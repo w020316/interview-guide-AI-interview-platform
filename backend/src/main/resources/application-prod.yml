@@ -43,14 +43,10 @@ spring:
         options:
           model: ${AI_MODEL:agnes-2.0-flash}
           temperature: 0.3
-      embedding:
-        options:
-          model: ${EMBEDDING_MODEL:text-embedding-3-small}
-    vectorstore:
-      pgvector:
-        index-type: hnsw
-        distance-type: cosine_distance
-        dimensions: 1024
+  # 排除 pgvector 自动装配（512MB 容器内 Metaspace 不足）
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
 
   servlet:
     multipart:

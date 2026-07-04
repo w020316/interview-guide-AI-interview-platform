@@ -51,16 +51,17 @@
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
 
-        <!-- Spring AI pgvector 向量库 -->
+        <!-- Spring AI pgvector 向量库（生产环境通过 autoconfigure exclude 禁用，避免 Metaspace OOM） -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
         </dependency>
 
-        <!-- Spring AI Tika 文档读取（解析简历 PDF/Word） -->
+        <!-- PDFBox 轻量 PDF 解析（替代 Tika，大幅减少 Metaspace 占用） -->
         <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-tika-document-reader</artifactId>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.3</version>
         </dependency>
 
         <!-- PostgreSQL 驱动 -->
