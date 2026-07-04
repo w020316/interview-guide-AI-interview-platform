@@ -35,5 +35,5 @@ EXPOSE 8080
 ENV JAVA_OPTS="-Xmx220m -XX:MaxMetaspaceSize=96m -XX:+UseSerialGC -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0"
 ENV SPRING_PROFILES_ACTIVE=prod
 
-# 启动命令
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar --server.port=${PORT:-8080}"]
+# 启动命令（显式指定 prod profile，避免环境变量未生效）
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar --spring.profiles.active=prod --server.port=${PORT:-8080}"]
