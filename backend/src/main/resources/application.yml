@@ -1,72 +1,81 @@
-server:
-  port: 8080
-
 spring:
   application:
     name: interview-guide
-  threads:
-    virtual:
-      enabled: true
 
-  # PostgreSQL + pgvector（本地开发用 Docker 启动，端口 5432）
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:interview_guide}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/interview}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 5
-      minimum-idle: 1
+      minimum-idle: 2
+      connection-timeout: 30000
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  # Redis
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      url: ${REDIS_URL:redis://localhost:6379}
+      ssl:
+        enabled: ${REDIS_SSL:false}
 
-  # Spring AI 配置（Agnes AI，兼容 OpenAI 协议，免费无限量）
   ai:
     openai:
       api-key: ${AI_API_KEY:sk-placeholder}
-      base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com/v1}
+      base-url: ${AI_BASE_URL:https://api.openai.com}
       chat:
         options:
-          model: ${AI_MODEL:agnes-base}
-          temperature: 0.3
+          model: ${AI_CHAT_MODEL:gpt-3.5-turbo}
+          temperature: 0.7
       embedding:
         options:
-          model: ${EMBEDDING_MODEL:text-embedding-3-small}
+          model: ${AI_EMBEDDING_MODEL:text-embedding-3-small}
     vectorstore:
       pgvector:
-        index-type: hnsw
-        distance-type: cosine_distance
-        dimensions: 1024
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
 
-  # 文件上传限制
   servlet:
     multipart:
+      enabled: true
       max-file-size: 10MB
       max-request-size: 10MB
 
-# 监控端点
+server:
+  port: ${PORT:8080}
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,prometheus,metrics
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: always
+  metrics:
+    tags:
+      application: interview-guide
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-this-in-production-must-be-32-chars-min!!}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  supabase:
+    url: ${SUPABASE_URL:https://your-project.supabase.co}
+    service-key: ${SUPABASE_SERVICE_KEY:your-service-key}
+    bucket: ${SUPABASE_BUCKET:resumes}
 
 logging:
   level:
     com.example.interview: INFO
-    org.springframework.ai: INFO
+    org.springframework.ai: WARN
+    org.hibernate.SQL: WARN
