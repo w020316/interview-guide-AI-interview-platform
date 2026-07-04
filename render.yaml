@@ -22,13 +22,9 @@ services:
         value: agnes-2.0-flash
       - key: AI_EMBEDDING_MODEL
         value: text-embedding-3-small
-      # ── Supabase PostgreSQL ──
+      # ── Supabase PostgreSQL（用户名密码直接写进 DATABASE_URL，避免环境变量注入问题）──
       - key: DATABASE_URL
-        sync: false  # jdbc:postgresql://xxx.supabase.co:5432/postgres
-      - key: DATABASE_USER
-        value: postgres.pzaigjphybqzqlhcvytt
-      - key: DATABASE_PASSWORD
-        sync: false
+        sync: false  # jdbc:postgresql://aws-0-xxx.pooler.supabase.com:5432/postgres?user=postgres.REF&password=PASSWORD
       # ── Upstash Redis ──
       - key: REDIS_URL
         sync: false

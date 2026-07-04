@@ -11,11 +11,9 @@ spring:
     virtual:
       enabled: false
 
-  # Supabase PostgreSQL
+  # Supabase PostgreSQL（用户名/密码直接写在 DATABASE_URL 里，避免环境变量未注入问题）
   datasource:
     url: ${DATABASE_URL}
-    username: ${DATABASE_USER:postgres}
-    password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 2
