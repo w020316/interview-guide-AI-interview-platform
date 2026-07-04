@@ -32,7 +32,7 @@ COPY --from=builder /build/target/interview-guide.jar app.jar
 EXPOSE 8080
 
 # JVM 参数（小内存优化）
-ENV JAVA_OPTS="-Xmx384m -Xms128m -XX:+UseZGC -XX:MaxMetaspaceSize=128m -XX:+UseStringDeduplication"
+ENV JAVA_OPTS="-Xmx300m -XX:MaxMetaspaceSize=64m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
 ENV SPRING_PROFILES_ACTIVE=prod
 
 # 启动命令
