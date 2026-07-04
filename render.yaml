@@ -24,9 +24,9 @@ services:
         value: text-embedding-3-small
       # ── Supabase PostgreSQL ──
       - key: DATABASE_URL
-        sync: false
-      - key: DATABASE_USERNAME
-        value: postgres
+        sync: false  # jdbc:postgresql://xxx.supabase.co:5432/postgres
+      - key: DATABASE_USER
+        value: postgres.pzaigjphybqzqlhcvytt
       - key: DATABASE_PASSWORD
         sync: false
       # ── Upstash Redis ──
