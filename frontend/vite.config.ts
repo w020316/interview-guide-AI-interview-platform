@@ -4,16 +4,18 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   server: {
-    port: 3000,
+    port: 5173,
+    // 开发环境代理，避免跨域
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
+        target: process.env.VITE_API_BASE_URL || 'http://localhost:8080',
+        changeOrigin: true,
       }
     }
   },
   build: {
     outDir: 'dist',
-    chunkSizeWarningLimit: 1000
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
   }
 })

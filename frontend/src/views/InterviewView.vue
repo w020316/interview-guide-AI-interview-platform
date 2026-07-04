@@ -1,223 +1,182 @@
 <template>
-  <div class="interview-container">
-    <el-row :gutter="20">
-      <!-- 左侧：面试题生成 -->
-      <el-col :span="8">
-        <el-card shadow="hover">
-          <template #header><span class="card-title">面试题生成</span></template>
-          <el-form label-position="top">
-            <el-form-item label="岗位描述">
-              <el-input v-model="genForm.jobDescription" type="textarea" :rows="4" placeholder="例如：Java 后端，熟悉 Spring Boot、MySQL、Redis" />
-            </el-form-item>
-            <el-form-item label="简历摘要">
-              <el-input v-model="genForm.resumeText" type="textarea" :rows="4" placeholder="简要描述你的项目经验与技术栈" />
-            </el-form-item>
-            <el-form-item label="题目数量">
-              <el-slider v-model="genForm.count" :min="3" :max="10" show-input />
-            </el-form-item>
-            <el-button type="primary" :loading="genLoading" @click="generate" style="width:100%">
-              <el-icon><MagicStick /></el-icon>生成面试题
-            </el-button>
-          </el-form>
-        </el-card>
+  <div>
+    <h2>🤖 AI 模拟面试</h2>
 
-        <el-card shadow="hover" style="margin-top:16px">
-          <template #header><span class="card-title">题目列表</span></template>
-          <div v-if="questions.length">
-            <div v-for="(q, i) in questions" :key="i" class="question-item" @click="selectQuestion(q)">
-              <el-tag size="small" type="info">Q{{ i + 1 }}</el-tag>
-              <span class="q-text">{{ q }}</span>
-            </div>
-          </div>
-          <el-empty v-else description="尚未生成题目" :image-size="60" />
-        </el-card>
-      </el-col>
+    <!-- Step 1: 创建会话 -->
+    <el-card v-if="!sessionId" style="max-width:600px">
+      <el-form label-width="100px">
+        <el-form-item label="目标岗位">
+          <el-input v-model="jobDesc" placeholder="Java 后端开发工程师" />
+        </el-form-item>
+        <el-form-item label="简历摘要">
+          <el-input v-model="resumeText" type="textarea" :rows="4" placeholder="粘贴简历核心内容（可选）" />
+        </el-form-item>
+        <el-form-item label="题目数量">
+          <el-input-number v-model="count" :min="3" :max="10" />
+        </el-form-item>
+        <el-button type="primary" :loading="loading" @click="startInterview">开始面试</el-button>
+      </el-form>
+    </el-card>
 
-      <!-- 中间：AI 流式回答 -->
-      <el-col :span="10">
-        <el-card shadow="hover" class="chat-card">
-          <template #header>
-            <div class="chat-header">
-              <span class="card-title">AI 流式回答</span>
-              <el-tag v-if="streaming" type="success" size="small">回答中...</el-tag>
-            </div>
-          </template>
-          <div v-if="!currentQuestion && !streaming" class="empty-chat">
-            <el-icon :size="48" color="#dcdfe6"><ChatLineSquare /></el-icon>
-            <p>点击左侧题目或输入问题，AI 将流式回答</p>
-          </div>
-          <div v-else class="chat-body">
-            <div class="msg user-msg" v-if="currentQuestion">
-              <el-avatar :size="28" style="background:#409EFF">我</el-avatar>
-              <div class="msg-content">{{ currentQuestion }}</div>
-            </div>
-            <div class="msg ai-msg">
-              <el-avatar :size="28" style="background:#67C23A">AI</el-avatar>
-              <div class="msg-content markdown-body" v-html="renderedAnswer"></div>
-              <span v-if="streaming" class="cursor">▊</span>
-            </div>
-          </div>
-        </el-card>
+    <!-- Step 2: 面试进行中 -->
+    <div v-else>
+      <el-progress :percentage="progress" :stroke-width="12" style="margin-bottom:20px" />
 
-        <el-card shadow="hover" style="margin-top:16px">
-          <el-input v-model="customQuestion" placeholder="输入自定义问题，回车发送" @keyup.enter="askCustom">
-            <template #append>
-              <el-button :loading="streaming" @click="askCustom">发送</el-button>
-            </template>
-          </el-input>
-        </el-card>
-      </el-col>
+      <el-card v-if="currentQ" class="question-card">
+        <div class="q-meta">
+          <el-tag>{{ currentQ.category }}</el-tag>
+          <el-tag :type="diffColor(currentQ.difficulty)">{{ currentQ.difficulty }}</el-tag>
+          <span style="color:#999;margin-left:8px">第 {{ qIndex+1 }} / {{ questions.length }} 题</span>
+        </div>
+        <h3 style="margin:16px 0">{{ currentQ.question }}</h3>
 
-      <!-- 右侧：回答评估 -->
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <template #header><span class="card-title">回答评估</span></template>
-          <el-form label-position="top">
-            <el-form-item label="问题">
-              <el-input v-model="evalForm.question" type="textarea" :rows="3" />
-            </el-form-item>
-            <el-form-item label="你的回答">
-              <el-input v-model="evalForm.userAnswer" type="textarea" :rows="6" placeholder="输入你的回答，AI 将评分" />
-            </el-form-item>
-            <el-button type="warning" :loading="evalLoading" @click="evaluate" style="width:100%">
-              <el-icon><DataAnalysis /></el-icon>评估打分
-            </el-button>
-          </el-form>
-        </el-card>
+        <!-- SSE 流式 AI 提示 -->
+        <el-collapse style="margin-bottom:16px">
+          <el-collapse-item title="💡 AI 实时提示（流式）">
+            <div class="stream-box" v-html="streamHtml" />
+            <el-button size="small" @click="streamHint" :loading="streaming">获取 AI 提示</el-button>
+          </el-collapse-item>
+        </el-collapse>
 
-        <el-card v-if="evalResult" shadow="hover" style="margin-top:16px">
-          <template #header><span class="card-title">评估结果</span></template>
-          <div class="markdown-body" v-html="renderedEval"></div>
-        </el-card>
-      </el-col>
-    </el-row>
+        <el-input v-model="userAnswer" type="textarea" :rows="6" placeholder="请输入你的回答..." />
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <el-button type="primary" :loading="evalLoading" @click="submitAnswer">提交回答</el-button>
+          <el-button @click="nextQuestion" v-if="qIndex < questions.length-1">跳过</el-button>
+          <el-button type="success" @click="finishSession" v-if="qIndex === questions.length-1">结束面试</el-button>
+        </div>
+      </el-card>
+
+      <el-card v-if="evalResult" class="eval-card">
+        <h4>📊 AI 评估</h4>
+        <el-descriptions :column="3" border size="small">
+          <el-descriptions-item label="综合">{{ evalResult.overallScore }}分</el-descriptions-item>
+          <el-descriptions-item label="完整性">{{ evalResult.completeness }}分</el-descriptions-item>
+          <el-descriptions-item label="准确性">{{ evalResult.accuracy }}分</el-descriptions-item>
+        </el-descriptions>
+        <ul style="margin-top:12px">
+          <li v-for="i in evalResult.improvements" :key="i" style="color:#e6a23c">{{ i }}</li>
+        </ul>
+        <el-button type="primary" style="margin-top:12px" @click="nextQuestion"
+          v-if="qIndex < questions.length-1">下一题</el-button>
+        <el-button type="success" style="margin-top:12px" @click="finishSession"
+          v-else>结束面试</el-button>
+      </el-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, ChatLineSquare, DataAnalysis } from '@element-plus/icons-vue'
+import axios from 'axios'
 import MarkdownIt from 'markdown-it'
-import api from '../api'
 
-const md = new MarkdownIt({ html: true, breaks: true, linkify: true })
+const md = new MarkdownIt()
+const API = import.meta.env.VITE_API_BASE_URL || ''
+const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
 
-const genForm = reactive({ jobDescription: '', resumeText: '', count: 5 })
-const genLoading = ref(false)
-const questions = ref<string[]>([])
-const currentQuestion = ref('')
-const answer = ref('')
-const streaming = ref(false)
-const customQuestion = ref('')
-
-const evalForm = reactive({ question: '', userAnswer: '' })
+const jobDesc = ref('Java 后端开发工程师')
+const resumeText = ref('')
+const count = ref(5)
+const loading = ref(false)
+const sessionId = ref('')
+const questions = ref<any[]>([])
+const qIndex = ref(0)
+const userAnswer = ref('')
 const evalLoading = ref(false)
-const evalResult = ref('')
+const evalResult = ref<any>(null)
+const streaming = ref(false)
+const streamContent = ref('')
 
-const renderedAnswer = computed(() => md.render(answer.value))
-const renderedEval = computed(() => md.render(evalResult.value))
+const currentQ = computed(() => questions.value[qIndex.value])
+const progress = computed(() => Math.round((qIndex.value / questions.value.length) * 100))
+const streamHtml = computed(() => md.render(streamContent.value))
 
-const generate = async () => {
-  if (!genForm.jobDescription) { ElMessage.warning('请填写岗位描述'); return }
-  genLoading.value = true
+function diffColor(d: string) {
+  return d === 'HARD' ? 'danger' : d === 'MEDIUM' ? 'warning' : 'success'
+}
+
+async function startInterview() {
+  if (!jobDesc.value.trim()) return ElMessage.warning('请填写目标岗位')
+  loading.value = true
   try {
-    const res = await api.post('/interview/questions', genForm)
-    // 后端返回字符串，按换行或数字编号切分
-    const text = res as string
-    questions.value = text.split(/\n(?=\d+[.、])/).map(s => s.trim()).filter(Boolean)
-    if (questions.value.length === 0) questions.value = [text]
-    ElMessage.success(`生成 ${questions.value.length} 道题目`)
+    // 创建会话
+    const { data: sess } = await axios.post(`${API}/api/session/create`,
+      { userId: 'user1', jobDescription: jobDesc.value }, { headers: headers() })
+    sessionId.value = sess.data.sessionId
+
+    // 生成面试题
+    const { data: qs } = await axios.post(`${API}/api/interview/questions`,
+      { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value },
+      { headers: headers() })
+    questions.value = JSON.parse(qs.data)
+    ElMessage.success(`已生成 ${questions.value.length} 道题目，开始面试！`)
   } catch (e: any) {
-    ElMessage.error(e.message || '生成失败')
-  } finally {
-    genLoading.value = false
-  }
+    ElMessage.error('创建面试失败')
+  } finally { loading.value = false }
 }
 
-const selectQuestion = (q: string) => {
-  currentQuestion.value = q
-  evalForm.question = q
-  streamAnswer(q)
-}
-
-const askCustom = () => {
-  if (!customQuestion.value.trim()) return
-  currentQuestion.value = customQuestion.value
-  evalForm.question = customQuestion.value
-  streamAnswer(customQuestion.value)
-  customQuestion.value = ''
-}
-
-const streamAnswer = async (question: string) => {
-  answer.value = ''
+async function streamHint() {
+  if (!currentQ.value) return
   streaming.value = true
+  streamContent.value = ''
   try {
-    // POST SSE：用 fetch + ReadableStream 接收
-    const resp = await fetch(`${import.meta.env.VITE_API_BASE || '/api'}/interview/ask/stream`, {
+    const resp = await fetch(`${API}/api/interview/ask/stream`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
-      },
-      body: JSON.stringify({ question })
+      headers: { 'Content-Type': 'application/json', ...headers() },
+      body: JSON.stringify({ question: currentQ.value.question })
     })
-    if (!resp.ok || !resp.body) throw new Error('SSE 连接失败')
-
-    const reader = resp.body.getReader()
+    const reader = resp.body!.getReader()
     const decoder = new TextDecoder()
-    let buffer = ''
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      // SSE 格式：event: token\ndata: xxx\n\n
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-      for (const line of lines) {
-        if (line.startsWith('data:')) {
-          const token = line.slice(5).trim()
-          if (token) answer.value += token
-        }
-      }
+      const text = decoder.decode(value)
+      // 解析 SSE data: <token> 格式
+      text.split('\n').forEach(line => {
+        if (line.startsWith('data:')) streamContent.value += line.slice(5)
+      })
     }
-  } catch (e: any) {
-    ElMessage.error(e.message || '流式回答失败')
-  } finally {
-    streaming.value = false
-  }
+  } catch (e) { ElMessage.error('流式请求失败') }
+  finally { streaming.value = false }
 }
 
-const evaluate = async () => {
-  if (!evalForm.userAnswer) { ElMessage.warning('请输入你的回答'); return }
+async function submitAnswer() {
+  if (!userAnswer.value.trim()) return ElMessage.warning('请输入回答')
   evalLoading.value = true
+  evalResult.value = null
   try {
-    const res = await api.post('/interview/evaluate', evalForm)
-    evalResult.value = res as string
-    ElMessage.success('评估完成')
-  } catch (e: any) {
-    ElMessage.error(e.message || '评估失败')
-  } finally {
-    evalLoading.value = false
-  }
+    const { data } = await axios.post(`${API}/api/interview/evaluate`, {
+      question: currentQ.value.question,
+      userAnswer: userAnswer.value,
+      referenceAnswer: currentQ.value.referenceAnswer
+    }, { headers: headers() })
+    evalResult.value = JSON.parse(data.data)
+  } catch { ElMessage.error('评估失败') }
+  finally { evalLoading.value = false }
+}
+
+function nextQuestion() {
+  qIndex.value++
+  userAnswer.value = ''
+  evalResult.value = null
+  streamContent.value = ''
+}
+
+async function finishSession() {
+  try {
+    await axios.put(`${API}/api/session/${sessionId.value}/finish`, {}, { headers: headers() })
+    ElMessage.success('面试结束，结果已保存！')
+    sessionId.value = ''
+    qIndex.value = 0
+  } catch { ElMessage.error('结束失败') }
 }
 </script>
 
 <style scoped>
-.interview-container { padding: 20px; }
-.card-title { font-weight: 600; }
-.question-item { padding: 8px; border-radius: 6px; cursor: pointer; margin-bottom: 6px; display: flex; gap: 8px; align-items: flex-start; }
-.question-item:hover { background: #f5f7fa; }
-.q-text { font-size: 13px; color: #606266; flex: 1; }
-.chat-card { height: 500px; display: flex; flex-direction: column; }
-.chat-header { display: flex; justify-content: space-between; align-items: center; }
-.empty-chat { text-align: center; padding: 60px 0; color: #c0c4cc; }
-.chat-body { display: flex; flex-direction: column; gap: 16px; height: 420px; overflow-y: auto; }
-.msg { display: flex; gap: 8px; }
-.msg-content { flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
-.user-msg .msg-content { background: #ecf5ff; }
-.ai-msg .msg-content { background: #f0f9eb; }
-.cursor { color: #67C23A; animation: blink 1s infinite; }
-@keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
-.markdown-body :deep(code) { background:#f5f7fa; padding:2px 6px; border-radius:4px; }
+.question-card { margin-bottom:16px; }
+.q-meta { display:flex; gap:8px; flex-wrap:wrap; }
+.stream-box { font-size:14px; line-height:1.6; max-height:200px; overflow-y:auto;
+  background:#f8f8f8; padding:8px; border-radius:4px; margin-bottom:8px; }
+.eval-card { background:#fdf6ec; }
 </style>
