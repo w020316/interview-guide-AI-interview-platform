@@ -43,7 +43,8 @@ public class ResumeAnalysisService {
      */
     public String analyze(String resumeText, String targetJob) {
         // 1. 缓存命中检查（Redis 不可用时降级跳过缓存）
-        String cacheKey = CACHE_PREFIX + Math.abs((resumeText + targetJob).hashCode());
+        // 使用 SHA-256 避免 hashCode 碰撞导致缓存串
+        String cacheKey = CACHE_PREFIX + sha256(resumeText + targetJob);
         try {
             Object cached = redisTemplate.opsForValue().get(cacheKey);
             if (cached != null) {
@@ -124,5 +125,20 @@ public class ResumeAnalysisService {
                 System.err.println("简历向量化失败：" + e.getMessage());
             }
         });
+    }
+
+    /** SHA-256 哈希，用于生成无碰撞的缓存键 */
+    private static String sha256(String input) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.substring(0, 32);
+        } catch (Exception e) {
+            return String.valueOf(input.hashCode());
+        }
     }
 }

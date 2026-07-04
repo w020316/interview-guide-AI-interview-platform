@@ -18,7 +18,6 @@ import java.util.UUID;
 @Tag(name = "知识库", description = "RAG 检索、问答、批量导入")
 @RestController
 @RequestMapping("/api/knowledge")
-@CrossOrigin(origins = "*")
 public class KnowledgeController {
 
     @Autowired private RagSearchService ragSearchService;

@@ -18,7 +18,6 @@ import java.util.concurrent.Executors;
  */
 @RestController
 @RequestMapping("/api/interview")
-@CrossOrigin(origins = "*")
 public class InterviewController {
 
     @Autowired
@@ -39,7 +38,15 @@ public class InterviewController {
     public Result<String> generateQuestions(@RequestBody Map<String, Object> request) {
         String resumeText = (String) request.get("resumeText");
         String jobDescription = (String) request.get("jobDescription");
-        int count = (int) request.getOrDefault("count", 5);
+        // 安全类型转换：避免 ClassCastException
+        int count = 5;
+        Object countObj = request.get("count");
+        if (countObj instanceof Number n) {
+            count = n.intValue();
+        }
+        // 范围校验
+        if (count < 1) count = 1;
+        if (count > 20) count = 20;
 
         if (resumeText == null || jobDescription == null) {
             return Result.error(400, "简历和岗位描述不能为空");
@@ -84,7 +91,9 @@ public class InterviewController {
             SseEmitter err = new SseEmitter(0L);
             try {
                 err.send(SseEmitter.event().name("error").data("question 不能为空"));
-            } catch (IOException ignored) {}
+            } catch (IOException e) {
+                // 仅记录日志，不中断流程
+            }
             err.complete();
             return err;
         }

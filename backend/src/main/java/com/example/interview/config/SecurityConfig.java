@@ -41,13 +41,16 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // 认证接口公开
                 .requestMatchers("/api/auth/**").permitAll()
+                // 系统信息公开
+                .requestMatchers("/api/info").permitAll()
                 // Swagger UI & OpenAPI 公开
                 .requestMatchers(
                     "/swagger-ui.html", "/swagger-ui/**",
                     "/v3/api-docs/**", "/v3/api-docs"
                 ).permitAll()
-                // Actuator 健康检查公开
-                .requestMatchers("/actuator/**").permitAll()
+                // Actuator 健康检查公开（prometheus/metrics 需认证）
+                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/actuator/**").authenticated()
                 // 其他所有接口需认证
                 .anyRequest().authenticated()
             )
@@ -56,14 +59,20 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /** 跨域配置：允许前端（Vercel）域名访问 */
+    /** 跨域配置：白名单制，允许前端（Vercel）域名 + 本地调试 */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        // 生产前端域名 + 本地开发端口，不再使用通配符
+        config.setAllowedOriginPatterns(List.of(
+                "https://*.vercel.app",
+                "http://localhost:*",
+                "http://127.0.0.1:*"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

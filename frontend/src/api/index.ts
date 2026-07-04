@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { clearAuth } from '../auth'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -30,10 +31,9 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('username')
+      clearAuth()
       if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
+        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
       }
     }
     return Promise.reject(error)

@@ -4,28 +4,43 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * IP 级别请求限流拦截器（Bucket4j 内存模式）
  * - 每个 IP 每分钟最多 10 次请求
  * - 超限返回 429 Too Many Requests
+ * - 使用 Caffeine 风格的过期清理，防止内存泄漏
  */
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
 
-    /** IP → Bucket 映射，ConcurrentHashMap 保证线程安全 */
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private static final Logger log = LoggerFactory.getLogger(RateLimitInterceptor.class);
 
-    /** 每分钟 10 次，令牌桶策略 */
+    /** IP → Bucket 映射，附带最后访问时间用于过期清理 */
+    private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+
+    /** Bucket 最后访问时间，用于过期清理 */
+    private final ConcurrentHashMap<String, Long> lastAccess = new ConcurrentHashMap<>();
+
+    /** 清理间隔（毫秒） */
+    private static final long CLEANUP_INTERVAL_MS = 5 * 60 * 1000L;
+    private volatile long lastCleanupTime = System.currentTimeMillis();
+
+    /** Bucket 过期时间（30 分钟无访问则清理） */
+    private static final long BUCKET_EXPIRE_MS = 30 * 60 * 1000L;
+
     private Bucket resolveBucket(String ip) {
+        cleanupIfNeeded();
+        lastAccess.put(ip, System.currentTimeMillis());
         return buckets.computeIfAbsent(ip, k ->
                 Bucket.builder()
                         .addLimit(Bandwidth.builder()
@@ -36,6 +51,23 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         );
     }
 
+    /** 定期清理过期的 Bucket，防止内存泄漏 */
+    private void cleanupIfNeeded() {
+        long now = System.currentTimeMillis();
+        if (now - lastCleanupTime < CLEANUP_INTERVAL_MS) {
+            return;
+        }
+        lastCleanupTime = now;
+        lastAccess.entrySet().removeIf(entry -> {
+            if (now - entry.getValue() > BUCKET_EXPIRE_MS) {
+                buckets.remove(entry.getKey());
+                return true;
+            }
+            return false;
+        });
+        log.debug("限流桶清理完成，当前桶数量：{}", buckets.size());
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request,
                               HttpServletResponse response,
@@ -44,12 +76,12 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         Bucket bucket = resolveBucket(ip);
 
         if (bucket.tryConsume(1)) {
-            // 在响应头中暴露剩余令牌数，便于前端/客户端感知
             response.setHeader("X-Rate-Limit-Remaining",
                     String.valueOf(bucket.getAvailableTokens()));
             return true;
         }
 
+        log.warn("IP {} 请求频率超限", ip);
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
@@ -59,12 +91,26 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return false;
     }
 
-    /** 优先取代理头，兼容 Nginx/Cloudflare 反向代理 */
+    /**
+     * 解析客户端 IP
+     * 仅在直连 IP 为受信代理时才读 X-Forwarded-For，防止 IP 伪造
+     */
     private String resolveClientIp(HttpServletRequest request) {
+        String remoteAddr = request.getRemoteAddr();
         String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
+        // 仅当直连是内网/代理时才信任 X-Forwarded-For
+        if (forwarded != null && !forwarded.isBlank() && isTrustedProxy(remoteAddr)) {
             return forwarded.split(",")[0].trim();
         }
-        return request.getRemoteAddr();
+        return remoteAddr;
+    }
+
+    /** 判断是否为受信代理（内网地址或 Render/Cloudflare 代理） */
+    private boolean isTrustedProxy(String ip) {
+        return ip != null && (ip.startsWith("10.")
+                || ip.startsWith("172.")
+                || ip.startsWith("192.168.")
+                || ip.equals("127.0.0.1")
+                || ip.startsWith("::1"));
     }
 }

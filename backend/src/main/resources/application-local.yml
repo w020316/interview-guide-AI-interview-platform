@@ -35,7 +35,7 @@ spring:
   # Spring AI（Agnes AI，OpenAI 兼容协议）
   ai:
     openai:
-      api-key: ${AI_API_KEY:sk-JFAyQwcTPZ9ZvtiBzmBxbnqc9u6qmrOp9ld1NokYoUsrngA8}
+      api-key: ${AI_API_KEY:sk-placeholder-replace-with-real-key}
       base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com}
       chat:
         options:

@@ -14,7 +14,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/resume")
-@CrossOrigin(origins = "*")
 public class ResumeController {
 
     @Autowired
@@ -55,14 +54,19 @@ public class ResumeController {
             return Result.error(400, "请上传简历文件");
         }
 
-        // 限制文件类型
+        // 文件大小校验（10MB）
+        if (file.getSize() > 10 * 1024 * 1024) {
+            return Result.error(400, "文件大小不能超过 10MB");
+        }
+
+        // 限制文件类型：仅 PDF / TXT（DOCX 暂不支持）
         String originalFilename = file.getOriginalFilename();
-        if (originalFilename != null) {
-            String lower = originalFilename.toLowerCase();
-            if (!lower.endsWith(".pdf") && !lower.endsWith(".docx")
-                    && !lower.endsWith(".doc") && !lower.endsWith(".txt")) {
-                return Result.error(400, "仅支持 PDF、Word、TXT 格式的简历文件");
-            }
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return Result.error(400, "文件名不能为空");
+        }
+        String lower = originalFilename.toLowerCase();
+        if (!lower.endsWith(".pdf") && !lower.endsWith(".txt")) {
+            return Result.error(400, "仅支持 PDF、TXT 格式的简历文件（Word 请转换为 PDF）");
         }
 
         try {

@@ -1,16 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
-import ResumeView from '../views/ResumeView.vue'
-import InterviewView from '../views/InterviewView.vue'
-import HistoryView from '../views/HistoryView.vue'
-import LoginView from '../views/LoginView.vue'
 
 const routes = [
-  { path: '/',         component: HomeView,     meta: { requiresAuth: false } },
-  { path: '/login',    component: LoginView,    meta: { requiresAuth: false } },
-  { path: '/resume',   component: ResumeView,   meta: { requiresAuth: true  } },
-  { path: '/interview',component: InterviewView,meta: { requiresAuth: true  } },
-  { path: '/history',  component: HistoryView,  meta: { requiresAuth: true  } },
+  { path: '/',          component: () => import('../views/HomeView.vue'),      meta: { requiresAuth: false } },
+  { path: '/login',     component: () => import('../views/LoginView.vue'),     meta: { requiresAuth: false } },
+  { path: '/resume',    component: () => import('../views/ResumeView.vue'),    meta: { requiresAuth: true  } },
+  { path: '/interview', component: () => import('../views/InterviewView.vue'),meta: { requiresAuth: true  } },
+  { path: '/history',   component: () => import('../views/HistoryView.vue'),   meta: { requiresAuth: true  } },
 ]
 
 const router = createRouter({
@@ -18,11 +13,11 @@ const router = createRouter({
   routes,
 })
 
-// 路由守卫：未登录自动跳转到 /login
+// 路由守卫：未登录自动跳转到 /login，并记录 redirect 参数
 router.beforeEach((to) => {
   const token = localStorage.getItem('token')
   if (to.meta.requiresAuth && !token) {
-    return { path: '/login' }
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
 })
 

@@ -5,6 +5,8 @@ import com.example.interview.entity.InterviewQuestionEntity;
 import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.service.InterviewSessionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,69 +16,98 @@ import java.util.Map;
  * 面试会话 CRUD 接口
  * - 创建/查询/完成会话
  * - 题目保存、用户回答保存
+ * - userId 从 JWT token 中提取，防止 IDOR 越权
  */
 @RestController
 @RequestMapping("/api/session")
-@CrossOrigin(origins = "*")
 public class InterviewSessionController {
 
     @Autowired
     private InterviewSessionService sessionService;
 
+    /** 从 SecurityContext 获取当前登录用户 ID（JWT subject） */
+    private String currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+            throw new IllegalStateException("未认证用户");
+        }
+        return auth.getPrincipal().toString();
+    }
+
     /**
      * 创建面试会话
      * POST /api/session/create
-     * Body: {"userId":"u1","jobDescription":"Java 后端","resumeId":1}
+     * Body: {"jobDescription":"Java 后端","resumeId":1}
+     * userId 自动从 token 提取，不接受客户端传入
      */
     @PostMapping("/create")
     public Result<InterviewSessionEntity> createSession(@RequestBody Map<String, Object> req) {
-        String userId = (String) req.get("userId");
+        String userId = currentUserId();
         String jobDesc = (String) req.get("jobDescription");
         Long resumeId = req.get("resumeId") != null
                 ? Long.valueOf(req.get("resumeId").toString()) : null;
 
-        if (userId == null || jobDesc == null) {
-            return Result.error(400, "userId 和 jobDescription 不能为空");
+        if (jobDesc == null || jobDesc.isBlank()) {
+            return Result.error(400, "jobDescription 不能为空");
         }
         return Result.success(sessionService.createSession(userId, jobDesc, resumeId));
     }
 
     /**
-     * 查询用户历史会话列表
-     * GET /api/session/list?userId=u1
+     * 查询当前用户历史会话列表
+     * GET /api/session/list
+     * userId 自动从 token 提取
      */
     @GetMapping("/list")
-    public Result<List<InterviewSessionEntity>> listSessions(@RequestParam String userId) {
-        if (userId == null || userId.isBlank()) {
-            return Result.error(400, "userId 不能为空");
-        }
-        return Result.success(sessionService.listByUser(userId));
+    public Result<List<InterviewSessionEntity>> listSessions() {
+        return Result.success(sessionService.listByUser(currentUserId()));
     }
 
     /**
-     * 获取会话详情
+     * 获取会话详情（仅限本人会话）
      * GET /api/session/{sessionId}
      */
     @GetMapping("/{sessionId}")
     public Result<InterviewSessionEntity> getSession(@PathVariable String sessionId) {
-        return Result.success(sessionService.getBySessionId(sessionId));
+        InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
+        if (session == null) {
+            return Result.error(404, "会话不存在");
+        }
+        if (!currentUserId().equals(session.getUserId())) {
+            return Result.error(403, "无权访问该会话");
+        }
+        return Result.success(session);
     }
 
     /**
-     * 结束面试会话
+     * 结束面试会话（仅限本人会话）
      * PUT /api/session/{sessionId}/finish
      */
     @PutMapping("/{sessionId}/finish")
     public Result<InterviewSessionEntity> finishSession(@PathVariable String sessionId) {
+        InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
+        if (session == null) {
+            return Result.error(404, "会话不存在");
+        }
+        if (!currentUserId().equals(session.getUserId())) {
+            return Result.error(403, "无权操作该会话");
+        }
         return Result.success(sessionService.finishSession(sessionId));
     }
 
     /**
-     * 查询会话下的所有题目
+     * 查询会话下的所有题目（仅限本人会话）
      * GET /api/session/{sessionId}/questions
      */
     @GetMapping("/{sessionId}/questions")
     public Result<List<InterviewQuestionEntity>> listQuestions(@PathVariable String sessionId) {
+        InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
+        if (session == null) {
+            return Result.error(404, "会话不存在");
+        }
+        if (!currentUserId().equals(session.getUserId())) {
+            return Result.error(403, "无权访问该会话");
+        }
         return Result.success(sessionService.listQuestions(sessionId));
     }
 
@@ -87,12 +118,16 @@ public class InterviewSessionController {
      */
     @PostMapping("/answer")
     public Result<InterviewQuestionEntity> saveAnswer(@RequestBody Map<String, Object> req) {
-        Long questionId = Long.valueOf(req.get("questionId").toString());
+        Object qid = req.get("questionId");
+        if (qid == null) {
+            return Result.error(400, "questionId 不能为空");
+        }
+        Long questionId = Long.valueOf(qid.toString());
         String userAnswer = (String) req.get("userAnswer");
         Integer score = req.get("evaluationScore") != null
                 ? Integer.valueOf(req.get("evaluationScore").toString()) : null;
 
-        if (userAnswer == null) {
+        if (userAnswer == null || userAnswer.isBlank()) {
             return Result.error(400, "userAnswer 不能为空");
         }
         return Result.success(sessionService.saveAnswer(questionId, userAnswer, score));

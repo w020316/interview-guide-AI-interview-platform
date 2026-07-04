@@ -35,6 +35,7 @@
           <el-collapse-item title="💡 AI 实时提示（流式）">
             <div class="stream-box" v-html="streamHtml" />
             <el-button size="small" @click="streamHint" :loading="streaming">获取 AI 提示</el-button>
+            <el-button size="small" v-if="streaming" @click="stopStream">停止</el-button>
           </el-collapse-item>
         </el-collapse>
 
@@ -49,12 +50,12 @@
       <el-card v-if="evalResult" class="eval-card">
         <h4>📊 AI 评估</h4>
         <el-descriptions :column="3" border size="small">
-          <el-descriptions-item label="综合">{{ evalResult.overallScore }}分</el-descriptions-item>
-          <el-descriptions-item label="完整性">{{ evalResult.completeness }}分</el-descriptions-item>
-          <el-descriptions-item label="准确性">{{ evalResult.accuracy }}分</el-descriptions-item>
+          <el-descriptions-item label="综合">{{ evalResult.overallScore ?? '-' }}分</el-descriptions-item>
+          <el-descriptions-item label="完整性">{{ evalResult.completeness ?? '-' }}分</el-descriptions-item>
+          <el-descriptions-item label="准确性">{{ evalResult.accuracy ?? '-' }}分</el-descriptions-item>
         </el-descriptions>
-        <ul style="margin-top:12px">
-          <li v-for="i in evalResult.improvements" :key="i" style="color:#e6a23c">{{ i }}</li>
+        <ul v-if="evalResult.improvements?.length" style="margin-top:12px">
+          <li v-for="(i, idx) in evalResult.improvements" :key="idx" style="color:#e6a23c">{{ i }}</li>
         </ul>
         <el-button type="primary" style="margin-top:12px" @click="nextQuestion"
           v-if="qIndex < questions.length-1">下一题</el-button>
@@ -66,53 +67,81 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
+import api from '../api'
 import MarkdownIt from 'markdown-it'
 
-const md = new MarkdownIt()
-const API = import.meta.env.VITE_API_BASE_URL || ''
-const headers = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
+// html: false 禁止 HTML 标签通过，防止 XSS
+const md = new MarkdownIt({ html: false, linkify: true })
+
+interface Question {
+  question: string
+  category: string
+  difficulty: string
+  referenceAnswer?: string
+}
+
+interface EvalResult {
+  overallScore?: number
+  completeness?: number
+  accuracy?: number
+  expression?: number
+  improvements?: string[]
+}
 
 const jobDesc = ref('Java 后端开发工程师')
 const resumeText = ref('')
 const count = ref(5)
 const loading = ref(false)
 const sessionId = ref('')
-const questions = ref<any[]>([])
+const questions = ref<Question[]>([])
 const qIndex = ref(0)
 const userAnswer = ref('')
 const evalLoading = ref(false)
-const evalResult = ref<any>(null)
+const evalResult = ref<EvalResult | null>(null)
 const streaming = ref(false)
 const streamContent = ref('')
 
+// AbortController 用于取消 SSE 流式请求
+let abortController: AbortController | null = null
+
 const currentQ = computed(() => questions.value[qIndex.value])
-const progress = computed(() => Math.round((qIndex.value / questions.value.length) * 100))
-const streamHtml = computed(() => md.render(streamContent.value))
+// 修复进度条：第一题不为 0%，最后一题能到 100%
+const progress = computed(() =>
+  Math.round(((qIndex.value + 1) / Math.max(questions.value.length, 1)) * 100)
+)
+const streamHtml = computed(() => md.render(streamContent.value || '等待获取...'))
 
 function diffColor(d: string) {
   return d === 'HARD' ? 'danger' : d === 'MEDIUM' ? 'warning' : 'success'
+}
+
+function safeParse<T>(str: string, fallback: T): T {
+  try { return JSON.parse(str) as T } catch { return fallback }
 }
 
 async function startInterview() {
   if (!jobDesc.value.trim()) return ElMessage.warning('请填写目标岗位')
   loading.value = true
   try {
-    // 创建会话
-    const { data: sess } = await axios.post(`${API}/api/session/create`,
-      { userId: 'user1', jobDescription: jobDesc.value }, { headers: headers() })
-    sessionId.value = sess.data.sessionId
+    // 创建会话（userId 由后端从 token 提取，前端不传）
+    const sess = await api.post('/api/session/create',
+      { jobDescription: jobDesc.value }) as unknown as { sessionId: string }
+    sessionId.value = sess.sessionId
 
     // 生成面试题
-    const { data: qs } = await axios.post(`${API}/api/interview/questions`,
-      { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value },
-      { headers: headers() })
-    questions.value = JSON.parse(qs.data)
+    const qs = await api.post('/api/interview/questions',
+      { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value }) as unknown as string
+    questions.value = safeParse<Question[]>(qs, [])
+    if (!questions.value.length) {
+      ElMessage.error('面试题生成失败，请重试')
+      return
+    }
     ElMessage.success(`已生成 ${questions.value.length} 道题目，开始面试！`)
-  } catch (e: any) {
-    ElMessage.error('创建面试失败')
+  } catch (e: unknown) {
+    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '创建面试失败'
+    ElMessage.error(msg)
   } finally { loading.value = false }
 }
 
@@ -120,25 +149,46 @@ async function streamHint() {
   if (!currentQ.value) return
   streaming.value = true
   streamContent.value = ''
+  abortController = new AbortController()
   try {
-    const resp = await fetch(`${API}/api/interview/ask/stream`, {
+    const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/interview/ask/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...headers() },
-      body: JSON.stringify({ question: currentQ.value.question })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ question: currentQ.value.question }),
+      signal: abortController.signal
     })
-    const reader = resp.body!.getReader()
+    if (!resp.body) throw new Error('Response body is null')
+    const reader = resp.body.getReader()
     const decoder = new TextDecoder()
+    let buffer = ''
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      const text = decoder.decode(value)
-      // 解析 SSE data: <token> 格式
-      text.split('\n').forEach(line => {
-        if (line.startsWith('data:')) streamContent.value += line.slice(5)
-      })
+      buffer += decoder.decode(value, { stream: true })
+      // 按行解析 SSE
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          const data = line.slice(5).trim()
+          if (data === '[DONE]') { streaming.value = false; return }
+          streamContent.value += data
+        }
+      }
     }
-  } catch (e) { ElMessage.error('流式请求失败') }
-  finally { streaming.value = false }
+  } catch (e: unknown) {
+    if ((e as Error).name !== 'AbortError') {
+      ElMessage.error('流式请求失败')
+    }
+  } finally { streaming.value = false }
+}
+
+function stopStream() {
+  abortController?.abort()
+  streaming.value = false
 }
 
 async function submitAnswer() {
@@ -146,31 +196,45 @@ async function submitAnswer() {
   evalLoading.value = true
   evalResult.value = null
   try {
-    const { data } = await axios.post(`${API}/api/interview/evaluate`, {
+    // 不再传 referenceAnswer，由后端自行评估
+    const data = await api.post('/api/interview/evaluate', {
       question: currentQ.value.question,
-      userAnswer: userAnswer.value,
-      referenceAnswer: currentQ.value.referenceAnswer
-    }, { headers: headers() })
-    evalResult.value = JSON.parse(data.data)
-  } catch { ElMessage.error('评估失败') }
-  finally { evalLoading.value = false }
+      userAnswer: userAnswer.value
+    }) as unknown as string
+    evalResult.value = safeParse<EvalResult>(data, {})
+  } catch (e: unknown) {
+    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '评估失败'
+    ElMessage.error(msg)
+  } finally { evalLoading.value = false }
 }
 
 function nextQuestion() {
-  qIndex.value++
-  userAnswer.value = ''
-  evalResult.value = null
-  streamContent.value = ''
+  if (qIndex.value < questions.value.length - 1) {
+    qIndex.value++
+    userAnswer.value = ''
+    evalResult.value = null
+    streamContent.value = ''
+  }
 }
 
 async function finishSession() {
+  if (!sessionId.value) return
   try {
-    await axios.put(`${API}/api/session/${sessionId.value}/finish`, {}, { headers: headers() })
+    await api.put(`/api/session/${sessionId.value}/finish`)
     ElMessage.success('面试结束，结果已保存！')
     sessionId.value = ''
     qIndex.value = 0
-  } catch { ElMessage.error('结束失败') }
+    questions.value = []
+  } catch (e: unknown) {
+    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '结束失败'
+    ElMessage.error(msg)
+  }
 }
+
+// 组件卸载时取消流式请求
+onUnmounted(() => {
+  abortController?.abort()
+})
 </script>
 
 <style scoped>

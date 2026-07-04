@@ -20,7 +20,6 @@ import java.util.Map;
 @Tag(name = "认证", description = "用户注册与登录")
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     @Autowired

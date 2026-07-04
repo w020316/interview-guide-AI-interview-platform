@@ -35,7 +35,8 @@ public class InterviewService {
      */
     public String generateQuestions(String resumeText, String jobDescription, int count) {
         // 1. 缓存命中（Redis 不可用时降级跳过缓存）
-        String cacheKey = QUESTION_CACHE + Math.abs((resumeText + jobDescription + count).hashCode());
+        // 使用 SHA-256 避免 hashCode 碰撞导致缓存串
+        String cacheKey = QUESTION_CACHE + sha256(resumeText + jobDescription + count);
         try {
             Object cached = redisTemplate.opsForValue().get(cacheKey);
             if (cached != null) {
@@ -151,5 +152,21 @@ public class InterviewService {
                 .content();
 
         return response.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
+    }
+
+    /** SHA-256 哈希，用于生成无碰撞的缓存键 */
+    private static String sha256(String input) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.substring(0, 32); // 取前 32 位足够防碰撞
+        } catch (Exception e) {
+            // 降级用 hashCode
+            return String.valueOf(input.hashCode());
+        }
     }
 }
