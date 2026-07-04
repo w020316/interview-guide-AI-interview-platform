@@ -48,4 +48,4 @@ services:
         value: resumes
       # ── JVM 内存（适配 Render 免费层 512MB）──
       - key: JAVA_OPTS
-        value: "-Xmx300m -XX:MaxMetaspaceSize=64m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+        value: "-Xmx240m -XX:MaxMetaspaceSize=48m -XX:+UseSerialGC -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0"
