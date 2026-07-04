@@ -1,14 +1,5 @@
-# Render 部署配置（方案 B：Vercel + Render + Supabase）
-# 文档：https://render.com/docs/blueprint-spec
-# 使用：在 Render Dashboard → New → Blueprint → 选择仓库，自动读取此文件
-#
-# Render 免费层特性：
-# - 512MB 内存
-# - 5GB 带宽/月
-# - 15 分钟无访问自动休眠（用 UptimeRobot 保活）
-# - 不需要信用卡
-# - 支持 Docker 部署
-
+# Render 部署配置
+# 使用方法: Render Dashboard → New → Blueprint → 选择此仓库
 services:
   - type: web
     name: interview-guide-backend
@@ -19,39 +10,42 @@ services:
     dockerContext: ./backend
     healthCheckPath: /actuator/health
     autoDeploy: true
-    # Render 会自动注入 PORT 环境变量，应用需监听此端口
-    # Spring Boot 通过 server.port=${PORT:8080} 适配
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
-      # Agnes AI（OpenAI 兼容协议）
+      # ── Agnes AI ──
       - key: AI_API_KEY
-        sync: false  # 在 Render 后台手动填写 Agnes AI Key
+        sync: false
       - key: AI_BASE_URL
         value: https://apihub.agnes-ai.com
-      - key: AI_MODEL
+      - key: AI_CHAT_MODEL
         value: agnes-2.0-flash
-      # Supabase PostgreSQL
+      - key: AI_EMBEDDING_MODEL
+        value: text-embedding-3-small
+      # ── Supabase PostgreSQL ──
       - key: DATABASE_URL
-        sync: false  # jdbc:postgresql://xxx.supabase.co:5432/postgres
-      - key: DATABASE_USER
+        sync: false
+      - key: DATABASE_USERNAME
         value: postgres
       - key: DATABASE_PASSWORD
         sync: false
-      # Upstash Redis（TLS 连接 URL）
+      # ── Upstash Redis ──
       - key: REDIS_URL
-        sync: false  # rediss://default:xxx@xxx.upstash.io:6379
-      # JWT 密钥（32 字符以上）
+        sync: false
+      - key: REDIS_SSL
+        value: "true"
+      # ── JWT ──
       - key: JWT_SECRET
         sync: false
-      # Supabase Storage（简历文件存储）
+      - key: JWT_EXPIRATION_MS
+        value: "86400000"
+      # ── Supabase Storage ──
       - key: SUPABASE_URL
-        sync: false  # https://xxx.supabase.co
+        sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
-      # JVM 参数优化（适配 512MB 内存）
+      - key: SUPABASE_BUCKET
+        value: resumes
+      # ── JVM 内存（适配 Render 免费层 512MB）──
       - key: JAVA_OPTS
         value: "-Xmx384m -Xms128m -XX:+UseZGC -XX:MaxMetaspaceSize=128m"
-      # Render 健康检查端点
-      - key: MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS
-        value: "never"
