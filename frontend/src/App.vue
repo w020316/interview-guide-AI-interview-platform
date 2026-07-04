@@ -1,78 +1,56 @@
 <template>
-  <el-container class="app-container">
-    <el-header class="app-header">
-      <div class="header-left" @click="router.push('/')">
-        <el-icon :size="24" color="#409EFF"><ChatDotRound /></el-icon>
-        <span class="app-title">AI 智能面试辅助平台</span>
-      </div>
-      <div class="header-right">
-        <el-menu mode="horizontal" :default-active="activeMenu" router :ellipsis="false" background-color="transparent" text-color="#303133" active-text-color="#409EFF">
+  <el-config-provider>
+    <div class="app-wrapper">
+      <!-- 顶部导航栏 -->
+      <el-header class="navbar" v-if="isLoggedIn">
+        <div class="nav-logo">🎯 AI 面试助手</div>
+        <el-menu mode="horizontal" :default-active="$route.path" router class="nav-menu">
           <el-menu-item index="/">首页</el-menu-item>
-          <el-menu-item index="/resume" v-if="logged">简历分析</el-menu-item>
-          <el-menu-item index="/interview" v-if="logged">模拟面试</el-menu-item>
-          <el-menu-item index="/history" v-if="logged">历史记录</el-menu-item>
+          <el-menu-item index="/resume">简历分析</el-menu-item>
+          <el-menu-item index="/interview">模拟面试</el-menu-item>
+          <el-menu-item index="/history">历史记录</el-menu-item>
         </el-menu>
-        <div v-if="logged" class="user-box">
-          <el-avatar :size="28" style="background:#409EFF">{{ username.charAt(0).toUpperCase() }}</el-avatar>
-          <span class="username">{{ username }}</span>
-          <el-button text type="danger" @click="logout">退出</el-button>
+        <div class="nav-right">
+          <el-button type="danger" size="small" @click="logout">退出</el-button>
         </div>
-        <el-button v-else type="primary" @click="router.push('/login')">登录</el-button>
-      </div>
-    </el-header>
+      </el-header>
 
-    <el-main class="app-main">
-      <router-view />
-    </el-main>
-
-    <el-footer class="app-footer">
-      <span>Spring Boot 3.3.6 + Spring AI 1.0 + Java 21 | Agnes AI | PostgreSQL + pgvector | 0 元部署</span>
-    </el-footer>
-  </el-container>
+      <!-- 主内容区 -->
+      <el-main class="main-content">
+        <router-view />
+      </el-main>
+    </div>
+  </el-config-provider>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { ChatDotRound } from '@element-plus/icons-vue'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const route = useRoute()
-const username = ref('')
+const isLoggedIn = computed(() => !!localStorage.getItem('token'))
 
-const logged = computed(() => !!username.value)
-const activeMenu = computed(() => route.path)
-
-const logout = () => {
+function logout() {
   localStorage.removeItem('token')
-  localStorage.removeItem('username')
-  username.value = ''
   router.push('/login')
 }
-
-onMounted(() => {
-  username.value = localStorage.getItem('username') || ''
-})
 </script>
 
 <style scoped>
-* { box-sizing: border-box; }
-body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-.app-container { min-height: 100vh; }
-.app-header {
-  display: flex; justify-content: space-between; align-items: center;
-  background: #fff; border-bottom: 1px solid #ebeef5;
-  padding: 0 24px; height: 60px;
+.app-wrapper { display: flex; flex-direction: column; min-height: 100vh; }
+.navbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 24px; background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08); height: 56px;
 }
-.header-left { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.app-title { font-size: 16px; font-weight: 600; color: #303133; }
-.header-right { display: flex; align-items: center; gap: 16px; }
-.header-right :deep(.el-menu) { border-bottom: none; }
-.user-box { display: flex; align-items: center; gap: 8px; }
-.username { font-size: 14px; color: #606266; }
-.app-main { background: #f5f7fa; padding: 0; }
-.app-footer {
-  text-align: center; color: #909399; font-size: 12px;
-  padding: 16px; background: #fff; border-top: 1px solid #ebeef5;
+.nav-logo { font-size: 18px; font-weight: 700; color: #409eff; white-space: nowrap; }
+.nav-menu { flex: 1; border-bottom: none; }
+.nav-right { margin-left: auto; }
+.main-content { flex: 1; padding: 24px; background: #f5f7fa; }
+
+/* 响应式：移动端隐藏横向菜单文字 */
+@media (max-width: 640px) {
+  .nav-menu .el-menu-item span { display: none; }
+  .main-content { padding: 12px; }
 }
 </style>
