@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { isLoggedIn } from '../auth'
 
 const routes = [
   { path: '/',          component: () => import('../views/HomeView.vue'),      meta: { requiresAuth: false } },
@@ -13,10 +14,9 @@ const router = createRouter({
   routes,
 })
 
-// 路由守卫：未登录自动跳转到 /login，并记录 redirect 参数
+// 路由守卫：未登录或 token 格式非法时跳转到 /login，并记录 redirect 参数
 router.beforeEach((to) => {
-  const token = localStorage.getItem('token')
-  if (to.meta.requiresAuth && !token) {
+  if (to.meta.requiresAuth && !isLoggedIn()) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
 })

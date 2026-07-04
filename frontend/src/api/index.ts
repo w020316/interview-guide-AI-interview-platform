@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { clearAuth } from '../auth'
+import { clearAuth, isValidJwt } from '../auth'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -9,8 +9,15 @@ const api = axios.create({
 // 请求拦截器：自动注入 JWT token + Content-Type
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
-  if (token) {
+  // 仅在 token 为合法 JWT 格式时注入，避免污染请求头（如 sk-xxx API Key）
+  if (token && isValidJwt(token)) {
     config.headers.Authorization = `Bearer ${token}`
+  } else if (token && !isValidJwt(token)) {
+    // token 格式非法，清除污染数据并跳转登录
+    clearAuth()
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
+    }
   }
   // FormData 时让浏览器自动设置 Content-Type（multipart/form-data + boundary）
   if (config.data instanceof FormData) {

@@ -70,6 +70,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api'
+import { authState, isValidJwt } from '../auth'
 import MarkdownIt from 'markdown-it'
 
 // html: false 禁止 HTML 标签通过，防止 XSS
@@ -151,11 +152,17 @@ async function streamHint() {
   streamContent.value = ''
   abortController = new AbortController()
   try {
+    const token = authState.token
+    if (!isValidJwt(token)) {
+      ElMessage.error('登录状态异常，请重新登录')
+      streaming.value = false
+      return
+    }
     const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/interview/ask/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({ question: currentQ.value.question }),
       signal: abortController.signal
