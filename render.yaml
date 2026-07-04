@@ -24,23 +24,30 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
+      # Agnes AI（OpenAI 兼容协议）
       - key: AI_API_KEY
         sync: false  # 在 Render 后台手动填写 Agnes AI Key
       - key: AI_BASE_URL
-        value: https://apihub.agnes-ai.com/v1
+        value: https://apihub.agnes-ai.com
       - key: AI_MODEL
-        value: agnes-base
+        value: agnes-2.0-flash
+      # Supabase PostgreSQL
       - key: DATABASE_URL
-        sync: false
+        sync: false  # jdbc:postgresql://xxx.supabase.co:5432/postgres
       - key: DATABASE_USER
         value: postgres
       - key: DATABASE_PASSWORD
         sync: false
-      - key: REDIS_HOST
+      # Upstash Redis（TLS 连接 URL）
+      - key: REDIS_URL
+        sync: false  # rediss://default:xxx@xxx.upstash.io:6379
+      # JWT 密钥（32 字符以上）
+      - key: JWT_SECRET
         sync: false
-      - key: REDIS_PORT
-        value: 6379
-      - key: REDIS_PASSWORD
+      # Supabase Storage（简历文件存储）
+      - key: SUPABASE_URL
+        sync: false  # https://xxx.supabase.co
+      - key: SUPABASE_SERVICE_KEY
         sync: false
       # JVM 参数优化（适配 512MB 内存）
       - key: JAVA_OPTS

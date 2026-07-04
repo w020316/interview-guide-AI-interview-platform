@@ -42,11 +42,15 @@ public class ResumeAnalysisService {
      * @return 分析结果（JSON 字符串）
      */
     public String analyze(String resumeText, String targetJob) {
-        // 1. 缓存命中检查
+        // 1. 缓存命中检查（Redis 不可用时降级跳过缓存）
         String cacheKey = CACHE_PREFIX + Math.abs((resumeText + targetJob).hashCode());
-        Object cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
-            return cached.toString();
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                return cached.toString();
+            }
+        } catch (Exception e) {
+            System.err.println("Redis 缓存读取失败，降级直连 AI：" + e.getMessage());
         }
 
         // 2. 构建 Prompt
@@ -89,8 +93,12 @@ public class ResumeAnalysisService {
         // 4. 清理可能的 Markdown 代码块
         String cleaned = response.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
 
-        // 5. 写入缓存（30 分钟）
-        redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);
+        // 5. 写入缓存（30 分钟，Redis 不可用时静默跳过）
+        try {
+            redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            System.err.println("Redis 缓存写入失败，跳过缓存：" + e.getMessage());
+        }
 
         // 6. 简历文本向量化存入向量库
         storeResumeEmbedding(cacheKey, resumeText);
@@ -99,19 +107,22 @@ public class ResumeAnalysisService {
     }
 
     /**
-     * 将简历存入向量库，用于后续面试题生成
+     * 将简历存入向量库，用于后续面试题生成（异步执行，避免 embedding 不可用时阻塞主请求）
      */
     public void storeResumeEmbedding(String resumeId, String resumeText) {
-        try {
-            Document doc = Document.builder()
-                    .id(resumeId)
-                    .text(resumeText)
-                    .metadata(Map.of("type", "resume", "resumeId", resumeId))
-                    .build();
-            vectorStore.add(List.of(doc));
-        } catch (Exception e) {
-            // 向量化失败不影响主流程
-            System.err.println("简历向量化失败：" + e.getMessage());
-        }
+        // 用虚拟线程异步执行，避免 embedding 不可用时阻塞主请求
+        Thread.startVirtualThread(() -> {
+            try {
+                Document doc = Document.builder()
+                        .id(resumeId)
+                        .text(resumeText)
+                        .metadata(Map.of("type", "resume", "resumeId", resumeId))
+                        .build();
+                vectorStore.add(List.of(doc));
+            } catch (Exception e) {
+                // 向量化失败不影响主流程
+                System.err.println("简历向量化失败：" + e.getMessage());
+            }
+        });
     }
 }

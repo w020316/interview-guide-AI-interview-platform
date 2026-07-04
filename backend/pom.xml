@@ -69,6 +69,13 @@
             <artifactId>postgresql</artifactId>
         </dependency>
 
+        <!-- H2 内存数据库（本地联调 profile=local 时使用） -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Spring Data JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

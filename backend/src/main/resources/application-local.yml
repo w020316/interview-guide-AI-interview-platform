@@ -1,0 +1,80 @@
+# 本地联调配置（零外部依赖：H2 内存库 + SimpleVectorStore + Redis 容错）
+# 启动方式：mvn spring-boot:run -Dspring-boot.run.profiles=local
+
+server:
+  port: 8080
+
+spring:
+  # H2 内存数据库
+  datasource:
+    url: jdbc:h2:mem:interview;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # 禁用 schema.sql（H2 不兼容 PostgreSQL 语法，由 JPA ddl-auto 自动建表）
+  sql:
+    init:
+      mode: never
+
+  # Redis：本地无 Redis 时连接失败，业务代码 try-catch 容错降级
+  data:
+    redis:
+      url: redis://localhost:6379
+      timeout: 1000
+
+  # Spring AI（Agnes AI，OpenAI 兼容协议）
+  ai:
+    openai:
+      api-key: ${AI_API_KEY:sk-JFAyQwcTPZ9ZvtiBzmBxbnqc9u6qmrOp9ld1NokYoUsrngA8}
+      base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com}
+      chat:
+        options:
+          model: ${AI_CHAT_MODEL:agnes-2.0-flash}
+          temperature: 0.7
+      embedding:
+        options:
+          model: ${AI_EMBEDDING_MODEL:text-embedding-3-small}
+
+  # 排除 PgVectorStore 自动装配（local profile 用 SimpleVectorStore 替代）
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.example.interview: DEBUG
+    org.springframework.ai: INFO
+    org.hibernate.SQL: DEBUG
+
+app:
+  jwt:
+    secret: local-dev-secret-key-must-be-32-chars-min!!
+    expiration-ms: 86400000
+  supabase:
+    url: https://your-project.supabase.co
+    service-key: local-dev-placeholder
+    bucket: resumes

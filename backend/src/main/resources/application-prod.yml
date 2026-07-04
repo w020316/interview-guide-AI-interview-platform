@@ -29,22 +29,22 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  # Redis（Upstash 或本地）
+  # Redis（Upstash，TLS 连接）
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      url: ${REDIS_URL}
       timeout: 5000
+      ssl:
+        enabled: true
 
-  # Spring AI（Agnes AI，兼容 OpenAI 协议，免费无限量）
+  # Spring AI（Agnes AI，兼容 OpenAI 协议）
   ai:
     openai:
       api-key: ${AI_API_KEY}
-      base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com/v1}
+      base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com}
       chat:
         options:
-          model: ${AI_MODEL:agnes-base}
+          model: ${AI_MODEL:agnes-2.0-flash}
           temperature: 0.3
       embedding:
         options:
@@ -68,6 +68,15 @@ management:
   endpoint:
     health:
       show-details: never
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: 86400000
+  supabase:
+    url: ${SUPABASE_URL}
+    service-key: ${SUPABASE_SERVICE_KEY}
+    bucket: resumes
 
 logging:
   level:

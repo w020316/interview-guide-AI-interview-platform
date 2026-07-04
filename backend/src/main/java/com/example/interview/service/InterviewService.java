@@ -34,11 +34,15 @@ public class InterviewService {
      * 生成面试题
      */
     public String generateQuestions(String resumeText, String jobDescription, int count) {
-        // 1. 缓存命中
+        // 1. 缓存命中（Redis 不可用时降级跳过缓存）
         String cacheKey = QUESTION_CACHE + Math.abs((resumeText + jobDescription + count).hashCode());
-        Object cached = redisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
-            return cached.toString();
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                return cached.toString();
+            }
+        } catch (Exception e) {
+            System.err.println("Redis 缓存读取失败，降级直连 AI：" + e.getMessage());
         }
 
         // 2. RAG 检索相关知识
@@ -100,8 +104,12 @@ public class InterviewService {
         // 5. 清理 Markdown
         String cleaned = response.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
 
-        // 6. 写入缓存（1 小时）
-        redisTemplate.opsForValue().set(cacheKey, cleaned, 1, TimeUnit.HOURS);
+        // 6. 写入缓存（1 小时，Redis 不可用时静默跳过）
+        try {
+            redisTemplate.opsForValue().set(cacheKey, cleaned, 1, TimeUnit.HOURS);
+        } catch (Exception e) {
+            System.err.println("Redis 缓存写入失败，跳过缓存：" + e.getMessage());
+        }
 
         return cleaned;
     }
