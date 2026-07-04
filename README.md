@@ -1,7 +1,8 @@
 # AI 智能面试辅助平台
 
 > 基于 Spring Boot 3.3 + Spring AI 1.0 + Java 21 的 AI 面试辅助系统
-> 零成本部署到云端（Vercel + Koyeb + Supabase + Upstash，全部免费）
+> 零成本部署到云端（Vercel + Render + Supabase + Upstash，全部免费）
+> AI 模型使用 Agnes AI（兼容 OpenAI 协议，免费无限量）
 
 ## 核心功能
 
@@ -19,7 +20,8 @@
 | 数据库 | PostgreSQL 16 + pgvector 向量扩展 |
 | 缓存 | Redis 7 |
 | 前端 | Vue 3 + Element Plus + TypeScript + Vite |
-| 部署 | Vercel + Koyeb + Supabase + Upstash（0 元） |
+| 部署 | Vercel + Render + Supabase + Upstash（0 元） |
+| AI 模型 | Agnes AI（兼容 OpenAI，免费无限量） |
 
 ## 项目结构
 
@@ -68,15 +70,15 @@ docker-compose up -d postgres redis
 **方式 B：本地安装 PostgreSQL 16 + Redis 7**
 - 安装后执行 `backend/src/main/resources/schema.sql`
 
-### 3. 获取通义千问 API Key
-1. 访问 https://bailian.console.aliyun.com/
-2. 开通"百炼大模型服务"
-3. 创建 API Key（格式 `sk-xxxx`）
+### 3. 获取 Agnes AI API Key（免费无限量）
+1. 访问 https://platform.agnes-ai.com/settings/apikeys
+2. 创建 API Key（格式 `sk-xxxx`）
+3. Agnes AI 兼容 OpenAI 协议，免费且不限量
 
 ### 4. 启动后端
 ```bash
 cd backend
-export DASHSCOPE_API_KEY=sk-your-key   # Windows: set DASHSCOPE_API_KEY=sk-your-key
+export AI_API_KEY=sk-your-agnes-key   # Windows: set AI_API_KEY=sk-your-agnes-key
 mvn spring-boot:run
 ```
 访问：http://localhost:8080/api/info

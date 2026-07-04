@@ -24,8 +24,12 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
-      - key: DASHSCOPE_API_KEY
-        sync: false  # 在 Render 后台手动填写，不写入仓库
+      - key: AI_API_KEY
+        sync: false  # 在 Render 后台手动填写 Agnes AI Key
+      - key: AI_BASE_URL
+        value: https://apihub.agnes-ai.com/v1
+      - key: AI_MODEL
+        value: agnes-base
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_USER

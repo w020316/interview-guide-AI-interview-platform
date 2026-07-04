@@ -37,18 +37,18 @@ spring:
       password: ${REDIS_PASSWORD:}
       timeout: 5000
 
-  # Spring AI
+  # Spring AI（Agnes AI，兼容 OpenAI 协议，免费无限量）
   ai:
     openai:
-      api-key: ${DASHSCOPE_API_KEY}
-      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: ${AI_API_KEY}
+      base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com/v1}
       chat:
         options:
-          model: qwen-max
+          model: ${AI_MODEL:agnes-base}
           temperature: 0.3
       embedding:
         options:
-          model: text-embedding-v3
+          model: ${EMBEDDING_MODEL:text-embedding-3-small}
     vectorstore:
       pgvector:
         index-type: hnsw

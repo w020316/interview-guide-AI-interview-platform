@@ -84,12 +84,11 @@ REDIS_PASSWORD=你的 token
 
 ---
 
-### Step 3: 获取通义千问 API Key（2 分钟）
+### Step 3: 获取 Agnes AI API Key（2 分钟，免费无限量）
 
-1. 访问 https://bailian.console.aliyun.com/
-2. 用支付宝/钉钉登录（送免费额度，学生够用）
-3. **API Key 管理** → 创建 API Key
-4. 复制 `sk-xxxx`
+1. 访问 https://platform.agnes-ai.com/settings/apikeys
+2. 创建 API Key
+3. 复制 `sk-xxxx`（Agnes AI 免费且不限量，兼容 OpenAI 协议）
 
 ---
 
@@ -121,11 +120,13 @@ git push -u origin main
 
    | Key | Value |
    |-----|-------|
-   | `DASHSCOPE_API_KEY` | `sk-你的通义千问key` |
+   | `AI_API_KEY` | `sk-你的Agnes AI key` |
    | `DATABASE_URL` | `jdbc:postgresql://db.xxxx.supabase.co:5432/postgres` |
    | `DATABASE_PASSWORD` | 你的 Supabase 密码 |
    | `REDIS_HOST` | `xxxx.upstash.io` |
    | `REDIS_PASSWORD` | 你的 Upstash token |
+
+   **注意**：`AI_BASE_URL` 和 `AI_MODEL` 已在 render.yaml 中默认配置为 Agnes AI，无需手动填写。
 
 6. 点 **Apply**
 7. 等待构建（约 5-8 分钟，首次会下载 Maven 依赖）
@@ -233,11 +234,14 @@ Supabase 免费层 7 天不访问会暂停。
 
 ### Q6：AI 接口报 401
 
-`DASHSCOPE_API_KEY` 没配或配错，去阿里云百炼重新复制。
+`AI_API_KEY` 没配或配错，去 https://platform.agnes-ai.com/settings/apikeys 重新复制。
 
-### Q7：通义千问 API 限流
+### Q7：Agnes AI 接口调用失败
 
-免费额度有限，高并发会限流。Redis 缓存已配置，重复请求会走缓存。
+Agnes AI 免费且不限量，但需确认：
+- `AI_BASE_URL` = `https://apihub.agnes-ai.com/v1`
+- `AI_MODEL` = `agnes-base`
+- `AI_API_KEY` 以 `sk-` 开头
 
 ---
 
@@ -257,4 +261,5 @@ Supabase 免费层 7 天不访问会暂停。
 - Vercel 文档：https://vercel.com/docs
 - Supabase 文档：https://supabase.com/docs
 - Upstash 文档：https://docs.upstash.com/redis
-- 通义千问：https://help.aliyun.com/zh/dashscope/
+- Agnes AI：https://platform.agnes-ai.com/
+- 通义千问（备选）：https://help.aliyun.com/zh/dashscope/
