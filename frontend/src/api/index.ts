@@ -4,14 +4,19 @@ import { clearAuth } from '../auth'
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 60000,
-  headers: { 'Content-Type': 'application/json' }
 })
 
-// 请求拦截器：自动注入 JWT token
+// 请求拦截器：自动注入 JWT token + Content-Type
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  // FormData 时让浏览器自动设置 Content-Type（multipart/form-data + boundary）
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  } else {
+    config.headers['Content-Type'] = 'application/json'
   }
   return config
 })
