@@ -90,8 +90,9 @@ public class InterviewService {
             }
 
             // 3. 构建 Prompt（强化 JSON 格式约束）
+            // 根据岗位描述动态生成面试官角色，支持所有岗位
             String prompt = String.format("""
-                    你是一位资深 Java 后端面试官，请为以下候选人生成 %d 道面试题。
+                    你是一位资深的%s面试官，请为以下候选人生成 %d 道面试题。
 
                     【岗位要求】
                     %s
@@ -102,14 +103,21 @@ public class InterviewService {
                     【参考知识点】
                     %s
 
+                    【出题原则】
+                    1. 题目必须与岗位要求高度相关，覆盖该岗位的核心技能与项目经验
+                    2. 难度分布：简单 30%%、中等 50%%、困难 20%%
+                    3. 分类覆盖：技术基础、项目深挖、场景设计、行为面试（按岗位特点调整）
+                    4. 参考答案需精炼到位，避免冗长
+
                     【输出要求（务必严格遵守）】
                     1. 直接输出 JSON 数组，不要任何 Markdown 代码块、不要 ```json 标记
                     2. 所有字符串必须使用 ASCII 双引号 "，禁止使用单引号 ' 或中文引号 “ ” ‘ ’
                     3. 不要在字符串值中使用引号，如需引用请用书名号《》
-                    4. 不要输出任何注释、解释、前后缀文字
-                    5. 输出格式：
+                    4. 字符串值内禁止包含裸换行符、回车符、制表符
+                    5. 不要输出任何注释、解释、前后缀文字
+                    6. 输出格式：
                     [{"question":"请介绍你的项目架构","category":"项目深挖","difficulty":"MEDIUM","keyPoints":["考察点1"],"referenceAnswer":"参考答案要点"}]
-                    """, count, jobDescription, resumeText, relatedKnowledge);
+                    """, jobDescription, count, jobDescription, resumeText, relatedKnowledge);
 
             // 4. 调用 AI
             String response = chatClient.prompt()

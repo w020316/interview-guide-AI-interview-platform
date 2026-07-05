@@ -1,0 +1,60 @@
+/**
+ * 版本更新日志
+ * 每次发布新增版本条目，前端会与 localStorage 中的版本号对比
+ * 若版本不同则弹窗展示本次更新内容
+ */
+export interface ChangelogEntry {
+  version: string
+  date: string
+  title: string
+  items: string[]
+}
+
+export const CURRENT_VERSION = '1.2.0'
+
+export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.2.0',
+    date: '2026-07-05',
+    title: '版本 1.2.0 · 全岗位支持 + 知识库关联面试',
+    items: [
+      '修复 Network Error：vercel.json 添加 /api 反向代理到 Render 后端',
+      '修复 JSON 解析错误：字符串内裸换行符自动转义（Bad control character）',
+      '修复 JSON 解析错误：单引号、中文引号、中文冒号自动修复',
+      '模拟面试支持所有岗位：去除 Java 硬编码，根据岗位动态生成面试官角色',
+      '岗位输入支持自动补全（18 个常见岗位）',
+      '知识库新增「错题总结」：关联所有模拟面试，按阈值汇总错题',
+      '知识库新增「题目汇总」：按分类、难度聚合统计答题情况',
+      'SSE 流式接口优化：心跳保活、首 token 优化、即时反馈',
+      '前端 UI 全面重设计：编辑风专业平台，深墨绿主色 + 暖米白背景',
+      '安全加固：注册接口参数校验、CORS 配置收紧'
+    ]
+  },
+  {
+    version: '1.1.0',
+    date: '2026-07-04',
+    title: '版本 1.1.0 · 设计系统 v3 + 交付完善',
+    items: [
+      '设计系统 v3：编辑风专业平台，消除 AI slop 美学',
+      '深墨绿主色 #0f766e + 暖米白背景 #fafaf9 + 衬线标题字体',
+      '所有页面重设计：HomeView / LoginView / InterviewView / HistoryView 等',
+      'JsonRepairUtil：两阶段状态机修复非标准 JSON',
+      'SSE 优化：心跳保活避免 Vercel/Nginx 60s 超时',
+      'AuthController 安全加固：用户名/密码/邮箱校验',
+      '34 个后端测试通过'
+    ]
+  },
+  {
+    version: '1.0.0',
+    date: '2026-07-03',
+    title: '版本 1.0.0 · 初始发布',
+    items: [
+      'Vue 3.4 + TypeScript + Vite 5 前端',
+      'Spring Boot 3.3.6 + Spring AI 1.0 + PostgreSQL/pgvector 后端',
+      '简历分析：AI 多维度评估 + 改进建议',
+      '模拟面试：流式 AI 实时提示 + 自动评估打分',
+      'RAG 知识库：语义检索 + 增强问答',
+      'JWT 鉴权 + Redis 限流 + Supabase 文件存储'
+    ]
+  }
+]

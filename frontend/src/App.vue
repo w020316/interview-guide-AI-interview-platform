@@ -106,21 +106,31 @@
             <span>AI 面试助手</span>
           </div>
           <p class="footer-desc">基于 Spring Boot 3.3 + Spring AI 1.0 + Vue 3 构建，为求职者打造的智能面试准备平台</p>
-          <p class="footer-copy">© 2026 AI 面试助手 · MIT License</p>
+          <p class="footer-copy">
+            © 2026 AI 面试助手 · MIT License
+            <button class="version-link" @click="showChangelog = true">v{{ CURRENT_VERSION }}</button>
+          </p>
         </div>
       </footer>
+
+      <!-- 版本更新弹窗 -->
+      <ChangelogDialog v-model:visible="showChangelog" />
     </div>
   </el-config-provider>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { authState, clearAuth } from './auth'
 import api from './api'
+import ChangelogDialog from './components/ChangelogDialog.vue'
+import { CURRENT_VERSION } from './changelog'
 
 const router = useRouter()
 const route = useRoute()
+const showChangelog = ref(false)
 
 async function logout() {
   try {
@@ -416,6 +426,27 @@ async function logout() {
   font-size: 12px;
   color: var(--c-text-tertiary);
   margin: 0;
+}
+
+.version-link {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand-primary);
+  background: var(--brand-primary-light);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  letter-spacing: 0.2px;
+}
+
+.version-link:hover {
+  background: var(--brand-primary);
+  color: #fff;
 }
 
 /* ── 页面切换动画 ── */

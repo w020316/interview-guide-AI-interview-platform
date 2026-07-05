@@ -10,7 +10,27 @@
       <div class="form-grid">
         <div class="field-row">
           <label>目标岗位</label>
-          <input v-model="jobDesc" type="text" placeholder="Java 后端开发工程师" />
+          <input v-model="jobDesc" type="text" list="job-suggestions" placeholder="如：Java 后端开发、前端工程师、产品经理、数据分析师…" />
+          <datalist id="job-suggestions">
+            <option value="Java 后端开发工程师" />
+            <option value="前端开发工程师" />
+            <option value="Python 后端开发工程师" />
+            <option value="Go 后端开发工程师" />
+            <option value="全栈开发工程师" />
+            <option value="iOS 开发工程师" />
+            <option value="Android 开发工程师" />
+            <option value="数据分析师" />
+            <option value="算法工程师" />
+            <option value="机器学习工程师" />
+            <option value="产品经理" />
+            <option value="项目经理" />
+            <option value="UI/UX 设计师" />
+            <option value="测试工程师" />
+            <option value="运维工程师" />
+            <option value="DevOps 工程师" />
+            <option value="数据库管理员" />
+            <option value="安全工程师" />
+          </datalist>
         </div>
         <div class="field-row">
           <label>简历摘要 <span class="optional">（可选）</span></label>
@@ -155,7 +175,7 @@ interface EvalResult {
   improvements?: string[]
 }
 
-const jobDesc = ref('Java 后端开发工程师')
+const jobDesc = ref('')
 const resumeText = ref('')
 const count = ref(5)
 const loading = ref(false)
