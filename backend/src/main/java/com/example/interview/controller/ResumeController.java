@@ -32,13 +32,15 @@ public class ResumeController {
     private static final Logger log = LoggerFactory.getLogger(ResumeController.class);
 
     /** 允许的文件扩展名 */
-    private static final Set<String> ALLOWED_EXTS = Set.of(".pdf", ".txt");
+    private static final Set<String> ALLOWED_EXTS = Set.of(".pdf", ".txt", ".html", ".htm", ".md", ".markdown");
 
     /** 允许的 Content-Type */
     private static final Set<String> ALLOWED_CT = Set.of(
             "application/pdf",
             "text/plain",
-            "application/octet-stream" // 部分浏览器上传 txt 时为此类型
+            "text/html",
+            "text/markdown",
+            "application/octet-stream" // 部分浏览器上传 txt/md 时为此类型
     );
 
     @Autowired

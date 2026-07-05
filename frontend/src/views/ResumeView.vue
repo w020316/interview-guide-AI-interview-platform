@@ -13,12 +13,12 @@
       </div>
 
       <div v-if="tab === 'upload'" class="upload-area">
-        <el-upload drag accept=".pdf,.txt"
+        <el-upload drag accept=".pdf,.txt,.html,.htm,.md,.markdown"
           :before-upload="handleUpload" :show-file-list="false" :http-request="() => {}">
           <div class="upload-inner">
-            <div class="upload-icon">📄</div>
+            <div class="upload-icon"></div>
             <div class="upload-text">拖拽文件到此处或 <span class="upload-action">点击上传</span></div>
-            <div class="upload-hint">支持 PDF / TXT 格式，文件 ≤ 10MB</div>
+            <div class="upload-hint">支持 PDF / HTML / MD / TXT 格式，文件 ≤ 10MB</div>
           </div>
         </el-upload>
         <div class="field-row">
