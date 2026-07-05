@@ -69,10 +69,8 @@ public class InterviewSessionController {
      */
     @GetMapping("/{sessionId}")
     public Result<InterviewSessionEntity> getSession(@PathVariable String sessionId) {
+        // service 在会话不存在时抛 IllegalArgumentException，由全局异常处理器统一返回 400
         InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
-        if (session == null) {
-            return Result.error(404, "会话不存在");
-        }
         if (!currentUserId().equals(session.getUserId())) {
             return Result.error(403, "无权访问该会话");
         }
@@ -86,9 +84,6 @@ public class InterviewSessionController {
     @PutMapping("/{sessionId}/finish")
     public Result<InterviewSessionEntity> finishSession(@PathVariable String sessionId) {
         InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
-        if (session == null) {
-            return Result.error(404, "会话不存在");
-        }
         if (!currentUserId().equals(session.getUserId())) {
             return Result.error(403, "无权操作该会话");
         }
@@ -102,9 +97,6 @@ public class InterviewSessionController {
     @GetMapping("/{sessionId}/questions")
     public Result<List<InterviewQuestionEntity>> listQuestions(@PathVariable String sessionId) {
         InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
-        if (session == null) {
-            return Result.error(404, "会话不存在");
-        }
         if (!currentUserId().equals(session.getUserId())) {
             return Result.error(403, "无权访问该会话");
         }

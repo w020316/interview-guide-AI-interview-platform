@@ -10,6 +10,9 @@
 - **AI 模拟面试**：根据简历 + 岗位 JD 生成个性化面试题
 - **RAG 知识库问答**：基于 pgvector 向量检索 JavaGuide 八股文
 - **回答质量评估**：从完整性、准确性、表达能力 3 维度打分
+- **简历历史记录**：每次分析自动持久化，可回看完整评分与建议 ✨
+- **个人中心仪表盘**：统计数据卡片 + 平均分横幅 + 最近活动流 ✨
+- **知识库管理**：批量导入知识点，RAG 智能问答 ✨
 
 ## 技术栈
 
@@ -100,13 +103,31 @@ npm run dev
 | 接口 | 方法 | 说明 |
 |------|------|------|
 | `/api/info` | GET | 系统信息 |
-| `/api/resume/analyze` | POST | 简历分析 |
+| `/api/auth/register` | POST | 用户注册 |
+| `/api/auth/login` | POST | 用户登录 |
+| `/api/auth/logout` | POST | 用户登出 |
+| `/api/resume/analyze` | POST | 简历分析（自动持久化） |
+| `/api/resume/upload` | POST | 上传 PDF/TXT 简历分析 |
+| `/api/resume/history` | GET | 简历历史列表 ✨ |
+| `/api/resume/{id}` | GET | 简历详情 ✨ |
 | `/api/interview/questions` | POST | 生成面试题 |
 | `/api/interview/evaluate` | POST | 评估回答 |
+| `/api/interview/ask/stream` | POST | SSE 流式 AI 提示 |
+| `/api/session/create` | POST | 创建面试会话 |
+| `/api/session/{id}` | GET | 会话详情 |
+| `/api/session/{id}/finish` | PUT | 结束会话 |
+| `/api/session/list` | GET | 用户会话列表 |
+| `/api/session/{id}/questions` | GET | 会话题目详情 |
+| `/api/session/answer` | POST | 提交回答与评分 |
 | `/api/knowledge/search` | GET | 知识检索 |
 | `/api/knowledge/ask` | POST | RAG 问答 |
 | `/api/knowledge/import` | POST | 导入知识文档 |
+| `/api/knowledge/import/batch` | POST | 批量导入分块 |
+| `/api/stats/dashboard` | GET | 个人中心统计 ✨ |
 | `/actuator/health` | GET | 健康检查 |
+| `/swagger-ui.html` | GET | API 文档 |
+
+✨ 标记为 v2 新增功能
 
 ## License
 

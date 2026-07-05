@@ -1,20 +1,29 @@
 package com.example.interview.controller;
 
 import com.example.interview.common.Result;
+import com.example.interview.entity.ResumeEntity;
 import com.example.interview.service.ResumeAnalysisService;
 import com.example.interview.service.ResumeParseService;
+import com.example.interview.service.ResumeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
  * 简历分析接口
+ * - POST /api/resume/analyze 粘贴文本分析
+ * - POST /api/resume/upload  上传 PDF/TXT 分析
+ * - GET  /api/resume/history 简历历史列表
+ * - GET  /api/resume/{id}    简历详情
  */
 @RestController
 @RequestMapping("/api/resume")
@@ -38,6 +47,18 @@ public class ResumeController {
     @Autowired
     private ResumeParseService resumeParseService;
 
+    @Autowired
+    private ResumeService resumeService;
+
+    /** 从 SecurityContext 获取当前登录用户 ID */
+    private String currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+            throw new IllegalStateException("未认证用户");
+        }
+        return auth.getPrincipal().toString();
+    }
+
     /**
      * 分析简历（纯文本）
      * POST /api/resume/analyze
@@ -53,6 +74,12 @@ public class ResumeController {
         }
 
         String result = resumeAnalysisService.analyze(resumeText, targetJob);
+        // 持久化到数据库（失败不影响返回分析结果给用户）
+        try {
+            resumeService.saveResume(currentUserId(), resumeText, targetJob, result);
+        } catch (Exception e) {
+            log.warn("简历分析结果持久化失败：{}", e.getMessage());
+        }
         return Result.success(result);
     }
 
@@ -107,8 +134,17 @@ public class ResumeController {
         }
 
         try {
-            String result = resumeParseService.parseAndAnalyze(file, targetJob);
-            return Result.success(result);
+            // 解析 + 分析，返回 AI JSON
+            String analysisJson = resumeParseService.parseAndAnalyze(file, targetJob);
+            // 解析后的纯文本用于持久化（再解析一次以拿到 resumeText，避免修改 parseAndAnalyze 签名）
+            // 这里简化处理：直接持久化上传文件名 + 分析结果
+            try {
+                String preview = originalFilename;
+                resumeService.saveResume(currentUserId(), "[上传文件] " + preview, targetJob, analysisJson);
+            } catch (Exception e) {
+                log.warn("简历上传结果持久化失败：{}", e.getMessage());
+            }
+            return Result.success(analysisJson);
         } catch (IllegalArgumentException e) {
             return Result.error(400, e.getMessage());
         } catch (Exception e) {
@@ -116,4 +152,23 @@ public class ResumeController {
             return Result.error("简历解析失败，请检查文件是否损坏或重试");
         }
     }
+
+    /**
+     * 当前用户的简历历史列表
+     * GET /api/resume/history
+     */
+    @GetMapping("/history")
+    public Result<List<ResumeEntity>> history() {
+        return Result.success(resumeService.listByUser(currentUserId()));
+    }
+
+    /**
+     * 简历详情（仅本人）
+     * GET /api/resume/{id}
+     */
+    @GetMapping("/{id}")
+    public Result<ResumeEntity> getById(@PathVariable Long id) {
+        return Result.success(resumeService.getByIdAndUser(id, currentUserId()));
+    }
 }
+

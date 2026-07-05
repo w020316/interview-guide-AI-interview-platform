@@ -1,5 +1,8 @@
 package com.example.interview.service;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Timer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,8 +28,17 @@ class ResumeAnalysisServiceTest {
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private ObjectMapper objectMapper;
     @Mock private ValueOperations<String, Object> valueOps;
+    @Mock private Counter resumeCounter;
+    @Mock private Counter cacheHitCounter;
+    @Mock private Counter cacheMissCounter;
+    @Mock private Timer aiCallTimer;
 
     @InjectMocks private ResumeAnalysisService service;
+
+    @BeforeEach
+    void setUp() {
+        // micrometer mock 默认返回 0，无需 stub
+    }
 
     @Test
     @DisplayName("analyze: 缓存命中时不调用 AI")

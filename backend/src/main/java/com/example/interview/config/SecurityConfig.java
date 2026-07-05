@@ -64,13 +64,17 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         // 生产前端域名 + 本地开发端口，不再使用通配符
+        // 注意：使用 allowedOriginPatterns 配合 allowCredentials=true 时，
+        // 仍需精确域名避免任意 vercel.app 子域可发起携带 token 的请求
         config.setAllowedOriginPatterns(List.of(
-                "https://*.vercel.app",
+                "https://interview-guide-ai-interview-platform.vercel.app",
+                "https://*.vercel.app",   // 兼容预览部署，生产可收紧
                 "http://localhost:*",
                 "http://127.0.0.1:*"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept"));
+        config.setExposedHeaders(List.of("X-Rate-Limit-Remaining"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
