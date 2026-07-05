@@ -177,6 +177,62 @@
         <summary>查看 AI 原始返回</summary>
         <pre class="raw-output">{{ result }}</pre>
       </details>
+
+      <!-- 优化简历区 -->
+      <div class="optimize-section fade-in-up">
+        <div class="optimize-head">
+          <div>
+            <h4 class="optimize-title">一键生成优化简历</h4>
+            <p class="optimize-desc">基于分析建议自动改写，量化项目成果，强化岗位匹配，可下载 Markdown / HTML 文档</p>
+          </div>
+          <button class="btn-optimize" :disabled="optimizing || !result" @click="generateOptimized">
+            <span v-if="optimizing" class="spinner"></span>
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 21h6 M10 18h4 M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ optimizing ? '生成中…' : '生成优化简历' }}
+          </button>
+        </div>
+
+        <div v-if="optimizing" class="optimize-loading">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">AI 正在基于分析建议改写你的简历…</div>
+          <div class="loading-hint">冷启动约 30-60s，请耐心等待</div>
+        </div>
+
+        <div v-if="optimizedMarkdown && !optimizing" class="optimize-result">
+          <div class="optimize-toolbar">
+            <div class="optimize-tabs">
+              <button :class="{ active: optimizeView === 'preview' }" @click="optimizeView = 'preview'">预览</button>
+              <button :class="{ active: optimizeView === 'source' }" @click="optimizeView = 'source'">源码</button>
+            </div>
+            <div class="optimize-downloads">
+              <button class="btn-download" @click="downloadMarkdown">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3v12 M7 10l5 5 5-5 M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                下载 .md
+              </button>
+              <button class="btn-download" @click="downloadHtml">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3v12 M7 10l5 5 5-5 M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                下载 .html
+              </button>
+              <button class="btn-download" @click="copyOptimized">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="2"/>
+                  <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                复制
+              </button>
+            </div>
+          </div>
+          <div v-if="optimizeView === 'preview'" class="optimize-preview" v-html="optimizedHtml"></div>
+          <pre v-else class="optimize-source">{{ optimizedMarkdown }}</pre>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -185,6 +241,10 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
+import MarkdownIt from 'markdown-it'
+import DOMPurify from 'dompurify'
+
+const md = new MarkdownIt({ html: false, linkify: true })
 
 interface AnalysisResult {
   overallScore: number
@@ -199,6 +259,19 @@ const targetJob = ref('')
 const loading = ref(false)
 const result = ref('')
 const parseError = ref('')
+
+// 优化简历相关状态
+const optimizing = ref(false)
+const optimizedMarkdown = ref('')
+const optimizeView = ref<'preview' | 'source'>('preview')
+
+const optimizedHtml = computed(() => {
+  if (!optimizedMarkdown.value) return ''
+  return DOMPurify.sanitize(md.render(optimizedMarkdown.value), {
+    FORBID_TAGS: ['style', 'iframe'],
+    FORBID_ATTR: ['onerror', 'onload']
+  })
+})
 
 const parsed = computed<AnalysisResult>(() => {
   if (!result.value) {
@@ -339,6 +412,104 @@ const scoreLevel = computed(() => {
   if (s > 0) return '待提升 · 需重点修改'
   return '-'
 })
+
+/** 重新分析时清空优化简历 */
+watch(tab, (v) => {
+  if (v === 'upload') {
+    optimizedMarkdown.value = ''
+  }
+})
+
+/** 调用后端生成优化简历 */
+async function generateOptimized() {
+  if (!result.value) {
+    ElMessage.warning('请先完成简历分析')
+    return
+  }
+  optimizing.value = true
+  optimizedMarkdown.value = ''
+  optimizeView.value = 'preview'
+  try {
+    const res = await api.post('/api/resume/optimize', {
+      resumeText: resumeText.value,
+      targetJob: targetJob.value || '通用岗位',
+      analysis: result.value
+    }, { timeout: AI_TIMEOUT })
+    if (res.data?.code === 200 && res.data.data) {
+      optimizedMarkdown.value = res.data.data
+      ElMessage.success('优化简历已生成')
+    } else {
+      ElMessage.error(res.data?.message || '生成失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(getErrMessage(e, '生成优化简历失败'))
+  } finally {
+    optimizing.value = false
+  }
+}
+
+/** 下载 Markdown 文件 */
+function downloadMarkdown() {
+  if (!optimizedMarkdown.value) return
+  const blob = new Blob([optimizedMarkdown.value], { type: 'text/markdown;charset=utf-8' })
+  triggerDownload(blob, `优化简历-${targetJob.value || '通用'}-${formatDate()}.md`)
+}
+
+/** 下载 HTML 文件（含基本样式） */
+function downloadHtml() {
+  if (!optimizedMarkdown.value) return
+  const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>优化简历 - ${targetJob.value || '通用岗位'}</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 800px; margin: 40px auto; padding: 0 24px; color: #1c1917; line-height: 1.7; }
+  h1 { color: #0f766e; border-bottom: 2px solid #0f766e; padding-bottom: 8px; }
+  h2 { color: #115e59; margin-top: 28px; border-left: 4px solid #0f766e; padding-left: 12px; }
+  h3 { color: #134e4a; }
+  ul { padding-left: 24px; }
+  li { margin: 4px 0; }
+  strong { color: #0f766e; }
+  @media print { body { margin: 0; } }
+</style>
+</head>
+<body>
+${optimizedHtml.value}
+</body>
+</html>`
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  triggerDownload(blob, `优化简历-${targetJob.value || '通用'}-${formatDate()}.html`)
+}
+
+/** 复制到剪贴板 */
+async function copyOptimized() {
+  if (!optimizedMarkdown.value) return
+  try {
+    await navigator.clipboard.writeText(optimizedMarkdown.value)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.error('复制失败，请手动选择文本复制')
+  }
+}
+
+/** 触发浏览器下载 */
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/** 格式化日期为 YYYYMMDD */
+function formatDate() {
+  const d = new Date()
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+}
 </script>
 <style scoped>
 .resume-page {
@@ -844,6 +1015,248 @@ const scoreLevel = computed(() => {
   }
   .page-header h1 {
     font-size: 24px;
+  }
+}
+
+/* ── 优化简历区 ── */
+.optimize-section {
+  margin-top: 28px;
+  padding: 24px;
+  background: var(--brand-primary-50);
+  border: 1px solid var(--brand-primary-100);
+  border-radius: var(--radius-lg);
+}
+
+.optimize-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.optimize-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin: 0 0 6px;
+}
+
+.optimize-desc {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  margin: 0;
+  max-width: 520px;
+  line-height: 1.6;
+}
+
+.btn-optimize {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn-optimize:hover:not(:disabled) {
+  background: var(--brand-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-optimize:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.optimize-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--brand-primary-100);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-text {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--c-text);
+}
+
+.loading-hint {
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+
+.optimize-result {
+  margin-top: 20px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.optimize-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--c-bg-alt);
+  border-bottom: 1px solid var(--c-border);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.optimize-tabs {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--c-surface);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--c-border);
+}
+
+.optimize-tabs button {
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.optimize-tabs button.active {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.optimize-downloads {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-download:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background: var(--brand-primary-50);
+}
+
+.optimize-preview {
+  padding: 32px 40px;
+  font-family: var(--font-sans);
+  color: var(--c-text);
+  line-height: 1.8;
+  max-height: 800px;
+  overflow-y: auto;
+}
+
+.optimize-preview :deep(h1) {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand-primary);
+  border-bottom: 2px solid var(--brand-primary-100);
+  padding-bottom: 8px;
+  margin: 0 0 20px;
+}
+
+.optimize-preview :deep(h2) {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--brand-primary-hover);
+  margin: 24px 0 12px;
+  border-left: 4px solid var(--brand-primary);
+  padding-left: 12px;
+}
+
+.optimize-preview :deep(h3) {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin: 16px 0 8px;
+}
+
+.optimize-preview :deep(ul) {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+
+.optimize-preview :deep(li) {
+  margin: 4px 0;
+}
+
+.optimize-preview :deep(strong) {
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.optimize-preview :deep(p) {
+  margin: 8px 0;
+}
+
+.optimize-source {
+  padding: 24px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--c-text);
+  background: var(--c-bg-alt);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 800px;
+  overflow-y: auto;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .optimize-head {
+    flex-direction: column;
+  }
+  .btn-optimize {
+    width: 100%;
+    justify-content: center;
+  }
+  .optimize-preview {
+    padding: 20px;
+  }
+  .optimize-toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

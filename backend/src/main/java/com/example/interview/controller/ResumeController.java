@@ -172,5 +172,30 @@ public class ResumeController {
     public Result<ResumeEntity> getById(@PathVariable Long id) {
         return Result.success(resumeService.getByIdAndUser(id, currentUserId()));
     }
+
+    /**
+     * 基于分析结果生成优化版简历（Markdown 格式）
+     * POST /api/resume/optimize
+     * Body: {"resumeText": "...", "targetJob": "...", "analysis": "..."}
+     *
+     * 返回优化后的 Markdown 简历，前端可直接下载为 .md 文件或渲染预览
+     */
+    @PostMapping("/optimize")
+    public Result<String> optimize(@RequestBody Map<String, String> request) {
+        String resumeText = request.get("resumeText");
+        String targetJob = request.getOrDefault("targetJob", "通用岗位");
+        String analysis = request.get("analysis");
+
+        if (resumeText == null || resumeText.trim().isEmpty()) {
+            return Result.error(400, "简历内容不能为空");
+        }
+        if (analysis == null || analysis.trim().isEmpty()) {
+            return Result.error(400, "请先完成简历分析，再生成优化版简历");
+        }
+
+        String optimized = resumeAnalysisService.generateOptimizedResume(
+                currentUserId(), resumeText, targetJob, analysis);
+        return Result.success(optimized);
+    }
 }
 

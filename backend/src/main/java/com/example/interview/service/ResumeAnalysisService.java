@@ -190,5 +190,114 @@ public class ResumeAnalysisService {
             return String.valueOf(input.hashCode());
         }
     }
+
+    /**
+     * 基于原始简历 + 分析结果，生成优化版简历（Markdown 格式）
+     * 优化方向：
+     * 1. 根据 improvements 建议逐条改进
+     * 2. 量化项目成果（数据、影响力）
+     * 3. 优化表述结构（STAR 法则）
+     * 4. 强化岗位匹配关键词
+     *
+     * @param userId     用户 ID
+     * @param resumeText 原始简历文本
+     * @param targetJob  目标岗位
+     * @param analysis   分析结果 JSON（含 overallScore / dimensions / improvements）
+     * @return 优化版简历 Markdown 字符串
+     */
+    public String generateOptimizedResume(String userId, String resumeText, String targetJob, String analysis) {
+        long start = System.nanoTime();
+        try {
+            // 1. 缓存命中检查
+            String cacheKey = "resume:optimize:" + userId + ":" + sha256(resumeText + "\u0001" + targetJob + "\u0001" + (analysis == null ? "" : analysis));
+            try {
+                Object cached = redisTemplate.opsForValue().get(cacheKey);
+                if (cached != null) {
+                    return cached.toString();
+                }
+            } catch (Exception e) {
+                log.warn("Redis 缓存读取失败，降级直连 AI：{}", e.getMessage());
+            }
+
+            // 2. 简历文本截断（避免 prompt 过长）
+            String truncatedResume = resumeText.length() > MAX_RESUME_LEN
+                    ? resumeText.substring(0, MAX_RESUME_LEN) + "..." : resumeText;
+            String truncatedAnalysis = analysis != null && analysis.length() > 800
+                    ? analysis.substring(0, 800) + "..." : (analysis == null ? "无分析数据" : analysis);
+
+            // 3. 构建 Prompt
+            String prompt = String.format("""
+                    你是一位资深 %s 招聘面试官兼简历优化专家，请基于以下原始简历和 AI 分析结果，生成一份优化后的简历。
+
+                    【目标岗位】
+                    %s
+
+                    【原始简历】
+                    %s
+
+                    【AI 分析结果（含改进建议）】
+                    %s
+
+                    【优化原则】
+                    1. 严格遵循改进建议逐条优化
+                    2. 项目经历采用 STAR 法则（情境/任务/行动/结果），量化成果数据
+                    3. 技能描述精确到具体技术栈和应用场景，避免笼统
+                    4. 强化与目标岗位的关键词匹配
+                    5. 保持简历结构清晰：基本信息 / 教育背景 / 工作经历 / 项目经历 / 专业技能 / 自我评价
+                    6. 语言简洁有力，每句话控制在 25 字以内，突出成果而非职责
+
+                    【输出要求】
+                    1. 直接输出 Markdown 格式简历，不要任何前后缀解释
+                    2. 使用标准 Markdown 语法：# 一级标题、## 二级标题、- 列表、**加粗**
+                    3. 禁止使用 HTML 标签、禁止使用代码块
+                    4. 字符串内禁止裸换行符，使用分号或逗号分隔
+                    5. 输出一份完整可用的简历，不要省略任何原始简历中的关键信息
+                    """, targetJob, targetJob, truncatedResume, truncatedAnalysis);
+
+            // 4. 调用 AI
+            String response;
+            AI_SEMAPHORE.acquire();
+            try {
+                response = chatClient.prompt()
+                        .user(prompt)
+                        .call()
+                        .content();
+            } finally {
+                AI_SEMAPHORE.release();
+            }
+
+            // 5. 空值校验
+            if (response == null || response.isBlank()) {
+                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+            }
+
+            String cleaned = response.trim();
+            // 剥离可能的 Markdown 代码块包裹
+            if (cleaned.startsWith("```")) {
+                cleaned = cleaned.replaceAll("^```(?:markdown|md)?\\s*\\n", "").replaceAll("\\n```\\s*$", "");
+            }
+
+            // 6. 写入缓存（30 分钟）
+            try {
+                redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);
+            } catch (Exception e) {
+                log.warn("Redis 缓存写入失败，跳过缓存：{}", e.getMessage());
+            }
+
+            return cleaned;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("AI 调用被中断", e);
+        } finally {
+            resumeCounter.increment();
+            aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+        }
+    }
+
+    /** AI 并发控制（与 InterviewService 共享限流） */
+    private static final java.util.concurrent.Semaphore AI_SEMAPHORE = new java.util.concurrent.Semaphore(5);
+
+    /** 简历文本最大长度 */
+    private static final int MAX_RESUME_LEN = 800;
 }
 

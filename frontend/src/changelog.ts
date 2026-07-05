@@ -10,9 +10,24 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.5.1'
+export const CURRENT_VERSION = '1.6.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.6.0',
+    date: '2026-07-05',
+    title: '版本 1.6.0 · 新增 AI 简历优化 + 文档下载',
+    items: [
+      '新增功能：基于分析结果一键生成优化版简历，AI 按 STAR 法则改写并量化项目成果',
+      '新增功能：优化简历支持预览/源码双视图切换，实时渲染 Markdown',
+      '新增功能：支持下载 Markdown 格式简历文档（.md）',
+      '新增功能：支持下载 HTML 格式简历文档（.html，含打印样式，可直接打印为 PDF）',
+      '新增功能：优化简历支持一键复制到剪贴板',
+      '新增功能：优化简历结果缓存 30 分钟，避免重复调用 AI',
+      '安全：优化简历 Markdown 经 DOMPurify 消毒后渲染，防 XSS',
+      '工程化：后端新增 POST /api/resume/optimize 接口'
+    ]
+  },
   {
     version: '1.5.1',
     date: '2026-07-05',
