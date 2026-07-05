@@ -105,8 +105,9 @@ public class ResumeAnalysisService {
                     1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记
                     2. 所有字符串必须使用 ASCII 双引号 "，禁止使用单引号 ' 或中文引号 “ ” ‘ ’
                     3. 不要在字符串值中使用单引号或双引号，如需引用请用中文书名号《》或直接描述
-                    4. 不要输出任何注释、解释、前后缀文字
-                    5. 输出格式：
+                    4. 字符串值内禁止包含裸换行符、回车符、制表符；如需换行请用分号或逗号分隔
+                    5. 不要输出任何注释、解释、前后缀文字
+                    6. 输出格式：
                     {"overallScore":75,"dimensions":[{"name":"技术栈匹配度","score":80,"suggestion":"改进建议"}],"strengths":["优势1"],"weaknesses":["不足1"],"improvements":["建议1"]}
                     """, targetJob, resumeText);
 

@@ -128,4 +128,37 @@ class JsonRepairUtilTest {
         String result = JsonRepairUtil.repairAndLog(raw, "test");
         assertThat(result).isEqualTo(raw);
     }
+
+    @Test
+    @DisplayName("修复字符串内裸换行符：Bad control character in string literal")
+    void repair_controlCharInString_shouldEscape() throws Exception {
+        // AI 在 suggestion 字段里直接返回裸换行符，导致 JSON.parse 报错
+        // position 729 (line 29 column 23) 即此场景
+        String raw = "{\"suggestion\": \"项目1\n项目2\"}";
+        String repaired = JsonRepairUtil.repair(raw);
+        var node = mapper.readTree(repaired);
+        assertThat(node.get("suggestion").asText()).contains("项目1");
+        assertThat(node.get("suggestion").asText()).contains("项目2");
+    }
+
+    @Test
+    @DisplayName("修复字符串内回车+制表符：保留 JSON 缩进格式化")
+    void repair_controlChars_shouldEscapeInStringOnly() throws Exception {
+        // 字符串内 \n \r \t 转义，但 JSON 结构外的 \n 保留（缩进格式化）
+        String raw = "{\n  \"score\": 80,\n  \"desc\": \"line1\nline2\ttabbed\"\n}";
+        String repaired = JsonRepairUtil.repair(raw);
+        var node = mapper.readTree(repaired);
+        assertThat(node.get("score").asInt()).isEqualTo(80);
+        assertThat(node.get("desc").asText()).isEqualTo("line1\nline2\ttabbed");
+    }
+
+    @Test
+    @DisplayName("综合：单引号+裸换行+中文引号（用户实际报错场景）")
+    void repair_complexWithControlChars() throws Exception {
+        String raw = "{'overallScore': 72, 'dimensions': [{'name': '技术栈', 'suggestion': '建议补充：\n1. Spring Boot\n2. MySQL'}],}";
+        String repaired = JsonRepairUtil.repair(raw);
+        var node = mapper.readTree(repaired);
+        assertThat(node.get("overallScore").asInt()).isEqualTo(72);
+        assertThat(node.get("dimensions").get(0).get("suggestion").asText()).contains("Spring Boot");
+    }
 }

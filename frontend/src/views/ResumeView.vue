@@ -224,7 +224,57 @@ function repairJson(raw: string): string {
   s = s.replace(/([{,])\s*([A-Za-z_\u4e00-\u9fa5][A-Za-z0-9_\u4e00-\u9fa5\-]*)\s*:/g, '$1"$2":')
   // 尾随逗号
   s = s.replace(/,\s*([}\]])/g, '$1')
+  // 字符串字面量内部的控制字符转义（修复 "Bad control character in string literal"）
+  // 状态机：仅在 "..." 内部将 \n \r \t 转义，外部保留（JSON 缩进格式化）
+  s = escapeControlCharsInStrings(s)
   return s
+}
+
+/**
+ * 状态机：仅在 JSON 字符串字面量内部转义控制字符
+ * - 字符串外：保留原样（缩进 \n 不动）
+ * - 字符串内：\n -> \\n, \r -> \\r, \t -> \\t, 其他控制字符删除
+ */
+function escapeControlCharsInStrings(s: string): string {
+  if (!s) return s
+  let out = ''
+  let inString = false
+  let escaped = false
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (!inString) {
+      out += c
+      if (c === '"') {
+        inString = true
+        escaped = false
+      }
+      continue
+    }
+    if (escaped) {
+      out += c
+      escaped = false
+      continue
+    }
+    if (c === '\\') {
+      out += c
+      escaped = true
+      continue
+    }
+    if (c === '"') {
+      out += c
+      inString = false
+      continue
+    }
+    if (c === '\n') out += '\\n'
+    else if (c === '\r') out += '\\r'
+    else if (c === '\t') out += '\\t'
+    else if (c === '\b') out += '\\b'
+    else if (c === '\f') out += '\\f'
+    else if (c.charCodeAt(0) < 0x20) {
+      // 其他控制字符删除
+    } else out += c
+  }
+  return out
 }
 
 function handleResult(data: unknown) {

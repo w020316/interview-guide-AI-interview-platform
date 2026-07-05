@@ -83,10 +83,73 @@ public final class JsonRepairUtil {
         // 7. 尾随逗号清理
         s = TRAILING_COMMA.matcher(s).replaceAll("$1");
 
-        // 8. 清理控制字符（除 \n \r \t 外）
-        s = s.replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", "");
+        // 8. 字符串字面量内部的控制字符转义
+        // JSON 规范要求：字符串内的 \n \r \t 等控制字符必须转义为 \n \r \t
+        // AI 经常在 suggestion 字段里直接返回裸换行符，导致 "Bad control character in string literal"
+        s = escapeControlCharsInStrings(s);
 
         return s;
+    }
+
+    /**
+     * 状态机遍历 JSON，仅在字符串字面量内部将控制字符转义
+     * - 字符串外（结构字符、空白）：保留原样（JSON 缩进格式化的 \n 不动）
+     * - 字符串内：\n -> \\n, \r -> \\r, \t -> \\t, 其他控制字符删除
+     *
+     * 关键：正确识别字符串边界（跳过 \" 转义）
+     */
+    private static String escapeControlCharsInStrings(String s) {
+        if (s == null || s.isEmpty()) return s;
+        StringBuilder out = new StringBuilder(s.length() + 16);
+        boolean inString = false;
+        boolean escaped = false; // 前一个字符是否为反斜杠
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!inString) {
+                out.append(c);
+                if (c == '"') {
+                    inString = true;
+                    escaped = false;
+                }
+                continue;
+            }
+            // 在字符串内部
+            if (escaped) {
+                // 前一个字符是 \，当前字符是转义序列的一部分，原样输出
+                out.append(c);
+                escaped = false;
+                continue;
+            }
+            if (c == '\\') {
+                out.append(c);
+                escaped = true;
+                continue;
+            }
+            if (c == '"') {
+                // 字符串结束（非转义的 "）
+                out.append(c);
+                inString = false;
+                continue;
+            }
+            // 处理控制字符
+            if (c == '\n') {
+                out.append("\\n");
+            } else if (c == '\r') {
+                out.append("\\r");
+            } else if (c == '\t') {
+                out.append("\\t");
+            } else if (c == '\b') {
+                out.append("\\b");
+            } else if (c == '\f') {
+                out.append("\\f");
+            } else if (c < 0x20) {
+                // 其他控制字符（0x00-0x1F）删除
+                // 已被上面覆盖的除外
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     /**
