@@ -45,8 +45,8 @@ public class ResumeParseService {
                 resumeText = stripper.getText(document);
             }
         } else if (lower.endsWith(".txt")) {
-            // 纯文本直接读取
-            resumeText = new String(file.getBytes());
+            // 纯文本直接读取（显式指定 UTF-8，避免 Windows 默认 GBK 导致中文乱码）
+            resumeText = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
         } else {
             // DOCX/DOC 及其他格式暂不支持
             throw new IllegalArgumentException(

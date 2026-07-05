@@ -62,12 +62,12 @@ public class ResumeController {
     /**
      * 分析简历（纯文本）
      * POST /api/resume/analyze
-     * Body: {"resumeText": "...", "targetJob": "Java 后端开发"}
+     * Body: {"resumeText": "...", "targetJob": "目标岗位"}
      */
     @PostMapping("/analyze")
     public Result<String> analyze(@RequestBody Map<String, String> request) {
         String resumeText = request.get("resumeText");
-        String targetJob = request.getOrDefault("targetJob", "Java 后端开发");
+        String targetJob = request.getOrDefault("targetJob", "通用岗位");
 
         if (resumeText == null || resumeText.trim().isEmpty()) {
             return Result.error(400, "简历内容不能为空");
@@ -91,7 +91,7 @@ public class ResumeController {
     @PostMapping("/upload")
     public Result<String> upload(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "targetJob", defaultValue = "Java 后端开发") String targetJob) {
+            @RequestParam(value = "targetJob", defaultValue = "通用岗位") String targetJob) {
 
         if (file == null || file.isEmpty()) {
             return Result.error(400, "请上传简历文件");
@@ -121,9 +121,9 @@ public class ResumeController {
 
         // PDF 文件 magic bytes 校验（%PDF-）
         if (lower.endsWith(".pdf")) {
-            try {
+            try (java.io.InputStream is = file.getInputStream()) {
                 byte[] head = new byte[5];
-                int read = file.getInputStream().read(head);
+                int read = is.read(head);
                 if (read < 5 || !"%PDF-".equals(new String(head))) {
                     return Result.error(400, "文件内容不是合法的 PDF");
                 }

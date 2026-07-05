@@ -30,6 +30,10 @@ public class ResumeService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /** 兜底 JSON：AI 返回无法解析时使用，保证 JSONB 字段写入不失败 */
+    private static final String FALLBACK_JSON =
+            "{\"overallScore\":0,\"dimensions\":[],\"strengths\":[],\"improvements\":[\"AI 返回内容无法解析，请稍后重试\"]}";
+
     /**
      * 保存简历分析结果
      *
@@ -47,14 +51,24 @@ public class ResumeService {
             safeResult = JsonRepairUtil.repairAndLog(analysisResult, "resume-persist");
         }
 
-        // 解析综合评分（容错：解析失败则不存）
+        // 合法性校验：修复后仍非法则用兜底 JSON，避免 JSONB 字段写入失败
+        if (safeResult == null || safeResult.isBlank() || !JsonRepairUtil.isValid(safeResult)) {
+            log.warn("简历分析结果修复后仍非法，使用兜底 JSON 持久化");
+            safeResult = FALLBACK_JSON;
+        }
+
+        // 解析综合评分（容错：解析失败则不存；强制数字转换）
         Integer overallScore = null;
         try {
-            if (safeResult != null && !safeResult.isBlank()) {
-                Map<?, ?> obj = objectMapper.readValue(safeResult, Map.class);
-                Object score = obj.get("overallScore");
-                if (score instanceof Number n) {
-                    overallScore = n.intValue();
+            Map<?, ?> obj = objectMapper.readValue(safeResult, Map.class);
+            Object score = obj.get("overallScore");
+            if (score instanceof Number n) {
+                overallScore = n.intValue();
+            } else if (score instanceof String s && !s.isBlank()) {
+                // AI 可能返回字符串 "75"，强制转换
+                try {
+                    overallScore = Integer.parseInt(s.trim());
+                } catch (NumberFormatException ignored) {
                 }
             }
         } catch (Exception e) {

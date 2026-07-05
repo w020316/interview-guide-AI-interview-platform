@@ -122,6 +122,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
+import { repairAndCheck } from '../utils/jsonRepair'
 
 const router = useRouter()
 
@@ -171,14 +172,21 @@ async function openDetail(r: Resume) {
   parseError.value = ''
   try {
     const data = await api.get(`/api/resume/${r.id}`) as unknown as Resume
-    detail.value = data
+    // 加载详情后立即尝试修复，保证 parsed computed 能正常解析
     if (data.analysisResult) {
-      try {
-        JSON.parse(data.analysisResult)
-      } catch (e) {
-        parseError.value = 'AI 返回内容无法解析为标准 JSON。错误：' + (e as Error).message
+      const { repaired, valid } = repairAndCheck(data.analysisResult)
+      if (valid && repaired !== data.analysisResult) {
+        data.analysisResult = repaired // 用修复后的内容替换
+      }
+      if (!valid) {
+        try {
+          JSON.parse(data.analysisResult)
+        } catch (e) {
+          parseError.value = 'AI 返回内容无法解析为标准 JSON。错误：' + (e as Error).message
+        }
       }
     }
+    detail.value = data
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载详情失败'))
     detailVisible.value = false
@@ -193,12 +201,21 @@ const parsed = computed<AnalysisResult>(() => {
   }
   try {
     const obj = JSON.parse(detail.value.analysisResult)
-    return {
-      overallScore: obj.overallScore ?? 0,
-      dimensions: obj.dimensions ?? [],
-      strengths: obj.strengths ?? [],
-      improvements: obj.improvements ?? [],
-    }
+    // 强制数字转换（与 ResumeView 保持一致）
+    const rawScore = obj.overallScore
+    const overallScore = typeof rawScore === 'number' ? rawScore
+      : typeof rawScore === 'string' ? (Number(rawScore) || 0)
+      : 0
+    const dimensions = Array.isArray(obj.dimensions) ? obj.dimensions.map((d: any) => ({
+      name: String(d?.name ?? ''),
+      score: typeof d?.score === 'number' ? d.score
+        : typeof d?.score === 'string' ? (Number(d.score) || 0)
+        : 0,
+      suggestion: String(d?.suggestion ?? ''),
+    })) : []
+    const strengths = Array.isArray(obj.strengths) ? obj.strengths.map((s: any) => String(s)) : []
+    const improvements = Array.isArray(obj.improvements) ? obj.improvements.map((s: any) => String(s)) : []
+    return { overallScore, dimensions, strengths, improvements }
   } catch {
     return { overallScore: 0, dimensions: [], strengths: [], improvements: [] }
   }

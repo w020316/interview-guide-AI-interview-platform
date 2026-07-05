@@ -57,12 +57,16 @@ public class ResumeAnalysisService {
 
     private static final String CACHE_PREFIX = "resume:analysis:";
 
+    /** 兜底 JSON：AI 返回无法解析时使用，保证前端不报错 */
+    private static final String FALLBACK_JSON =
+            "{\"overallScore\":0,\"dimensions\":[],\"strengths\":[],\"improvements\":[\"AI 返回内容无法解析，请稍后重试\"]}";
+
     /**
      * 分析简历并给出评分和建议
      *
      * @param resumeText 简历文本
-     * @param targetJob  目标岗位
-     * @return 分析结果（JSON 字符串）
+     * @param targetJob  目标岗位（支持任意行业岗位）
+     * @return 分析结果（合法 JSON 字符串）
      */
     public String analyze(String resumeText, String targetJob) {
         long start = System.nanoTime();
@@ -70,13 +74,14 @@ public class ResumeAnalysisService {
         try {
             // 1. 缓存命中检查（Redis 不可用时降级跳过缓存）
             // 使用 SHA-256 避免 hashCode 碰撞导致缓存串
-            String cacheKey = CACHE_PREFIX + sha256(resumeText + targetJob);
+            String cacheKey = CACHE_PREFIX + sha256(resumeText + "\u0001" + targetJob);
             try {
                 Object cached = redisTemplate.opsForValue().get(cacheKey);
                 if (cached != null) {
                     cacheHit = true;
                     cacheHitCounter.increment();
-                    return cached.toString();
+                    // 缓存命中也走一次修复，兼容历史脏数据
+                    return JsonRepairUtil.repairAndLog(cached.toString(), "resume-cache");
                 }
             } catch (Exception e) {
                 log.warn("Redis 缓存读取失败，降级直连 AI：{}", e.getMessage());
@@ -85,9 +90,9 @@ public class ResumeAnalysisService {
                 cacheMissCounter.increment();
             }
 
-            // 2. 构建 Prompt（强化 JSON 格式约束，避免单引号/中文引号）
+            // 2. 构建 Prompt（根据岗位动态生成，支持任意行业）
             String prompt = String.format("""
-                    你是一位资深 Java 后端面试官，请根据以下简历和目标岗位进行多维度分析。
+                    你是一位资深的%s招聘面试官，请根据以下简历和目标岗位进行多维度分析。
 
                     【目标岗位】
                     %s
@@ -96,22 +101,24 @@ public class ResumeAnalysisService {
                     %s
 
                     请从以下维度评分（0-100）并给出具体修改建议：
-                    1. 技术栈匹配度
-                    2. 项目经历含金量
-                    3. 简历表述清晰度
-                    4. 求职意向匹配度
+                    1. 岗位匹配度：技能、经验、学历等是否符合岗位要求
+                    2. 项目/工作经历含金量：成果、数据、影响力
+                    3. 简历表述清晰度：结构、语言、重点突出
+                    4. 求职意向匹配度：职业规划与岗位的契合度
 
                     【输出要求（务必严格遵守）】
                     1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记
-                    2. 所有字符串必须使用 ASCII 双引号 "，禁止使用单引号 ' 或中文引号 “ ” ‘ ’
+                    2. 所有字符串必须使用 ASCII 双引号 "，禁止使用单引号 ' 或中文引号 “ ” ‘ ’ 「 」 『 』
                     3. 不要在字符串值中使用单引号或双引号，如需引用请用中文书名号《》或直接描述
                     4. 字符串值内禁止包含裸换行符、回车符、制表符；如需换行请用分号或逗号分隔
-                    5. 不要输出任何注释、解释、前后缀文字
-                    6. 输出格式：
-                    {"overallScore":75,"dimensions":[{"name":"技术栈匹配度","score":80,"suggestion":"改进建议"}],"strengths":["优势1"],"weaknesses":["不足1"],"improvements":["建议1"]}
-                    """, targetJob, resumeText);
+                    5. 字符串值内的反斜杠 \\ 必须转义为 \\\\
+                    6. overallScore 和 dimensions 中的 score 必须是整数类型，不要加引号（如 75 而非 "75"）
+                    7. 不要输出任何注释、解释、前后缀文字
+                    8. 输出格式（不要包含 weaknesses 字段）：
+                    {"overallScore":75,"dimensions":[{"name":"岗位匹配度","score":80,"suggestion":"改进建议"}],"strengths":["优势1"],"improvements":["建议1"]}
+                    """, targetJob, targetJob, resumeText);
 
-            // 3. 调用 AI（显式指定温度参数提升稳定性）
+            // 3. 调用 AI
             String response = chatClient.prompt()
                     .user(prompt)
                     .call()
@@ -122,17 +129,24 @@ public class ResumeAnalysisService {
                 throw new IllegalStateException("AI 返回内容为空，请稍后重试");
             }
 
-            // 5. 清理 Markdown + 修复非标准 JSON（单引号/中文引号/尾随逗号等）
+            // 5. 清理 Markdown + 修复非标准 JSON
             String cleaned = JsonRepairUtil.repairAndLog(response, "resume-analyze");
 
-            // 6. 写入缓存（30 分钟，Redis 不可用时静默跳过）
+            // 6. 合法性校验：修复后仍非法则用兜底 JSON（保证前端不报错）
+            if (!JsonRepairUtil.isValid(cleaned)) {
+                log.warn("AI 返回修复后仍非法，使用兜底 JSON。原始返回前 200 字符：{}",
+                        response.length() > 200 ? response.substring(0, 200) + "..." : response);
+                cleaned = FALLBACK_JSON;
+            }
+
+            // 7. 写入缓存（30 分钟，Redis 不可用时静默跳过）
             try {
                 redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);
             } catch (Exception e) {
                 log.warn("Redis 缓存写入失败，跳过缓存：{}", e.getMessage());
             }
 
-            // 7. 简历文本向量化存入向量库
+            // 8. 简历文本向量化存入向量库
             storeResumeEmbedding(cacheKey, resumeText);
 
             return cleaned;

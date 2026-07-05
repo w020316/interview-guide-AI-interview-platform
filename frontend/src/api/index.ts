@@ -28,13 +28,21 @@ export const AI_TIMEOUT = 120000
 /**
  * 统一错误信息提取，避免在各视图中重复 try/catch 模板
  * 用法：catch (e) { ElMessage.error(getErrMessage(e, '操作失败')) }
+ *
+ * 优先级：
+ * 1. HTTP 错误响应中的后端友好 message（response.data.message）
+ * 2. axios 拦截器已 reject 的 Error.message（业务错误、超时、网络错误）
+ * 3. fallback 兜底
  */
 export function getErrMessage(e: unknown, fallback: string): string {
-  // axios 拦截器已把业务错误 reject 为 Error(message)
-  if (e instanceof Error && e.message) return e.message
-  // 兼容原始 axios error（带 response.data.message）
   const err = e as { response?: { data?: { message?: string } }; message?: string }
-  return err?.response?.data?.message || err?.message || fallback
+  // 优先返回后端友好 message（HTTP 5xx 场景）
+  const backendMsg = err?.response?.data?.message
+  if (backendMsg) return backendMsg
+  // 其次返回拦截器已处理过的 message（超时、网络错误、业务错误）
+  if (e instanceof Error && e.message) return e.message
+  // 最后兜底
+  return err?.message || fallback
 }
 
 // 请求拦截器：自动注入 JWT token + Content-Type
@@ -64,7 +72,9 @@ api.interceptors.response.use(
   (response) => {
     const data = response.data
     // 防御：如果返回的是 HTML（Vercel SPA fallback），说明 API 代理未生效
-    if (typeof data === 'string' && data.trim().startsWith('<!DOCTYPE') || data?.toString?.().includes('<html')) {
+    // 注意：data 可能为 null/undefined，需用安全转换
+    const dataStr = data == null ? '' : String(data)
+    if (typeof data === 'string' && data.trim().startsWith('<!DOCTYPE') || dataStr.includes('<html')) {
       return Promise.reject(new Error('API 不可达：收到 HTML 响应，请检查 vercel.json 反向代理配置或后端部署状态'))
     }
     // 后端 Result<T> 结构：{code, message, data}

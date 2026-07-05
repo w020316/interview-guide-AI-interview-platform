@@ -23,7 +23,55 @@
         </el-upload>
         <div class="field-row">
           <label>目标岗位</label>
-          <input v-model="targetJob" type="text" placeholder="Java 后端开发" />
+          <input v-model="targetJob" type="text" list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
+          <datalist id="job-suggestions">
+            <option value="Java 后端开发工程师" />
+            <option value="前端开发工程师" />
+            <option value="Python 后端开发工程师" />
+            <option value="Go 后端开发工程师" />
+            <option value="全栈开发工程师" />
+            <option value="iOS 开发工程师" />
+            <option value="Android 开发工程师" />
+            <option value="数据分析师" />
+            <option value="算法工程师" />
+            <option value="机器学习工程师" />
+            <option value="产品经理" />
+            <option value="项目经理" />
+            <option value="UI/UX 设计师" />
+            <option value="测试工程师" />
+            <option value="运维工程师" />
+            <option value="DevOps 工程师" />
+            <option value="数据库管理员" />
+            <option value="安全工程师" />
+            <option value="教师" />
+            <option value="医生" />
+            <option value="护士" />
+            <option value="药剂师" />
+            <option value="律师" />
+            <option value="会计师" />
+            <option value="审计师" />
+            <option value="财务经理" />
+            <option value="销售经理" />
+            <option value="市场专员" />
+            <option value="运营专员" />
+            <option value="人力资源专员" />
+            <option value="行政助理" />
+            <option value="翻译" />
+            <option value="编辑" />
+            <option value="记者" />
+            <option value="建筑师" />
+            <option value="土木工程师" />
+            <option value="机械工程师" />
+            <option value="电气工程师" />
+            <option value="化工工程师" />
+            <option value="供应链管理" />
+            <option value="采购专员" />
+            <option value="物流管理" />
+            <option value="客户经理" />
+            <option value="店长" />
+            <option value="厨师" />
+            <option value="摄影师" />
+          </datalist>
         </div>
       </div>
 
@@ -34,7 +82,7 @@
         </div>
         <div class="field-row">
           <label>目标岗位</label>
-          <input v-model="targetJob" type="text" placeholder="Java 后端开发" />
+          <input v-model="targetJob" type="text" list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
         </div>
         <button class="btn-analyze" :disabled="loading" @click="analyzeText">
           <span v-if="loading" class="spinner"></span>
@@ -131,6 +179,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
+import { repairAndCheck } from '../utils/jsonRepair'
 
 interface AnalysisResult {
   overallScore: number
@@ -141,7 +190,7 @@ interface AnalysisResult {
 
 const tab = ref('upload')
 const resumeText = ref('')
-const targetJob = ref('Java 后端开发')
+const targetJob = ref('')
 const loading = ref(false)
 const result = ref('')
 const parseError = ref('')
@@ -152,130 +201,58 @@ const parsed = computed<AnalysisResult>(() => {
   }
   try {
     const obj = JSON.parse(result.value)
-    return {
-      overallScore: obj.overallScore ?? 0,
-      dimensions: obj.dimensions ?? [],
-      strengths: obj.strengths ?? [],
-      improvements: obj.improvements ?? [],
-    }
+    // 强制数字转换：AI 可能返回字符串 "75" 而非数字 75
+    const rawScore = obj.overallScore
+    const overallScore = typeof rawScore === 'number' ? rawScore
+      : typeof rawScore === 'string' ? (Number(rawScore) || 0)
+      : 0
+    const dimensions = Array.isArray(obj.dimensions) ? obj.dimensions.map((d: any) => ({
+      name: String(d?.name ?? ''),
+      score: typeof d?.score === 'number' ? d.score
+        : typeof d?.score === 'string' ? (Number(d.score) || 0)
+        : 0,
+      suggestion: String(d?.suggestion ?? ''),
+    })) : []
+    const strengths = Array.isArray(obj.strengths) ? obj.strengths.map((s: any) => String(s)) : []
+    const improvements = Array.isArray(obj.improvements) ? obj.improvements.map((s: any) => String(s)) : []
+    return { overallScore, dimensions, strengths, improvements }
   } catch {
     return { overallScore: 0, dimensions: [], strengths: [], improvements: [] }
   }
 })
 
-// 监听 result 变化，更新 parseError（避免在 computed 中产生副作用）
+/**
+ * 监听 result 变化，更新 parseError
+ * 使用标志位避免在 watch 内修改 result 导致递归触发
+ */
+let isRepairing = false
 watch(result, (val) => {
   if (!val) {
     parseError.value = ''
     return
   }
+  // 直接尝试解析
   try {
     JSON.parse(val)
     parseError.value = ''
+    return
   } catch (e) {
-    // 后端已做 JSON 修复，此处为兜底：尝试前端二次修复
-    const repaired = repairJson(val)
-    if (repaired) {
-      try {
-        JSON.parse(repaired)
-        result.value = repaired
-        parseError.value = ''
-        return
-      } catch (e2) {
-        // 仍失败，保留原始并提示
-      }
-    }
+    // 解析失败，走前端兜底修复
+  }
+
+  if (isRepairing) return // 避免递归
+  const { repaired, valid } = repairAndCheck(val)
+  if (valid) {
+    isRepairing = true
+    result.value = repaired // 修复后重新赋值，会再次触发 watch
+    parseError.value = ''
+    // 用 nextTick 重置标志位
+    setTimeout(() => { isRepairing = false }, 0)
+  } else {
     parseError.value = 'AI 返回内容无法解析为标准 JSON，可在下方查看原始返回。错误：' + (e as Error).message
+    isRepairing = false
   }
 })
-
-/**
- * 前端 JSON 修复工具（后端修复的兜底）
- * 处理：单引号、中文引号、尾随逗号、Markdown 代码块
- */
-function repairJson(raw: string): string {
-  if (!raw) return raw
-  let s = raw.trim()
-  // 剥离 Markdown 代码块
-  if (s.startsWith('```')) {
-    const firstNl = s.indexOf('\n')
-    if (firstNl > 0) s = s.substring(firstNl + 1)
-    const lastFence = s.lastIndexOf('```')
-    if (lastFence >= 0) s = s.substring(0, lastFence)
-    s = s.trim()
-  }
-  // 提取 JSON 主体
-  const start = s.search(/[{[]/)
-  if (start >= 0) {
-    const startChar = s[start]
-    const endChar = startChar === '{' ? '}' : ']'
-    const end = s.lastIndexOf(endChar)
-    if (end > start) s = s.substring(start, end + 1)
-  }
-  // 中文引号 -> ASCII 双引号
-  s = s.replace(/[\u201C\u201D]/g, '"')
-  // 中文单引号 -> ASCII 单引号
-  s = s.replace(/[\u2018\u2019]/g, "'")
-  // 单引号字符串 -> 双引号字符串
-  s = s.replace(/'((?:\\.|[^'\\])*)'/g, (_m, content) => {
-    return '"' + content.replace(/\\'/g, "'").replace(/"/g, '\\"') + '"'
-  })
-  // 未加引号的 key
-  s = s.replace(/([{,])\s*([A-Za-z_\u4e00-\u9fa5][A-Za-z0-9_\u4e00-\u9fa5\-]*)\s*:/g, '$1"$2":')
-  // 尾随逗号
-  s = s.replace(/,\s*([}\]])/g, '$1')
-  // 字符串字面量内部的控制字符转义（修复 "Bad control character in string literal"）
-  // 状态机：仅在 "..." 内部将 \n \r \t 转义，外部保留（JSON 缩进格式化）
-  s = escapeControlCharsInStrings(s)
-  return s
-}
-
-/**
- * 状态机：仅在 JSON 字符串字面量内部转义控制字符
- * - 字符串外：保留原样（缩进 \n 不动）
- * - 字符串内：\n -> \\n, \r -> \\r, \t -> \\t, 其他控制字符删除
- */
-function escapeControlCharsInStrings(s: string): string {
-  if (!s) return s
-  let out = ''
-  let inString = false
-  let escaped = false
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i]
-    if (!inString) {
-      out += c
-      if (c === '"') {
-        inString = true
-        escaped = false
-      }
-      continue
-    }
-    if (escaped) {
-      out += c
-      escaped = false
-      continue
-    }
-    if (c === '\\') {
-      out += c
-      escaped = true
-      continue
-    }
-    if (c === '"') {
-      out += c
-      inString = false
-      continue
-    }
-    if (c === '\n') out += '\\n'
-    else if (c === '\r') out += '\\r'
-    else if (c === '\t') out += '\\t'
-    else if (c === '\b') out += '\\b'
-    else if (c === '\f') out += '\\f'
-    else if (c.charCodeAt(0) < 0x20) {
-      // 其他控制字符删除
-    } else out += c
-  }
-  return out
-}
 
 function handleResult(data: unknown) {
   if (data == null || (typeof data === 'string' && !data.trim())) {

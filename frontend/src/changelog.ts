@@ -10,9 +10,30 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.2.0'
+export const CURRENT_VERSION = '1.3.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.3.0',
+    date: '2026-07-05',
+    title: '版本 1.3.0 · 简历分析稳定性强化 + 全行业岗位支持',
+    items: [
+      '简历分析全链路加固：新增兜底 JSON 机制，AI 返回异常时不再报错',
+      'JSON 修复工具升级：括号配对算法，正确处理嵌套单引号和前缀文本中的 {',
+      '前端抽取公共 jsonRepair util，与后端修复能力完全对齐',
+      'ResumeView/ResumeHistoryView：score 字段强制数字转换，避免字符串 "75" 导致颜色错误',
+      'ResumeView：watch 递归修复副作用，使用标志位避免循环触发',
+      'ResumeAnalysisService：去除 Java 硬编码，根据任意岗位动态生成面试官角色',
+      'ResumeAnalysisService：缓存命中也走修复流程，兼容历史脏数据',
+      'ResumeService：持久化前增加合法性校验，JSONB 字段不再写入失败',
+      'ResumeParseService：TXT 文件显式指定 UTF-8 字符集，修复 Windows 中文乱码',
+      'ResumeController：PDF magic bytes 校验改用 try-with-resources，修复资源泄漏',
+      'api/index.ts：getErrMessage 优先返回后端友好 message，HTTP 5xx 不再显示 axios 默认信息',
+      'api/index.ts：HTML 响应检测修复 null data 时的 TypeError',
+      '岗位输入支持 46 个常见行业：开发/产品/设计/医疗/法律/财务/销售/教育/工程/建筑/供应链等',
+      'prompt 强化：明确禁止反斜杠未转义、明确 score 必须为整数类型、移除 weaknesses 字段'
+    ]
+  },
   {
     version: '1.2.0',
     date: '2026-07-05',

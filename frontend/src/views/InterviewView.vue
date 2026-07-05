@@ -10,7 +10,7 @@
       <div class="form-grid">
         <div class="field-row">
           <label>目标岗位</label>
-          <input v-model="jobDesc" type="text" list="job-suggestions" placeholder="如：Java 后端开发、前端工程师、产品经理、数据分析师…" />
+          <input v-model="jobDesc" type="text" list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
           <datalist id="job-suggestions">
             <option value="Java 后端开发工程师" />
             <option value="前端开发工程师" />
@@ -30,6 +30,34 @@
             <option value="DevOps 工程师" />
             <option value="数据库管理员" />
             <option value="安全工程师" />
+            <option value="教师" />
+            <option value="医生" />
+            <option value="护士" />
+            <option value="药剂师" />
+            <option value="律师" />
+            <option value="会计师" />
+            <option value="审计师" />
+            <option value="财务经理" />
+            <option value="销售经理" />
+            <option value="市场专员" />
+            <option value="运营专员" />
+            <option value="人力资源专员" />
+            <option value="行政助理" />
+            <option value="翻译" />
+            <option value="编辑" />
+            <option value="记者" />
+            <option value="建筑师" />
+            <option value="土木工程师" />
+            <option value="机械工程师" />
+            <option value="电气工程师" />
+            <option value="化工工程师" />
+            <option value="供应链管理" />
+            <option value="采购专员" />
+            <option value="物流管理" />
+            <option value="客户经理" />
+            <option value="店长" />
+            <option value="厨师" />
+            <option value="摄影师" />
           </datalist>
         </div>
         <div class="field-row">

@@ -200,26 +200,31 @@ public final class JsonRepairUtil {
         if (trimmed.startsWith("```")) {
             // 去掉首行 ```json 或 ```
             int firstNewline = trimmed.indexOf('\n');
+            String body;
             if (firstNewline > 0) {
-                trimmed = trimmed.substring(firstNewline + 1);
+                body = trimmed.substring(firstNewline + 1);
+            } else {
+                // ``` 后无换行，直接跳过 ``` 前缀
+                body = trimmed.substring(3);
             }
-            // 去掉末尾 ```
-            int lastFence = trimmed.lastIndexOf("```");
-            if (lastFence >= 0) {
-                trimmed = trimmed.substring(0, lastFence);
+            // 去掉末尾 ```（仅在 lastFence > 0 时剥离，避免误删整个内容）
+            int lastFence = body.lastIndexOf("```");
+            if (lastFence > 0) {
+                body = body.substring(0, lastFence);
             }
-            return trimmed.trim();
+            return body.trim();
         }
         return trimmed;
     }
 
     /**
      * 从可能包含前后多余文本的字符串中提取 JSON 主体
-     * 定位第一个 { 或 [，与最后一个 } 或 ]
+     * 使用括号配对算法（计数器），避免误判前缀文本中的 {
+     * 注意：此时字符串可能仍含中文引号/单引号，需要正确识别字符串边界
+     * 简化处理：识别 "..." 字符串和 '...' 字符串，跳过其内部的括号
      */
     private static String extractJsonBody(String s) {
         int start = -1;
-        int end = -1;
         char startChar = 0;
         char endChar = 0;
 
@@ -234,16 +239,52 @@ public final class JsonRepairUtil {
         }
         if (start < 0) return s;
 
-        // 从后往前找匹配的结束符
-        for (int i = s.length() - 1; i > start; i--) {
-            if (s.charAt(i) == endChar) {
-                end = i + 1;
-                break;
+        // 括号配对：从 start 开始计数，遇到字符串跳过
+        int depth = 0;
+        boolean inString = false;
+        boolean inSingleString = false;
+        boolean escaped = false;
+        for (int i = start; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                    continue;
+                }
+                if (c == '\\') {
+                    escaped = true;
+                    continue;
+                }
+                if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (inSingleString) {
+                if (c == '\'') {
+                    inSingleString = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inString = true;
+                continue;
+            }
+            if (c == '\'') {
+                inSingleString = true;
+                continue;
+            }
+            if (c == startChar) {
+                depth++;
+            } else if (c == endChar) {
+                depth--;
+                if (depth == 0) {
+                    return s.substring(start, i + 1);
+                }
             }
         }
-        if (end <= start) return s;
-
-        return s.substring(start, end);
+        // 配对失败，返回原字符串
+        return s;
     }
 
     /**
