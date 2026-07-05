@@ -59,16 +59,19 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /** 跨域配置：白名单制，允许前端（Vercel）域名 + 本地调试 */
+    /** 跨域配置：白名单制，允许前端域名 + 本地调试 */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // 生产前端域名 + 本地开发端口，不再使用通配符
-        // 注意：使用 allowedOriginPatterns 配合 allowCredentials=true 时，
-        // 仍需精确域名避免任意 vercel.app 子域可发起携带 token 的请求
+        // 生产前端域名 + 本地开发端口
+        // Vercel + Cloudflare Pages + 自定义域名均支持
         config.setAllowedOriginPatterns(List.of(
+                // Vercel 部署
                 "https://interview-guide-ai-interview-platform.vercel.app",
-                "https://*.vercel.app",   // 兼容预览部署，生产可收紧
+                "https://*.vercel.app",
+                // Cloudflare Pages 部署（*.pages.dev）
+                "https://*.pages.dev",
+                // 本地开发
                 "http://localhost:*",
                 "http://127.0.0.1:*"
         ));
