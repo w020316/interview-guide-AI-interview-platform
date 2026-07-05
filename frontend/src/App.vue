@@ -1,5 +1,5 @@
 <template>
-  <el-config-provider>
+  <el-config-provider :locale="zhCn">
     <div class="app-wrapper">
       <!-- 顶部导航栏 -->
       <el-header class="navbar" v-if="authState.token">
@@ -26,12 +26,20 @@
 
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { authState, clearAuth } from './auth'
+import api from './api'
 
 const router = useRouter()
 const route = useRoute()
 
-function logout() {
+async function logout() {
+  // 通知后端使 token 失效（best-effort，失败也清前端）
+  try {
+    await api.post('/api/auth/logout')
+  } catch {
+    // 忽略后端失败
+  }
   clearAuth()
   router.push('/login')
 }

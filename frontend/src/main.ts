@@ -3,6 +3,7 @@ import App from './App.vue'
 import router from './router/index'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import * as Icons from '@element-plus/icons-vue'
 
 const app = createApp(App)
@@ -12,11 +13,13 @@ Object.entries(Icons).forEach(([name, component]) => {
   app.component(name, component)
 })
 
-// 全局错误处理器
+// 全局错误处理器：生产环境不输出到 console
 app.config.errorHandler = (err) => {
-  console.error('全局错误:', err)
+  if (!import.meta.env.PROD) {
+    console.error('全局错误:', err)
+  }
 }
 
 app.use(router)
-app.use(ElementPlus)
+app.use(ElementPlus, { locale: zhCn })
 app.mount('#app')

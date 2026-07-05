@@ -103,11 +103,18 @@ public class InterviewSessionService {
      * @param questionId      题目 ID
      * @param userAnswer      用户回答文本
      * @param evaluationScore AI 评分（0-100）
+     * @param currentUserId   当前登录用户 ID（用于越权校验）
      */
     @Transactional
-    public InterviewQuestionEntity saveAnswer(Long questionId, String userAnswer, Integer evaluationScore) {
+    public InterviewQuestionEntity saveAnswer(Long questionId, String userAnswer, Integer evaluationScore, String currentUserId) {
         InterviewQuestionEntity question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new IllegalArgumentException("题目不存在：" + questionId));
+        // 越权校验：题目所属会话必须归当前用户所有
+        InterviewSessionEntity session = sessionRepository.findBySessionId(question.getSessionId())
+                .orElseThrow(() -> new IllegalArgumentException("会话不存在：" + question.getSessionId()));
+        if (!currentUserId.equals(session.getUserId())) {
+            throw new IllegalArgumentException("无权操作他人题目");
+        }
         question.setUserAnswer(userAnswer);
         question.setEvaluationScore(evaluationScore);
         return questionRepository.save(question);

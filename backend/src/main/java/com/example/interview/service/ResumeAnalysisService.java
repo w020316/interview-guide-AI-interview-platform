@@ -1,6 +1,8 @@
 package com.example.interview.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -19,6 +21,8 @@ import java.util.concurrent.TimeUnit;
  */
 @Service
 public class ResumeAnalysisService {
+
+    private static final Logger log = LoggerFactory.getLogger(ResumeAnalysisService.class);
 
     @Autowired
     private ChatClient chatClient;
@@ -51,25 +55,25 @@ public class ResumeAnalysisService {
                 return cached.toString();
             }
         } catch (Exception e) {
-            System.err.println("Redis 缓存读取失败，降级直连 AI：" + e.getMessage());
+            log.warn("Redis 缓存读取失败，降级直连 AI：{}", e.getMessage());
         }
 
         // 2. 构建 Prompt
         String prompt = String.format("""
                 你是一位资深 Java 后端面试官，请根据以下简历和目标岗位进行多维度分析：
-                
+
                 【目标岗位】
                 %s
-                
+
                 【简历内容】
                 %s
-                
+
                 请从以下维度评分（0-100）并给出具体修改建议：
                 1. 技术栈匹配度
                 2. 项目经历含金量
                 3. 简历表述清晰度
                 4. 求职意向匹配度
-                
+
                 输出格式（严格 JSON，不要 Markdown 代码块）：
                 {
                   "overallScore": 75,
@@ -91,17 +95,22 @@ public class ResumeAnalysisService {
                 .call()
                 .content();
 
-        // 4. 清理可能的 Markdown 代码块
+        // 4. AI 响应空值校验
+        if (response == null || response.isBlank()) {
+            throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+        }
+
+        // 5. 清理可能的 Markdown 代码块
         String cleaned = response.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
 
-        // 5. 写入缓存（30 分钟，Redis 不可用时静默跳过）
+        // 6. 写入缓存（30 分钟，Redis 不可用时静默跳过）
         try {
             redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);
         } catch (Exception e) {
-            System.err.println("Redis 缓存写入失败，跳过缓存：" + e.getMessage());
+            log.warn("Redis 缓存写入失败，跳过缓存：{}", e.getMessage());
         }
 
-        // 6. 简历文本向量化存入向量库
+        // 7. 简历文本向量化存入向量库
         storeResumeEmbedding(cacheKey, resumeText);
 
         return cleaned;
@@ -110,7 +119,7 @@ public class ResumeAnalysisService {
     /**
      * 将简历存入向量库，用于后续面试题生成（异步执行，避免 embedding 不可用时阻塞主请求）
      */
-    public void storeResumeEmbedding(String resumeId, String resumeText) {
+    private void storeResumeEmbedding(String resumeId, String resumeText) {
         // 用虚拟线程异步执行，避免 embedding 不可用时阻塞主请求
         Thread.startVirtualThread(() -> {
             try {
@@ -122,7 +131,7 @@ public class ResumeAnalysisService {
                 vectorStore.add(List.of(doc));
             } catch (Exception e) {
                 // 向量化失败不影响主流程
-                System.err.println("简历向量化失败：" + e.getMessage());
+                log.warn("简历向量化失败：{}", e.getMessage());
             }
         });
     }

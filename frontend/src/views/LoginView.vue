@@ -38,7 +38,7 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import api from '../api'
+import api, { getErrMessage } from '../api'
 import { setAuth } from '../auth'
 
 const router = useRouter()
@@ -48,9 +48,11 @@ const loading = ref(false)
 const loginForm = ref({ username: '', password: '' })
 const regForm = ref({ username: '', password: '', email: '' })
 
+/** 登录/注册成功后跳转：redirect 必须以 / 开头的相对路径，防止开放重定向 */
 function redirectAfterAuth() {
-  const redirect = route.query.redirect as string
-  router.push(redirect || '/')
+  const r = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
+  const safe = typeof r === 'string' && r.startsWith('/') ? r : '/'
+  router.push(safe)
 }
 
 async function handleLogin() {
@@ -63,8 +65,7 @@ async function handleLogin() {
     ElMessage.success('登录成功')
     redirectAfterAuth()
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '登录失败'
-    ElMessage.error(msg)
+    ElMessage.error(getErrMessage(e, '登录失败'))
   } finally { loading.value = false }
 }
 
@@ -82,8 +83,7 @@ async function handleRegister() {
     ElMessage.success('注册成功')
     redirectAfterAuth()
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '注册失败'
-    ElMessage.error(msg)
+    ElMessage.error(getErrMessage(e, '注册失败'))
   } finally { loading.value = false }
 }
 </script>

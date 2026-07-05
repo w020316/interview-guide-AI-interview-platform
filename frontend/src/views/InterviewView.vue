@@ -68,9 +68,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import api, { AI_TIMEOUT } from '../api'
-import { authState, isValidJwt } from '../auth'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import api, { AI_TIMEOUT, getErrMessage } from '../api'
+import { authState, isTokenValid, clearAuth } from '../auth'
 import MarkdownIt from 'markdown-it'
 
 // html: false 禁止 HTML 标签通过，防止 XSS
@@ -118,6 +118,7 @@ function diffColor(d: string) {
   return d === 'HARD' ? 'danger' : d === 'MEDIUM' ? 'warning' : 'success'
 }
 
+/** JSON.parse 失败时返回 fallback，不抛异常 */
 function safeParse<T>(str: string, fallback: T): T {
   try { return JSON.parse(str) as T } catch { return fallback }
 }
@@ -135,27 +136,36 @@ async function startInterview() {
     const qs = await api.post('/api/interview/questions',
       { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value },
       { timeout: AI_TIMEOUT }) as unknown as string
-    questions.value = safeParse<Question[]>(qs, [])
-    if (!questions.value.length) {
+    const parsed = safeParse<Question[]>(qs, [])
+    if (!parsed.length) {
       ElMessage.error('面试题生成失败，请重试')
+      // 回滚：题目生成失败时清空 sessionId，避免用户卡在空界面
+      sessionId.value = ''
       return
     }
+    questions.value = parsed
     ElMessage.success(`已生成 ${questions.value.length} 道题目，开始面试！`)
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '创建面试失败'
-    ElMessage.error(msg)
+    ElMessage.error(getErrMessage(e, '创建面试失败'))
+    // 回滚 sessionId，让用户能重新开始
+    sessionId.value = ''
   } finally { loading.value = false }
 }
 
 async function streamHint() {
   if (!currentQ.value) return
+  // 防重入：若上一次流仍在，先 abort
+  if (streaming.value) {
+    abortController?.abort()
+  }
   streaming.value = true
   streamContent.value = ''
   abortController = new AbortController()
   try {
     const token = authState.token
-    if (!isValidJwt(token)) {
-      ElMessage.error('登录状态异常，请重新登录')
+    if (!isTokenValid(token)) {
+      ElMessage.error('登录已过期，请重新登录')
+      clearAuth()
       streaming.value = false
       return
     }
@@ -168,6 +178,17 @@ async function streamHint() {
       body: JSON.stringify({ question: currentQ.value.question }),
       signal: abortController.signal
     })
+    // HTTP 状态码校验：非 2xx 不应作为流式内容渲染
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        ElMessage.error('登录已过期，请重新登录')
+        clearAuth()
+      } else {
+        ElMessage.error(`AI 提示请求失败（HTTP ${resp.status}）`)
+      }
+      streaming.value = false
+      return
+    }
     if (!resp.body) throw new Error('Response body is null')
     const reader = resp.body.getReader()
     const decoder = new TextDecoder()
@@ -188,8 +209,12 @@ async function streamHint() {
       }
     }
   } catch (e: unknown) {
-    if ((e as Error).name !== 'AbortError') {
-      ElMessage.error('流式请求失败')
+    if ((e as Error).name === 'AbortError') {
+      // 用户主动取消，静默
+    } else if (e instanceof TypeError) {
+      ElMessage.error('网络连接失败，请检查网络后重试')
+    } else {
+      ElMessage.error(getErrMessage(e, '流式请求失败'))
     }
   } finally { streaming.value = false }
 }
@@ -211,8 +236,7 @@ async function submitAnswer() {
     }) as unknown as string
     evalResult.value = safeParse<EvalResult>(data, {})
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '评估失败'
-    ElMessage.error(msg)
+    ElMessage.error(getErrMessage(e, '评估失败'))
   } finally { evalLoading.value = false }
 }
 
@@ -234,8 +258,20 @@ async function finishSession() {
     qIndex.value = 0
     questions.value = []
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '结束失败'
-    ElMessage.error(msg)
+    // 失败时提供"重试"与"强制退出"两个选项，避免用户卡死
+    try {
+      await ElMessageBox.confirm(
+        getErrMessage(e, '结束面试失败') + '。是否强制退出当前面试？（后端记录可能未保存）',
+        '结束失败',
+        { confirmButtonText: '强制退出', cancelButtonText: '重试', type: 'warning' }
+      )
+      // 用户选择强制退出，清本地状态
+      sessionId.value = ''
+      qIndex.value = 0
+      questions.value = []
+    } catch {
+      // 用户选择重试，不清理状态
+    }
   }
 }
 

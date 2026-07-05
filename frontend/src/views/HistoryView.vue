@@ -25,7 +25,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import api from '../api'
+import api, { getErrMessage } from '../api'
 
 interface Session {
   sessionId: string
@@ -53,8 +53,7 @@ async function loadHistory() {
     const data = await api.get('/api/session/list') as unknown as Session[]
     sessions.value = data || []
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '加载历史失败'
-    ElMessage.error(msg)
+    ElMessage.error(getErrMessage(e, '加载历史失败'))
   }
 }
 
@@ -64,12 +63,14 @@ async function loadQuestions(sessionId: string) {
     const data = await api.get(`/api/session/${sessionId}/questions`) as unknown as Question[]
     qMap.value = { ...qMap.value, [sessionId]: data || [] }
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '加载题目失败'
-    ElMessage.error(msg)
+    ElMessage.error(getErrMessage(e, '加载题目失败'))
   } finally { loadingId.value = '' }
 }
 
 function fmtDate(dt: string) {
-  return dt ? new Date(dt).toLocaleString('zh-CN', { hour12: false }) : ''
+  if (!dt) return '-'
+  const d = new Date(dt)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleString('zh-CN', { hour12: false })
 }
 </script>

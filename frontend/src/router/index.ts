@@ -7,6 +7,8 @@ const routes = [
   { path: '/resume',    component: () => import('../views/ResumeView.vue'),    meta: { requiresAuth: true  } },
   { path: '/interview', component: () => import('../views/InterviewView.vue'),meta: { requiresAuth: true  } },
   { path: '/history',   component: () => import('../views/HistoryView.vue'),   meta: { requiresAuth: true  } },
+  // 404 兜底：所有未匹配路径重定向到首页
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({

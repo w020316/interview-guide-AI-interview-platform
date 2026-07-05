@@ -16,6 +16,7 @@ import java.util.Map;
  * 认证接口（无需 token 即可访问）
  * POST /api/auth/register  — 注册
  * POST /api/auth/login     — 登录，返回 JWT
+ * POST /api/auth/logout    — 登出（前端清 token，服务端无状态）
  */
 @Tag(name = "认证", description = "用户注册与登录")
 @RestController
@@ -83,5 +84,16 @@ public class AuthController {
         }
 
         return Result.success(jwtUtil.generateToken(username));
+    }
+
+    /**
+     * 登出
+     * 当前 JWT 为无状态方案，登出仅由前端清除 token 即可。
+     * 此接口保留供未来扩展 token 黑名单使用，当前返回成功。
+     */
+    @Operation(summary = "用户登出")
+    @PostMapping("/logout")
+    public Result<Void> logout() {
+        return Result.success(null);
     }
 }

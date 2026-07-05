@@ -130,6 +130,6 @@ public class InterviewSessionController {
         if (userAnswer == null || userAnswer.isBlank()) {
             return Result.error(400, "userAnswer 不能为空");
         }
-        return Result.success(sessionService.saveAnswer(questionId, userAnswer, score));
+        return Result.success(sessionService.saveAnswer(questionId, userAnswer, score, currentUserId()));
     }
 }

@@ -1,5 +1,7 @@
 package com.example.interview.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -18,6 +20,8 @@ import java.util.concurrent.TimeUnit;
  */
 @Service
 public class InterviewService {
+
+    private static final Logger log = LoggerFactory.getLogger(InterviewService.class);
 
     @Autowired
     private ChatClient chatClient;
@@ -43,7 +47,7 @@ public class InterviewService {
                 return cached.toString();
             }
         } catch (Exception e) {
-            System.err.println("Redis 缓存读取失败，降级直连 AI：" + e.getMessage());
+            log.warn("Redis 缓存读取失败，降级直连 AI：{}", e.getMessage());
         }
 
         // 2. RAG 检索相关知识
@@ -63,27 +67,27 @@ public class InterviewService {
                 relatedKnowledge = sb.toString();
             }
         } catch (Exception e) {
-            System.err.println("RAG 检索失败：" + e.getMessage());
+            log.warn("RAG 检索失败：{}", e.getMessage());
         }
 
         // 3. 构建 Prompt
         String prompt = String.format("""
                 你是一位资深 Java 后端面试官，请为以下候选人生成 %d 道面试题。
-                
+
                 【岗位要求】
                 %s
-                
+
                 【简历亮点】
                 %s
-                
+
                 【参考知识点】
                 %s
-                
+
                 要求：
                 1. 题目难度适中，覆盖 Java 基础、框架、数据库、中间件
                 2. 每道题标注考察点和参考答案要点
                 3. 结合简历项目经历出题
-                
+
                 输出格式（严格 JSON 数组，不要 Markdown 代码块）：
                 [
                   {
@@ -102,14 +106,19 @@ public class InterviewService {
                 .call()
                 .content();
 
-        // 5. 清理 Markdown
+        // 5. AI 响应空值校验
+        if (response == null || response.isBlank()) {
+            throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+        }
+
+        // 6. 清理 Markdown
         String cleaned = response.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
 
-        // 6. 写入缓存（1 小时，Redis 不可用时静默跳过）
+        // 7. 写入缓存（1 小时，Redis 不可用时静默跳过）
         try {
             redisTemplate.opsForValue().set(cacheKey, cleaned, 1, TimeUnit.HOURS);
         } catch (Exception e) {
-            System.err.println("Redis 缓存写入失败，跳过缓存：" + e.getMessage());
+            log.warn("Redis 缓存写入失败，跳过缓存：{}", e.getMessage());
         }
 
         return cleaned;
@@ -121,19 +130,19 @@ public class InterviewService {
     public String evaluateAnswer(String question, String userAnswer, String referenceAnswer) {
         String prompt = String.format("""
                 你是一位面试官，请评估以下回答：
-                
+
                 【面试题】
                 %s
-                
+
                 【参考答案】
                 %s
-                
+
                 【用户回答】
                 %s
-                
+
                 请从完整性（30%%）、准确性（40%%）、表达能力（30%%）三个维度评分，
                 并给出改进建议。
-                
+
                 输出格式（严格 JSON，不要 Markdown 代码块）：
                 {
                   "overallScore": 75,
@@ -150,6 +159,10 @@ public class InterviewService {
                 .user(prompt)
                 .call()
                 .content();
+
+        if (response == null || response.isBlank()) {
+            throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+        }
 
         return response.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
     }

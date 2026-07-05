@@ -4,7 +4,8 @@ spring:
 
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/interview}
-    username: ${DATABASE_USER:postgres}
+    # 注意：Supabase Session pooler 用户名必须为 postgres.pzaigjphybqzqlhcvytt（非默认 postgres）
+    username: ${DATABASE_USER:postgres.pzaigjphybqzqlhcvytt}
     password: ${DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
@@ -29,10 +30,11 @@ spring:
   ai:
     openai:
       api-key: ${AI_API_KEY:sk-placeholder}
-      base-url: ${AI_BASE_URL:https://api.openai.com}
+      # 注意：Agnes AI base URL 不带 /v1 后缀
+      base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com}
       chat:
         options:
-          model: ${AI_CHAT_MODEL:gpt-3.5-turbo}
+          model: ${AI_CHAT_MODEL:agnes-2.0-flash}
           temperature: 0.7
       embedding:
         options:

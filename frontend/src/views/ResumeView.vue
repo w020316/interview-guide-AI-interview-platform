@@ -71,7 +71,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import api, { AI_TIMEOUT } from '../api'
+import api, { AI_TIMEOUT, getErrMessage } from '../api'
 
 interface AnalysisResult {
   overallScore: number
@@ -151,9 +151,7 @@ async function handleUpload(file: File) {
     const data = await api.post('/api/resume/upload', form, { timeout: AI_TIMEOUT }) as unknown as string
     if (handleResult(data)) ElMessage.success('分析完成')
   } catch (e: unknown) {
-    const err = e as { code?: string; message?: string; response?: { data?: { message?: string } } }
-    const msg = err?.response?.data?.message || err?.message || '上传失败'
-    ElMessage.error(msg)
+    ElMessage.error(getErrMessage(e, '上传失败'))
   } finally { loading.value = false }
   return false
 }
@@ -168,9 +166,7 @@ async function analyzeText() {
       { timeout: AI_TIMEOUT }) as unknown as string
     if (handleResult(data)) ElMessage.success('分析完成')
   } catch (e: unknown) {
-    const err = e as { code?: string; message?: string; response?: { data?: { message?: string } } }
-    const msg = err?.response?.data?.message || err?.message || '分析失败'
-    ElMessage.error(msg)
+    ElMessage.error(getErrMessage(e, '分析失败'))
   } finally { loading.value = false }
 }
 </script>
