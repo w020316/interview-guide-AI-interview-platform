@@ -1,70 +1,129 @@
 <template>
-  <div>
-    <h2>📄 简历分析</h2>
-    <el-tabs v-model="tab">
-      <el-tab-pane label="上传 PDF" name="upload">
+  <div class="resume-page">
+    <header class="page-header">
+      <h1>简历分析</h1>
+      <p>AI 从多维度评估你的简历，给出可执行的改进建议</p>
+    </header>
+
+    <!-- 输入区 -->
+    <div class="input-section">
+      <div class="tab-switch">
+        <button :class="{ active: tab === 'upload' }" @click="tab = 'upload'">上传文件</button>
+        <button :class="{ active: tab === 'text' }" @click="tab = 'text'">粘贴文本</button>
+      </div>
+
+      <div v-if="tab === 'upload'" class="upload-area">
         <el-upload drag accept=".pdf,.txt"
           :before-upload="handleUpload" :show-file-list="false" :http-request="() => {}">
-          <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-          <div>拖拽文件到此处或 <em>点击上传</em></div>
-          <template #tip><div style="color:#999">支持 PDF / TXT，≤10MB</div></template>
+          <div class="upload-inner">
+            <div class="upload-icon">📄</div>
+            <div class="upload-text">拖拽文件到此处或 <span class="upload-action">点击上传</span></div>
+            <div class="upload-hint">支持 PDF / TXT 格式，文件 ≤ 10MB</div>
+          </div>
         </el-upload>
-        <el-form-item label="目标岗位" style="margin-top:16px;max-width:400px">
-          <el-input v-model="targetJob" placeholder="Java 后端开发" />
-        </el-form-item>
-      </el-tab-pane>
-      <el-tab-pane label="粘贴文本" name="text">
-        <el-input v-model="resumeText" type="textarea" :rows="10" placeholder="粘贴简历文本..." />
-        <el-form-item label="目标岗位" style="margin-top:12px">
-          <el-input v-model="targetJob" placeholder="Java 后端开发" />
-        </el-form-item>
-        <el-button type="primary" :loading="loading" @click="analyzeText" style="margin-top:8px">
-          开始分析
-        </el-button>
-      </el-tab-pane>
-    </el-tabs>
+        <div class="field-row">
+          <label>目标岗位</label>
+          <input v-model="targetJob" type="text" placeholder="Java 后端开发" />
+        </div>
+      </div>
 
-    <div v-if="loading" class="loading-tip">
-      <el-icon class="is-loading"><loading /></el-icon> AI 分析中，请稍候（首次调用需冷启动，最长约 1-2 分钟）…
+      <div v-else class="text-area">
+        <div class="field-row">
+          <label>简历内容</label>
+          <textarea v-model="resumeText" rows="10" placeholder="粘贴你的简历文本..."></textarea>
+        </div>
+        <div class="field-row">
+          <label>目标岗位</label>
+          <input v-model="targetJob" type="text" placeholder="Java 后端开发" />
+        </div>
+        <button class="btn-analyze" :disabled="loading" @click="analyzeText">
+          <span v-if="loading" class="spinner"></span>
+          {{ loading ? '分析中...' : '开始分析' }}
+        </button>
+      </div>
     </div>
 
-    <div v-if="result" class="result-section">
-      <el-divider>分析结果</el-divider>
-      <el-alert v-if="parseError" type="warning" :title="parseError" show-icon :closable="false" style="margin-bottom:12px" />
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="综合评分">
-          <el-tag type="success" size="large">{{ parsed.overallScore }} 分</el-tag>
-        </el-descriptions-item>
-      </el-descriptions>
-      <el-collapse v-if="parsed.dimensions?.length" style="margin-top:16px">
-        <el-collapse-item v-for="(d, idx) in parsed.dimensions" :key="idx"
-          :title="`${d.name}  ${d.score}分`">
-          {{ d.suggestion }}
-        </el-collapse-item>
-      </el-collapse>
-      <el-row :gutter="16" style="margin-top:16px">
-        <el-col :span="12">
-          <el-card header="✅ 优势">
-            <ul v-if="parsed.strengths?.length">
-              <li v-for="(s, idx) in parsed.strengths" :key="idx">{{ s }}</li>
-            </ul>
-            <el-empty v-else description="无" :image-size="40" />
-          </el-card>
-        </el-col>
-        <el-col :span="12">
-          <el-card header="💡 改进建议">
-            <ul v-if="parsed.improvements?.length">
-              <li v-for="(i, idx) in parsed.improvements" :key="idx">{{ i }}</li>
-            </ul>
-            <el-empty v-else description="无" :image-size="40" />
-          </el-card>
-        </el-col>
-      </el-row>
-      <el-collapse style="margin-top:16px">
-        <el-collapse-item title="查看 AI 原始返回">
-          <pre class="raw-output">{{ result }}</pre>
-        </el-collapse-item>
-      </el-collapse>
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-state">
+      <div class="loading-card">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">AI 正在分析你的简历</div>
+        <div class="loading-hint">首次调用需冷启动，最长约 1-2 分钟</div>
+      </div>
+    </div>
+
+    <!-- 分析结果 -->
+    <div v-if="result && !loading" class="result-section fade-in-up">
+      <div v-if="parseError" class="parse-warning">
+        <span class="warning-icon">⚠</span>
+        <span>{{ parseError }}</span>
+      </div>
+
+      <!-- 综合评分 -->
+      <div class="score-hero">
+        <div class="score-circle" :style="{ '--score-color': scoreColor }">
+          <svg viewBox="0 0 120 120" class="score-svg">
+            <circle cx="60" cy="60" r="52" class="score-track" />
+            <circle cx="60" cy="60" r="52" class="score-fill"
+              :style="{ strokeDasharray: 327, strokeDashoffset: 327 - (327 * (parsed.overallScore || 0)) / 100 }" />
+          </svg>
+          <div class="score-value">
+            <span class="score-num">{{ parsed.overallScore ?? '-' }}</span>
+            <span class="score-unit">分</span>
+          </div>
+        </div>
+        <div class="score-meta">
+          <h3>综合评分</h3>
+          <p>{{ scoreLevel }}</p>
+        </div>
+      </div>
+
+      <!-- 维度评分 -->
+      <div v-if="parsed.dimensions?.length" class="dimensions">
+        <h4 class="block-title">维度评分</h4>
+        <div class="dim-grid">
+          <div v-for="(d, idx) in parsed.dimensions" :key="idx" class="dim-card">
+            <div class="dim-head">
+              <span class="dim-name">{{ d.name }}</span>
+              <span class="dim-score" :style="{ color: getScoreColor(d.score) }">{{ d.score }}分</span>
+            </div>
+            <div class="dim-bar">
+              <div class="dim-bar-fill" :style="{ width: (d.score || 0) + '%', background: getScoreGradient(d.score) }"></div>
+            </div>
+            <p class="dim-suggestion">{{ d.suggestion }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 优势 & 建议 -->
+      <div class="analysis-grid">
+        <div class="analysis-card strengths">
+          <div class="card-head">
+            <span class="card-icon strengths-icon">✓</span>
+            <h4>核心优势</h4>
+          </div>
+          <ul v-if="parsed.strengths?.length" class="analysis-list">
+            <li v-for="(s, idx) in parsed.strengths" :key="idx">{{ s }}</li>
+          </ul>
+          <div v-else class="empty-hint">暂无</div>
+        </div>
+        <div class="analysis-card improvements">
+          <div class="card-head">
+            <span class="card-icon improvements-icon">💡</span>
+            <h4>改进建议</h4>
+          </div>
+          <ul v-if="parsed.improvements?.length" class="analysis-list">
+            <li v-for="(i, idx) in parsed.improvements" :key="idx">{{ i }}</li>
+          </ul>
+          <div v-else class="empty-hint">暂无</div>
+        </div>
+      </div>
+
+      <!-- 原始返回 -->
+      <details class="raw-section">
+        <summary>查看 AI 原始返回</summary>
+        <pre class="raw-output">{{ result }}</pre>
+      </details>
     </div>
   </div>
 </template>
@@ -169,9 +228,540 @@ async function analyzeText() {
     ElMessage.error(getErrMessage(e, '分析失败'))
   } finally { loading.value = false }
 }
+
+/** 评分对应颜色 */
+function getScoreColor(score: number): string {
+  if (score >= 85) return '#10b981'
+  if (score >= 70) return '#3b82f6'
+  if (score >= 60) return '#f59e0b'
+  return '#ef4444'
+}
+
+/** 评分对应渐变 */
+function getScoreGradient(score: number): string {
+  if (score >= 85) return 'linear-gradient(90deg, #10b981, #34d399)'
+  if (score >= 70) return 'linear-gradient(90deg, #3b82f6, #60a5fa)'
+  if (score >= 60) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+  return 'linear-gradient(90deg, #ef4444, #f87171)'
+}
+
+/** 综合评分主色 */
+const scoreColor = computed(() => getScoreColor(parsed.value.overallScore || 0))
+
+/** 综合评分等级文案 */
+const scoreLevel = computed(() => {
+  const s = parsed.value.overallScore || 0
+  if (s >= 85) return '优秀 · 简历竞争力强'
+  if (s >= 70) return '良好 · 仍有提升空间'
+  if (s >= 60) return '合格 · 建议针对性优化'
+  if (s > 0) return '待提升 · 需重点修改'
+  return '-'
+})
 </script>
 <style scoped>
-.loading-tip { text-align:center; padding:20px; color:#409eff; font-size:16px; }
-.result-section { margin-top:24px; }
-.raw-output { white-space: pre-wrap; word-break: break-word; background:#f5f7fa; padding:12px; border-radius:4px; font-size:13px; max-height:400px; overflow:auto; }
+.resume-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 32px;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--c-text);
+  margin: 0 0 6px;
+  letter-spacing: -0.5px;
+}
+
+.page-header p {
+  font-size: 14px;
+  color: var(--c-text-secondary);
+  margin: 0;
+}
+
+/* ── Tab 切换 ── */
+.tab-switch {
+  display: inline-flex;
+  background: var(--c-bg-alt);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.tab-switch button {
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.tab-switch button.active {
+  background: var(--c-surface);
+  color: var(--c-text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── 上传区 ── */
+.upload-area {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.upload-area :deep(.el-upload-dragger) {
+  border: 2px dashed var(--c-border);
+  border-radius: var(--radius-lg);
+  padding: 40px 20px;
+  transition: all var(--transition-fast);
+  background: var(--c-surface);
+}
+
+.upload-area :deep(.el-upload-dragger:hover) {
+  border-color: var(--brand-primary);
+  background: var(--brand-primary-light);
+}
+
+.upload-inner {
+  text-align: center;
+}
+
+.upload-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.upload-text {
+  font-size: 15px;
+  color: var(--c-text);
+  margin-bottom: 6px;
+}
+
+.upload-action {
+  color: var(--brand-primary);
+  font-weight: 500;
+}
+
+.upload-hint {
+  font-size: 13px;
+  color: var(--c-text-tertiary);
+}
+
+/* ── 表单字段 ── */
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-row label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text);
+}
+
+.field-row input,
+.field-row textarea {
+  padding: 11px 14px;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: all var(--transition-fast);
+  resize: vertical;
+}
+
+.field-row input::placeholder,
+.field-row textarea::placeholder {
+  color: var(--c-text-tertiary);
+}
+
+.field-row input:focus,
+.field-row textarea:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.text-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.btn-analyze {
+  align-self: flex-start;
+  padding: 12px 32px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-analyze:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+}
+
+.btn-analyze:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── 加载状态 ── */
+.loading-state {
+  margin-top: 32px;
+}
+
+.loading-card {
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--c-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--c-border-light);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--c-border);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin-bottom: 6px;
+}
+
+.loading-hint {
+  font-size: 13px;
+  color: var(--c-text-tertiary);
+}
+
+/* ── 结果区 ── */
+.result-section {
+  margin-top: 40px;
+}
+
+.parse-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: var(--radius-md);
+  border: 1px solid #fde68a;
+}
+
+.warning-icon {
+  font-size: 16px;
+}
+
+/* ── 综合评分 ── */
+.score-hero {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 32px;
+  background: var(--c-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--c-border-light);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 32px;
+}
+
+.score-circle {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  flex-shrink: 0;
+}
+
+.score-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.score-track {
+  fill: none;
+  stroke: var(--c-bg-alt);
+  stroke-width: 8;
+}
+
+.score-fill {
+  fill: none;
+  stroke: var(--score-color, var(--brand-primary));
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.8s ease;
+}
+
+.score-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.score-num {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--c-text);
+  display: block;
+  line-height: 1;
+}
+
+.score-unit {
+  font-size: 13px;
+  color: var(--c-text-tertiary);
+}
+
+.score-meta h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin: 0 0 4px;
+}
+
+.score-meta p {
+  font-size: 14px;
+  color: var(--c-text-secondary);
+  margin: 0;
+}
+
+/* ── 维度评分 ── */
+.block-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin: 0 0 16px;
+}
+
+.dim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.dim-card {
+  padding: 20px;
+  background: var(--c-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--c-border-light);
+}
+
+.dim-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.dim-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-text);
+}
+
+.dim-score {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dim-bar {
+  height: 6px;
+  background: var(--c-bg-alt);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.dim-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.dim-suggestion {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
+  margin: 0;
+}
+
+/* ── 优势 & 建议 ── */
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.analysis-card {
+  padding: 20px;
+  background: var(--c-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--c-border-light);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.strengths-icon {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.improvements-icon {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.card-head h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin: 0;
+}
+
+.analysis-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.analysis-list li {
+  position: relative;
+  padding: 6px 0 6px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
+}
+
+.analysis-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 13px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--c-text-tertiary);
+}
+
+.empty-hint {
+  font-size: 13px;
+  color: var(--c-text-tertiary);
+  padding: 8px 0;
+}
+
+/* ── 原始返回 ── */
+.raw-section {
+  margin-top: 8px;
+  padding: 14px 18px;
+  background: var(--c-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--c-border-light);
+}
+
+.raw-section summary {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+  cursor: pointer;
+}
+
+.raw-section summary:hover {
+  color: var(--c-text);
+}
+
+.raw-output {
+  margin: 12px 0 0;
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--c-text-secondary);
+  background: var(--c-bg-alt);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 400px;
+  overflow: auto;
+}
+
+/* ── 响应式 ── */
+@media (max-width: 768px) {
+  .score-hero {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+    padding: 24px 20px;
+  }
+  .dim-grid {
+    grid-template-columns: 1fr;
+  }
+  .analysis-grid {
+    grid-template-columns: 1fr;
+  }
+  .page-header h1 {
+    font-size: 24px;
+  }
+}
 </style>

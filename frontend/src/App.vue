@@ -2,24 +2,32 @@
   <el-config-provider :locale="zhCn">
     <div class="app-wrapper">
       <!-- 顶部导航栏 -->
-      <el-header class="navbar" v-if="authState.token">
-        <div class="nav-logo">🎯 AI 面试助手</div>
-        <el-menu mode="horizontal" :default-active="route.path" router class="nav-menu">
-          <el-menu-item index="/">首页</el-menu-item>
-          <el-menu-item index="/resume">简历分析</el-menu-item>
-          <el-menu-item index="/interview">模拟面试</el-menu-item>
-          <el-menu-item index="/history">历史记录</el-menu-item>
-        </el-menu>
-        <div class="nav-right">
-          <span v-if="authState.username" class="user-name">{{ authState.username }}</span>
-          <el-button type="danger" size="small" @click="logout">退出</el-button>
+      <header v-if="authState.token" class="navbar">
+        <div class="nav-inner">
+          <div class="nav-brand" @click="router.push('/')">
+            <span class="brand-mark">AI</span>
+            <span class="brand-text">面试助手</span>
+          </div>
+          <nav class="nav-menu">
+            <router-link to="/" class="nav-link" :class="{ active: route.path === '/' }">首页</router-link>
+            <router-link to="/resume" class="nav-link" :class="{ active: route.path === '/resume' }">简历分析</router-link>
+            <router-link to="/interview" class="nav-link" :class="{ active: route.path === '/interview' }">模拟面试</router-link>
+            <router-link to="/history" class="nav-link" :class="{ active: route.path === '/history' }">历史记录</router-link>
+          </nav>
+          <div class="nav-actions">
+            <div class="user-chip">
+              <span class="user-avatar">{{ (authState.username || '?').charAt(0).toUpperCase() }}</span>
+              <span class="user-name">{{ authState.username }}</span>
+            </div>
+            <button class="btn-logout" @click="logout">退出</button>
+          </div>
         </div>
-      </el-header>
+      </header>
 
       <!-- 主内容区 -->
-      <el-main class="main-content">
+      <main class="main-content">
         <router-view />
-      </el-main>
+      </main>
     </div>
   </el-config-provider>
 </template>
@@ -46,23 +54,188 @@ async function logout() {
 </script>
 
 <style scoped>
-.app-wrapper { display: flex; flex-direction: column; min-height: 100vh; }
-.navbar {
-  display: flex; align-items: center; gap: 16px;
-  padding: 0 24px; background: #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,.08); height: 56px;
+.app-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--c-bg);
 }
-.nav-logo { font-size: 18px; font-weight: 700; color: #409eff; white-space: nowrap; }
-.nav-menu { flex: 1; border-bottom: none; }
-.nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-.user-name { color: #606266; font-size: 14px; }
-.main-content { flex: 1; padding: 24px; background: #f5f7fa; }
 
-/* 响应式：移动端 */
-@media (max-width: 640px) {
-  .navbar { padding: 0 12px; gap: 8px; }
-  .nav-logo { font-size: 16px; }
-  .nav-menu .el-menu-item { padding: 0 8px; }
-  .main-content { padding: 12px; }
+/* ── 导航栏 ── */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  height: 60px;
+  padding: 0 24px;
+  gap: 32px;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--brand-gradient);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+.brand-text {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--c-text);
+  letter-spacing: -0.2px;
+}
+
+.nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.nav-link {
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all var(--transition-fast);
+}
+
+.nav-link:hover {
+  color: var(--c-text);
+  background: var(--c-bg-alt);
+}
+
+.nav-link.active {
+  color: var(--brand-primary);
+  background: var(--brand-primary-light);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  background: var(--c-bg-alt);
+  border-radius: 999px;
+}
+
+.user-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--brand-gradient);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text);
+}
+
+.btn-logout {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-logout:hover {
+  color: var(--c-danger);
+  border-color: var(--c-danger);
+  background: #fef2f2;
+}
+
+/* ── 主内容 ── */
+.main-content {
+  flex: 1;
+  padding: 32px 24px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ── 响应式 ── */
+@media (max-width: 768px) {
+  .nav-inner {
+    padding: 0 16px;
+    gap: 16px;
+    height: 54px;
+  }
+  .brand-text {
+    display: none;
+  }
+  .nav-menu {
+    gap: 2px;
+  }
+  .nav-link {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .user-name {
+    display: none;
+  }
+  .user-chip {
+    padding: 4px;
+  }
+  .main-content {
+    padding: 20px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-link {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .btn-logout {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
 }
 </style>
