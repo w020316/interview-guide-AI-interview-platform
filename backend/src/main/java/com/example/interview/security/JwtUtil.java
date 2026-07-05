@@ -33,6 +33,10 @@ public class JwtUtil {
     @Value("${app.jwt.expiration-ms:86400000}")
     private long expirationMs; // 默认 24 小时
 
+    /** JWT issuer / audience，防止 token 跨服务重放 */
+    private static final String ISSUER = "interview-guide";
+    private static final String AUDIENCE = "interview-guide-client";
+
     /** 启动时校验 secret 长度，HS256 要求 >= 32 字节 */
     @PostConstruct
     public void validateSecret() {
@@ -55,6 +59,8 @@ public class JwtUtil {
     public String generateToken(String subject) {
         return Jwts.builder()
                 .subject(subject)
+                .issuer(ISSUER)
+                .audience().add(AUDIENCE).and()
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getKey())
@@ -93,6 +99,8 @@ public class JwtUtil {
     private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getKey())
+                .requireIssuer(ISSUER)
+                .requireAudience(AUDIENCE)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();

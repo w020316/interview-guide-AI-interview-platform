@@ -10,9 +10,38 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.4.1'
+export const CURRENT_VERSION = '1.5.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.5.0',
+    date: '2026-07-05',
+    title: '版本 1.5.0 · 全面质量升级 + AI 性能优化 + UI 去AI化',
+    items: [
+      '安全修复（P0）：缓存 key 加入 userId，防止跨用户缓存串扰隐私泄露',
+      '安全修复（P0）：isTrustedProxy 精确校验 172.16-31 网段，防 IP 伪造绕过限流',
+      '安全修复（P0）：移除 application.yml 中泄露的 Supabase 项目引用 ID',
+      '安全修复（P0）：前端引入 DOMPurify 消毒所有 v-html，防 XSS',
+      '安全修复（P1）：CORS 收紧为精确域名，移除通配符',
+      '安全修复（P1）：JWT 加入 issuer/audience 声明，防 token 跨服务重放',
+      '安全修复（P1）：登录失败计数器增加定期清理，防内存泄漏',
+      'AI 性能优化：generateQuestions 加入并发控制 Semaphore=5，防 API 限流',
+      'AI 性能优化：RAG 检索 topK 从 5 降到 2 + 检测 SimpleVectorStore 短路跳过',
+      'AI 性能优化：Prompt 精简，简历文本截断到 800 字，去除岗位描述重复注入',
+      'AI 性能优化：AiConfig 移除硬编码 Java 后端默认 system prompt',
+      'AI 性能优化：SSE Disposable 保存与取消，客户端断开时释放 AI 订阅防泄漏',
+      'UI 美化：HomeView 重写，去除光晕/网格/玻璃态/紫青渐变等 AI slop 元素',
+      'UI 美化：全局 18 处硬编码靛蓝色替换为品牌色深墨绿',
+      'UI 美化：6 个文件 7 处装饰性 emoji 替换为 SVG 图标',
+      '功能完善：评估结果新增「表达力」分数展示',
+      '功能完善：题目数量支持直接输入（原仅 +/- 按钮）',
+      '功能完善：main.ts 移除全量图标注册（减包体积 200KB）',
+      '功能完善：路由 chunk 加载失败自动刷新，防白屏',
+      '功能完善：流式请求增加 60s 超时兜底 + reader 释放',
+      '功能完善：面试题生成失败时清理已创建会话，防孤儿会话',
+      '工程化：package.json 版本同步至 1.5.0'
+    ]
+  },
   {
     version: '1.4.1',
     date: '2026-07-05',

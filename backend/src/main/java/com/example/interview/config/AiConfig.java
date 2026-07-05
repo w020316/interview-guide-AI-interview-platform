@@ -6,15 +6,14 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Spring AI ChatClient 配置
+ * 不设置硬编码的岗位默认 system prompt，由各业务 Service 根据岗位动态生成，
+ * 避免默认 "Java 后端" 与实际岗位冲突（支持全行业岗位）
  */
 @Configuration
 public class AiConfig {
 
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder) {
-        return builder
-                .defaultSystem("你是一位资深 Java 后端面试官，拥有 10 年大厂面试经验，" +
-                        "擅长根据候选人简历和目标岗位进行个性化面试评估。")
-                .build();
+        return builder.build();
     }
 }

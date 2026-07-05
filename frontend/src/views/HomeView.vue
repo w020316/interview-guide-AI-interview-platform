@@ -2,13 +2,6 @@
   <div class="home">
     <!-- Hero 区 -->
     <section class="hero">
-      <!-- 背景装饰 -->
-      <div class="hero-bg">
-        <div class="hero-glow hero-glow-1"></div>
-        <div class="hero-glow hero-glow-2"></div>
-        <div class="hero-grid"></div>
-      </div>
-
       <div class="hero-content fade-in-up">
         <div class="hero-badge">
           <span class="badge-dot"></span>
@@ -46,7 +39,7 @@
           </div>
           <div class="stat-divider"></div>
           <div class="stat">
-            <div class="stat-num">3</div>
+            <div class="stat-num">4</div>
             <div class="stat-label">评估指标</div>
           </div>
           <div class="stat-divider"></div>
@@ -68,8 +61,10 @@
         <div v-for="(f, i) in features" :key="f.title"
              class="feature-card fade-in-up"
              :style="{ animationDelay: (i * 100) + 'ms' }">
-          <div class="feature-icon-wrap" :style="{ background: f.bg }">
-            <svg v-html="f.iconSvg" class="feature-icon" viewBox="0 0 24 24" fill="none"></svg>
+          <div class="feature-icon-wrap">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none">
+              <path :d="f.iconPath" stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </div>
           <h3>{{ f.title }}</h3>
           <p>{{ f.desc }}</p>
@@ -104,7 +99,6 @@
     <!-- CTA 区 -->
     <section class="cta-section fade-in-up">
       <div class="cta-card">
-        <div class="cta-glow"></div>
         <div class="cta-content">
           <h2 class="cta-title">准备好开始你的面试之旅了吗？</h2>
           <p class="cta-desc">免费使用，无需信用卡，立即获得 AI 智能评估</p>
@@ -127,7 +121,6 @@ import { isLoggedIn } from '../auth'
 const router = useRouter()
 
 function goTo(path: string) {
-  // 需要登录的页面：未登录跳转登录页并带 redirect
   const requiresAuth = ['/resume', '/interview', '/history', '/profile'].includes(path)
   if (requiresAuth && !isLoggedIn()) {
     router.push({ path: '/login', query: { redirect: path } })
@@ -141,27 +134,24 @@ const features = [
     title: '简历智能分析',
     desc: 'AI 从技术匹配度、项目含金量、表述清晰度等四个维度评分，给出可执行的改进建议',
     tags: ['PDF 解析', '多维度评分', '改进建议'],
-    bg: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
-    iconSvg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6 M9 9h1" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    iconPath: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6 M9 9h1',
   },
   {
     title: '个性化面试题',
     desc: '根据简历内容与目标岗位生成定制化面试题，覆盖基础、框架、数据库、中间件等方向',
     tags: ['岗位匹配', '难度分级', '参考答案'],
-    bg: 'linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)',
-    iconSvg: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z M8 10h.01 M12 10h.01 M16 10h.01" stroke="#06b6d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    iconPath: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z M8 10h.01 M12 10h.01 M16 10h.01',
   },
   {
     title: '答题实时评估',
     desc: '提交回答后 AI 从完整性、准确性、表达力三个维度评分，并给出针对性的改进建议',
-    tags: ['三维度评分', '流式提示', '历史回看'],
-    bg: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-    iconSvg: '<path d="M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    tags: ['四维度评分', '流式提示', '历史回看'],
+    iconPath: 'M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
   },
 ]
 
 const steps = [
-  { title: '上传简历', desc: '粘贴文本或上传 PDF/TXT 简历，支持多格式' },
+  { title: '上传简历', desc: '粘贴文本或上传 PDF/HTML/MD/TXT 简历，支持多格式' },
   { title: 'AI 分析', desc: '获得四维度评分与个性化面试题生成' },
   { title: '模拟面试', desc: '答题获得实时流式提示与自动评估' },
 ]
@@ -174,57 +164,12 @@ const steps = [
   padding: 0 24px;
 }
 
-/* ── Hero ── */
+/* ── Hero（去除光晕/网格/玻璃态，纯色 + 排版） ── */
 .hero {
   position: relative;
   text-align: center;
-  padding: 80px 0 64px;
+  padding: 72px 0 56px;
   overflow: hidden;
-}
-
-.hero-bg {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.hero-glow {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.6;
-}
-
-.hero-glow-1 {
-  top: -100px;
-  left: 10%;
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(79, 70, 229, 0.35) 0%, transparent 70%);
-}
-
-.hero-glow-2 {
-  top: -50px;
-  right: 10%;
-  width: 360px;
-  height: 360px;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.3) 0%, transparent 70%);
-}
-
-.hero-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
 }
 
 .hero-content {
@@ -236,17 +181,14 @@ const steps = [
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
+  padding: 6px 14px;
   font-size: 13px;
   font-weight: 500;
   color: var(--brand-primary);
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--brand-primary-50);
   border: 1px solid var(--brand-primary-100);
   border-radius: var(--radius-full);
-  margin-bottom: 28px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-sm);
+  margin-bottom: 24px;
 }
 
 .badge-dot {
@@ -254,17 +196,6 @@ const steps = [
   height: 6px;
   border-radius: 50%;
   background: var(--brand-primary);
-  position: relative;
-}
-
-.badge-dot::after {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 50%;
-  background: var(--brand-primary);
-  opacity: 0.4;
-  animation: ping 2s ease-in-out infinite;
 }
 
 .hero-title {
@@ -273,7 +204,7 @@ const steps = [
   line-height: 1.15;
   letter-spacing: -1.5px;
   color: var(--c-text);
-  margin: 0 0 24px;
+  margin: 0 0 20px;
 }
 
 .hero-subtitle {
@@ -281,7 +212,7 @@ const steps = [
   line-height: 1.7;
   color: var(--c-text-secondary);
   max-width: 580px;
-  margin: 0 auto 36px;
+  margin: 0 auto 32px;
 }
 
 .hero-actions {
@@ -289,43 +220,29 @@ const steps = [
   gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 56px;
+  margin-bottom: 48px;
 }
 
 .btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 28px;
+  padding: 13px 26px;
   font-size: 15px;
   font-weight: 600;
   color: #fff;
-  background: var(--brand-gradient);
+  background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
-  box-shadow: var(--shadow-brand);
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-primary::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4);
-}
-
-.btn-primary:hover::before {
-  opacity: 1;
+  background: var(--brand-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .btn-primary:active {
@@ -344,7 +261,7 @@ const steps = [
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 28px;
+  padding: 13px 26px;
   font-size: 15px;
   font-weight: 500;
   color: var(--c-text);
@@ -353,37 +270,29 @@ const steps = [
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
-  box-shadow: var(--shadow-xs);
 }
 
 .btn-secondary:hover {
   border-color: var(--brand-primary);
   color: var(--brand-primary);
   background: var(--brand-primary-50);
-  transform: translateY(-1px);
-}
-
-.btn-secondary:active {
-  transform: translateY(0);
 }
 
 .btn-lg {
-  padding: 16px 36px;
+  padding: 15px 32px;
   font-size: 16px;
 }
 
-/* ── Hero 数据展示 ── */
+/* ── Hero 数据展示（实色卡片，无玻璃态） ── */
 .hero-stats {
   display: inline-flex;
   align-items: center;
-  gap: 32px;
-  padding: 20px 36px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  gap: 28px;
+  padding: 18px 32px;
+  background: var(--c-surface);
   border: 1px solid var(--c-border-light);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .stat {
@@ -391,61 +300,61 @@ const steps = [
 }
 
 .stat-num {
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 26px;
+  font-weight: 700;
   color: var(--brand-primary);
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--c-text-secondary);
   font-weight: 500;
 }
 
 .stat-divider {
   width: 1px;
-  height: 32px;
+  height: 28px;
   background: var(--c-border);
 }
 
 /* ── 通用 Section ── */
 .section {
-  padding: 64px 0;
+  padding: 56px 0;
 }
 
 .section-header {
   text-align: center;
-  margin-bottom: 48px;
+  margin-bottom: 40px;
 }
 
 .section-title {
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 700;
   color: var(--c-text);
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   letter-spacing: -0.5px;
 }
 
 .section-subtitle {
-  font-size: 16px;
+  font-size: 15px;
   color: var(--c-text-secondary);
   margin: 0;
 }
 
-/* ── 特性卡片 ── */
+/* ── 特性卡片（克制 hover，无图标旋转） ── */
 .features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 20px;
 }
 
 .feature-card {
   background: var(--c-surface);
   border: 1px solid var(--c-border-light);
-  border-radius: var(--radius-xl);
-  padding: 32px 28px;
+  border-radius: var(--radius-lg);
+  padding: 28px 24px;
   transition: all var(--transition-base);
   position: relative;
   overflow: hidden;
@@ -457,17 +366,16 @@ const steps = [
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: var(--brand-gradient);
+  height: 2px;
+  background: var(--brand-primary);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform var(--transition-base);
 }
 
 .feature-card:hover {
-  transform: translateY(-6px);
-  box-shadow: var(--shadow-xl);
   border-color: var(--c-border);
+  box-shadow: var(--shadow-md);
 }
 
 .feature-card:hover::before {
@@ -478,34 +386,31 @@ const steps = [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-lg);
-  margin-bottom: 20px;
-  transition: transform var(--transition-base);
-}
-
-.feature-card:hover .feature-icon-wrap {
-  transform: scale(1.08) rotate(-3deg);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--brand-primary-50);
+  border: 1px solid var(--brand-primary-100);
+  margin-bottom: 16px;
 }
 
 .feature-icon {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
 }
 
 .feature-card h3 {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--c-text);
-  margin: 0 0 10px;
+  margin: 0 0 8px;
 }
 
 .feature-card p {
   font-size: 14px;
   line-height: 1.65;
   color: var(--c-text-secondary);
-  margin: 0 0 18px;
+  margin: 0 0 16px;
 }
 
 .feature-tags {
@@ -515,13 +420,12 @@ const steps = [
 }
 
 .tag {
-  padding: 4px 10px;
+  padding: 3px 10px;
   font-size: 12px;
   font-weight: 500;
   color: var(--c-text-secondary);
   background: var(--c-bg-alt);
   border-radius: var(--radius-full);
-  transition: all var(--transition-fast);
 }
 
 .feature-card:hover .tag {
@@ -533,14 +437,14 @@ const steps = [
 .steps {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 20px;
   position: relative;
 }
 
 .step {
   display: flex;
   align-items: flex-start;
-  gap: 20px;
+  gap: 16px;
   position: relative;
 }
 
@@ -554,14 +458,13 @@ const steps = [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: var(--brand-gradient);
+  background: var(--brand-primary);
   color: #fff;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
-  box-shadow: var(--shadow-brand);
   flex-shrink: 0;
   position: relative;
   z-index: 1;
@@ -571,19 +474,19 @@ const steps = [
   position: absolute;
   top: 50%;
   left: 100%;
-  width: calc(100% - 0px);
-  height: 2px;
-  background: linear-gradient(to right, var(--c-border) 50%, transparent 50%);
-  background-size: 12px 2px;
-  background-repeat: repeat-x;
+  width: 100%;
+  height: 1px;
+  background: var(--c-border-strong);
+  background-image: linear-gradient(to right, var(--c-border-strong) 50%, transparent 50%);
+  background-size: 10px 1px;
   transform: translateY(-50%);
 }
 
 .step-content h4 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--c-text);
-  margin: 8px 0 6px;
+  margin: 6px 0 4px;
 }
 
 .step-content p {
@@ -593,29 +496,18 @@ const steps = [
   line-height: 1.6;
 }
 
-/* ── CTA 区 ── */
+/* ── CTA 区（品牌色实色，无紫青渐变） ── */
 .cta-section {
-  padding: 64px 0 96px;
+  padding: 56px 0 80px;
 }
 
 .cta-card {
   position: relative;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #06b6d4 100%);
-  border-radius: var(--radius-2xl);
-  padding: 64px 48px;
+  background: var(--brand-gradient);
+  border-radius: var(--radius-xl);
+  padding: 56px 40px;
   text-align: center;
-  overflow: hidden;
-  box-shadow: var(--shadow-2xl);
-}
-
-.cta-glow {
-  position: absolute;
-  top: -50%;
-  left: -10%;
-  width: 60%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
-  pointer-events: none;
+  box-shadow: var(--shadow-lg);
 }
 
 .cta-content {
@@ -624,46 +516,39 @@ const steps = [
 }
 
 .cta-title {
-  font-size: clamp(24px, 4vw, 32px);
+  font-size: clamp(24px, 4vw, 30px);
   font-weight: 700;
   color: #fff;
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   letter-spacing: -0.5px;
 }
 
 .cta-desc {
-  font-size: 16px;
+  font-size: 15px;
   color: rgba(255, 255, 255, 0.9);
-  margin: 0 0 32px;
+  margin: 0 0 28px;
 }
 
 .cta-card .btn-primary {
   background: #fff;
   color: var(--brand-primary);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
 }
 
 .cta-card .btn-primary:hover {
-  background: rgba(255, 255, 255, 0.95);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  background: var(--brand-primary-50);
+    transform: translateY(-1px);
 }
 
-/* ── 响应式 ── */
 @media (max-width: 768px) {
-  .home { padding: 0 16px; }
-  .hero { padding: 56px 0 40px; }
-  .hero-stats { gap: 16px; padding: 16px 20px; }
+  .features, .steps {
+    grid-template-columns: 1fr;
+  }
+  .hero-stats {
+    gap: 16px;
+    padding: 14px 20px;
+  }
   .stat-num { font-size: 22px; }
-  .stat-label { font-size: 12px; }
-  .stat-divider { height: 24px; }
-  .features { grid-template-columns: 1fr; gap: 16px; }
-  .feature-card { padding: 24px 20px; }
-  .steps { grid-template-columns: 1fr; gap: 20px; }
-  .step-line { display: none; }
-  .section { padding: 40px 0; }
-  .section-title { font-size: 24px; }
-  .cta-card { padding: 40px 24px; }
 }
 
 @media (max-width: 480px) {

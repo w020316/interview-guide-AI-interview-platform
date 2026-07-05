@@ -105,12 +105,24 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return remoteAddr;
     }
 
-    /** 判断是否为受信代理（内网地址或 Render/Cloudflare 代理） */
+    /** 判断是否为受信代理（精确校验内网地址，避免 172.* 误判） */
     private boolean isTrustedProxy(String ip) {
-        return ip != null && (ip.startsWith("10.")
-                || ip.startsWith("172.")
+        if (ip == null) return false;
+        if (ip.startsWith("10.")
                 || ip.startsWith("192.168.")
                 || ip.equals("127.0.0.1")
-                || ip.startsWith("::1"));
+                || ip.startsWith("::1")) {
+            return true;
+        }
+        // 精确校验 172.16.0.0/12
+        if (ip.startsWith("172.")) {
+            try {
+                int second = Integer.parseInt(ip.split("\\.")[1]);
+                return second >= 16 && second <= 31;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
+        }
+        return false;
     }
 }

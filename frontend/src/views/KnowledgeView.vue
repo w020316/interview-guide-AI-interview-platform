@@ -206,14 +206,24 @@
         </div>
 
         <div v-if="summary.totalQuestions === 0" class="empty-state">
-          <div class="empty-icon">📋</div>
+          <div class="empty-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2 M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2 M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 M9 12h6 M9 16h4"
+                stroke="var(--c-text-quaternary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
           <div class="empty-text">暂无题目记录</div>
           <div class="empty-hint">完成模拟面试后，题目会自动汇总到这里</div>
         </div>
       </template>
 
       <div v-else class="empty-state">
-        <div class="empty-icon">📋</div>
+        <div class="empty-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2 M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2 M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 M9 12h6 M9 16h4"
+              stroke="var(--c-text-quaternary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div class="empty-text">暂无数据</div>
       </div>
     </div>
@@ -224,6 +234,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
+import DOMPurify from 'dompurify'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 
 const md = new MarkdownIt({ html: false, linkify: true })
@@ -279,7 +290,10 @@ interface Summary {
 const summary = ref<Summary | null>(null)
 const summaryLoading = ref(false)
 
-const renderedAnswer = computed(() => md.render(answer.value || '*等待提问...*'))
+const renderedAnswer = computed(() =>
+  DOMPurify.sanitize(md.render(answer.value || '*等待提问...*'),
+    { FORBID_TAGS: ['style', 'iframe'], FORBID_ATTR: ['onerror', 'onload'] })
+)
 const ratePercent = computed(() => {
   if (!summary.value || !summary.value.totalQuestions) return 0
   return Math.round((summary.value.answeredQuestions / summary.value.totalQuestions) * 100)
@@ -512,7 +526,7 @@ function formatTime(t?: string) {
 .field-row textarea:focus,
 .field-row select:focus {
   border-color: var(--brand-primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 /* ── 按钮 ── */
@@ -535,7 +549,7 @@ function formatTime(t?: string) {
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.4);
 }
 
 .btn-primary:disabled {
@@ -590,7 +604,7 @@ function formatTime(t?: string) {
   display: inline-block;
   width: 13px;
   height: 13px;
-  border: 2px solid rgba(79, 70, 229, 0.3);
+  border: 2px solid rgba(15, 118, 110, 0.3);
   border-top-color: var(--brand-primary);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;

@@ -7,7 +7,12 @@
 
     <!-- 空状态 -->
     <div v-if="!sessions.length && !loading" class="empty-state fade-in">
-      <div class="empty-icon">📋</div>
+      <div class="empty-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2 M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2 M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 M9 12h6 M9 16h4"
+            stroke="var(--c-text-quaternary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
       <div class="empty-title">暂无面试记录</div>
       <div class="empty-desc">完成一次模拟面试后，记录会出现在这里</div>
       <button class="btn-primary" @click="$router.push('/interview')">前往面试</button>
@@ -390,12 +395,12 @@ function scoreColor(s?: number | null) {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.35);
 }
 
 .btn-ghost {
@@ -432,7 +437,7 @@ function scoreColor(s?: number | null) {
 .spinner-sm {
   width: 13px;
   height: 13px;
-  border: 2px solid rgba(79, 70, 229, 0.3);
+  border: 2px solid rgba(15, 118, 110, 0.3);
   border-top-color: var(--brand-primary);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;

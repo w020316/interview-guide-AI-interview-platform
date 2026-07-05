@@ -1,7 +1,12 @@
 <template>
   <div class="not-found">
     <div class="nf-content">
-      <div class="nf-emoji">🔍</div>
+      <div class="nf-emoji">
+        <svg width="72" height="72" viewBox="0 0 24 24" fill="none">
+          <circle cx="11" cy="11" r="7" stroke="var(--brand-primary)" stroke-width="1.5"/>
+          <path d="M21 21l-4.3-4.3" stroke="var(--brand-primary)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
       <h1 class="nf-title">
         <span class="text-gradient-static">404</span>
       </h1>
@@ -108,7 +113,7 @@ function goBack() {
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.4);
 }
 
 .btn-secondary {

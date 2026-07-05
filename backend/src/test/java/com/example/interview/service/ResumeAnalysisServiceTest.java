@@ -46,7 +46,7 @@ class ResumeAnalysisServiceTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.get(anyString())).thenReturn("{\"overallScore\":80}");
 
-        String result = service.analyze("简历内容", "Java 后端");
+        String result = service.analyze("user-123", "简历内容", "Java 后端");
 
         assertThat(result).contains("overallScore");
         verify(chatClient, never()).prompt();

@@ -7,7 +7,12 @@
 
     <!-- 空状态 -->
     <div v-if="!loading && !resumes.length" class="empty-state fade-in">
-      <div class="empty-icon">📄</div>
+      <div class="empty-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6"
+            stroke="var(--c-text-quaternary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
       <div class="empty-title">暂无简历分析记录</div>
       <div class="empty-desc">完成一次简历分析后，记录会出现在这里</div>
       <button class="btn-primary" @click="router.push('/resume')">前往简历分析</button>
@@ -331,7 +336,7 @@ function scoreBg(s?: number | null): string {
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.4);
 }
 
 /* ── 简历卡片 ── */

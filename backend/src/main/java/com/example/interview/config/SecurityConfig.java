@@ -59,18 +59,14 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /** 跨域配置：白名单制，允许前端域名 + 本地调试 */
+    /** 跨域配置：白名单制，仅允许生产前端域名 + 本地调试（收紧通配符防滥用） */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // 生产前端域名 + 本地开发端口
-        // Vercel + Cloudflare Pages + 自定义域名均支持
         config.setAllowedOriginPatterns(List.of(
-                // Vercel 部署
+                // 生产前端域名（精确匹配，防止任意子域名滥用）
                 "https://interview-guide-ai-interview-platform.vercel.app",
-                "https://*.vercel.app",
-                // Cloudflare Pages 部署（*.pages.dev）
-                "https://*.pages.dev",
+                "https://interview-guide-ai-interview-platform.pages.dev",
                 // 本地开发
                 "http://localhost:*",
                 "http://127.0.0.1:*"

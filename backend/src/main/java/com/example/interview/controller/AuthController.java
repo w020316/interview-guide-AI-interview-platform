@@ -50,6 +50,18 @@ public class AuthController {
         volatile long lastFailTime = 0;
     }
 
+    /** 定期清理过期的登录失败计数，防止内存泄漏 */
+    private void cleanupExpiredLoginFails() {
+        long now = System.currentTimeMillis();
+        loginFailMap.entrySet().removeIf(entry -> {
+            LoginFailInfo info = entry.getValue();
+            // 锁定过期或 30 分钟无失败则清理
+            return info.count.get() >= MAX_FAIL_COUNT
+                    ? (now - info.lastFailTime) > LOCK_DURATION_MS
+                    : (now - info.lastFailTime) > 30 * 60 * 1000L;
+        });
+    }
+
     /**
      * 注册
      * Body: {"username":"alice","password":"123456","email":"a@b.com"}
@@ -113,6 +125,13 @@ public class AuthController {
         if (username == null || password == null) {
             return Result.error(400, "用户名和密码不能为空");
         }
+        // 登录接口也校验长度上限，防止超长字符串 DoS
+        if (username.length() > 64 || password.length() > 128) {
+            return Result.error(400, "用户名或密码长度超限");
+        }
+
+        // 顺便清理过期的失败计数
+        cleanupExpiredLoginFails();
 
         String clientIp = resolveClientIp(request);
 
@@ -175,10 +194,22 @@ public class AuthController {
     }
 
     private boolean isTrustedProxy(String ip) {
-        return ip != null && (ip.startsWith("10.")
-                || ip.startsWith("172.")
+        if (ip == null) return false;
+        if (ip.startsWith("10.")
                 || ip.startsWith("192.168.")
                 || ip.equals("127.0.0.1")
-                || ip.startsWith("::1"));
+                || ip.startsWith("::1")) {
+            return true;
+        }
+        // 精确校验 172.16.0.0/12（172.16.0.0 - 172.31.255.255），避免 172.* 误判
+        if (ip.startsWith("172.")) {
+            try {
+                int second = Integer.parseInt(ip.split("\\.")[1]);
+                return second >= 16 && second <= 31;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
+        }
+        return false;
     }
 }

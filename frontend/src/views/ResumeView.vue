@@ -157,7 +157,12 @@
         </div>
         <div class="analysis-card improvements">
           <div class="card-head">
-            <span class="card-icon improvements-icon">💡</span>
+            <span class="card-icon improvements-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M9 21h6 M10 18h4 M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"
+                  stroke="#d97706" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
             <h4>改进建议</h4>
           </div>
           <ul v-if="parsed.improvements?.length" class="analysis-list">
@@ -466,7 +471,7 @@ const scoreLevel = computed(() => {
 .field-row input:focus,
 .field-row textarea:focus {
   border-color: var(--brand-primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 .text-area {
@@ -486,7 +491,7 @@ const scoreLevel = computed(() => {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -494,7 +499,7 @@ const scoreLevel = computed(() => {
 
 .btn-analyze:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.35);
 }
 
 .btn-analyze:disabled {

@@ -64,17 +64,17 @@ public class ResumeAnalysisService {
     /**
      * 分析简历并给出评分和建议
      *
+     * @param userId     用户 ID（用于缓存隔离，防跨用户串扰）
      * @param resumeText 简历文本
      * @param targetJob  目标岗位（支持任意行业岗位）
      * @return 分析结果（合法 JSON 字符串）
      */
-    public String analyze(String resumeText, String targetJob) {
+    public String analyze(String userId, String resumeText, String targetJob) {
         long start = System.nanoTime();
         boolean cacheHit = false;
         try {
-            // 1. 缓存命中检查（Redis 不可用时降级跳过缓存）
-            // 使用 SHA-256 避免 hashCode 碰撞导致缓存串
-            String cacheKey = CACHE_PREFIX + sha256(resumeText + "\u0001" + targetJob);
+            // 1. 缓存命中检查（key 包含 userId 防跨用户串扰）
+            String cacheKey = CACHE_PREFIX + userId + ":" + sha256(resumeText + "\u0001" + targetJob);
             try {
                 Object cached = redisTemplate.opsForValue().get(cacheKey);
                 if (cached != null) {

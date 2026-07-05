@@ -7,8 +7,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import reactor.core.Disposable;
 
 import java.io.IOException;
 import java.util.Map;
@@ -63,8 +67,18 @@ public class InterviewController {
             return Result.error(400, "简历和岗位描述不能为空");
         }
 
-        String result = interviewService.generateQuestions(resumeText, jobDescription, count);
+        String userId = currentUserId();
+        String result = interviewService.generateQuestions(userId, resumeText, jobDescription, count);
         return Result.success(result);
+    }
+
+    /** 从 SecurityContext 获取当前登录用户 ID（JWT subject） */
+    private String currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+            throw new IllegalStateException("未认证用户");
+        }
+        return auth.getPrincipal().toString();
     }
 
     /**
@@ -115,6 +129,29 @@ public class InterviewController {
         // 超时 120 秒
         SseEmitter emitter = new SseEmitter(120_000L);
         AtomicBoolean heartbeatRunning = new AtomicBoolean(false);
+        // 保存 Disposable 以便客户端断开时取消订阅，防止资源泄漏
+        final Disposable[] disposableHolder = new Disposable[1];
+
+        // 客户端断开或超时时取消 AI 订阅
+        emitter.onCompletion(() -> {
+            heartbeatRunning.set(false);
+            if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
+                disposableHolder[0].dispose();
+            }
+        });
+        emitter.onTimeout(() -> {
+            heartbeatRunning.set(false);
+            if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
+                disposableHolder[0].dispose();
+            }
+            emitter.complete();
+        });
+        emitter.onError(e -> {
+            heartbeatRunning.set(false);
+            if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
+                disposableHolder[0].dispose();
+            }
+        });
 
         sseExecutor.submit(() -> {
             try {
@@ -126,15 +163,13 @@ public class InterviewController {
                 var heartbeatFuture = heartbeat.scheduleAtFixedRate(() -> {
                     if (!heartbeatRunning.get()) return;
                     try {
-                        // SSE 注释行，前端 EventSource 会自动忽略
                         emitter.send(SseEmitter.event().comment("ping"));
                     } catch (IOException e) {
-                        // 连接已断，停止心跳
                         heartbeatRunning.set(false);
                     }
                 }, 15, 15, TimeUnit.SECONDS);
 
-                // 构建 prompt：精简系统提示，聚焦问题本身，加快响应
+                // 构建 prompt：精简，聚焦问题本身，加快响应
                 String prompt;
                 if (context == null || context.isBlank()) {
                     prompt = "请简洁回答以下面试题，控制在 300 字以内，突出要点：\n\n" + question;
@@ -143,8 +178,8 @@ public class InterviewController {
                             + "【背景】" + context + "\n\n【问题】" + question;
                 }
 
-                // 使用 Spring AI stream() 逐 token 推送
-                chatClient.prompt()
+                // 使用 Spring AI stream() 逐 token 推送，保存 Disposable 以便取消
+                disposableHolder[0] = chatClient.prompt()
                         .user(prompt)
                         .stream()
                         .content()

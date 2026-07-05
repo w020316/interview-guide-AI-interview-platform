@@ -49,16 +49,22 @@ public class InterviewService {
 
     private static final String QUESTION_CACHE = "interview:question:";
 
+    /** AI 并发控制：避免免费层 API 限流导致批量失败 */
+    private static final java.util.concurrent.Semaphore AI_SEMAPHORE = new java.util.concurrent.Semaphore(5);
+
+    /** 简历文本最大长度（截断后送 AI，避免 prompt 过长拖慢推理） */
+    private static final int MAX_RESUME_LEN = 800;
+
     /**
      * 生成面试题
+     * @param userId 用户 ID（用于缓存隔离，防跨用户串扰）
      */
-    public String generateQuestions(String resumeText, String jobDescription, int count) {
+    public String generateQuestions(String userId, String resumeText, String jobDescription, int count) {
         long start = System.nanoTime();
         boolean cacheHit = false;
         try {
-            // 1. 缓存命中（Redis 不可用时降级跳过缓存）
-            // 使用 SHA-256 避免 hashCode 碰撞导致缓存串
-            String cacheKey = QUESTION_CACHE + sha256(resumeText + jobDescription + count);
+            // 1. 缓存命中（key 包含 userId 防跨用户串扰）
+            String cacheKey = QUESTION_CACHE + userId + ":" + sha256(resumeText + jobDescription + count);
             try {
                 Object cached = redisTemplate.opsForValue().get(cacheKey);
                 if (cached != null) {
@@ -69,33 +75,36 @@ public class InterviewService {
                 log.warn("Redis 缓存读取失败，降级直连 AI：{}", e.getMessage());
             }
 
-            // 2. RAG 检索相关知识
+            // 2. RAG 检索（降 topK=2 + 短路：生产环境 pgvector 被排除时直接跳过，避免 5s 超时浪费）
             String relatedKnowledge = "";
             try {
-                List<Document> docs = vectorStore.similaritySearch(
-                        SearchRequest.builder()
-                                .query(jobDescription + " " + resumeText)
-                                .topK(5)
-                                .build()
-                );
-                if (docs != null && !docs.isEmpty()) {
-                    StringBuilder sb = new StringBuilder();
-                    for (Document doc : docs) {
-                        sb.append("- ").append(doc.getText()).append("\n");
+                if (isVectorStoreAvailable()) {
+                    List<Document> docs = vectorStore.similaritySearch(
+                            SearchRequest.builder()
+                                    .query(jobDescription)
+                                    .topK(2)
+                                    .build()
+                    );
+                    if (docs != null && !docs.isEmpty()) {
+                        StringBuilder sb = new StringBuilder();
+                        for (Document doc : docs) {
+                            String t = doc.getText();
+                            if (t != null && !t.isBlank()) {
+                                sb.append("- ").append(t.length() > 100 ? t.substring(0, 100) : t).append("\n");
+                            }
+                        }
+                        relatedKnowledge = sb.toString();
                     }
-                    relatedKnowledge = sb.toString();
                 }
             } catch (Exception e) {
-                log.warn("RAG 检索失败：{}", e.getMessage());
+                log.warn("RAG 检索失败，跳过：{}", e.getMessage());
             }
 
-            // 3. 构建 Prompt（强化 JSON 格式约束）
-            // 根据岗位描述动态生成面试官角色，支持所有岗位
+            // 3. 精简 Prompt（去除 jobDescription 重复注入 + 截断简历文本 + 压缩知识点）
+            String truncatedResume = resumeText.length() > MAX_RESUME_LEN
+                    ? resumeText.substring(0, MAX_RESUME_LEN) + "..." : resumeText;
             String prompt = String.format("""
-                    你是一位资深的%s面试官，请为以下候选人生成 %d 道面试题。
-
-                    【岗位要求】
-                    %s
+                    你是一位资深的%s面试官，请为候选人生成 %d 道面试题。
 
                     【简历亮点】
                     %s
@@ -104,26 +113,30 @@ public class InterviewService {
                     %s
 
                     【出题原则】
-                    1. 题目必须与岗位要求高度相关，覆盖该岗位的核心技能与项目经验
+                    1. 题目与岗位高度相关，覆盖核心技能与项目经验
                     2. 难度分布：简单 30%%、中等 50%%、困难 20%%
-                    3. 分类覆盖：技术基础、项目深挖、场景设计、行为面试（按岗位特点调整）
-                    4. 参考答案需精炼到位，避免冗长
+                    3. 分类覆盖：技术基础、项目深挖、场景设计、行为面试（按岗位调整）
 
                     【输出要求（务必严格遵守）】
-                    1. 直接输出 JSON 数组，不要任何 Markdown 代码块、不要 ```json 标记
-                    2. 所有字符串必须使用 ASCII 双引号 "，禁止使用单引号 ' 或中文引号 “ ” ‘ ’
-                    3. 不要在字符串值中使用引号，如需引用请用书名号《》
-                    4. 字符串值内禁止包含裸换行符、回车符、制表符
-                    5. 不要输出任何注释、解释、前后缀文字
-                    6. 输出格式：
+                    1. 直接输出 JSON 数组，不要 Markdown 代码块、不要 ```json 标记
+                    2. 字符串必须用 ASCII 双引号 "，禁止单引号或中文引号
+                    3. 字符串值内禁止裸换行符、回车符、制表符
+                    4. 不要输出注释、解释、前后缀文字
+                    5. 输出格式：
                     [{"question":"请介绍你的项目架构","category":"项目深挖","difficulty":"MEDIUM","keyPoints":["考察点1"],"referenceAnswer":"参考答案要点"}]
-                    """, jobDescription, count, jobDescription, resumeText, relatedKnowledge);
+                    """, jobDescription, count, truncatedResume, relatedKnowledge.isEmpty() ? "无" : relatedKnowledge);
 
-            // 4. 调用 AI
-            String response = chatClient.prompt()
-                    .user(prompt)
-                    .call()
-                    .content();
+            // 4. 调用 AI（并发控制 + 信号量保护）
+            String response;
+            AI_SEMAPHORE.acquire();
+            try {
+                response = chatClient.prompt()
+                        .user(prompt)
+                        .call()
+                        .content();
+            } finally {
+                AI_SEMAPHORE.release();
+            }
 
             // 5. AI 响应空值校验
             if (response == null || response.isBlank()) {
@@ -133,7 +146,7 @@ public class InterviewService {
             // 6. 清理 Markdown + 修复非标准 JSON
             String cleaned = JsonRepairUtil.repairAndLog(response, "interview-questions");
 
-            // 7. 写入缓存（1 小时，Redis 不可用时静默跳过）
+            // 7. 写入缓存（1 小时）
             try {
                 redisTemplate.opsForValue().set(cacheKey, cleaned, 1, TimeUnit.HOURS);
             } catch (Exception e) {
@@ -141,13 +154,27 @@ public class InterviewService {
             }
 
             return cleaned;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("AI 调用被中断", e);
         } finally {
-            // 监控指标：记录 AI 调用次数与耗时
             questionCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
             if (cacheHit) {
                 log.debug("面试题缓存命中");
             }
+        }
+    }
+
+    /**
+     * 检测 VectorStore 是否真正可用（生产环境 pgvector 被排除时返回 false）
+     */
+    private boolean isVectorStoreAvailable() {
+        try {
+            return vectorStore != null
+                    && !vectorStore.getClass().getName().contains("SimpleVectorStore");
+        } catch (Exception e) {
+            return false;
         }
     }
 

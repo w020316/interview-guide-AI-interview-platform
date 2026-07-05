@@ -4,8 +4,8 @@ spring:
 
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/interview}
-    # 注意：Supabase Session pooler 用户名必须为 postgres.pzaigjphybqzqlhcvytt（非默认 postgres）
-    username: ${DATABASE_USER:postgres.pzaigjphybqzqlhcvytt}
+    # Supabase Session pooler 用户名格式为 postgres.<project-ref>，需通过环境变量注入
+    username: ${DATABASE_USER:postgres}
     password: ${DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:

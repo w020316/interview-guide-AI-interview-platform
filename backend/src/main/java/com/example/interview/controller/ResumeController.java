@@ -75,7 +75,7 @@ public class ResumeController {
             return Result.error(400, "简历内容不能为空");
         }
 
-        String result = resumeAnalysisService.analyze(resumeText, targetJob);
+        String result = resumeAnalysisService.analyze(currentUserId(), resumeText, targetJob);
         // 持久化到数据库（失败不影响返回分析结果给用户）
         try {
             resumeService.saveResume(currentUserId(), resumeText, targetJob, result);
@@ -137,7 +137,7 @@ public class ResumeController {
 
         try {
             // 解析 + 分析，返回 AI JSON
-            String analysisJson = resumeParseService.parseAndAnalyze(file, targetJob);
+            String analysisJson = resumeParseService.parseAndAnalyze(currentUserId(), file, targetJob);
             // 解析后的纯文本用于持久化（再解析一次以拿到 resumeText，避免修改 parseAndAnalyze 签名）
             // 这里简化处理：直接持久化上传文件名 + 分析结果
             try {

@@ -28,11 +28,12 @@ public class ResumeParseService {
     /**
      * 解析上传的简历文件，返回 AI 分析结果
      *
+     * @param userId    用户 ID（用于缓存隔离）
      * @param file      上传的简历文件（支持 PDF / HTML / MD / TXT）
      * @param targetJob 目标岗位
      * @return AI 分析 JSON 字符串
      */
-    public String parseAndAnalyze(MultipartFile file, String targetJob) throws IOException {
+    public String parseAndAnalyze(String userId, MultipartFile file, String targetJob) throws IOException {
         String filename = file.getOriginalFilename();
         if (filename == null || filename.isBlank()) {
             throw new IllegalArgumentException("文件名不能为空");
@@ -67,8 +68,8 @@ public class ResumeParseService {
             throw new IllegalArgumentException("简历文件内容为空，请检查文件是否损坏");
         }
 
-        // 调用 AI 分析（含 Redis 缓存）
-        return resumeAnalysisService.analyze(resumeText, targetJob);
+        // 调用 AI 分析（含 Redis 缓存，key 含 userId 防跨用户串扰）
+        return resumeAnalysisService.analyze(userId, resumeText, targetJob);
     }
 
     /**

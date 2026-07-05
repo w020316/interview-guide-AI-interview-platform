@@ -68,10 +68,11 @@
           <label>题目数量</label>
           <div class="count-stepper">
             <button @click="count = Math.max(3, count - 1)" :disabled="count <= 3">−</button>
-            <span class="count-value">{{ count }}</span>
+            <input class="count-input" type="number" v-model.number="count"
+              min="3" max="10" @blur="count = Math.min(10, Math.max(3, count || 5))" />
             <button @click="count = Math.min(10, count + 1)" :disabled="count >= 10">+</button>
           </div>
-          <div class="count-hint">建议 5 题，约 20-30 分钟</div>
+          <div class="count-hint">建议 5 题，约 20-30 分钟（3-10 题）</div>
         </div>
       </div>
       <button class="btn-primary" :disabled="loading" @click="startInterview">
@@ -104,7 +105,10 @@
         <!-- SSE 流式 AI 提示 -->
         <div class="hint-section">
           <button class="hint-toggle" @click="hintOpen = !hintOpen">
-            <span class="hint-icon">💡</span>
+            <svg class="hint-icon" width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M9 21h6 M10 18h4 M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"
+                stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
             <span>AI 实时提示</span>
             <span class="hint-arrow" :class="{ open: hintOpen }">▾</span>
           </button>
@@ -138,7 +142,10 @@
       <!-- 评估结果卡片 -->
       <div v-if="evalResult" class="eval-card fade-in-up">
         <div class="eval-head">
-          <span class="eval-icon">📊</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M3 3v18h18 M7 14l4-4 4 4 5-5" stroke="var(--brand-primary)" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
           <h4>AI 评估结果</h4>
         </div>
         <div class="eval-scores">
@@ -162,6 +169,13 @@
             </div>
             <div class="score-name">准确性</div>
           </div>
+          <div class="score-divider"></div>
+          <div class="score-item">
+            <div class="score-num" :style="{ color: scoreColor(evalResult.expression) }">
+              {{ evalResult.expression ?? '-' }}
+            </div>
+            <div class="score-name">表达力</div>
+          </div>
         </div>
         <div v-if="evalResult.improvements?.length" class="improve-list">
           <div class="improve-title">改进建议</div>
@@ -184,9 +198,15 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
 import MarkdownIt from 'markdown-it'
+import DOMPurify from 'dompurify'
 
-// html: false 禁止 HTML 标签通过，防止 XSS
+// html: false 禁止 HTML 标签通过，linkify 自动识别链接
 const md = new MarkdownIt({ html: false, linkify: true })
+
+// DOMPurify 消毒：阻止 javascript: 协议等 XSS 向量
+function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, { FORBID_TAGS: ['style', 'iframe'], FORBID_ATTR: ['onerror', 'onload'] })
+}
 
 interface Question {
   question: string
@@ -225,7 +245,7 @@ const currentQ = computed(() => questions.value[qIndex.value])
 const progress = computed(() =>
   Math.round(((qIndex.value + 1) / Math.max(questions.value.length, 1)) * 100)
 )
-const streamHtml = computed(() => md.render(streamContent.value || '等待获取...'))
+const streamHtml = computed(() => sanitizeHtml(md.render(streamContent.value || '等待获取...')))
 
 function diffClass(d: string) {
   if (d === 'HARD') return 'tag-danger'
@@ -250,49 +270,58 @@ async function startInterview() {
   if (!jobDesc.value.trim()) return ElMessage.warning('请填写目标岗位')
   if (loading.value) return // 防止重复点击
   loading.value = true
+  let createdSessionId = ''
   try {
-    // 1. 先创建会话（但不立即设置 sessionId）
+    // 1. 先创建会话（但不立即设置到响应式状态）
     const sess = await api.post('/api/session/create',
       { jobDescription: jobDesc.value }, { timeout: AI_TIMEOUT }) as unknown as { sessionId: string }
+    createdSessionId = sess.sessionId
 
     // 2. 生成面试题
     const qs = await api.post('/api/interview/questions',
       { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value },
       { timeout: AI_TIMEOUT }) as unknown as string
-    
-    // 3. 解析题目（失败时回退到设置页）
+
+    // 3. 解析题目（失败时清理已创建的会话，防孤儿会话）
     const parsed = safeParse<Question[]>(qs, [])
     if (!parsed.length) {
       ElMessage.error('面试题生成失败，请检查岗位描述后重试')
-      // 不设置 sessionId，用户留在设置页
+      // 清理已创建的会话
+      api.put(`/api/session/${createdSessionId}/finish`).catch(() => {})
       return
     }
 
     // 4. 题目成功后才设置状态，切换到面试页
-    sessionId.value = sess.sessionId
+    sessionId.value = createdSessionId
     questions.value = parsed
     ElMessage.success(`已生成 ${questions.value.length} 道题目，开始面试！`)
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '创建面试失败'))
-    // 异常时不设置 sessionId，用户留在设置页
+    // 异常时也清理已创建的会话
+    if (createdSessionId) {
+      api.put(`/api/session/${createdSessionId}/finish`).catch(() => {})
+    }
   } finally { loading.value = false }
 }
 
 async function streamHint() {
   if (!currentQ.value) return
-  // 防重入：若上一次流仍在，先 abort
+  // 防重入：若上一次流仍在，先 abort 并等待退出
   if (streaming.value) {
     abortController?.abort()
+    await new Promise(r => setTimeout(r, 50))
   }
   streaming.value = true
   streamContent.value = ''
   abortController = new AbortController()
+  // 60s 超时兜底，防止 SSE 无限挂起
+  const timeoutId = setTimeout(() => abortController?.abort(), 60000)
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
   try {
     const token = authState.token
     if (!isTokenValid(token)) {
       ElMessage.error('登录已过期，请重新登录')
       clearAuth()
-      streaming.value = false
       return
     }
     const resp = await fetch(`${apiBaseUrl}/api/interview/ask/stream`, {
@@ -304,7 +333,6 @@ async function streamHint() {
       body: JSON.stringify({ question: currentQ.value.question }),
       signal: abortController.signal
     })
-    // HTTP 状态码校验：非 2xx 不应作为流式内容渲染
     if (!resp.ok) {
       if (resp.status === 401) {
         ElMessage.error('登录已过期，请重新登录')
@@ -312,37 +340,45 @@ async function streamHint() {
       } else {
         ElMessage.error(`AI 提示请求失败（HTTP ${resp.status}）`)
       }
-      streaming.value = false
       return
     }
     if (!resp.body) throw new Error('Response body is null')
-    const reader = resp.body.getReader()
+    reader = resp.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
-      // 按行解析 SSE
       const lines = buffer.split('\n')
       buffer = lines.pop() || ''
       for (const line of lines) {
         if (line.startsWith('data:')) {
           const data = line.slice(5).trim()
-          if (data === '[DONE]') { streaming.value = false; return }
+          if (data === '[DONE]') {
+            await reader.cancel()
+            return
+          }
           streamContent.value += data
         }
       }
     }
   } catch (e: unknown) {
     if ((e as Error).name === 'AbortError') {
-      // 用户主动取消，静默
+      // 用户主动取消或超时，静默
     } else if (e instanceof TypeError) {
       ElMessage.error('网络连接失败，请检查网络后重试')
     } else {
       ElMessage.error(getErrMessage(e, '流式请求失败'))
     }
-  } finally { streaming.value = false }
+  } finally {
+    clearTimeout(timeoutId)
+    if (reader) {
+      try { await reader.cancel() } catch { /* 已关闭 */ }
+    }
+    streaming.value = false
+    abortController = null
+  }
 }
 
 function stopStream() {
@@ -486,7 +522,7 @@ onUnmounted(() => {
 .field-row input:focus,
 .field-row textarea:focus {
   border-color: var(--brand-primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 /* ── 题目数量步进器 ── */
@@ -533,6 +569,23 @@ onUnmounted(() => {
   text-align: center;
 }
 
+.count-input {
+  width: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text);
+  text-align: center;
+  border: none;
+  background: transparent;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.count-input::-webkit-outer-spin-button,
+.count-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .count-hint {
   font-size: 12px;
   color: var(--c-text-tertiary);
@@ -550,7 +603,7 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -558,7 +611,7 @@ onUnmounted(() => {
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.35);
 }
 
 .btn-primary:disabled {
@@ -627,7 +680,7 @@ onUnmounted(() => {
 .spinner-sm {
   width: 13px;
   height: 13px;
-  border: 2px solid rgba(79, 70, 229, 0.3);
+  border: 2px solid rgba(15, 118, 110, 0.3);
   border-top-color: var(--brand-primary);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
@@ -765,7 +818,7 @@ onUnmounted(() => {
 }
 
 .hint-toggle:hover {
-  background: rgba(79, 70, 229, 0.04);
+  background: rgba(15, 118, 110, 0.04);
 }
 
 .hint-icon {
@@ -854,7 +907,7 @@ onUnmounted(() => {
 
 .answer-section textarea:focus {
   border-color: var(--brand-primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 .action-row {
