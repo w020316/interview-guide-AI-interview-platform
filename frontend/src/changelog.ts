@@ -10,9 +10,28 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.3.0'
+export const CURRENT_VERSION = '1.4.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.4.0',
+    date: '2026-07-05',
+    title: '版本 1.4.0 · 注册登录体验优化 + Cloudflare Pages 部署',
+    items: [
+      '登录注册超时优化：认证接口单独 90s 超时，兜底 Render 冷启动',
+      '错误信息区分场景：AI 接口/认证接口/普通接口分别提示不同错误信息',
+      '登录页新增密码显示/隐藏切换：避免密码输入错误',
+      '登录页新增"记住用户名"功能：本地存储用户名方便下次登录',
+      '登录页新增冷启动提示：网络错误时显示"后端服务正在冷启动（30-60s）"',
+      '登录页新增重试按钮：网络错误后可一键重试，无需重新输入',
+      '注册表单实时校验：用户名/密码/邮箱输入时即时反馈错误',
+      '后端登录失败限流：IP 维度 5 次失败后锁定 5 分钟，防暴力破解',
+      '后端返回剩余尝试次数：用户名或密码错误时提示"还可尝试 X 次"',
+      'Cloudflare Pages 部署支持：国内访问更稳定',
+      '简历分析支持 HTML/MD 格式：新增 jsoup 解析 HTML 简历',
+      'CORS 允许 *.pages.dev 域名：支持 Cloudflare Pages 跨域请求'
+    ]
+  },
   {
     version: '1.3.0',
     date: '2026-07-05',

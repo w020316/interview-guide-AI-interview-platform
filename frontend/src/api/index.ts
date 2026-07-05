@@ -26,6 +26,32 @@ const api = axios.create({
 export const AI_TIMEOUT = 120000
 
 /**
+ * 认证接口超时：Render 免费层冷启动可能需要 30-60s，给 90s 兜底
+ */
+export const AUTH_TIMEOUT = 90000
+
+/**
+ * 判断是否为 AI 接口（用于区分超时错误信息）
+ */
+function isAiRequest(url: string | undefined): boolean {
+  if (!url) return false
+  return url.includes('/resume/analyze') ||
+         url.includes('/resume/upload') ||
+         url.includes('/interview/generate') ||
+         url.includes('/interview/evaluate') ||
+         url.includes('/interview/stream') ||
+         url.includes('/knowledge/ask')
+}
+
+/**
+ * 判断是否为认证接口（用于区分超时错误信息）
+ */
+function isAuthRequest(url: string | undefined): boolean {
+  if (!url) return false
+  return url.includes('/auth/login') || url.includes('/auth/register')
+}
+
+/**
  * 统一错误信息提取，避免在各视图中重复 try/catch 模板
  * 用法：catch (e) { ElMessage.error(getErrMessage(e, '操作失败')) }
  *
@@ -43,6 +69,23 @@ export function getErrMessage(e: unknown, fallback: string): string {
   if (e instanceof Error && e.message) return e.message
   // 最后兜底
   return err?.message || fallback
+}
+
+/**
+ * 自动重试（仅对 GET 请求和网络错误重试，POST 不重试避免重复写入）
+ */
+async function retryRequest(config: any, retryCount = 1): Promise<any> {
+  try {
+    return await api.request(config)
+  } catch (err: any) {
+    const isNetworkError = err.message === 'Network Error' || err.code === 'ECONNABORTED'
+    const canRetry = retryCount > 0 && isNetworkError && (config.method || 'get').toLowerCase() === 'get'
+    if (canRetry) {
+      await new Promise(r => setTimeout(r, 1500)) // 1.5s 后重试
+      return retryRequest(config, retryCount - 1)
+    }
+    throw err
+  }
 }
 
 // 请求拦截器：自动注入 JWT token + Content-Type
@@ -63,6 +106,10 @@ api.interceptors.request.use((config) => {
     delete config.headers['Content-Type']
   } else {
     config.headers['Content-Type'] = 'application/json'
+  }
+  // 认证接口使用更长超时（Render 冷启动兜底）
+  if (isAuthRequest(config.url)) {
+    config.timeout = AUTH_TIMEOUT
   }
   return config
 })
@@ -88,24 +135,32 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      clearAuth()
+      // 401 在登录页不跳转（避免循环），其他页面跳登录
       if (window.location.pathname !== '/login') {
+        clearAuth()
         window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
       }
     }
-    // 超时单独提示，便于用户排查
+    // 超时单独提示，根据接口类型区分错误信息
     if (error.code === 'ECONNABORTED') {
-      error.message = '请求超时，AI 服务可能正在冷启动，请稍后重试'
+      const url = error.config?.url || ''
+      if (isAiRequest(url)) {
+        error.message = 'AI 服务响应超时，可能正在冷启动或推理中，请稍后重试'
+      } else if (isAuthRequest(url)) {
+        error.message = '后端服务正在冷启动（首次访问需 30-60s 唤醒），请等待几秒后重试'
+      } else {
+        error.message = '请求超时，后端服务可能正在冷启动，请稍后重试'
+      }
     }
     // 检测 HTML 响应（API 代理失效，Vercel 返回 index.html）
     const contentType = error.response?.headers?.['content-type'] || ''
     const respData = error.response?.data
     if (contentType.includes('text/html') || (typeof respData === 'string' && respData.includes('<html'))) {
-      error.message = 'API 不可达：后端服务未响应，请检查部署配置或稍后重试（Render 免费层可能正在冷启动）'
+      error.message = '后端服务未响应，Render 免费层可能正在冷启动，请等待 30-60s 后重试'
     }
     // 网络层错误（DNS/连接失败）
     if (error.message === 'Network Error') {
-      error.message = '网络连接失败，请检查网络或后端服务是否可用'
+      error.message = '网络连接失败，请检查网络后重试（后端服务可能正在冷启动）'
     }
     return Promise.reject(error)
   }
