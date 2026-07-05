@@ -25,7 +25,7 @@
     </el-tabs>
 
     <div v-if="loading" class="loading-tip">
-      <el-icon class="is-loading"><loading /></el-icon> AI 分析中，请稍候…
+      <el-icon class="is-loading"><loading /></el-icon> AI 分析中，请稍候（首次调用需冷启动，最长约 1-2 分钟）…
     </div>
 
     <div v-if="result" class="result-section">
@@ -59,7 +59,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import api from '../api'
+import api, { AI_TIMEOUT } from '../api'
 
 interface AnalysisResult {
   overallScore: number
@@ -107,11 +107,12 @@ async function handleUpload(file: File) {
   form.append('file', file)
   form.append('targetJob', targetJob.value)
   try {
-    const data = await api.post('/api/resume/upload', form) as unknown as string
+    const data = await api.post('/api/resume/upload', form, { timeout: AI_TIMEOUT }) as unknown as string
     result.value = data
     ElMessage.success('分析完成')
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '上传失败'
+    const err = e as { code?: string; message?: string; response?: { data?: { message?: string } } }
+    const msg = err?.response?.data?.message || err?.message || '上传失败'
     ElMessage.error(msg)
   } finally { loading.value = false }
   return false
@@ -122,11 +123,13 @@ async function analyzeText() {
   loading.value = true
   try {
     const data = await api.post('/api/resume/analyze',
-      { resumeText: resumeText.value, targetJob: targetJob.value }) as unknown as string
+      { resumeText: resumeText.value, targetJob: targetJob.value },
+      { timeout: AI_TIMEOUT }) as unknown as string
     result.value = data
     ElMessage.success('分析完成')
   } catch (e: unknown) {
-    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || '分析失败'
+    const err = e as { code?: string; message?: string; response?: { data?: { message?: string } } }
+    const msg = err?.response?.data?.message || err?.message || '分析失败'
     ElMessage.error(msg)
   } finally { loading.value = false }
 }

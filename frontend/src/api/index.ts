@@ -6,6 +6,9 @@ const api = axios.create({
   timeout: 60000,
 })
 
+// AI 相关接口需要更长超时（冷启动 + AI 推理 30-60s）
+export const AI_TIMEOUT = 120000
+
 // 请求拦截器：自动注入 JWT token + Content-Type
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
@@ -47,6 +50,10 @@ api.interceptors.response.use(
       if (window.location.pathname !== '/login') {
         window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
       }
+    }
+    // 超时单独提示，便于用户排查
+    if (error.code === 'ECONNABORTED') {
+      error.message = '请求超时，AI 服务可能正在冷启动，请稍后重试'
     }
     return Promise.reject(error)
   }

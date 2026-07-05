@@ -69,7 +69,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import api from '../api'
+import api, { AI_TIMEOUT } from '../api'
 import { authState, isValidJwt } from '../auth'
 import MarkdownIt from 'markdown-it'
 
@@ -128,12 +128,13 @@ async function startInterview() {
   try {
     // 创建会话（userId 由后端从 token 提取，前端不传）
     const sess = await api.post('/api/session/create',
-      { jobDescription: jobDesc.value }) as unknown as { sessionId: string }
+      { jobDescription: jobDesc.value }, { timeout: AI_TIMEOUT }) as unknown as { sessionId: string }
     sessionId.value = sess.sessionId
 
     // 生成面试题
     const qs = await api.post('/api/interview/questions',
-      { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value }) as unknown as string
+      { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value },
+      { timeout: AI_TIMEOUT }) as unknown as string
     questions.value = safeParse<Question[]>(qs, [])
     if (!questions.value.length) {
       ElMessage.error('面试题生成失败，请重试')
