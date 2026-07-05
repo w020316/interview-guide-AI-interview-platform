@@ -338,6 +338,23 @@ function handleResult(data: unknown) {
     result.value = ''
     return false
   }
+  // 新格式：上传文件时后端返回 { analysis, resumeText }
+  if (data && typeof data === 'object' && 'analysis' in (data as Record<string, unknown>)) {
+    const payload = data as { analysis?: string; resumeText?: string }
+    const analysis = payload.analysis || ''
+    if (!analysis.trim()) {
+      ElMessage.error('AI 返回为空，请重试')
+      result.value = ''
+      return false
+    }
+    result.value = analysis
+    // 保存后端解析出的简历文本，供"生成优化简历"使用
+    if (payload.resumeText) {
+      resumeText.value = payload.resumeText
+    }
+    return true
+  }
+  // 兼容旧格式：纯字符串
   result.value = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
   return true
 }

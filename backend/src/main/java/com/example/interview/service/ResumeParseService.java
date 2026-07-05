@@ -34,6 +34,20 @@ public class ResumeParseService {
      * @return AI 分析 JSON 字符串
      */
     public String parseAndAnalyze(String userId, MultipartFile file, String targetJob) throws IOException {
+        String resumeText = parseToText(file);
+        // 调用 AI 分析（含 Redis 缓存，key 含 userId 防跨用户串扰）
+        return resumeAnalysisService.analyze(userId, resumeText, targetJob);
+    }
+
+    /**
+     * 解析上传的简历文件，返回纯文本
+     * 供 Controller 在 upload 时同步拿到 resumeText 返回给前端，
+     * 前端可基于此文本调用 /api/resume/optimize 生成优化简历
+     *
+     * @param file 上传的简历文件（支持 PDF / HTML / MD / TXT）
+     * @return 简历纯文本
+     */
+    public String parseToText(MultipartFile file) throws IOException {
         String filename = file.getOriginalFilename();
         if (filename == null || filename.isBlank()) {
             throw new IllegalArgumentException("文件名不能为空");
@@ -68,8 +82,7 @@ public class ResumeParseService {
             throw new IllegalArgumentException("简历文件内容为空，请检查文件是否损坏");
         }
 
-        // 调用 AI 分析（含 Redis 缓存，key 含 userId 防跨用户串扰）
-        return resumeAnalysisService.analyze(userId, resumeText, targetJob);
+        return resumeText;
     }
 
     /**

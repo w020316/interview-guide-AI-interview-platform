@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,7 +92,7 @@ public class ResumeController {
      * Form-data: file=<文件>, targetJob=<岗位>
      */
     @PostMapping("/upload")
-    public Result<String> upload(
+    public Result<Map<String, String>> upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "targetJob", defaultValue = "通用岗位") String targetJob) {
 
@@ -136,17 +137,21 @@ public class ResumeController {
         }
 
         try {
-            // 解析 + 分析，返回 AI JSON
-            String analysisJson = resumeParseService.parseAndAnalyze(currentUserId(), file, targetJob);
-            // 解析后的纯文本用于持久化（再解析一次以拿到 resumeText，避免修改 parseAndAnalyze 签名）
-            // 这里简化处理：直接持久化上传文件名 + 分析结果
+            // 1. 解析文件为纯文本
+            String resumeText = resumeParseService.parseToText(file);
+            // 2. 调用 AI 分析
+            String analysisJson = resumeAnalysisService.analyze(currentUserId(), resumeText, targetJob);
+            // 3. 持久化（保存真实简历文本，便于后续优化与回看）
             try {
-                String preview = originalFilename;
-                resumeService.saveResume(currentUserId(), "[上传文件] " + preview, targetJob, analysisJson);
+                resumeService.saveResume(currentUserId(), resumeText, targetJob, analysisJson);
             } catch (Exception e) {
                 log.warn("简历上传结果持久化失败：{}", e.getMessage());
             }
-            return Result.success(analysisJson);
+            // 4. 返回 analysis + resumeText（前端需要 resumeText 调用 /optimize 生成优化简历）
+            Map<String, String> payload = new HashMap<>();
+            payload.put("analysis", analysisJson);
+            payload.put("resumeText", resumeText);
+            return Result.success(payload);
         } catch (IllegalArgumentException e) {
             return Result.error(400, e.getMessage());
         } catch (Exception e) {
