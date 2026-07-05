@@ -248,30 +248,29 @@ function safeParse<T>(str: string, fallback: T): T {
 
 async function startInterview() {
   if (!jobDesc.value.trim()) return ElMessage.warning('请填写目标岗位')
+  if (loading.value) return // 防止重复点击
   loading.value = true
   try {
-    // 创建会话（userId 由后端从 token 提取，前端不传）
+    // 1. 先创建会话
     const sess = await api.post('/api/session/create',
       { jobDescription: jobDesc.value }, { timeout: AI_TIMEOUT }) as unknown as { sessionId: string }
-    sessionId.value = sess.sessionId
 
-    // 生成面试题
+    // 2. 生成面试题（失败时不设置 sessionId，用户留在设置页）
     const qs = await api.post('/api/interview/questions',
       { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value },
       { timeout: AI_TIMEOUT }) as unknown as string
     const parsed = safeParse<Question[]>(qs, [])
     if (!parsed.length) {
       ElMessage.error('面试题生成失败，请重试')
-      // 回滚：题目生成失败时清空 sessionId，避免用户卡在空界面
-      sessionId.value = ''
       return
     }
+
+    // 3. 题目成功后才设置状态，切换到面试页
+    sessionId.value = sess.sessionId
     questions.value = parsed
     ElMessage.success(`已生成 ${questions.value.length} 道题目，开始面试！`)
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '创建面试失败'))
-    // 回滚 sessionId，让用户能重新开始
-    sessionId.value = ''
   } finally { loading.value = false }
 }
 
