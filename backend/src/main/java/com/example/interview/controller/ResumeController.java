@@ -187,19 +187,38 @@ public class ResumeController {
      */
     @PostMapping("/optimize")
     public Result<String> optimize(@RequestBody Map<String, String> request) {
+        String userId = currentUserId();
         String resumeText = request.get("resumeText");
         String targetJob = request.getOrDefault("targetJob", "通用岗位");
         String analysis = request.get("analysis");
 
+        // resumeText 为空时，从数据库最近一次简历兜底（兼容老前端或刷新页面丢失状态）
         if (resumeText == null || resumeText.trim().isEmpty()) {
-            return Result.error(400, "简历内容不能为空");
+            try {
+                List<ResumeEntity> history = resumeService.listByUser(userId);
+                if (!history.isEmpty()) {
+                    ResumeEntity latest = history.get(0);
+                    resumeText = latest.getContent();
+                    if (targetJob == null || targetJob.isBlank() || "通用岗位".equals(targetJob)) {
+                        targetJob = latest.getTargetJob();
+                    }
+                    log.info("optimize 接口 resumeText 为空，从数据库最近简历兜底 userId={} resumeId={}",
+                            userId, latest.getId());
+                }
+            } catch (Exception e) {
+                log.warn("从数据库兜底 resumeText 失败：{}", e.getMessage());
+            }
+        }
+
+        if (resumeText == null || resumeText.trim().isEmpty()) {
+            return Result.error(400, "简历内容不能为空，请先上传简历或粘贴文本完成分析");
         }
         if (analysis == null || analysis.trim().isEmpty()) {
             return Result.error(400, "请先完成简历分析，再生成优化版简历");
         }
 
         String optimized = resumeAnalysisService.generateOptimizedResume(
-                currentUserId(), resumeText, targetJob, analysis);
+                userId, resumeText, targetJob, analysis);
         return Result.success(optimized);
     }
 }
