@@ -133,7 +133,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import api, { AI_TIMEOUT, getErrMessage } from '../api'
+import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
 import MarkdownIt from 'markdown-it'
 
@@ -244,7 +244,7 @@ async function streamHint() {
       streaming.value = false
       return
     }
-    const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/interview/ask/stream`, {
+    const resp = await fetch(`${apiBaseUrl}/api/interview/ask/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

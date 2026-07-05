@@ -7,8 +7,18 @@ import { clearAuth, isTokenValid } from '../auth'
  * - 若未来切换到 Cookie 方案，需引入 CSRF Token
  */
 
+/**
+ * 后端 API 基地址
+ * - 生产环境：通过 Vercel rewrites 代理到 Render 后端，baseURL 留空（同源 /api）
+ * - 显式配置 VITE_API_BASE_URL 时优先使用（直连后端，需 CORS）
+ * - SSE fetch 必须使用此变量，避免与 axios baseURL 不一致
+ */
+export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  // baseURL 末尾不带 /api，请求时统一以 /api/xxx 开头
+  // 这样同源场景下走 Vercel rewrites，跨域场景下直连后端
+  baseURL: apiBaseUrl || '/',
   timeout: 60000,
 })
 
@@ -53,6 +63,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => {
     const data = response.data
+    // 防御：如果返回的是 HTML（Vercel SPA fallback），说明 API 代理未生效
+    if (typeof data === 'string' && data.trim().startsWith('<!DOCTYPE') || data?.toString?.().includes('<html')) {
+      return Promise.reject(new Error('API 不可达：收到 HTML 响应，请检查 vercel.json 反向代理配置或后端部署状态'))
+    }
     // 后端 Result<T> 结构：{code, message, data}
     if (data && typeof data.code !== 'undefined') {
       if (data.code === 200 || data.code === 0) {
@@ -72,6 +86,16 @@ api.interceptors.response.use(
     // 超时单独提示，便于用户排查
     if (error.code === 'ECONNABORTED') {
       error.message = '请求超时，AI 服务可能正在冷启动，请稍后重试'
+    }
+    // 检测 HTML 响应（API 代理失效，Vercel 返回 index.html）
+    const contentType = error.response?.headers?.['content-type'] || ''
+    const respData = error.response?.data
+    if (contentType.includes('text/html') || (typeof respData === 'string' && respData.includes('<html'))) {
+      error.message = 'API 不可达：后端服务未响应，请检查部署配置或稍后重试（Render 免费层可能正在冷启动）'
+    }
+    // 网络层错误（DNS/连接失败）
+    if (error.message === 'Network Error') {
+      error.message = '网络连接失败，请检查网络或后端服务是否可用'
     }
     return Promise.reject(error)
   }
