@@ -10,9 +10,21 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.4.0'
+export const CURRENT_VERSION = '1.4.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.4.1',
+    date: '2026-07-05',
+    title: '版本 1.4.1 · 用户名支持中文',
+    items: [
+      '注册用户名支持中文字符：可使用中文、字母、数字、下划线组合',
+      '用户名最小长度由 3 位放宽至 2 位，方便中文用户名（如「小明」）',
+      '前后端校验规则同步更新：正则 ^[A-Za-z0-9_\\u4e00-\\u9fa5]+$ 允许中文',
+      '前端提示文案更新：「2-32 位，支持中文」，错误提示同步中文说明',
+      '后端 AuthController 注册接口校验逻辑与前端完全对齐'
+    ]
+  },
   {
     version: '1.4.0',
     date: '2026-07-05',

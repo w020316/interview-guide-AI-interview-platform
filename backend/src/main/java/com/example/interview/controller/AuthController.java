@@ -65,12 +65,12 @@ public class AuthController {
         if (username == null || password == null) {
             return Result.error(400, "用户名和密码不能为空");
         }
-        // 用户名长度与字符校验（字母数字下划线，3-32 字符）
-        if (username.length() < 3 || username.length() > 32) {
-            return Result.error(400, "用户名长度需 3-32 字符");
+        // 用户名长度与字符校验（支持中文、字母、数字、下划线，2-32 字符）
+        if (username.length() < 2 || username.length() > 32) {
+            return Result.error(400, "用户名长度需 2-32 字符");
         }
-        if (!username.matches("^[A-Za-z0-9_]+$")) {
-            return Result.error(400, "用户名只能包含字母、数字和下划线");
+        if (!username.matches("^[A-Za-z0-9_\\u4e00-\\u9fa5]+$")) {
+            return Result.error(400, "用户名只能包含中文、字母、数字和下划线");
         }
         // 密码强度校验（6-64 字符）
         if (password.length() < 6 || password.length() > 64) {

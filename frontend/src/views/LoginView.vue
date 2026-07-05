@@ -137,7 +137,7 @@
 
         <form v-else @submit.prevent="handleRegister" class="auth-form">
           <div class="field">
-            <label>用户名 <span class="hint">3-32 位字母数字下划线</span></label>
+            <label>用户名 <span class="hint">2-32 位，支持中文</span></label>
             <div class="input-wrap">
               <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"
@@ -146,7 +146,7 @@
               <input v-model="regForm.username" type="text" placeholder="请输入用户名" autocomplete="username"
                 @keyup.enter="handleRegister" />
             </div>
-            <span v-if="regForm.username && !isUsernameValid" class="field-error">用户名只能包含字母、数字和下划线</span>
+            <span v-if="regForm.username && !isUsernameValid" class="field-error">用户名只能包含中文、字母、数字和下划线</span>
           </div>
           <div class="field">
             <label>密码 <span class="hint">至少 6 位</span></label>
@@ -233,7 +233,7 @@ const coldStartHint = ref(false)
 const lastError = ref('')
 
 // 表单校验
-const isUsernameValid = computed(() => /^[A-Za-z0-9_]{3,32}$/.test(regForm.value.username))
+const isUsernameValid = computed(() => /^[A-Za-z0-9_\u4e00-\u9fa5]{2,32}$/.test(regForm.value.username))
 const isEmailValid = computed(() => !regForm.value.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regForm.value.email))
 const isFormValid = computed(() =>
   isUsernameValid.value &&
@@ -293,10 +293,10 @@ async function handleLogin() {
 }
 
 async function handleRegister() {
-  if (!regForm.value.username || regForm.value.username.length < 3)
-    return ElMessage.warning('用户名至少 3 位')
-  if (!/^[A-Za-z0-9_]+$/.test(regForm.value.username))
-    return ElMessage.warning('用户名只能包含字母、数字和下划线')
+  if (!regForm.value.username || regForm.value.username.length < 2)
+    return ElMessage.warning('用户名至少 2 位')
+  if (!/^[A-Za-z0-9_\u4e00-\u9fa5]+$/.test(regForm.value.username))
+    return ElMessage.warning('用户名只能包含中文、字母、数字和下划线')
   if (!regForm.value.password || regForm.value.password.length < 6)
     return ElMessage.warning('密码至少 6 位')
   if (regForm.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regForm.value.email))
