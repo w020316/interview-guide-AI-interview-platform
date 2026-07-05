@@ -10,9 +10,21 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.5.0'
+export const CURRENT_VERSION = '1.5.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.5.1',
+    date: '2026-07-05',
+    title: '版本 1.5.1 · 修复简历分析 403 + 上传格式校验对齐',
+    items: [
+      '修复（关键）：SecurityConfig 配置 AuthenticationEntryPoint，未认证请求统一返回 401 JSON（原默认 403 导致前端无法识别 token 失效）',
+      '修复（关键）：前端 axios 拦截器同时处理 401 和 403，均清除 auth 并跳登录页',
+      '修复（关键）：InterviewView SSE fetch 403 也跳登录页（fetch 不走 axios 拦截器）',
+      '修复：ResumeView 上传文件类型校验与后端对齐，补充 HTML/HTM/MD/MARKDOWN（原仅 PDF/TXT 导致上传被前端拒绝）',
+      '修复：ResumeController 错误提示文案与实际支持格式对齐'
+    ]
+  },
   {
     version: '1.5.0',
     date: '2026-07-05',

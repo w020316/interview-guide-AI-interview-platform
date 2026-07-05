@@ -334,9 +334,12 @@ async function streamHint() {
       signal: abortController.signal
     })
     if (!resp.ok) {
-      if (resp.status === 401) {
+      if (resp.status === 401 || resp.status === 403) {
         ElMessage.error('登录已过期，请重新登录')
         clearAuth()
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
+        }
       } else {
         ElMessage.error(`AI 提示请求失败（HTTP ${resp.status}）`)
       }

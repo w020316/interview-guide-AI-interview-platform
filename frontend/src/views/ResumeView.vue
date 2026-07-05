@@ -275,11 +275,11 @@ async function handleUpload(file: File) {
     ElMessage.error('文件大小不能超过 10MB')
     return false
   }
-  // 文件类型校验
-  const allowed = ['.pdf', '.txt']
+  // 文件类型校验（与后端 ALLOWED_EXTS + 模板 accept 对齐）
+  const allowed = ['.pdf', '.txt', '.html', '.htm', '.md', '.markdown']
   const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] || ''
   if (!allowed.includes(ext)) {
-    ElMessage.error('仅支持 PDF、TXT 格式')
+    ElMessage.error('仅支持 PDF / HTML / MD / TXT 格式（Word 请转换为 PDF）')
     return false
   }
 

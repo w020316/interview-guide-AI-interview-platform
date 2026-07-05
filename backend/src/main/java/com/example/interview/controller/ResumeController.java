@@ -111,7 +111,7 @@ public class ResumeController {
         }
         String lower = originalFilename.toLowerCase();
         if (!ALLOWED_EXTS.stream().anyMatch(lower::endsWith)) {
-            return Result.error(400, "仅支持 PDF、TXT 格式的简历文件（Word 请转换为 PDF）");
+            return Result.error(400, "仅支持 PDF / HTML / MD / TXT 格式的简历文件（Word 请转换为 PDF）");
         }
 
         // Content-Type 校验

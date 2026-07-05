@@ -134,8 +134,9 @@ api.interceptors.response.use(
     return data
   },
   (error) => {
-    if (error.response?.status === 401) {
-      // 401 在登录页不跳转（避免循环），其他页面跳登录
+    // 401 和 403 都视为认证失效（Spring Security 未配置 AuthenticationEntryPoint 时默认返回 403）
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // 登录页不跳转（避免循环），其他页面清除 auth 并跳登录
       if (window.location.pathname !== '/login') {
         clearAuth()
         window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
