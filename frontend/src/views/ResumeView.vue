@@ -167,15 +167,65 @@ const parsed = computed<AnalysisResult>(() => {
 watch(result, (val) => {
   if (!val) {
     parseError.value = ''
-  } else {
-    try {
-      JSON.parse(val)
-      parseError.value = ''
-    } catch (e) {
-      parseError.value = 'AI 返回内容无法解析为标准 JSON，可在下方查看原始返回。错误：' + (e as Error).message
+    return
+  }
+  try {
+    JSON.parse(val)
+    parseError.value = ''
+  } catch (e) {
+    // 后端已做 JSON 修复，此处为兜底：尝试前端二次修复
+    const repaired = repairJson(val)
+    if (repaired) {
+      try {
+        JSON.parse(repaired)
+        result.value = repaired
+        parseError.value = ''
+        return
+      } catch (e2) {
+        // 仍失败，保留原始并提示
+      }
     }
+    parseError.value = 'AI 返回内容无法解析为标准 JSON，可在下方查看原始返回。错误：' + (e as Error).message
   }
 })
+
+/**
+ * 前端 JSON 修复工具（后端修复的兜底）
+ * 处理：单引号、中文引号、尾随逗号、Markdown 代码块
+ */
+function repairJson(raw: string): string {
+  if (!raw) return raw
+  let s = raw.trim()
+  // 剥离 Markdown 代码块
+  if (s.startsWith('```')) {
+    const firstNl = s.indexOf('\n')
+    if (firstNl > 0) s = s.substring(firstNl + 1)
+    const lastFence = s.lastIndexOf('```')
+    if (lastFence >= 0) s = s.substring(0, lastFence)
+    s = s.trim()
+  }
+  // 提取 JSON 主体
+  const start = s.search(/[{[]/)
+  if (start >= 0) {
+    const startChar = s[start]
+    const endChar = startChar === '{' ? '}' : ']'
+    const end = s.lastIndexOf(endChar)
+    if (end > start) s = s.substring(start, end + 1)
+  }
+  // 中文引号 -> ASCII 双引号
+  s = s.replace(/[\u201C\u201D]/g, '"')
+  // 中文单引号 -> ASCII 单引号
+  s = s.replace(/[\u2018\u2019]/g, "'")
+  // 单引号字符串 -> 双引号字符串
+  s = s.replace(/'((?:\\.|[^'\\])*)'/g, (_m, content) => {
+    return '"' + content.replace(/\\'/g, "'").replace(/"/g, '\\"') + '"'
+  })
+  // 未加引号的 key
+  s = s.replace(/([{,])\s*([A-Za-z_\u4e00-\u9fa5][A-Za-z0-9_\u4e00-\u9fa5\-]*)\s*:/g, '$1"$2":')
+  // 尾随逗号
+  s = s.replace(/,\s*([}\]])/g, '$1')
+  return s
+}
 
 function handleResult(data: unknown) {
   if (data == null || (typeof data === 'string' && !data.trim())) {

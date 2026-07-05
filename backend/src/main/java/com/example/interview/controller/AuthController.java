@@ -35,6 +35,7 @@ public class AuthController {
     /**
      * 注册
      * Body: {"username":"alice","password":"123456","email":"a@b.com"}
+     * 安全加固：用户名长度 3-32，密码长度 6-64，邮箱格式校验
      */
     @Operation(summary = "用户注册")
     @PostMapping("/register")
@@ -46,17 +47,34 @@ public class AuthController {
         if (username == null || password == null) {
             return Result.error(400, "用户名和密码不能为空");
         }
+        // 用户名长度与字符校验（字母数字下划线，3-32 字符）
+        if (username.length() < 3 || username.length() > 32) {
+            return Result.error(400, "用户名长度需 3-32 字符");
+        }
+        if (!username.matches("^[A-Za-z0-9_]+$")) {
+            return Result.error(400, "用户名只能包含字母、数字和下划线");
+        }
+        // 密码强度校验（6-64 字符）
+        if (password.length() < 6 || password.length() > 64) {
+            return Result.error(400, "密码长度需 6-64 字符");
+        }
+        // 邮箱格式校验
+        if (email != null && !email.isBlank()) {
+            if (email.length() > 128 || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+                return Result.error(400, "邮箱格式不正确");
+            }
+        }
         if (userRepository.existsByUsername(username)) {
             return Result.error(400, "用户名已存在");
         }
-        if (email != null && userRepository.existsByEmail(email)) {
+        if (email != null && !email.isBlank() && userRepository.existsByEmail(email)) {
             return Result.error(400, "邮箱已被注册");
         }
 
         UserEntity user = UserEntity.builder()
                 .username(username)
                 .passwordHash(passwordEncoder.encode(password))
-                .email(email)
+                .email(email == null || email.isBlank() ? null : email)
                 .build();
         userRepository.save(user);
 

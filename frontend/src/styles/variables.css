@@ -1,44 +1,75 @@
 /**
- * AI 面试助手 - 设计系统
- * 风格：现代专业 SaaS（参考 Linear / Vercel / Stripe）
- * 原则：克制、留白、层级清晰、避免过度装饰
+ * AI 面试助手 - 设计系统 v3
+ * 风格：编辑风专业平台（参考 Notion / Linear / Stripe Docs）
+ * 核心理念：克制、权威、可读、有温度
+ *
+ * 反"AI slop"设计原则：
+ *   1. 拒绝紫色渐变光晕 —— 改用纯色 + 细微纹理
+ *   2. 拒绝网格背景 —— 用排版和留白建立层次
+ *   3. 拒绝玻璃态滥用 —— 实色卡片 + 精细边框
+ *   4. 引入衬线标题字体 —— 增加权威感和编辑气质
+ *   5. 暖色调中性背景 —— 米白/暖灰，避免冷冰冰的纯白
+ *   6. 单一强调色 —— 深墨绿，专业且不落俗套
  */
 
 :root {
-  /* ── 品牌色 ── */
-  --brand-primary: #4f46e5;        /* 靛蓝，专业可信 */
-  --brand-primary-hover: #4338ca;
-  --brand-primary-light: #eef2ff;
-  --brand-accent: #06b6d4;         /* 青色，活力点缀 */
-  --brand-gradient: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+  /* ── 品牌色：深墨绿（专业、沉稳、有辨识度） ── */
+  --brand-primary: #0f766e;           /* 深墨绿 teal-700 */
+  --brand-primary-hover: #115e59;     /* teal-800 */
+  --brand-primary-active: #134e4a;    /* teal-900 */
+  --brand-primary-light: #f0fdfa;     /* teal-50 */
+  --brand-primary-50: #f0fdfa;
+  --brand-primary-100: #ccfbf1;
+  --brand-primary-200: #99f6e4;
+  --brand-accent: #c2410c;            /* 赭石橙，用于强调点缀 */
+  --brand-accent-hover: #9a3412;
+  --brand-accent-light: #fff7ed;
+  --brand-gradient: linear-gradient(135deg, #0f766e 0%, #134e4a 100%);
+  --brand-gradient-soft: linear-gradient(135deg, #f0fdfa 0%, #f5f5f4 100%);
+  --brand-glow: 0 4px 14px rgba(15, 118, 110, 0.15);
+  --brand-glow-strong: 0 8px 24px rgba(15, 118, 110, 0.2);
 
   /* ── 语义色 ── */
-  --c-success: #10b981;
-  --c-warning: #f59e0b;
-  --c-danger: #ef4444;
-  --c-info: #3b82f6;
+  --c-success: #15803d;
+  --c-success-light: #f0fdf4;
+  --c-warning: #b45309;
+  --c-warning-light: #fffbeb;
+  --c-danger: #b91c1c;
+  --c-danger-light: #fef2f2;
+  --c-info: #1d4ed8;
+  --c-info-light: #eff6ff;
 
-  /* ── 中性色 ── */
-  --c-bg: #f8fafc;                 /* 页面背景 */
-  --c-bg-alt: #f1f5f9;
-  --c-surface: #ffffff;            /* 卡片背景 */
-  --c-border: #e2e8f0;
-  --c-border-light: #f1f5f9;
-  --c-text: #0f172a;               /* 主文字 */
-  --c-text-secondary: #475569;     /* 次要文字 */
-  --c-text-tertiary: #94a3b8;      /* 占位/辅助 */
+  /* ── 中性色：暖色调，避免冷冰冰 ── */
+  --c-bg: #fafaf9;                    /* stone-50 暖米白 */
+  --c-bg-alt: #f5f5f4;                /* stone-100 */
+  --c-bg-soft: #fafaf9;
+  --c-surface: #ffffff;
+  --c-surface-elevated: #ffffff;
+  --c-border: #e7e5e4;                /* stone-200 */
+  --c-border-light: #f5f5f4;
+  --c-border-strong: #d6d3d1;         /* stone-300 */
+  --c-text: #1c1917;                  /* stone-900 */
+  --c-text-secondary: #44403c;        /* stone-700 */
+  --c-text-tertiary: #78716c;         /* stone-500 */
+  --c-text-quaternary: #a8a29e;       /* stone-400 */
 
-  /* ── 阴影 ── */
-  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+  /* ── 阴影系统：更克制，避免浮夸 ── */
+  --shadow-xs: 0 1px 2px 0 rgba(28, 25, 23, 0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(28, 25, 23, 0.06), 0 1px 2px 0 rgba(28, 25, 23, 0.04);
+  --shadow-md: 0 2px 4px -1px rgba(28, 25, 23, 0.06), 0 4px 6px -1px rgba(28, 25, 23, 0.04);
+  --shadow-lg: 0 4px 6px -1px rgba(28, 25, 23, 0.08), 0 2px 4px -1px rgba(28, 25, 23, 0.04);
+  --shadow-xl: 0 10px 15px -3px rgba(28, 25, 23, 0.08), 0 4px 6px -2px rgba(28, 25, 23, 0.04);
+  --shadow-2xl: 0 20px 25px -5px rgba(28, 25, 23, 0.1), 0 8px 10px -6px rgba(28, 25, 23, 0.04);
+  --shadow-brand: 0 2px 8px rgba(15, 118, 110, 0.12);
 
-  /* ── 圆角 ── */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  /* ── 圆角：更小更精致 ── */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
 
   /* ── 间距 ── */
   --space-xs: 4px;
@@ -47,67 +78,109 @@
   --space-lg: 24px;
   --space-xl: 40px;
   --space-2xl: 64px;
+  --space-3xl: 96px;
 
-  /* ── 字体 ── */
+  /* ── 字体：衬线标题 + 无衬线正文，编辑风 ── */
+  --font-serif: "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong",
+    "Georgia", "Times New Roman", serif;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
     sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Consolas, "Liberation Mono", monospace;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 30px;
+  --font-size-4xl: 36px;
+  --font-size-5xl: 44px;
 
   /* ── 过渡 ── */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── z-index 层级 ── */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-toast: 700;
 }
 
 /* ── 基础重置 ── */
-* {
+*, *::before, *::after {
   box-sizing: border-box;
 }
 
-body {
+html, body {
   margin: 0;
+  padding: 0;
+}
+
+body {
   font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: var(--font-size-base);
+  line-height: 1.65;
   color: var(--c-text);
   background: var(--c-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* 极细微的纸张纹理，增加质感而非装饰 */
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(28, 25, 23, 0.015) 1px, transparent 0);
+  background-size: 24px 24px;
+  min-height: 100vh;
 }
 
-/* ── 滚动条美化 ── */
+a {
+  color: var(--brand-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--brand-primary-hover);
+}
+
+/* ── 滚动条 ── */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--c-border);
-  border-radius: 4px;
+  background: var(--c-border-strong);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--c-text-tertiary);
+  background-clip: content-box;
+  border: 2px solid transparent;
 }
 
 /* ── 文字选区 ── */
 ::selection {
-  background: var(--brand-primary-light);
-  color: var(--brand-primary);
+  background: var(--brand-primary-100);
+  color: var(--brand-primary-active);
 }
 
-/* ── 渐入动画 ── */
+/* ── 动画关键帧（精简，去除浮夸的 float/gradientshift） ── */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeIn {
@@ -120,24 +193,111 @@ body {
   50% { opacity: 0.5; }
 }
 
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ping {
+  0% { transform: scale(1); opacity: 1; }
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+/* ── 动画工具类 ── */
 .fade-in-up {
-  animation: fadeInUp 0.4s ease-out;
+  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .fade-in {
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.25s ease-out both;
 }
 
-/* ── 工具类 ── */
-.text-gradient {
-  background: var(--brand-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+/* ── 文字工具类：去除渐变文字，改用强调色 ── */
+.text-gradient,
+.text-gradient-static {
+  color: var(--brand-primary);
+  font-family: var(--font-serif);
+  font-weight: 600;
 }
 
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+/* ── 网格背景（保留但更克制） ── */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(28, 25, 23, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(28, 25, 23, 0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.bg-dots {
+  background-image: radial-gradient(rgba(28, 25, 23, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── Skeleton ── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--c-bg-alt) 25%,
+    var(--c-border) 50%,
+    var(--c-bg-alt) 75%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ── 通用按钮 ── */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn-base:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.btn-base:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── 减少动画偏好 ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── 焦点可见性 ── */
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── 标题字体：衬线，编辑风 ── */
+h1, h2, h3, .serif {
+  font-family: var(--font-serif);
+  letter-spacing: -0.01em;
 }
