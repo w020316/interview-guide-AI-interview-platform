@@ -251,26 +251,30 @@ async function startInterview() {
   if (loading.value) return // 防止重复点击
   loading.value = true
   try {
-    // 1. 先创建会话
+    // 1. 先创建会话（但不立即设置 sessionId）
     const sess = await api.post('/api/session/create',
       { jobDescription: jobDesc.value }, { timeout: AI_TIMEOUT }) as unknown as { sessionId: string }
 
-    // 2. 生成面试题（失败时不设置 sessionId，用户留在设置页）
+    // 2. 生成面试题
     const qs = await api.post('/api/interview/questions',
       { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value },
       { timeout: AI_TIMEOUT }) as unknown as string
+    
+    // 3. 解析题目（失败时回退到设置页）
     const parsed = safeParse<Question[]>(qs, [])
     if (!parsed.length) {
-      ElMessage.error('面试题生成失败，请重试')
+      ElMessage.error('面试题生成失败，请检查岗位描述后重试')
+      // 不设置 sessionId，用户留在设置页
       return
     }
 
-    // 3. 题目成功后才设置状态，切换到面试页
+    // 4. 题目成功后才设置状态，切换到面试页
     sessionId.value = sess.sessionId
     questions.value = parsed
     ElMessage.success(`已生成 ${questions.value.length} 道题目，开始面试！`)
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '创建面试失败'))
+    // 异常时不设置 sessionId，用户留在设置页
   } finally { loading.value = false }
 }
 
