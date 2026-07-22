@@ -39,8 +39,8 @@
           </div>
           <div class="stat-divider"></div>
           <div class="stat">
-            <div class="stat-num">4</div>
-            <div class="stat-label">评估指标</div>
+            <div class="stat-num">3</div>
+            <div class="stat-label">岗位分析</div>
           </div>
           <div class="stat-divider"></div>
           <div class="stat">
@@ -121,7 +121,7 @@ import { isLoggedIn } from '../auth'
 const router = useRouter()
 
 function goTo(path: string) {
-  const requiresAuth = ['/resume', '/interview', '/history', '/profile'].includes(path)
+  const requiresAuth = ['/resume', '/job', '/interview', '/history', '/profile'].includes(path)
   if (requiresAuth && !isLoggedIn()) {
     router.push({ path: '/login', query: { redirect: path } })
     return
@@ -137,22 +137,22 @@ const features = [
     iconPath: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6 M9 9h1',
   },
   {
+    title: '岗位深度分析',
+    desc: '拆解 JD 核心职责、硬技能、软技能、隐性条件，诊断简历匹配度，一键生成求职信',
+    tags: ['JD 拆解', '差距诊断', '求职信生成'],
+    iconPath: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  },
+  {
     title: '个性化面试题',
     desc: '根据简历内容与目标岗位生成定制化面试题，覆盖基础、框架、数据库、中间件等方向',
     tags: ['岗位匹配', '难度分级', '参考答案'],
     iconPath: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z M8 10h.01 M12 10h.01 M16 10h.01',
   },
-  {
-    title: '答题实时评估',
-    desc: '提交回答后 AI 从完整性、准确性、表达力三个维度评分，并给出针对性的改进建议',
-    tags: ['四维度评分', '流式提示', '历史回看'],
-    iconPath: 'M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
-  },
 ]
 
 const steps = [
   { title: '上传简历', desc: '粘贴文本或上传 PDF/HTML/MD/TXT 简历，支持多格式' },
-  { title: 'AI 分析', desc: '获得四维度评分与个性化面试题生成' },
+  { title: '岗位分析', desc: '拆解 JD 要求，诊断简历匹配度，生成求职信' },
   { title: '模拟面试', desc: '答题获得实时流式提示与自动评估' },
 ]
 </script>
