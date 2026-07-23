@@ -155,6 +155,8 @@ async function logout() {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
 }
 
 /* ── 导航栏：实色 + 细边框，无 blur ── */
@@ -484,10 +486,17 @@ async function logout() {
   }
   .nav-menu {
     gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav-menu::-webkit-scrollbar {
+    display: none;
   }
   .nav-link {
-    padding: 6px 8px;
+    padding: 10px 8px;
     font-size: 12px;
+    flex-shrink: 0;
   }
   .nav-link span {
     display: none;
@@ -500,6 +509,12 @@ async function logout() {
   }
   .user-chip {
     padding: 4px;
+  }
+  .btn-logout span {
+    display: none;
+  }
+  .btn-logout {
+    padding: 8px 10px;
   }
   .main-content {
     padding: 20px 16px;

@@ -121,7 +121,7 @@ api.interceptors.response.use(
     // 防御：如果返回的是 HTML（Vercel SPA fallback），说明 API 代理未生效
     // 注意：data 可能为 null/undefined，需用安全转换
     const dataStr = data == null ? '' : String(data)
-    if (typeof data === 'string' && data.trim().startsWith('<!DOCTYPE') || dataStr.includes('<html')) {
+    if ((typeof data === 'string' && data.trim().startsWith('<!DOCTYPE')) || (typeof data === 'string' && data.includes('<html'))) {
       return Promise.reject(new Error('API 不可达：收到 HTML 响应，请检查 vercel.json 反向代理配置或后端部署状态'))
     }
     // 后端 Result<T> 结构：{code, message, data}

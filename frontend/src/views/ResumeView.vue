@@ -9,11 +9,12 @@
     <div class="input-section">
       <div class="tab-switch">
         <button :class="{ active: tab === 'upload' }" @click="tab = 'upload'">上传文件</button>
+        <button :class="{ active: tab === 'import' }" @click="tab = 'import'">从其他平台导入</button>
         <button :class="{ active: tab === 'text' }" @click="tab = 'text'">粘贴文本</button>
       </div>
 
       <div v-if="tab === 'upload'" class="upload-area">
-        <el-upload drag accept=".pdf,.txt,.html,.htm,.md,.markdown"
+        <el-upload drag accept=".pdf,.txt,.html,.htm,.md,.markdown,application/pdf,text/plain,text/html,text/markdown"
           :before-upload="handleUpload" :show-file-list="false" :http-request="() => {}">
           <div class="upload-inner">
             <div class="upload-icon"></div>
@@ -72,6 +73,42 @@
             <option value="厨师" />
             <option value="摄影师" />
           </datalist>
+        </div>
+      </div>
+
+      <div v-else-if="tab === 'import'" class="import-area">
+        <div class="import-tips">
+          <p class="import-tip-title">支持的导入方式</p>
+          <ul class="import-tip-list">
+            <li><strong>在线简历链接</strong>：超级简历、GitHub 主页、个人博客等公开页面</li>
+            <li><strong>剪贴板粘贴</strong>：从招聘 App 或其他简历工具复制文本后一键粘贴</li>
+            <li><strong>云盘文件</strong>：iOS 点击"上传文件"可从 iCloud Drive / 文件 App 选取</li>
+          </ul>
+        </div>
+
+        <div class="field-row">
+          <label>简历页面 URL</label>
+          <input v-model="importUrl" type="url" placeholder="https://your-resume-url.com" />
+        </div>
+        <button class="btn-import" :disabled="importLoading" @click="importFromUrl">
+          <span v-if="importLoading" class="spinner"></span>
+          {{ importLoading ? '抓取分析中...' : '从 URL 导入' }}
+        </button>
+
+        <div class="import-divider"><span>或</span></div>
+
+        <button class="btn-clipboard" @click="pasteFromClipboard">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9 2h6a1 1 0 011 1v1h2a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2V3a1 1 0 011-1z"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 12h6 M9 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          从剪贴板粘贴
+        </button>
+
+        <div class="field-row" style="margin-top: 16px;">
+          <label>目标岗位</label>
+          <input v-model="targetJob" type="text" list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
         </div>
       </div>
 
@@ -260,6 +297,10 @@ const loading = ref(false)
 const result = ref('')
 const parseError = ref('')
 
+// 从其他平台导入相关状态
+const importUrl = ref('')
+const importLoading = ref(false)
+
 // 优化简历相关状态
 const optimizing = ref(false)
 const optimizedMarkdown = ref('')
@@ -401,6 +442,44 @@ async function analyzeText() {
   } finally { loading.value = false }
 }
 
+/** 从 URL 导入简历（iOS"从其他平台导入"功能） */
+async function importFromUrl() {
+  if (!importUrl.value.trim()) return ElMessage.warning('请输入简历页面 URL')
+  importLoading.value = true
+  loading.value = true
+  result.value = ''
+  try {
+    const data = await api.post('/api/resume/import-url',
+      { url: importUrl.value, targetJob: targetJob.value || '通用岗位' },
+      { timeout: AI_TIMEOUT }) as unknown as { analysis?: string; resumeText?: string }
+    if (handleResult(data)) {
+      ElMessage.success('导入分析完成')
+    }
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '导入失败'))
+  } finally {
+    importLoading.value = false
+    loading.value = false
+  }
+}
+
+/** 从剪贴板粘贴简历文本 */
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText()
+    if (!text || !text.trim()) {
+      ElMessage.warning('剪贴板为空，请先复制简历内容')
+      return
+    }
+    resumeText.value = text
+    tab.value = 'text'
+    ElMessage.success('已粘贴，请确认内容后点击"开始分析"')
+  } catch {
+    ElMessage.info('剪贴板访问被拒绝，请手动粘贴到文本框')
+    tab.value = 'text'
+  }
+}
+
 /** 评分对应颜色 */
 function getScoreColor(score: number): string {
   if (score >= 85) return '#10b981'
@@ -447,18 +526,19 @@ async function generateOptimized() {
   optimizedMarkdown.value = ''
   optimizeView.value = 'preview'
   try {
+    // axios 拦截器已解包 Result.data，返回的就是纯字符串
     const res = await api.post('/api/resume/optimize', {
       resumeText: resumeText.value,
       targetJob: targetJob.value || '通用岗位',
       analysis: result.value
-    }, { timeout: AI_TIMEOUT })
-    if (res.data?.code === 200 && res.data.data) {
-      optimizedMarkdown.value = res.data.data
+    }, { timeout: AI_TIMEOUT }) as unknown as string
+    if (typeof res === 'string' && res.trim()) {
+      optimizedMarkdown.value = res
       ElMessage.success('优化简历已生成')
     } else {
-      ElMessage.error(res.data?.message || '生成失败')
+      ElMessage.error('生成结果为空，请重试')
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '生成优化简历失败'))
   } finally {
     optimizing.value = false
@@ -666,6 +746,116 @@ function formatDate() {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* ── 从其他平台导入区 ── */
+.import-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.import-tips {
+  padding: 16px 20px;
+  background: var(--brand-primary-50);
+  border: 1px solid var(--brand-primary-100);
+  border-radius: var(--radius-md);
+}
+
+.import-tip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-primary);
+  margin: 0 0 8px;
+}
+
+.import-tip-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.import-tip-list li {
+  position: relative;
+  padding: 3px 0 3px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
+}
+
+.import-tip-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 11px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+}
+
+.btn-import {
+  align-self: flex-start;
+  padding: 12px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-import:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.35);
+}
+
+.btn-import:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.import-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--c-text-tertiary);
+  font-size: 13px;
+}
+
+.import-divider::before,
+.import-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--c-border);
+}
+
+.btn-clipboard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--brand-primary);
+  background: var(--c-surface);
+  border: 2px solid var(--brand-primary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-clipboard:hover {
+  background: var(--brand-primary-50);
+  transform: translateY(-1px);
 }
 
 .btn-analyze {

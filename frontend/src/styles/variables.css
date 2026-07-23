@@ -139,6 +139,12 @@ body {
     radial-gradient(circle at 1px 1px, rgba(28, 25, 23, 0.015) 1px, transparent 0);
   background-size: 24px 24px;
   min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* iOS Safari 惯性滚动支持 */
+* {
+  -webkit-overflow-scrolling: touch;
 }
 
 a {

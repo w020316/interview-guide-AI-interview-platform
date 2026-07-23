@@ -95,7 +95,23 @@
         </div>
         <div class="field-row">
           <label>你的简历</label>
-          <textarea v-model="resumeText" rows="8" placeholder="粘贴简历内容..."></textarea>
+          <div class="resume-input-group">
+            <textarea v-model="resumeText" rows="8" placeholder="粘贴简历内容，或点击下方按钮上传简历文件..."></textarea>
+            <div class="resume-upload-bar">
+              <el-upload accept=".pdf,.txt,.html,.htm,.md,.markdown,application/pdf,text/plain,text/html,text/markdown"
+                :before-upload="handleResumeUpload" :show-file-list="false" :http-request="() => {}">
+                <button class="btn-upload-resume" type="button">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M17 8l-5-5-5 5 M12 3v12"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  上传简历文件
+                </button>
+              </el-upload>
+              <span v-if="resumeFileName" class="resume-file-name">{{ resumeFileName }}</span>
+              <button v-if="resumeFileName" class="btn-clear-resume" @click="clearResumeFile">清除</button>
+            </div>
+          </div>
         </div>
         <button class="btn-primary" :disabled="gapLoading" @click="diagnoseGap">
           <span v-if="gapLoading" class="spinner"></span>
@@ -255,6 +271,48 @@ function repairAndParse<T>(str: string, fallback: T): T {
     }
     return fallback
   }
+}
+
+// ── 简历上传（差距诊断用） ──
+const resumeFileName = ref('')
+
+/** 上传简历文件，解析为纯文本填入 textarea */
+async function handleResumeUpload(file: File) {
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.error('文件大小不能超过 10MB')
+    return false
+  }
+  const allowed = ['.pdf', '.txt', '.html', '.htm', '.md', '.markdown']
+  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] || ''
+  if (!allowed.includes(ext)) {
+    ElMessage.error('仅支持 PDF / HTML / MD / TXT 格式')
+    return false
+  }
+
+  // 上传到后端解析为纯文本（复用 /api/resume/upload 但仅取 resumeText）
+  const form = new FormData()
+  form.append('file', file)
+  form.append('targetJob', '通用岗位')
+  try {
+    ElMessage.info('正在解析简历文件...')
+    const data = await api.post('/api/resume/upload', form, { timeout: AI_TIMEOUT }) as unknown as { resumeText?: string; analysis?: string }
+    if (data?.resumeText) {
+      resumeText.value = data.resumeText
+      resumeFileName.value = file.name
+      ElMessage.success(`已加载：${file.name}`)
+    } else {
+      ElMessage.error('简历解析失败，请尝试直接粘贴文本')
+    }
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '上传失败，请尝试直接粘贴文本'))
+  }
+  return false
+}
+
+/** 清除上传的简历文件 */
+function clearResumeFile() {
+  resumeText.value = ''
+  resumeFileName.value = ''
 }
 
 // ── Tab 1: JD 分析 ──
@@ -446,6 +504,67 @@ function gapStatusIcon(status: string): string {
 .field-row textarea:focus {
   border-color: var(--brand-primary);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+/* ── 简历上传组合（差距诊断用） ── */
+.resume-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.resume-upload-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-upload-resume {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brand-primary);
+  background: var(--brand-primary-50);
+  border: 1px solid var(--brand-primary-100);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-upload-resume:hover {
+  background: var(--brand-primary-100);
+}
+
+.resume-file-name {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  background: var(--c-bg-alt);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-clear-resume {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-clear-resume:hover {
+  color: var(--c-danger);
+  border-color: var(--c-danger);
 }
 
 .input-card textarea::placeholder,

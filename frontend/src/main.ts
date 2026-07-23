@@ -22,6 +22,13 @@ router.onError((error) => {
   }
 })
 
+// 全局未处理 Promise rejection 捕获（SSE/fetch/async 中的未 catch 异常）
+window.addEventListener('unhandledrejection', (event) => {
+  if (!import.meta.env.PROD) {
+    console.error('未处理 Promise rejection:', event.reason)
+  }
+})
+
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
 app.mount('#app')

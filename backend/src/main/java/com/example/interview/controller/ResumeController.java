@@ -5,6 +5,8 @@ import com.example.interview.entity.ResumeEntity;
 import com.example.interview.service.ResumeAnalysisService;
 import com.example.interview.service.ResumeParseService;
 import com.example.interview.service.ResumeService;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -220,6 +222,78 @@ public class ResumeController {
         String optimized = resumeAnalysisService.generateOptimizedResume(
                 userId, resumeText, targetJob, analysis);
         return Result.success(optimized);
+    }
+
+    /**
+     * 从 URL 导入简历（iOS/移动端"从其他平台导入"功能）
+     * POST /api/resume/import-url
+     * Body: {"url": "https://...", "targetJob": "..."}
+     *
+     * 后端抓取 URL 页面 HTML，提取纯文本后调用 AI 分析。
+     * 支持：在线简历页面（超级简历/GitHub 主页/个人博客等公开 URL）
+     */
+    @PostMapping("/import-url")
+    public Result<Map<String, String>> importFromUrl(@RequestBody Map<String, String> request) {
+        String url = request.get("url");
+        String targetJob = request.getOrDefault("targetJob", "通用岗位");
+
+        if (url == null || url.trim().isEmpty()) {
+            return Result.error(400, "URL 不能为空");
+        }
+
+        // URL 安全校验：仅允许 http/https
+        String lowerUrl = url.toLowerCase().trim();
+        if (!lowerUrl.startsWith("http://") && !lowerUrl.startsWith("https://")) {
+            return Result.error(400, "请输入有效的 URL（以 http:// 或 https:// 开头）");
+        }
+
+        // 防止 SSRF：禁止访问内网地址
+        if (lowerUrl.contains("localhost") || lowerUrl.contains("127.0.0.1")
+                || lowerUrl.contains("192.168.") || lowerUrl.contains("10.")
+                || lowerUrl.contains("172.16.") || lowerUrl.contains("0.0.0.0")) {
+            return Result.error(400, "不支持访问内网地址");
+        }
+
+        String userId = currentUserId();
+        try {
+            // 抓取 URL 页面（限制 10 秒超时，模拟浏览器 UA）
+            org.jsoup.nodes.Document doc = Jsoup.connect(url)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .timeout(10_000)
+                    .maxBodySize(5 * 1024 * 1024) // 5MB 上限
+                    .get();
+
+            // 提取纯文本
+            String resumeText = Jsoup.clean(doc.html(), Safelist.none())
+                    .replaceAll("\\n{3,}", "\n\n")
+                    .trim();
+
+            if (resumeText == null || resumeText.length() < 50) {
+                return Result.error(400, "页面内容过少，可能不是有效的简历页面");
+            }
+
+            // 调用 AI 分析
+            String analysisJson = resumeAnalysisService.analyze(userId, resumeText, targetJob);
+
+            // 持久化
+            try {
+                resumeService.saveResume(userId, resumeText, targetJob, analysisJson);
+            } catch (Exception e) {
+                log.warn("URL 导入简历持久化失败：{}", e.getMessage());
+            }
+
+            Map<String, String> payload = new HashMap<>();
+            payload.put("analysis", analysisJson);
+            payload.put("resumeText", resumeText);
+            return Result.success(payload);
+        } catch (java.net.SocketTimeoutException e) {
+            return Result.error(400, "网页访问超时，请检查 URL 是否可公开访问");
+        } catch (org.jsoup.HttpStatusException e) {
+            return Result.error(400, "网页返回错误状态码：" + e.getStatusCode());
+        } catch (Exception e) {
+            log.error("URL 导入简历失败 url={}", url, e);
+            return Result.error(400, "导入失败，请确认 URL 可公开访问后重试");
+        }
     }
 }
 

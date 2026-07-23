@@ -355,14 +355,26 @@ async function streamHint() {
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
       buffer = lines.pop() || ''
+      let currentEvent = 'message'
       for (const line of lines) {
-        if (line.startsWith('data:')) {
+        if (line.startsWith('event:')) {
+          currentEvent = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
           const data = line.slice(5).trim()
-          if (data === '[DONE]') {
+          if (currentEvent === 'error') {
+            ElMessage.error(data || 'AI 服务异常，请重试')
             await reader.cancel()
             return
           }
-          streamContent.value += data
+          if (currentEvent === 'done' || data === '[DONE]') {
+            await reader.cancel()
+            return
+          }
+          if (currentEvent === 'token' && data) {
+            streamContent.value += data
+          }
+          // start 事件和 comment 行忽略
+          currentEvent = 'message'
         }
       }
     }
