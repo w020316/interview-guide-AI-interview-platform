@@ -10,9 +10,24 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.11.0'
+export const CURRENT_VERSION = '1.12.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.12.0',
+    date: '2026-07-23',
+    title: '版本 1.12.0 · BaseTextarea 组件 + 表单控件批量迁移 + InterviewController 测试',
+    items: [
+      '前端组件库：新增 BaseTextarea 通用文本域（rows/size/error/block/maxlength + resize:vertical），12 个单测',
+      '前端组件库：BaseInput 新增 list 属性，配合 <datalist> 实现岗位自动补全',
+      '前端迁移：5 个 View 共 10 个 textarea 批量迁移到 BaseTextarea（InterviewView 2 + ResumeView 1 + JobAnalysisView 5 + KnowledgeView 2）',
+      '前端迁移：ResumeView/InterviewView 共 5 个 input 迁移到 BaseInput（含 list 自动补全）',
+      '测试：新增 InterviewController MockMvc 测试（12 用例，questions 7 + evaluate 5，覆盖入参校验 + count 边界夹紧 + 默认值）',
+      '测试：mock RateLimitInterceptor 绕过 10 次/分钟限流阈值，确保 12 用例全通过',
+      '运维：确认 actuator 端点安全策略合理（health/info permitAll，metrics authenticated，show-details=when_authorized）',
+      '测试统计：后端 108 tests passed（+12），前端 81 tests passed（+13）'
+    ]
+  },
   {
     version: '1.11.0',
     date: '2026-07-23',

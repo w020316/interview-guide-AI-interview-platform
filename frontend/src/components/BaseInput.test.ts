@@ -84,4 +84,9 @@ describe('BaseInput', () => {
     const wrapper = mount(BaseInput, { props: { maxlength: 100 } })
     expect(wrapper.find('input').attributes('maxlength')).toBe('100')
   })
+
+  it('list 属性透传（配合 datalist 自动补全）', () => {
+    const wrapper = mount(BaseInput, { props: { list: 'job-suggestions' } })
+    expect(wrapper.find('input').attributes('list')).toBe('job-suggestions')
+  })
 })

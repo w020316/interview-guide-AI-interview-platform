@@ -39,7 +39,7 @@
     <div v-if="tab === 'ask'" class="ask-section fade-in">
       <div class="field-row">
         <label>你的问题</label>
-        <textarea v-model="question" rows="3" placeholder="例如：HashMap 的底层原理是什么？"></textarea>
+        <BaseTextarea v-model="question" :rows="3" placeholder="例如：HashMap 的底层原理是什么？" />
       </div>
       <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="ask">
         {{ loading ? '查询中…' : 'AI 知识问答' }}
@@ -65,8 +65,8 @@
       </div>
       <div class="field-row">
         <label>知识点内容 <span class="hint">每行一条，建议 200 字以内</span></label>
-        <textarea v-model="importText" rows="10"
-          placeholder="例如：&#10;HashMap 基于哈希表实现，JDK 8 后采用数组+链表+红黑树结构。&#10;ConcurrentHashMap 在 JDK 8 中使用 CAS + synchronized 实现。"></textarea>
+        <BaseTextarea v-model="importText" :rows="10"
+          placeholder="例如：&#10;HashMap 基于哈希表实现，JDK 8 后采用数组+链表+红黑树结构。&#10;ConcurrentHashMap 在 JDK 8 中使用 CAS + synchronized 实现。" />
       </div>
       <BaseButton variant="gradient" :loading="importing" :disabled="importing" @click="importKnowledge">
         {{ importing ? '导入中…' : '批量导入' }}
@@ -233,7 +233,7 @@ import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
-import { BaseButton, BaseInput } from '../components'
+import { BaseButton, BaseInput, BaseTextarea } from '../components'
 
 const md = new MarkdownIt({ html: false, linkify: true })
 

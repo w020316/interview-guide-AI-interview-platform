@@ -15,6 +15,7 @@
       :readonly="readonly"
       :autocomplete="autocomplete"
       :maxlength="maxlength"
+      :list="list"
       class="base-input__inner"
       @input="onInput"
       @keyup="onKeyup"
@@ -48,6 +49,8 @@ interface Props {
   block?: boolean
   autocomplete?: string
   maxlength?: number
+  /** v1.12 新增：datalist id，配合 <datalist> 实现自动补全 */
+  list?: string
 }
 const props = withDefaults(defineProps<Props>(), {
   modelValue: '',
@@ -60,6 +63,7 @@ const props = withDefaults(defineProps<Props>(), {
   block: false,
   autocomplete: 'off',
   maxlength: undefined,
+  list: undefined,
 })
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void

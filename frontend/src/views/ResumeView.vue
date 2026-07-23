@@ -24,7 +24,7 @@
         </el-upload>
         <div class="field-row">
           <label>目标岗位</label>
-          <input v-model="targetJob" type="text" list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
+          <BaseInput v-model="targetJob" block list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
           <datalist id="job-suggestions">
             <option value="Java 后端开发工程师" />
             <option value="前端开发工程师" />
@@ -88,7 +88,7 @@
 
         <div class="field-row">
           <label>简历页面 URL</label>
-          <input v-model="importUrl" type="url" placeholder="https://your-resume-url.com" />
+          <BaseInput v-model="importUrl" type="url" block placeholder="https://your-resume-url.com" />
         </div>
         <button class="btn-import" :disabled="importLoading" @click="importFromUrl">
           <span v-if="importLoading" class="spinner"></span>
@@ -108,18 +108,18 @@
 
         <div class="field-row" style="margin-top: 16px;">
           <label>目标岗位</label>
-          <input v-model="targetJob" type="text" list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
+          <BaseInput v-model="targetJob" block list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
         </div>
       </div>
 
       <div v-else class="text-area">
         <div class="field-row">
           <label>简历内容</label>
-          <textarea v-model="resumeText" rows="10" placeholder="粘贴你的简历文本..."></textarea>
+          <BaseTextarea v-model="resumeText" :rows="10" placeholder="粘贴你的简历文本..." />
         </div>
         <div class="field-row">
           <label>目标岗位</label>
-          <input v-model="targetJob" type="text" list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
+          <BaseInput v-model="targetJob" block list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
         </div>
         <button class="btn-analyze" :disabled="loading" @click="analyzeText">
           <span v-if="loading" class="spinner"></span>
@@ -280,6 +280,7 @@ import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
+import { BaseInput, BaseTextarea } from '../components'
 
 const md = new MarkdownIt({ html: false, linkify: true })
 

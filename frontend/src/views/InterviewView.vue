@@ -10,7 +10,7 @@
       <div class="form-grid">
         <div class="field-row">
           <label>目标岗位</label>
-          <input v-model="jobDesc" type="text" list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
+          <BaseInput v-model="jobDesc" block list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
           <datalist id="job-suggestions">
             <option value="Java 后端开发工程师" />
             <option value="前端开发工程师" />
@@ -62,7 +62,7 @@
         </div>
         <div class="field-row">
           <label>简历摘要 <span class="optional">（可选）</span></label>
-          <textarea v-model="resumeText" rows="4" placeholder="粘贴简历核心内容，AI 将据此定制题目"></textarea>
+          <BaseTextarea v-model="resumeText" :rows="4" placeholder="粘贴简历核心内容，AI 将据此定制题目" />
         </div>
         <div class="field-row">
           <label>题目数量</label>
@@ -125,7 +125,7 @@
         <!-- 答题区 -->
         <div class="answer-section">
           <label>你的回答</label>
-          <textarea v-model="userAnswer" rows="6" placeholder="请输入你的回答，可结合项目经验展开…"></textarea>
+          <BaseTextarea v-model="userAnswer" :rows="6" placeholder="请输入你的回答，可结合项目经验展开…" />
           <div class="action-row">
             <BaseButton variant="gradient" :loading="evalLoading" :disabled="evalLoading" @click="submitAnswer">
               {{ evalLoading ? '评估中…' : '提交回答' }}
@@ -196,7 +196,7 @@ import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
-import { BaseButton } from '../components'
+import { BaseButton, BaseInput, BaseTextarea } from '../components'
 
 // html: false 禁止 HTML 标签通过，linkify 自动识别链接
 const md = new MarkdownIt({ html: false, linkify: true })

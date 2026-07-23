@@ -16,7 +16,7 @@
     <div v-if="tab === 'analyze'" class="tab-panel">
       <div class="input-card">
         <label>粘贴岗位描述（JD）</label>
-        <textarea v-model="jdText" rows="10" placeholder="把招聘网站上的岗位描述全文粘贴到这里..."></textarea>
+        <BaseTextarea v-model="jdText" :rows="10" placeholder="把招聘网站上的岗位描述全文粘贴到这里..." />
         <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="analyzeJd">
           {{ loading ? '分析中...' : '开始分析' }}
         </BaseButton>
@@ -90,12 +90,12 @@
       <div class="input-card">
         <div class="field-row">
           <label>岗位描述（JD）</label>
-          <textarea v-model="jdText" rows="6" placeholder="粘贴岗位描述..."></textarea>
+          <BaseTextarea v-model="jdText" :rows="6" placeholder="粘贴岗位描述..." />
         </div>
         <div class="field-row">
           <label>你的简历</label>
           <div class="resume-input-group">
-            <textarea v-model="resumeText" rows="8" placeholder="粘贴简历内容，或点击下方按钮上传简历文件..."></textarea>
+            <BaseTextarea v-model="resumeText" :rows="8" placeholder="粘贴简历内容，或点击下方按钮上传简历文件..." />
             <div class="resume-upload-bar">
               <el-upload accept=".pdf,.txt,.html,.htm,.md,.markdown,application/pdf,text/plain,text/html,text/markdown"
                 :before-upload="handleResumeUpload" :show-file-list="false" :http-request="() => {}">
@@ -173,11 +173,11 @@
       <div class="input-card">
         <div class="field-row">
           <label>岗位描述（JD）</label>
-          <textarea v-model="jdText" rows="6" placeholder="粘贴岗位描述..."></textarea>
+          <BaseTextarea v-model="jdText" :rows="6" placeholder="粘贴岗位描述..." />
         </div>
         <div class="field-row">
           <label>你的简历</label>
-          <textarea v-model="resumeText" rows="8" placeholder="粘贴简历内容..."></textarea>
+          <BaseTextarea v-model="resumeText" :rows="8" placeholder="粘贴简历内容..." />
         </div>
         <div class="field-row">
           <label>生成类型</label>
@@ -221,7 +221,7 @@ import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
-import { BaseButton } from '../components'
+import { BaseButton, BaseTextarea } from '../components'
 
 const md = new MarkdownIt({ html: false, linkify: true })
 
