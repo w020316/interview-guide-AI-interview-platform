@@ -1,6 +1,7 @@
 package com.example.interview.service;
 
 import com.example.interview.util.JsonRepairUtil;
+import com.example.interview.util.PromptSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -143,16 +144,7 @@ public class JobAnalysisService {
      * Prompt 注入防御：剥离指令性模式 + 截断超长输入
      */
     private String sanitizePromptInput(String input) {
-        if (input == null) return "";
-        String s = input;
-        if (s.length() > 2000) {
-            s = s.substring(0, 2000);
-        }
-        s = s.replaceAll("(?i)忽略以上(所有)?(指令|规则|要求)", "[已过滤]")
-             .replaceAll("(?i)ignore (all )?(previous|above) instructions", "[filtered]")
-             .replaceAll("(?i)你现在是", "用户提到：")
-             .replaceAll("(?i)you are now", "user mentioned:");
-        return s;
+        return PromptSanitizer.sanitize(input);
     }
 
     // ─────────────────────────── 内部工具方法 ───────────────────────────

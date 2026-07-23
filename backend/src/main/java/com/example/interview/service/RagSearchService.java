@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.util.PromptSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,11 @@ public class RagSearchService {
     private static final String META_USER_ID = "userId";
     /** metadata 中共享知识标记（系统预置数据无 userId，标记为 shared） */
     private static final String META_SHARED = "shared";
+    /**
+     * 去重相似度阈值：相似度 >= 此值视为重复文档，跳过导入
+     * 0.90 对应 cosine distance <= 0.10，覆盖文本微调后重复的场景
+     */
+    private static final double DEDUP_SIMILARITY_THRESHOLD = 0.90;
 
     @Autowired
     private VectorStore vectorStore;
@@ -154,31 +160,66 @@ public class RagSearchService {
     /**
      * 导入知识文档到向量库（绑定 userId）
      * - 空列表直接返回，避免无意义调用
+     * - 去重预检：对每个文档做相似度搜索，相似度 >= {@link #DEDUP_SIMILARITY_THRESHOLD} 视为重复，跳过
      * - 异常时仅记录日志，不抛出，避免影响批量导入主流程
      *
      * @param documents 文档文本列表
      * @param userId    当前用户 ID（写入 metadata 实现隔离）
+     * @return 实际导入的文档数量（重复跳过的不计入）
      */
     public int importKnowledge(List<String> documents, String userId) {
         if (documents == null || documents.isEmpty()) {
             return 0;
         }
         try {
-            List<Document> docs = documents.stream()
-                    .filter(t -> t != null && !t.isBlank())
-                    .map(text -> Document.builder()
-                            .text(text)
-                            .metadata(Map.of("type", "knowledge", META_USER_ID, userId))
-                            .build())
-                    .toList();
+            FilterExpressionBuilder b = new FilterExpressionBuilder();
+            List<Document> docs = new ArrayList<>();
+            int skipped = 0;
+            for (String text : documents) {
+                if (text == null || text.isBlank()) continue;
+                // 去重预检：搜索该用户已有文档中是否存在高度相似的
+                if (isDuplicate(text, userId, b)) {
+                    skipped++;
+                    continue;
+                }
+                docs.add(Document.builder()
+                        .text(text)
+                        .metadata(Map.of("type", "knowledge", META_USER_ID, userId))
+                        .build());
+            }
             if (docs.isEmpty()) {
+                log.info("知识库导入：{} 条全部重复或为空，跳过", documents.size());
                 return 0;
             }
             vectorStore.add(docs);
+            if (skipped > 0) {
+                log.info("知识库导入：{} 条新增，{} 条重复跳过", docs.size(), skipped);
+            }
             return docs.size();
         } catch (Exception e) {
             log.error("知识库导入失败：{}", e.getMessage(), e);
             return 0;
+        }
+    }
+
+    /**
+     * 检查该用户已有文档中是否存在与 text 高度相似的（去重预检）
+     * - 仅搜索当前用户的文档，不影响其他用户
+     * - 去重检查失败不阻断导入（返回 false，按非重复处理）
+     */
+    private boolean isDuplicate(String text, String userId, FilterExpressionBuilder b) {
+        try {
+            SearchRequest dedupReq = SearchRequest.builder()
+                    .query(text)
+                    .topK(1)
+                    .similarityThreshold(DEDUP_SIMILARITY_THRESHOLD)
+                    .filterExpression(b.eq(META_USER_ID, userId).build())
+                    .build();
+            List<Document> existing = vectorStore.similaritySearch(dedupReq);
+            return existing != null && !existing.isEmpty();
+        } catch (Exception e) {
+            log.debug("去重检查失败，按非重复处理：{}", e.getMessage());
+            return false;
         }
     }
 
@@ -188,17 +229,6 @@ public class RagSearchService {
      * - 截断超长输入（防止 token 滥用）
      */
     private String sanitizePromptInput(String input) {
-        if (input == null) return "";
-        String s = input;
-        // 截断至 2000 字符，防止 token 滥用
-        if (s.length() > 2000) {
-            s = s.substring(0, 2000);
-        }
-        // 剥离常见 prompt 注入模式
-        s = s.replaceAll("(?i)忽略以上(所有)?(指令|规则|要求)", "[已过滤]")
-             .replaceAll("(?i)ignore (all )?(previous|above) instructions", "[filtered]")
-             .replaceAll("(?i)你现在是", "用户提到：")
-             .replaceAll("(?i)you are now", "user mentioned:");
-        return s;
+        return PromptSanitizer.sanitize(input);
     }
 }

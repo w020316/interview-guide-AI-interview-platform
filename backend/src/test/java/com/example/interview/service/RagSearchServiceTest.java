@@ -23,6 +23,8 @@ import static org.mockito.Mockito.*;
 @DisplayName("RagSearchService 单元测试")
 class RagSearchServiceTest {
 
+    private static final String USER_ID = "test-user-1";
+
     @Mock private VectorStore vectorStore;
     @Mock private ChatClient chatClient;
     @Spy  private ObjectMapper objectMapper = new ObjectMapper();
@@ -38,9 +40,9 @@ class RagSearchServiceTest {
     @Test
     @DisplayName("search: 空查询应返回 []")
     void search_blankQuery_shouldReturnEmptyArray() {
-        assertThat(service.search("", 5)).isEqualTo("[]");
-        assertThat(service.search(null, 5)).isEqualTo("[]");
-        assertThat(service.search("   ", 5)).isEqualTo("[]");
+        assertThat(service.search("", 5, USER_ID)).isEqualTo("[]");
+        assertThat(service.search(null, 5, USER_ID)).isEqualTo("[]");
+        assertThat(service.search("   ", 5, USER_ID)).isEqualTo("[]");
     }
 
     @Test
@@ -48,23 +50,23 @@ class RagSearchServiceTest {
     void search_exception_shouldReturnEmptyArray() {
         when(vectorStore.similaritySearch(any(SearchRequest.class)))
                 .thenThrow(new RuntimeException("sim failed"));
-        String result = service.search("test", 5);
+        String result = service.search("test", 5, USER_ID);
         assertThat(result).isEqualTo("[]");
     }
 
     @Test
     @DisplayName("answerWithRag: 空问题应返回提示")
     void answerWithRag_blank_shouldReturnHint() {
-        String result = service.answerWithRag("");
+        String result = service.answerWithRag("", USER_ID);
         assertThat(result).contains("问题不能为空");
     }
 
     @Test
     @DisplayName("importKnowledge: 空列表应返回 0")
     void importKnowledge_emptyList_shouldReturnZero() {
-        assertThat(service.importKnowledge(null)).isEqualTo(0);
-        assertThat(service.importKnowledge(List.of())).isEqualTo(0);
-        assertThat(service.importKnowledge(List.of("", "  "))).isEqualTo(0);
+        assertThat(service.importKnowledge(null, USER_ID)).isEqualTo(0);
+        assertThat(service.importKnowledge(List.of(), USER_ID)).isEqualTo(0);
+        assertThat(service.importKnowledge(List.of("", "  "), USER_ID)).isEqualTo(0);
     }
 }
 

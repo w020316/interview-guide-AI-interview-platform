@@ -17,18 +17,18 @@
           实时流式提示与自动评估，助你高效备战求职季
         </p>
         <div class="hero-actions">
-          <button class="btn-primary" @click="goTo('/resume')">
+          <BaseButton variant="primary" size="lg" shadow="sm" hoverable @click="goTo('/resume')">
             <span>开始简历分析</span>
             <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-          </button>
-          <button class="btn-secondary" @click="goTo('/interview')">
+          </BaseButton>
+          <BaseButton variant="ghost" size="lg" hoverable @click="goTo('/interview')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
             <span>模拟面试</span>
-          </button>
+          </BaseButton>
         </div>
 
         <!-- Hero 数据展示 -->
@@ -117,6 +117,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { isLoggedIn } from '../auth'
+import { BaseButton } from '../components'
 
 const router = useRouter()
 
@@ -249,33 +250,17 @@ const steps = [
   transform: translateY(0);
 }
 
-.btn-primary .arrow-icon {
+/* arrow-icon 平移动画（Hero 区 BaseButton + CTA 区原生按钮共用） */
+.arrow-icon {
   transition: transform var(--transition-fast);
+}
+
+.hero-actions :deep(.base-btn):hover .arrow-icon {
+  transform: translateX(4px);
 }
 
 .btn-primary:hover .arrow-icon {
   transform: translateX(4px);
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 13px 26px;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--c-text);
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.btn-secondary:hover {
-  border-color: var(--brand-primary);
-  color: var(--brand-primary);
-  background: var(--brand-primary-50);
 }
 
 .btn-lg {
@@ -553,6 +538,7 @@ const steps = [
 
 @media (max-width: 480px) {
   .hero-actions { flex-direction: column; width: 100%; }
-  .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+  .hero-actions :deep(.base-btn) { width: 100%; justify-content: center; }
+  .btn-primary { width: 100%; justify-content: center; }
 }
 </style>

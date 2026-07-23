@@ -71,6 +71,10 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  sse:
+    # SSE 流式回答最大并发数，超出返回 503
+    # Render 免费层建议 20，付费层可调高
+    max-concurrent: ${SSE_MAX_CONCURRENT:20}
   supabase:
     url: ${SUPABASE_URL:https://your-project.supabase.co}
     service-key: ${SUPABASE_SERVICE_KEY:your-service-key}

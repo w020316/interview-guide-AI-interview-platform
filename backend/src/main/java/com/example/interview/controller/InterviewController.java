@@ -2,10 +2,13 @@ package com.example.interview.controller;
 
 import com.example.interview.common.Result;
 import com.example.interview.service.InterviewService;
+import com.example.interview.util.PromptSanitizer;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -47,10 +50,19 @@ public class InterviewController {
 
     /**
      * SSE 并发限流：限制同时进行的流式连接数，防止虚拟线程池无界扩张导致 OOM
-     * - 20 个并发覆盖正常使用场景
+     * - 上限通过 app.sse.max-concurrent 配置，默认 20
      * - 超出则返回 503，前端提示用户稍后重试
      */
-    private static final Semaphore SSE_SEMAPHORE = new Semaphore(20, true);
+    @Value("${app.sse.max-concurrent:20}")
+    private int sseMaxConcurrent;
+
+    private Semaphore sseSemaphore;
+
+    @PostConstruct
+    private void initSemaphore() {
+        this.sseSemaphore = new Semaphore(sseMaxConcurrent, true);
+        log.info("SSE 并发限流初始化: max-concurrent={}", sseMaxConcurrent);
+    }
 
     /**
      * 生成面试题
@@ -90,21 +102,11 @@ public class InterviewController {
     }
 
     /**
-     * Prompt 注入防御：剥离指令性模式 + 截断超长输入
-     * - 移除 "忽略以上所有指令"、"你现在是" 等常见注入模式
-     * - 截断至 2000 字符，防止 token 滥用
+     * Prompt 注入防御：委托 {@link PromptSanitizer#sanitize(String)}
+     * v1.9 起统一使用工具类，消除 9 处重复 private 方法
      */
     private String sanitizePromptInput(String input) {
-        if (input == null) return "";
-        String s = input;
-        if (s.length() > 2000) {
-            s = s.substring(0, 2000);
-        }
-        s = s.replaceAll("(?i)忽略以上(所有)?(指令|规则|要求)", "[已过滤]")
-             .replaceAll("(?i)ignore (all )?(previous|above) instructions", "[filtered]")
-             .replaceAll("(?i)你现在是", "用户提到：")
-             .replaceAll("(?i)you are now", "user mentioned:");
-        return s;
+        return PromptSanitizer.sanitize(input);
     }
 
     /**
@@ -158,8 +160,8 @@ public class InterviewController {
         // 保存 Disposable 以便客户端断开时取消订阅，防止资源泄漏
         final Disposable[] disposableHolder = new Disposable[1];
 
-        // 尝试获取并发令牌，超出 20 个并发则返回 503
-        if (!SSE_SEMAPHORE.tryAcquire()) {
+        // 尝试获取并发令牌，超出 max-concurrent 则返回 503
+        if (!sseSemaphore.tryAcquire()) {
             // 注意：此处未注册 onCompletion，emitter.complete() 不会触发 release，避免 double release
             try {
                 emitter.send(SseEmitter.event().name("error").data("当前在线用户较多，请稍后重试"));
@@ -172,14 +174,14 @@ public class InterviewController {
         // 客户端断开或超时时取消 AI 订阅并释放令牌（仅在成功获取令牌后注册）
         emitter.onCompletion(() -> {
             heartbeatRunning.set(false);
-            SSE_SEMAPHORE.release();
+            sseSemaphore.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
         });
         emitter.onTimeout(() -> {
             heartbeatRunning.set(false);
-            SSE_SEMAPHORE.release();
+            sseSemaphore.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -187,7 +189,7 @@ public class InterviewController {
         });
         emitter.onError(e -> {
             heartbeatRunning.set(false);
-            SSE_SEMAPHORE.release();
+            sseSemaphore.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }

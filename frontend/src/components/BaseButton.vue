@@ -2,7 +2,13 @@
   <button
     :type="type"
     :disabled="disabled"
-    :class="['base-btn', `base-btn--${variant}`, `base-btn--${size}`, { 'is-block': block }]"
+    :class="[
+      'base-btn',
+      `base-btn--${variant}`,
+      `base-btn--${size}`,
+      shadow !== 'none' ? `base-btn--shadow-${shadow}` : '',
+      { 'is-block': block, 'is-hoverable': hoverable }
+    ]"
     @click="handleClick"
   >
     <span v-if="loading" class="base-btn__spinner" aria-hidden="true"></span>
@@ -17,6 +23,7 @@
  * - 三种变体：primary（品牌色）/ ghost（描边）/ success（绿色）
  * - 三种尺寸：sm / md / lg
  * - 支持 loading、disabled、block（块级宽度）
+ * - v1.9 新增 shadow（阴影等级）和 hoverable（悬停上浮）prop，向后兼容
  *
  * 基于 variables.css 设计系统，替代各 View 内联的 .btn-primary/.btn-ghost
  */
@@ -27,6 +34,8 @@ interface Props {
   disabled?: boolean
   loading?: boolean
   block?: boolean
+  shadow?: 'none' | 'sm' | 'md'
+  hoverable?: boolean
 }
 const props = withDefaults(defineProps<Props>(), {
   variant: 'primary',
@@ -35,6 +44,8 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   loading: false,
   block: false,
+  shadow: 'none',
+  hoverable: false,
 })
 const emit = defineEmits<{ (e: 'click', ev: MouseEvent): void }>()
 function handleClick(ev: MouseEvent) {
@@ -118,6 +129,25 @@ function handleClick(ev: MouseEvent) {
 .is-block {
   display: flex;
   width: 100%;
+}
+
+/* 阴影等级 */
+.base-btn--shadow-sm {
+  box-shadow: var(--shadow-sm);
+}
+.base-btn--shadow-md {
+  box-shadow: var(--shadow-md);
+}
+
+/* 悬停上浮：translateY + 阴影升级（sm→md） */
+.base-btn.is-hoverable:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.base-btn.is-hoverable:active:not(:disabled) {
+  transform: translateY(0);
+}
+.base-btn--shadow-sm.is-hoverable:hover:not(:disabled) {
+  box-shadow: var(--shadow-md);
 }
 
 /* loading spinner */

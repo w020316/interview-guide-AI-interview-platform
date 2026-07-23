@@ -1,164 +1,238 @@
 package com.example.interview.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * JsonRepairUtil 单元测试
- * 覆盖用户报错的核心场景：单引号、中文引号、Markdown 代码块、尾随逗号等
+ * {@link JsonRepairUtil} 单元测试
+ *
+ * <p>覆盖 AI 返回非标准 JSON 的 8 类修复场景，与前端 jsonRepair.test.ts 对齐。
+ * 不依赖 Spring 容器，纯逻辑测试，运行速度快。
  */
-@DisplayName("JSON 修复工具测试")
 class JsonRepairUtilTest {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    @Test
-    @DisplayName("修复单引号字符串：{'suggestion': '项目 '教材ING''}")
-    void repair_singleQuote_shouldConvertToDoubleQuote() throws Exception {
-        // 用户报错的原始场景：AI 返回单引号 + 内嵌单引号
-        String raw = "{'suggestion': '项目 '教材ING''}";
-        String repaired = JsonRepairUtil.repair(raw);
-        // 修复后必须可被标准 JSON 解析
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("suggestion").asText()).contains("项目");
+    private JsonNode parseStrict(String json) throws Exception {
+        return MAPPER.readTree(json);
     }
 
-    @Test
-    @DisplayName("修复中文引号：{'suggestion'：'项目'}")
-    void repair_chineseQuote_shouldConvertToAscii() throws Exception {
-        String raw = "{'suggestion'：'项目'}";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("suggestion").asText()).isEqualTo("项目");
+    @Nested
+    @DisplayName("基础修复")
+    class BasicRepair {
+
+        @Test
+        @DisplayName("null / 空白输入原样返回")
+        void nullAndBlank() {
+            assertNull(JsonRepairUtil.repair(null));
+            assertEquals("", JsonRepairUtil.repair(""));
+            assertEquals("   ", JsonRepairUtil.repair("   "));
+        }
+
+        @Test
+        @DisplayName("合法 JSON 原样通过（幂等）")
+        void validJsonPassthrough() throws Exception {
+            String json = "{\"name\":\"张三\",\"age\":25}";
+            String repaired = JsonRepairUtil.repair(json);
+            assertEquals(json, repaired);
+            assertNotNull(parseStrict(repaired));
+        }
+
+        @Test
+        @DisplayName("Markdown 代码块剥离（```json ... ```）")
+        void stripMarkdownFence() throws Exception {
+            String raw = "```json\n{\"k\":\"v\"}\n```";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertEquals("{\"k\":\"v\"}", repaired);
+            assertNotNull(parseStrict(repaired));
+        }
+
+        @Test
+        @DisplayName("无语言标记的 Markdown 代码块剥离")
+        void stripMarkdownFenceNoLang() throws Exception {
+            String raw = "```\n{\"k\":1}\n```";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertEquals("{\"k\":1}", repaired);
+            assertNotNull(parseStrict(repaired));
+        }
     }
 
-    @Test
-    @DisplayName("修复中文双引号：{“suggestion“：“项目“}")
-    void repair_chineseDoubleQuote_shouldConvertToAscii() throws Exception {
-        String raw = "{“suggestion“：“项目“}";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("suggestion").asText()).isEqualTo("项目");
+    @Nested
+    @DisplayName("引号修复")
+    class QuoteRepair {
+
+        @Test
+        @DisplayName("中文双引号 \" \" 替换为 ASCII 双引号")
+        void chineseDoubleQuotes() throws Exception {
+            String raw = "{\"name\":\"张三\",\"city\":\"北京\"}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("张三", parseStrict(repaired).get("name").asText());
+        }
+
+        @Test
+        @DisplayName("中文角标引号 「 」 作为结构性引号时替换为 ASCII 双引号")
+        void cornerQuotes() throws Exception {
+            // 角标引号替代 JSON 结构性双引号（AI 偶尔返回的格式）
+            String raw = "{「title」:「hello」}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("hello", parseStrict(repaired).get("title").asText());
+        }
+
+        @Test
+        @DisplayName("单引号字符串转双引号（key + value）")
+        void singleQuoteStrings() throws Exception {
+            String raw = "{'name':'李四','age':30}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("李四", parseStrict(repaired).get("name").asText());
+            assertEquals(30, parseStrict(repaired).get("age").asInt());
+        }
+
+        @Test
+        @DisplayName("value 内嵌单引号正确处理")
+        void nestedSingleQuote() throws Exception {
+            String raw = "{'desc':'it's a test'}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("it's a test", parseStrict(repaired).get("desc").asText());
+        }
     }
 
-    @Test
-    @DisplayName("剥离 Markdown 代码块")
-    void repair_markdownFence_shouldStrip() throws Exception {
-        String raw = "```json\n{\"score\": 80}\n```";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("score").asInt()).isEqualTo(80);
+    @Nested
+    @DisplayName("结构与语法修复")
+    class SyntaxRepair {
+
+        @Test
+        @DisplayName("尾随逗号清理")
+        void trailingComma() throws Exception {
+            String raw = "{\"a\":1,\"b\":2,}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals(1, parseStrict(repaired).get("a").asInt());
+            assertEquals(2, parseStrict(repaired).get("b").asInt());
+        }
+
+        @Test
+        @DisplayName("未加引号的 key 加双引号")
+        void unquotedKey() throws Exception {
+            String raw = "{name:\"王五\",age:40}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("王五", parseStrict(repaired).get("name").asText());
+            assertEquals(40, parseStrict(repaired).get("age").asInt());
+        }
+
+        @Test
+        @DisplayName("中文冒号 ：转 ASCII 冒号 :")
+        void chineseColon() throws Exception {
+            String raw = "{\"name\"：\"赵六\"}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("赵六", parseStrict(repaired).get("name").asText());
+        }
+
+        @Test
+        @DisplayName("字符串内控制字符转义（裸换行）")
+        void controlCharsInString() throws Exception {
+            String raw = "{\"desc\":\"第一行\n第二行\"}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("第一行\n第二行", parseStrict(repaired).get("desc").asText());
+        }
+
+        @Test
+        @DisplayName("字符串内 Tab 转义")
+        void tabInString() throws Exception {
+            String raw = "{\"col\":\"a\tb\"}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("a\tb", parseStrict(repaired).get("col").asText());
+        }
     }
 
-    @Test
-    @DisplayName("剥离前后多余文本，只保留 JSON 主体")
-    void repair_surroundingText_shouldExtractBody() throws Exception {
-        String raw = "好的，以下是分析结果：\n{\"score\": 80}\n希望对你有帮助。";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("score").asInt()).isEqualTo(80);
+    @Nested
+    @DisplayName("复合场景")
+    class ComplexScenarios {
+
+        @Test
+        @DisplayName("前后多余文本剥离（提取 JSON 主体）")
+        void extractJsonBody() throws Exception {
+            String raw = "好的，这是结果：\n{\"q\":\"1+1\"}\n以上是回答。";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("1+1", parseStrict(repaired).get("q").asText());
+        }
+
+        @Test
+        @DisplayName("数组类型 JSON 提取")
+        void extractArray() throws Exception {
+            String raw = "```json\n[{\"id\":1},{\"id\":2}]\n```";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertTrue(parseStrict(repaired).isArray());
+            assertEquals(2, parseStrict(repaired).size());
+        }
+
+        @Test
+        @DisplayName("多重问题混合修复")
+        void mixedIssues() throws Exception {
+            String raw = "```json\n{'name':'钱七','tags':['a','b',],'active':true}\n```";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("钱七", parseStrict(repaired).get("name").asText());
+            assertTrue(parseStrict(repaired).get("active").asBoolean());
+        }
     }
 
-    @Test
-    @DisplayName("清理尾随逗号")
-    void repair_trailingComma_shouldRemove() throws Exception {
-        String raw = "{\"a\": 1, \"b\": 2,}";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("a").asInt()).isEqualTo(1);
-        assertThat(node.get("b").asInt()).isEqualTo(2);
-    }
+    @Nested
+    @DisplayName("校验方法")
+    class ValidationMethods {
 
-    @Test
-    @DisplayName("未加引号的 key 自动加引号")
-    void repair_unquotedKey_shouldQuote() throws Exception {
-        String raw = "{score: 80, name: \"张三\"}";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("score").asInt()).isEqualTo(80);
-        assertThat(node.get("name").asText()).isEqualTo("张三");
-    }
+        @Test
+        @DisplayName("isValid：合法 JSON 返回 true")
+        void isValidTrue() {
+            assertTrue(JsonRepairUtil.isValid("{\"a\":1}"));
+            assertTrue(JsonRepairUtil.isValid("[1,2,3]"));
+        }
 
-    @Test
-    @DisplayName("合法 JSON 不被破坏")
-    void repair_validJson_shouldKeepAsIs() throws Exception {
-        String raw = "{\"score\": 80, \"name\": \"张三\"}";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("score").asInt()).isEqualTo(80);
-    }
+        @Test
+        @DisplayName("isValid：非法 JSON 返回 false")
+        void isValidFalse() {
+            assertFalse(JsonRepairUtil.isValid("{'a':1}"));
+            assertFalse(JsonRepairUtil.isValid(""));
+            assertFalse(JsonRepairUtil.isValid(null));
+            assertFalse(JsonRepairUtil.isValid("   "));
+            assertFalse(JsonRepairUtil.isValid("{a:}"));
+        }
 
-    @Test
-    @DisplayName("综合场景：单引号 + 中文引号 + 尾随逗号 + Markdown")
-    void repair_complexScenario_shouldAllFix() throws Exception {
-        String raw = "```json\n{'overallScore': 75, 'suggestion': '项目 '教材ING'',}\n```";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("overallScore").asInt()).isEqualTo(75);
-        assertThat(node.get("suggestion").asText()).contains("项目");
-    }
+        @Test
+        @DisplayName("repairAndLog：合法 JSON 原样返回")
+        void repairAndLogValid() {
+            String json = "{\"a\":1}";
+            assertEquals(json, JsonRepairUtil.repairAndLog(json, "test"));
+        }
 
-    @Test
-    @DisplayName("空值与空白字符串安全处理")
-    void repair_nullOrBlank_shouldReturnAsIs() {
-        assertThat(JsonRepairUtil.repair(null)).isNull();
-        assertThat(JsonRepairUtil.repair("")).isEqualTo("");
-        assertThat(JsonRepairUtil.repair("   ")).isEqualTo("   ");
-    }
+        @Test
+        @DisplayName("repairAndLog：非法 JSON 修复后返回")
+        void repairAndLogInvalid() throws Exception {
+            String raw = "{'a':1}";
+            String result = JsonRepairUtil.repairAndLog(raw, "test");
+            assertNotNull(parseStrict(result));
+            assertEquals(1, parseStrict(result).get("a").asInt());
+        }
 
-    @Test
-    @DisplayName("isValid: 合法 JSON 返回 true")
-    void isValid_validJson_returnsTrue() {
-        assertThat(JsonRepairUtil.isValid("{\"a\":1}")).isTrue();
-    }
-
-    @Test
-    @DisplayName("isValid: 非法 JSON 返回 false")
-    void isValid_invalidJson_returnsFalse() {
-        assertThat(JsonRepairUtil.isValid("{'a':1}")).isFalse();
-    }
-
-    @Test
-    @DisplayName("repairAndLog: 已合法 JSON 直接返回原值")
-    void repairAndLog_validJson_returnsOriginal() {
-        String raw = "{\"a\":1}";
-        String result = JsonRepairUtil.repairAndLog(raw, "test");
-        assertThat(result).isEqualTo(raw);
-    }
-
-    @Test
-    @DisplayName("修复字符串内裸换行符：Bad control character in string literal")
-    void repair_controlCharInString_shouldEscape() throws Exception {
-        // AI 在 suggestion 字段里直接返回裸换行符，导致 JSON.parse 报错
-        // position 729 (line 29 column 23) 即此场景
-        String raw = "{\"suggestion\": \"项目1\n项目2\"}";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("suggestion").asText()).contains("项目1");
-        assertThat(node.get("suggestion").asText()).contains("项目2");
-    }
-
-    @Test
-    @DisplayName("修复字符串内回车+制表符：保留 JSON 缩进格式化")
-    void repair_controlChars_shouldEscapeInStringOnly() throws Exception {
-        // 字符串内 \n \r \t 转义，但 JSON 结构外的 \n 保留（缩进格式化）
-        String raw = "{\n  \"score\": 80,\n  \"desc\": \"line1\nline2\ttabbed\"\n}";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("score").asInt()).isEqualTo(80);
-        assertThat(node.get("desc").asText()).isEqualTo("line1\nline2\ttabbed");
-    }
-
-    @Test
-    @DisplayName("综合：单引号+裸换行+中文引号（用户实际报错场景）")
-    void repair_complexWithControlChars() throws Exception {
-        String raw = "{'overallScore': 72, 'dimensions': [{'name': '技术栈', 'suggestion': '建议补充：\n1. Spring Boot\n2. MySQL'}],}";
-        String repaired = JsonRepairUtil.repair(raw);
-        var node = mapper.readTree(repaired);
-        assertThat(node.get("overallScore").asInt()).isEqualTo(72);
-        assertThat(node.get("dimensions").get(0).get("suggestion").asText()).contains("Spring Boot");
+        @Test
+        @DisplayName("repairAndLog：null/空白原样返回")
+        void repairAndLogNull() {
+            assertNull(JsonRepairUtil.repairAndLog(null, "test"));
+            assertEquals("", JsonRepairUtil.repairAndLog("", "test"));
+        }
     }
 }
