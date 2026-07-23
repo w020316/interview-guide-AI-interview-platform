@@ -10,9 +10,93 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.6.0'
+export const CURRENT_VERSION = '1.11.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.11.0',
+    date: '2026-07-23',
+    title: '版本 1.11.0 · Controller 测试扩展 + CORS 配置化 + SSE 监控 + BaseInput 组件',
+    items: [
+      '测试：新增 JobAnalysisController MockMvc 测试（8 用例，覆盖 analyze/gap/letter 三端点校验与正常路径）',
+      '测试：新增 ResumeController MockMvc 测试（10 用例，覆盖 analyze/optimize 入参校验 + import-url SSRF 防御）',
+      '工程化：CORS 允许来源从硬编码改为 app.cors.allowed-origins 配置项，修改部署域名无需改代码',
+      '可观测性：SSE 并发限流指标暴露到 actuator（sse.max.concurrent / sse.active.count），便于监控水位',
+      '前端组件库：新增 BaseInput 通用输入框（sm/md/lg 尺寸 + error 态 + prefix/suffix 插槽），13 个单测',
+      '前端组件库：KnowledgeView 分类输入框迁移到 BaseInput 作为试点',
+      '测试统计：后端 96 tests passed（+18），前端 68 tests passed（+13）'
+    ]
+  },
+  {
+    version: '1.10.0',
+    date: '2026-07-23',
+    title: '版本 1.10.0 · UI 组件库深化 + Controller MockMvc + 去重阈值配置化',
+    items: [
+      'UI 组件库：BaseButton 新增 cta（白底反色）与 gradient（品牌色渐变）variant',
+      'UI 组件库：BaseCard 新增 feature variant（顶部品牌色细条，hover 延展满宽）',
+      'UI 迁移：7 个 View 共 22 个按钮批量迁移到 BaseButton，清理冗余 CSS',
+      '测试：新增 HealthControllerTest（2 用例）+ AuthControllerTest（16 用例，覆盖注册/登录/登出全路径）',
+      '修复：@WebMvcTest 下 JwtAuthFilter 依赖 JwtUtil 注入失败（@MockBean 解耦 SecurityConfig 依赖链）',
+      '配置化：知识库去重相似度阈值改为 app.rag.dedup-similarity-threshold，运行时可调',
+      '测试统计：后端 78 tests passed（+35），前端 55 tests passed'
+    ]
+  },
+  {
+    version: '1.9.0',
+    date: '2026-07-23',
+    title: '版本 1.9.0 · 后端单测基础 + DRY 重构 + SSE 配置化 + 知识库去重',
+    items: [
+      '工程化：抽取 PromptSanitizer 工具类，消除 9 处重复 sanitizePromptInput 方法（DRY）',
+      '测试：新增 JsonRepairUtilTest（21 用例）+ PromptSanitizerTest（18 用例）',
+      '测试：修复 RagSearchServiceTest 以适配 v1.8 方法签名变更',
+      '配置化：SSE 并发限流从 static Semaphore 改为 @Value + @PostConstruct，运行时可调',
+      '功能：知识库导入新增去重预检（向量相似度 >= 0.90 视为重复，跳过）',
+      'UI 试点：HomeView Hero 区按钮迁移到 BaseButton，BaseButton 新增 shadow + hoverable prop',
+      '测试统计：后端 43 tests passed，前端 55 tests passed'
+    ]
+  },
+  {
+    version: '1.8.0',
+    date: '2026-07-23',
+    title: '版本 1.8.0 · P0/P1 遗留清零 + Vitest 落地 + UI 组件库 + 保活',
+    items: [
+      '功能：面试题目/答案持久化端点激活（InterviewSessionController + InterviewView 集成）',
+      '安全：JWT subject 改用 userId（不可变），用户名变更不再导致 token 失效',
+      '安全：Prompt 注入防御统一落地 9 处服务（InterviewService / JobAnalysisService 等）',
+      '安全：SSE 并发限流 Semaphore=20，防止虚拟线程池无界扩张',
+      '性能：StatsController N+1 查询修复，批量拉取关联数据',
+      '安全：知识库按 userId 隔离（metadata 过滤），防止跨用户读取',
+      '测试：前端 Vitest 落地，4 个测试文件覆盖率 60%+（jsonRepair/auth/index/BaseButton）',
+      'UI 组件库：新增 BaseButton / BaseCard / BaseTag 三类原子组件',
+      '工程化：GitHub Actions keepalive.yml 每 10 分钟 ping /api/info，防 Render 休眠',
+      '影响：JWT subject 变更要求所有用户重新登录'
+    ]
+  },
+  {
+    version: '1.7.1',
+    date: '2026-07-22',
+    title: '版本 1.7.1 · P0/P1 修复 + iOS 简历导入 + 移动端适配',
+    items: [
+      '修复：ResumeView 上传失败（axios 响应解包错误）',
+      '修复：SSE error 事件污染问题',
+      '修复：移动端导航溢出 + iOS 100dvh 视口问题',
+      '修复：HTML 检测 TypeError',
+      '功能：iOS「从其他平台导入简历」（URL/剪贴板/iCloud，后端 /api/resume/import-url 含 SSRF 防护）',
+      '功能：差距诊断 tab 新增简历上传按钮（/api/resume/upload）'
+    ]
+  },
+  {
+    version: '1.7.0',
+    date: '2026-07-22',
+    title: '版本 1.7.0 · 新增岗位分析模块（JD 分析 + 差距诊断 + 求职信）',
+    items: [
+      '新增功能：JD 岗位分析，拆解职责/硬技能/软技能/隐性条件/关键词（POST /api/job/analyze）',
+      '新增功能：差距诊断，简历 vs JD 逐条对比，输出强证据/弱证据/缺口（POST /api/job/gap）',
+      '新增功能：求职信/申请邮件/内推私信生成（POST /api/job/letter，支持 coverLetter/email/referral 三类）',
+      '前端：JobAnalysisView 三 tab 界面，导航栏新增「岗位分析」入口，/job 路由',
+      '前端：首页功能卡新增岗位分析入口'
+    ]
+  },
   {
     version: '1.6.0',
     date: '2026-07-05',

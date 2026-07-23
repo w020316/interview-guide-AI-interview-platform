@@ -3,6 +3,7 @@ package com.example.interview.controller;
 import com.example.interview.common.Result;
 import com.example.interview.service.InterviewService;
 import com.example.interview.util.PromptSanitizer;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,14 @@ public class InterviewController {
     @Autowired
     private ChatClient chatClient;
 
+    /**
+     * v1.11 起：注入 MeterRegistry，将 SSE 限流指标暴露到 actuator metrics
+     * - sse.max.concurrent：限流上限（容量）
+     * - sse.active.count：当前活跃流式连接数（已用许可 = max - available）
+     */
+    @Autowired(required = false)
+    private MeterRegistry meterRegistry;
+
     /** SSE 推送使用虚拟线程池，避免阻塞 Tomcat 工作线程 */
     private final ExecutorService sseExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
@@ -62,6 +71,12 @@ public class InterviewController {
     private void initSemaphore() {
         this.sseSemaphore = new Semaphore(sseMaxConcurrent, true);
         log.info("SSE 并发限流初始化: max-concurrent={}", sseMaxConcurrent);
+        // v1.11：注册 actuator gauge，便于监控 SSE 并发水位
+        // 测试环境（无 actuator）meterRegistry 为 null，@Autowired(required=false) 兜底
+        if (meterRegistry != null) {
+            meterRegistry.gauge("sse.max.concurrent", sseSemaphore, s -> sseMaxConcurrent);
+            meterRegistry.gauge("sse.active.count", sseSemaphore, s -> sseMaxConcurrent - s.availablePermits());
+        }
     }
 
     /**

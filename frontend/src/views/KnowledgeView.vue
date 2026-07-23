@@ -61,7 +61,7 @@
     <div v-else-if="tab === 'import'" class="import-section fade-in">
       <div class="field-row">
         <label>分类 <span class="hint">可选</span></label>
-        <input v-model="category" type="text" placeholder="例如：Spring、Java 基础" />
+        <BaseInput v-model="category" block placeholder="例如：Spring、Java 基础" />
       </div>
       <div class="field-row">
         <label>知识点内容 <span class="hint">每行一条，建议 200 字以内</span></label>
@@ -233,7 +233,7 @@ import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
-import { BaseButton } from '../components'
+import { BaseButton, BaseInput } from '../components'
 
 const md = new MarkdownIt({ html: false, linkify: true })
 

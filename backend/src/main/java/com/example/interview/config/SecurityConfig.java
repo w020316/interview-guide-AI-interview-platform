@@ -3,6 +3,7 @@ package com.example.interview.config;
 import com.example.interview.security.JwtAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -18,6 +19,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -33,6 +35,13 @@ public class SecurityConfig {
 
     @Autowired
     private JwtAuthFilter jwtAuthFilter;
+
+    /**
+     * CORS 允许的前端来源（逗号分隔）
+     * v1.11 起从 app.cors.allowed-origins 配置读取，修改部署域名无需改代码
+     */
+    @Value("${app.cors.allowed-origins}")
+    private String corsAllowedOrigins;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -71,18 +80,19 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /** 跨域配置：白名单制，仅允许生产前端域名 + 本地调试（收紧通配符防滥用） */
+    /**
+     * 跨域配置：白名单制，来源从 app.cors.allowed-origins 读取（逗号分隔）
+     * - 使用 allowedOriginPatterns 支持通配（如 http://localhost:*）
+     * - 修改部署域名时改环境变量 CORS_ALLOWED_ORIGINS 即可，无需改代码
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of(
-                // 生产前端域名（精确匹配，防止任意子域名滥用）
-                "https://interview-guide-ai-interview-platform.vercel.app",
-                "https://interview-guide-ai-interview-platform.pages.dev",
-                // 本地开发
-                "http://localhost:*",
-                "http://127.0.0.1:*"
-        ));
+        List<String> origins = Arrays.stream(corsAllowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        config.setAllowedOriginPatterns(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept"));
         config.setExposedHeaders(List.of("X-Rate-Limit-Remaining"));

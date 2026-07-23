@@ -59,7 +59,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
   endpoint:
     health:
       show-details: when_authorized
@@ -80,6 +80,10 @@ app:
     # 0.90 对应 cosine distance <= 0.10，覆盖文本微调后重复的场景
     # 调低可更严格去重（如 0.85），调高可放宽（如 0.95）
     dedup-similarity-threshold: ${RAG_DEDUP_THRESHOLD:0.90}
+  cors:
+    # 允许的前端来源（逗号分隔），生产精确域名 + 本地调试
+    # 修改部署域名时改环境变量 CORS_ALLOWED_ORIGINS 即可，无需改代码
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://interview-guide-ai-interview-platform.vercel.app,https://interview-guide-ai-interview-platform.pages.dev,http://localhost:5173,http://127.0.0.1:5173}
   supabase:
     url: ${SUPABASE_URL:https://your-project.supabase.co}
     service-key: ${SUPABASE_SERVICE_KEY:your-service-key}
