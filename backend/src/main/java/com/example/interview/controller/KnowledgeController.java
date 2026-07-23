@@ -46,7 +46,7 @@ public class KnowledgeController {
     @GetMapping("/search")
     public Result<String> search(@RequestParam String query,
                                  @RequestParam(defaultValue = "5") int topK) {
-        return Result.success(ragSearchService.search(query, topK));
+        return Result.success(ragSearchService.search(query, topK, currentUserId()));
     }
 
     @Operation(summary = "RAG 增强问答")
@@ -54,38 +54,45 @@ public class KnowledgeController {
     public Result<String> ask(@RequestBody Map<String, String> request) {
         String question = request.get("question");
         if (question == null || question.isBlank()) return Result.error(400, "问题不能为空");
-        return Result.success(ragSearchService.answerWithRag(question));
+        return Result.success(ragSearchService.answerWithRag(question, currentUserId()));
     }
 
-    @Operation(summary = "导入知识文档（简单模式）")
+    @Operation(summary = "导入知识文档（简单模式，按用户隔离）")
     @PostMapping("/import")
     public Result<String> importKnowledge(@RequestBody Map<String, List<String>> request) {
         List<String> documents = request.get("documents");
         if (documents == null || documents.isEmpty()) return Result.error(400, "文档列表不能为空");
-        int imported = ragSearchService.importKnowledge(documents);
+        // 限制单次导入数量，防止滥用
+        if (documents.size() > 100) return Result.error(400, "单次最多导入 100 条文档");
+        int imported = ragSearchService.importKnowledge(documents, currentUserId());
         return Result.success("成功导入 " + imported + " 条文档（请求 " + documents.size() + " 条）");
     }
 
     /**
-     * 批量导入 Markdown 知识分块（P1）
+     * 批量导入 Markdown 知识分块（P1，按用户隔离）
      * POST /api/knowledge/import/batch
      * Body: {"category":"Spring","chunks":["内容1","内容2"]}
      */
-    @Operation(summary = "批量导入 Markdown 知识分块并向量化")
+    @Operation(summary = "批量导入 Markdown 知识分块并向量化（按用户隔离）")
     @PostMapping("/import/batch")
     public Result<Map<String, Object>> batchImport(@RequestBody Map<String, Object> request) {
         String category = (String) request.getOrDefault("category", "通用");
         @SuppressWarnings("unchecked")
         List<String> chunks = (List<String>) request.get("chunks");
         if (chunks == null || chunks.isEmpty()) return Result.error(400, "chunks 不能为空");
+        // 限制单次导入数量
+        if (chunks.size() > 100) return Result.error(400, "单次最多导入 100 个分块");
 
+        String userId = currentUserId();
         List<Document> docs = new ArrayList<>();
         for (String chunk : chunks) {
             if (chunk == null || chunk.isBlank()) continue;
+            // 限制单个分块大小（8KB），防止超大文本拖慢向量化
+            String safeChunk = chunk.length() > 8192 ? chunk.substring(0, 8192) : chunk;
             docs.add(Document.builder()
                     .id(UUID.randomUUID().toString())
-                    .text(chunk)
-                    .metadata(Map.of("category", category, "source", "batch-import"))
+                    .text(safeChunk)
+                    .metadata(Map.of("category", category, "source", "batch-import", "userId", userId))
                     .build());
         }
         vectorStore.add(docs);

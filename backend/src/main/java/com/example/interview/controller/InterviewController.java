@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -43,6 +44,13 @@ public class InterviewController {
 
     /** 心跳调度器：定期发送注释行，避免反向代理/浏览器超时断开 */
     private final ScheduledExecutorService heartbeat = new ScheduledThreadPoolExecutor(1);
+
+    /**
+     * SSE 并发限流：限制同时进行的流式连接数，防止虚拟线程池无界扩张导致 OOM
+     * - 20 个并发覆盖正常使用场景
+     * - 超出则返回 503，前端提示用户稍后重试
+     */
+    private static final Semaphore SSE_SEMAPHORE = new Semaphore(20, true);
 
     /**
      * 生成面试题
@@ -79,6 +87,24 @@ public class InterviewController {
             throw new IllegalStateException("未认证用户");
         }
         return auth.getPrincipal().toString();
+    }
+
+    /**
+     * Prompt 注入防御：剥离指令性模式 + 截断超长输入
+     * - 移除 "忽略以上所有指令"、"你现在是" 等常见注入模式
+     * - 截断至 2000 字符，防止 token 滥用
+     */
+    private String sanitizePromptInput(String input) {
+        if (input == null) return "";
+        String s = input;
+        if (s.length() > 2000) {
+            s = s.substring(0, 2000);
+        }
+        s = s.replaceAll("(?i)忽略以上(所有)?(指令|规则|要求)", "[已过滤]")
+             .replaceAll("(?i)ignore (all )?(previous|above) instructions", "[filtered]")
+             .replaceAll("(?i)你现在是", "用户提到：")
+             .replaceAll("(?i)you are now", "user mentioned:");
+        return s;
     }
 
     /**
@@ -132,15 +158,28 @@ public class InterviewController {
         // 保存 Disposable 以便客户端断开时取消订阅，防止资源泄漏
         final Disposable[] disposableHolder = new Disposable[1];
 
-        // 客户端断开或超时时取消 AI 订阅
+        // 尝试获取并发令牌，超出 20 个并发则返回 503
+        if (!SSE_SEMAPHORE.tryAcquire()) {
+            // 注意：此处未注册 onCompletion，emitter.complete() 不会触发 release，避免 double release
+            try {
+                emitter.send(SseEmitter.event().name("error").data("当前在线用户较多，请稍后重试"));
+            } catch (IOException ignored) {
+            }
+            emitter.complete();
+            return emitter;
+        }
+
+        // 客户端断开或超时时取消 AI 订阅并释放令牌（仅在成功获取令牌后注册）
         emitter.onCompletion(() -> {
             heartbeatRunning.set(false);
+            SSE_SEMAPHORE.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
         });
         emitter.onTimeout(() -> {
             heartbeatRunning.set(false);
+            SSE_SEMAPHORE.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -148,6 +187,7 @@ public class InterviewController {
         });
         emitter.onError(e -> {
             heartbeatRunning.set(false);
+            SSE_SEMAPHORE.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -169,13 +209,15 @@ public class InterviewController {
                     }
                 }, 15, 15, TimeUnit.SECONDS);
 
-                // 构建 prompt：精简，聚焦问题本身，加快响应
+                // 构建 prompt：精简，聚焦问题本身，加快响应；用户输入经 sanitize 防注入
+                String safeQuestion = sanitizePromptInput(question);
+                String safeContext = context == null ? "" : sanitizePromptInput(context);
                 String prompt;
-                if (context == null || context.isBlank()) {
-                    prompt = "请简洁回答以下面试题，控制在 300 字以内，突出要点：\n\n" + question;
+                if (safeContext.isBlank()) {
+                    prompt = "请简洁回答以下面试题，控制在 300 字以内，突出要点：\n\n" + safeQuestion;
                 } else {
                     prompt = "请简洁回答以下面试题，控制在 300 字以内，突出要点：\n\n"
-                            + "【背景】" + context + "\n\n【问题】" + question;
+                            + "【背景】" + safeContext + "\n\n【问题】" + safeQuestion;
                 }
 
                 // 使用 Spring AI stream() 逐 token 推送，保存 Disposable 以便取消

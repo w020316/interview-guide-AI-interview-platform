@@ -53,7 +53,7 @@ public class JwtUtil {
     /**
      * 签发 JWT
      *
-     * @param subject 用户标识（写入 subject，建议用 users.id）
+     * @param subject 用户标识（v1.8 起统一使用 users.id，旧版本曾使用 username）
      * @return 签名后的 JWT 字符串
      */
     public String generateToken(String subject) {

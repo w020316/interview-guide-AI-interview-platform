@@ -1,0 +1,37 @@
+name: Keep Render Backend Warm
+
+# Render 免费层 15 分钟无请求会休眠，首次唤醒需 30~50 秒（SUS 评分主要拖累项）
+# 通过 GitHub Actions 每 10 分钟 ping 一次 /api/info，避免冷启动
+# 频率受 GitHub Actions 最小粒度限制（不能低于 5 分钟），10 分钟是稳定且不浪费免费额度的选择
+
+on:
+  schedule:
+    # 每 10 分钟执行一次（UTC 时间，与 Asia/Shanghai 无时差影响）
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # 允许手动触发，便于排查
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping backend health
+        env:
+          BACKEND_URL: https://interview-guide-backend.onrender.com
+        run: |
+          set -euo pipefail
+          TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "[$TS] 开始保活 ping → $BACKEND_URL/api/info"
+          # --fail: HTTP 非 2xx 退出码非 0
+          # --max-time: 总超时 30 秒（避免卡住整个 workflow）
+          # --silent --show-error: 静默成功，仅失败时打印错误
+          RESPONSE=$(curl --fail --max-time 30 --silent --show-error "$BACKEND_URL/api/info" || echo "PING_FAILED")
+          echo "响应: $RESPONSE"
+          if [[ "$RESPONSE" == "PING_FAILED" ]]; then
+            echo "::error::后端 ping 失败，请检查 Render 服务状态"
+            exit 1
+          fi
+          echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] 保活成功"

@@ -209,6 +209,7 @@ function sanitizeHtml(html: string): string {
 }
 
 interface Question {
+  id?: number
   question: string
   category: string
   difficulty: string
@@ -291,7 +292,20 @@ async function startInterview() {
       return
     }
 
-    // 4. 题目成功后才设置状态，切换到面试页
+    // 4. 持久化题目到后端（关联 sessionId），获取带 id 的题目列表
+    //    失败不阻塞流程，仅记录日志（用户仍可在当前会话答题，仅历史回顾不可用）
+    try {
+      const saved = await api.post(`/api/session/${createdSessionId}/questions`,
+        parsed, { timeout: AI_TIMEOUT }) as unknown as Question[]
+      if (Array.isArray(saved) && saved.length === parsed.length) {
+        // 用后端返回的带 id 题目替换，后续 saveAnswer 需要 questionId
+        parsed.splice(0, parsed.length, ...saved)
+      }
+    } catch (persistErr) {
+      console.warn('题目持久化失败，历史回顾将不可用：', persistErr)
+    }
+
+    // 5. 题目成功后设置状态，切换到面试页
     sessionId.value = createdSessionId
     questions.value = parsed
     ElMessage.success(`已生成 ${questions.value.length} 道题目，开始面试！`)
@@ -406,12 +420,27 @@ async function submitAnswer() {
   evalLoading.value = true
   evalResult.value = null
   try {
-    // 不再传 referenceAnswer，由后端自行评估
+    // 1. 评估回答（AI 返回评分 + 改进建议）
     const data = await api.post('/api/interview/evaluate', {
       question: currentQ.value.question,
       userAnswer: userAnswer.value
     }) as unknown as string
     evalResult.value = safeParse<EvalResult>(data, {})
+
+    // 2. 持久化用户答案 + 评估分到后端（关联 questionId）
+    //    失败不阻塞流程，仅记录日志（历史回顾会缺失本次答题记录）
+    const questionId = currentQ.value.id
+    if (questionId != null) {
+      try {
+        await api.post('/api/session/answer', {
+          questionId,
+          userAnswer: userAnswer.value,
+          evaluationScore: evalResult.value.overallScore ?? null
+        })
+      } catch (persistErr) {
+        console.warn('答案持久化失败，历史回顾将缺失本次记录：', persistErr)
+      }
+    }
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '评估失败'))
   } finally { evalLoading.value = false }

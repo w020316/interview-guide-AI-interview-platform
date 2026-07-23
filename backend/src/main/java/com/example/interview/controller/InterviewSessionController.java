@@ -104,6 +104,43 @@ public class InterviewSessionController {
     }
 
     /**
+     * 批量保存 AI 生成的面试题到会话（仅限本人会话）
+     * POST /api/session/{sessionId}/questions
+     * Body: [{"question":"...","category":"...","difficulty":"...","referenceAnswer":"..."}, ...]
+     *
+     * 用于 startInterview 成功后持久化题目，支持刷新页面/历史回顾
+     */
+    @PostMapping("/{sessionId}/questions")
+    public Result<List<InterviewQuestionEntity>> saveQuestions(@PathVariable String sessionId,
+                                                                @RequestBody List<Map<String, String>> questions) {
+        InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
+        if (!currentUserId().equals(session.getUserId())) {
+            return Result.error(403, "无权操作该会话");
+        }
+        if (questions == null || questions.isEmpty()) {
+            return Result.error(400, "题目列表不能为空");
+        }
+
+        List<InterviewQuestionEntity> entities = questions.stream().map(q ->
+                InterviewQuestionEntity.builder()
+                        .sessionId(sessionId)
+                        .question(q.getOrDefault("question", ""))
+                        .category(q.getOrDefault("category", ""))
+                        .difficulty(q.getOrDefault("difficulty", ""))
+                        .referenceAnswer(q.get("referenceAnswer"))
+                        .build()
+        ).toList();
+
+        // 过滤掉 question 为空的无效项
+        entities = entities.stream().filter(e -> !e.getQuestion().isBlank()).toList();
+        if (entities.isEmpty()) {
+            return Result.error(400, "题目内容不能为空");
+        }
+
+        return Result.success(sessionService.saveQuestions(sessionId, entities));
+    }
+
+    /**
      * 提交用户回答及评估结果
      * POST /api/session/answer
      * Body: {"questionId":1,"userAnswer":"...","evaluationScore":80}

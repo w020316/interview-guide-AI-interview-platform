@@ -74,15 +74,12 @@ public class StatsController {
                 .filter(s -> "FINISHED".equals(s.getStatus()))
                 .count();
 
-        // 计算面试题平均分
+        // 计算面试题平均分（单次批量查询，避免 N+1）
         Double avgInterviewScore = null;
         if (!sessions.isEmpty()) {
             List<String> sessionIds = sessions.stream().map(InterviewSessionEntity::getSessionId).toList();
-            // 累加每场面试的评分
-            List<InterviewQuestionEntity> allQ = new ArrayList<>();
-            for (String sid : sessionIds) {
-                allQ.addAll(questionRepository.findBySessionIdOrderByIdAsc(sid));
-            }
+            // 一次 IN 查询获取所有会话的题目，避免循环 N+1
+            List<InterviewQuestionEntity> allQ = questionRepository.findBySessionIdInOrderByCreatedAtDesc(sessionIds);
             avgInterviewScore = allQ.stream()
                     .map(InterviewQuestionEntity::getEvaluationScore)
                     .filter(s -> s != null)

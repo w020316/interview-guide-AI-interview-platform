@@ -100,31 +100,27 @@ public class InterviewService {
                 log.warn("RAG 检索失败，跳过：{}", e.getMessage());
             }
 
-            // 3. 精简 Prompt（去除 jobDescription 重复注入 + 截断简历文本 + 压缩知识点）
+            // 3. 精简 Prompt（用 StringBuilder 替代 String.format，避免 % 注入；用户输入经 sanitizePromptInput 消毒）
             String truncatedResume = resumeText.length() > MAX_RESUME_LEN
                     ? resumeText.substring(0, MAX_RESUME_LEN) + "..." : resumeText;
-            String prompt = String.format("""
-                    你是一位资深的%s面试官，请为候选人生成 %d 道面试题。
-
-                    【简历亮点】
-                    %s
-
-                    【参考知识点】
-                    %s
-
-                    【出题原则】
-                    1. 题目与岗位高度相关，覆盖核心技能与项目经验
-                    2. 难度分布：简单 30%%、中等 50%%、困难 20%%
-                    3. 分类覆盖：技术基础、项目深挖、场景设计、行为面试（按岗位调整）
-
-                    【输出要求（务必严格遵守）】
-                    1. 直接输出 JSON 数组，不要 Markdown 代码块、不要 ```json 标记
-                    2. 字符串必须用 ASCII 双引号 "，禁止单引号或中文引号
-                    3. 字符串值内禁止裸换行符、回车符、制表符
-                    4. 不要输出注释、解释、前后缀文字
-                    5. 输出格式：
-                    [{"question":"请介绍你的项目架构","category":"项目深挖","difficulty":"MEDIUM","keyPoints":["考察点1"],"referenceAnswer":"参考答案要点"}]
-                    """, jobDescription, count, truncatedResume, relatedKnowledge.isEmpty() ? "无" : relatedKnowledge);
+            String safeJobDesc = sanitizePromptInput(jobDescription);
+            String safeResume = sanitizePromptInput(truncatedResume);
+            String prompt = new StringBuilder()
+                    .append("你是一位资深的").append(safeJobDesc).append("面试官，请为候选人生成 ").append(count).append(" 道面试题。\n\n")
+                    .append("【简历亮点】\n").append(safeResume).append("\n\n")
+                    .append("【参考知识点】\n").append(relatedKnowledge.isEmpty() ? "无" : relatedKnowledge).append("\n\n")
+                    .append("【出题原则】\n")
+                    .append("1. 题目与岗位高度相关，覆盖核心技能与项目经验\n")
+                    .append("2. 难度分布：简单 30%、中等 50%、困难 20%\n")
+                    .append("3. 分类覆盖：技术基础、项目深挖、场景设计、行为面试（按岗位调整）\n\n")
+                    .append("【输出要求（务必严格遵守）】\n")
+                    .append("1. 直接输出 JSON 数组，不要 Markdown 代码块、不要 ```json 标记\n")
+                    .append("2. 字符串必须用 ASCII 双引号 \"，禁止单引号或中文引号\n")
+                    .append("3. 字符串值内禁止裸换行符、回车符、制表符\n")
+                    .append("4. 不要输出注释、解释、前后缀文字\n")
+                    .append("5. 输出格式：\n")
+                    .append("[{\"question\":\"请介绍你的项目架构\",\"category\":\"项目深挖\",\"difficulty\":\"MEDIUM\",\"keyPoints\":[\"考察点1\"],\"referenceAnswer\":\"参考答案要点\"}]")
+                    .toString();
 
             // 4. 调用 AI（并发控制 + 信号量保护）
             String response;
@@ -184,28 +180,21 @@ public class InterviewService {
     public String evaluateAnswer(String question, String userAnswer, String referenceAnswer) {
         long start = System.nanoTime();
         try {
-            String prompt = String.format("""
-                    你是一位面试官，请评估以下回答。
-
-                    【面试题】
-                    %s
-
-                    【参考答案】
-                    %s
-
-                    【用户回答】
-                    %s
-
-                    请从完整性（30%%）、准确性（40%%）、表达能力（30%%）三个维度评分，并给出改进建议。
-
-                    【输出要求（务必严格遵守）】
-                    1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记
-                    2. 所有字符串必须使用 ASCII 双引号 "，禁止使用单引号 ' 或中文引号 “ ” ‘ ’
-                    3. 不要在字符串值中使用引号，如需引用请用书名号《》
-                    4. 不要输出任何注释、解释、前后缀文字
-                    5. 输出格式：
-                    {"overallScore":75,"completeness":70,"accuracy":80,"expression":75,"strengths":["优点1"],"weaknesses":["不足1"],"improvements":["建议1"]}
-                    """, question, referenceAnswer, userAnswer);
+            // 用户输入经 sanitizePromptInput 消毒，避免 prompt 注入
+            String prompt = new StringBuilder()
+                    .append("你是一位面试官，请评估以下回答。\n\n")
+                    .append("【面试题】\n").append(sanitizePromptInput(question)).append("\n\n")
+                    .append("【参考答案】\n").append(sanitizePromptInput(referenceAnswer == null ? "" : referenceAnswer)).append("\n\n")
+                    .append("【用户回答】\n").append(sanitizePromptInput(userAnswer)).append("\n\n")
+                    .append("请从完整性（30%）、准确性（40%）、表达能力（30%）三个维度评分，并给出改进建议。\n\n")
+                    .append("【输出要求（务必严格遵守）】\n")
+                    .append("1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记\n")
+                    .append("2. 所有字符串必须使用 ASCII 双引号 \"，禁止使用单引号 ' 或中文引号\n")
+                    .append("3. 不要在字符串值中使用引号，如需引用请用书名号《》\n")
+                    .append("4. 不要输出任何注释、解释、前后缀文字\n")
+                    .append("5. 输出格式：\n")
+                    .append("{\"overallScore\":75,\"completeness\":70,\"accuracy\":80,\"expression\":75,\"strengths\":[\"优点1\"],\"weaknesses\":[\"不足1\"],\"improvements\":[\"建议1\"]}")
+                    .toString();
 
             String response = chatClient.prompt()
                     .user(prompt)
@@ -221,6 +210,24 @@ public class InterviewService {
             evaluateCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
+    }
+
+    /**
+     * Prompt 注入防御：剥离指令性模式 + 截断超长输入
+     * - 移除 "忽略以上所有指令"、"你现在是" 等常见注入模式
+     * - 截断至 2000 字符，防止 token 滥用
+     */
+    private String sanitizePromptInput(String input) {
+        if (input == null) return "";
+        String s = input;
+        if (s.length() > 2000) {
+            s = s.substring(0, 2000);
+        }
+        s = s.replaceAll("(?i)忽略以上(所有)?(指令|规则|要求)", "[已过滤]")
+             .replaceAll("(?i)ignore (all )?(previous|above) instructions", "[filtered]")
+             .replaceAll("(?i)你现在是", "用户提到：")
+             .replaceAll("(?i)you are now", "user mentioned:");
+        return s;
     }
 
     /** SHA-256 哈希，用于生成无碰撞的缓存键 */

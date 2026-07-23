@@ -7,23 +7,32 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * RAG 知识库服务
- * - 向量检索面试八股文
+ * - 向量检索面试八股文（按用户隔离）
  * - 构建带上下文的回答
  * - 通过 ObjectMapper 输出 JSON，避免手工拼接导致的安全/转义问题
+ *
+ * v1.8 起：所有 search/ask/import 均携带 userId，写入 metadata 并在检索时过滤
  */
 @Service
 public class RagSearchService {
 
     private static final Logger log = LoggerFactory.getLogger(RagSearchService.class);
+
+    /** metadata 中用户隔离字段名 */
+    private static final String META_USER_ID = "userId";
+    /** metadata 中共享知识标记（系统预置数据无 userId，标记为 shared） */
+    private static final String META_SHARED = "shared";
 
     @Autowired
     private VectorStore vectorStore;
@@ -36,35 +45,42 @@ public class RagSearchService {
 
     /**
      * 检索相关知识点（返回 JSON 数组字符串）
-     * 异常时返回 "[]"，避免上层解析失败
+     * v1.8：按 userId 隔离，仅返回该用户导入的 + 系统预置共享文档
+     *
+     * @param query  查询文本
+     * @param topK   返回条数（1-50）
+     * @param userId 当前用户 ID（用于隔离）
      */
-    public String search(String query, int topK) {
-        // 入参防御
+    public String search(String query, int topK, String userId) {
         if (query == null || query.isBlank()) {
             return "[]";
         }
-        int safeK = Math.max(1, Math.min(topK, 50)); // 限制 topK 上限，防止恶意大值
+        int safeK = Math.max(1, Math.min(topK, 50));
 
         try {
-            List<Document> docs = vectorStore.similaritySearch(
-                    SearchRequest.builder()
-                            .query(query)
-                            .topK(safeK)
-                            .build()
-            );
+            // 过滤条件：userId = 当前用户 OR shared = true
+            FilterExpressionBuilder b = new FilterExpressionBuilder();
+            SearchRequest.Builder reqBuilder = SearchRequest.builder()
+                    .query(query)
+                    .topK(safeK)
+                    .filterExpression(b.or(
+                            b.eq(META_USER_ID, userId),
+                            b.eq(META_SHARED, "true")
+                    ).build());
+
+            List<Document> docs = vectorStore.similaritySearch(reqBuilder.build());
 
             if (docs == null || docs.isEmpty()) {
                 return "[]";
             }
 
-            // 使用 ObjectMapper 序列化，自动处理转义，避免手工拼接 JSON 字符串的安全问题
             List<Map<String, Object>> result = new ArrayList<>(docs.size());
             for (Document doc : docs) {
-                result.add(Map.of(
-                        "id", doc.getId(),
-                        "content", doc.getText() == null ? "" : doc.getText(),
-                        "score", doc.getMetadata().getOrDefault("distance", 0.0)
-                ));
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", doc.getId());
+                item.put("content", doc.getText() == null ? "" : doc.getText());
+                item.put("score", doc.getMetadata().getOrDefault("distance", 0.0));
+                result.add(item);
             }
             return objectMapper.writeValueAsString(result);
         } catch (Exception e) {
@@ -74,23 +90,30 @@ public class RagSearchService {
     }
 
     /**
-     * 构建带上下文的回答
+     * 构建带上下文的回答（按 userId 隔离检索）
      * - 失败时返回兜底提示，避免返回 null 让前端崩
+     *
+     * @param question 用户问题
+     * @param userId   当前用户 ID
      */
-    public String answerWithRag(String question) {
+    public String answerWithRag(String question, String userId) {
         if (question == null || question.isBlank()) {
             return "问题不能为空";
         }
 
-        // 1. 检索相关知识
+        // 1. 检索相关知识（按 userId 隔离）
         String relatedKnowledge = "";
         try {
-            List<Document> docs = vectorStore.similaritySearch(
-                    SearchRequest.builder()
-                            .query(question)
-                            .topK(5)
-                            .build()
-            );
+            FilterExpressionBuilder b = new FilterExpressionBuilder();
+            SearchRequest req = SearchRequest.builder()
+                    .query(question)
+                    .topK(5)
+                    .filterExpression(b.or(
+                            b.eq(META_USER_ID, userId),
+                            b.eq(META_SHARED, "true")
+                    ).build())
+                    .build();
+            List<Document> docs = vectorStore.similaritySearch(req);
             if (docs != null && !docs.isEmpty()) {
                 StringBuilder sb = new StringBuilder();
                 for (Document doc : docs) {
@@ -102,25 +125,21 @@ public class RagSearchService {
             log.warn("RAG 检索失败 query='{}'：{}", question, e.getMessage());
         }
 
-        // 2. 构建 RAG Prompt
-        String prompt = String.format("""
-                你是一个 Java 后端面试助手，请根据以下参考资料回答问题。
-
-                【参考资料】
-                %s
-
-                【问题】
-                %s
-
-                要求：
-                1. 回答要准确、有条理
-                2. 尽量引用参考资料
-                3. 如果资料不足，明确说明
-                """, relatedKnowledge, question);
+        // 2. 构建 RAG Prompt（使用 StringBuilder 避免 String.format 注入风险）
+        StringBuilder promptBuilder = new StringBuilder()
+                .append("你是一个 Java 后端面试助手，请根据以下参考资料回答问题。\n\n")
+                .append("【参考资料】\n")
+                .append(relatedKnowledge.isEmpty() ? "无" : relatedKnowledge)
+                .append("\n【问题】\n")
+                .append(sanitizePromptInput(question))
+                .append("\n\n要求：\n")
+                .append("1. 回答要准确、有条理\n")
+                .append("2. 尽量引用参考资料\n")
+                .append("3. 如果资料不足，明确说明\n");
 
         // 3. 调用 AI 并做空值校验
         String response = chatClient.prompt()
-                .user(prompt)
+                .user(promptBuilder.toString())
                 .call()
                 .content();
 
@@ -133,11 +152,14 @@ public class RagSearchService {
     }
 
     /**
-     * 导入知识文档到向量库
+     * 导入知识文档到向量库（绑定 userId）
      * - 空列表直接返回，避免无意义调用
      * - 异常时仅记录日志，不抛出，避免影响批量导入主流程
+     *
+     * @param documents 文档文本列表
+     * @param userId    当前用户 ID（写入 metadata 实现隔离）
      */
-    public int importKnowledge(List<String> documents) {
+    public int importKnowledge(List<String> documents, String userId) {
         if (documents == null || documents.isEmpty()) {
             return 0;
         }
@@ -146,7 +168,7 @@ public class RagSearchService {
                     .filter(t -> t != null && !t.isBlank())
                     .map(text -> Document.builder()
                             .text(text)
-                            .metadata(Map.of("type", "knowledge"))
+                            .metadata(Map.of("type", "knowledge", META_USER_ID, userId))
                             .build())
                     .toList();
             if (docs.isEmpty()) {
@@ -158,5 +180,25 @@ public class RagSearchService {
             log.error("知识库导入失败：{}", e.getMessage(), e);
             return 0;
         }
+    }
+
+    /**
+     * Prompt 注入防御：剥离可能的指令性换行和角色扮演标记
+     * - 移除 "忽略以上所有指令"、"你现在是" 等常见注入模式
+     * - 截断超长输入（防止 token 滥用）
+     */
+    private String sanitizePromptInput(String input) {
+        if (input == null) return "";
+        String s = input;
+        // 截断至 2000 字符，防止 token 滥用
+        if (s.length() > 2000) {
+            s = s.substring(0, 2000);
+        }
+        // 剥离常见 prompt 注入模式
+        s = s.replaceAll("(?i)忽略以上(所有)?(指令|规则|要求)", "[已过滤]")
+             .replaceAll("(?i)ignore (all )?(previous|above) instructions", "[filtered]")
+             .replaceAll("(?i)你现在是", "用户提到：")
+             .replaceAll("(?i)you are now", "user mentioned:");
+        return s;
     }
 }

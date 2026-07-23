@@ -108,7 +108,8 @@ public class AuthController {
                 .build();
         userRepository.save(user);
 
-        return Result.success(jwtUtil.generateToken(username));
+        // subject 使用数据库自增 id（唯一且不可变），避免用户名变更导致 token 失效
+        return Result.success(jwtUtil.generateToken(user.getId().toString()));
     }
 
     /**
@@ -167,7 +168,8 @@ public class AuthController {
         // 登录成功，清除失败计数
         loginFailMap.remove(clientIp);
 
-        return Result.success(jwtUtil.generateToken(username));
+        // subject 使用数据库自增 id（唯一且不可变），避免用户名变更导致 token 失效
+        return Result.success(jwtUtil.generateToken(user.getId().toString()));
     }
 
     /**

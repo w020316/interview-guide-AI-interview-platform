@@ -90,33 +90,29 @@ public class ResumeAnalysisService {
                 cacheMissCounter.increment();
             }
 
-            // 2. 构建 Prompt（根据岗位动态生成，支持任意行业）
-            String prompt = String.format("""
-                    你是一位资深的%s招聘面试官，请根据以下简历和目标岗位进行多维度分析。
-
-                    【目标岗位】
-                    %s
-
-                    【简历内容】
-                    %s
-
-                    请从以下维度评分（0-100）并给出具体修改建议：
-                    1. 岗位匹配度：技能、经验、学历等是否符合岗位要求
-                    2. 项目/工作经历含金量：成果、数据、影响力
-                    3. 简历表述清晰度：结构、语言、重点突出
-                    4. 求职意向匹配度：职业规划与岗位的契合度
-
-                    【输出要求（务必严格遵守）】
-                    1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记
-                    2. 所有字符串必须使用 ASCII 双引号 "，禁止使用单引号 ' 或中文引号 “ ” ‘ ’ 「 」 『 』
-                    3. 不要在字符串值中使用单引号或双引号，如需引用请用中文书名号《》或直接描述
-                    4. 字符串值内禁止包含裸换行符、回车符、制表符；如需换行请用分号或逗号分隔
-                    5. 字符串值内的反斜杠 \\ 必须转义为 \\\\
-                    6. overallScore 和 dimensions 中的 score 必须是整数类型，不要加引号（如 75 而非 "75"）
-                    7. 不要输出任何注释、解释、前后缀文字
-                    8. 输出格式（不要包含 weaknesses 字段）：
-                    {"overallScore":75,"dimensions":[{"name":"岗位匹配度","score":80,"suggestion":"改进建议"}],"strengths":["优势1"],"improvements":["建议1"]}
-                    """, targetJob, targetJob, resumeText);
+            // 2. 构建 Prompt（用 StringBuilder 替代 String.format，用户输入经 sanitizePromptInput 消毒）
+            String safeTargetJob = sanitizePromptInput(targetJob);
+            String safeResume = sanitizePromptInput(resumeText);
+            String prompt = new StringBuilder()
+                    .append("你是一位资深的").append(safeTargetJob).append("招聘面试官，请根据以下简历和目标岗位进行多维度分析。\n\n")
+                    .append("【目标岗位】\n").append(safeTargetJob).append("\n\n")
+                    .append("【简历内容】\n").append(safeResume).append("\n\n")
+                    .append("请从以下维度评分（0-100）并给出具体修改建议：\n")
+                    .append("1. 岗位匹配度：技能、经验、学历等是否符合岗位要求\n")
+                    .append("2. 项目/工作经历含金量：成果、数据、影响力\n")
+                    .append("3. 简历表述清晰度：结构、语言、重点突出\n")
+                    .append("4. 求职意向匹配度：职业规划与岗位的契合度\n\n")
+                    .append("【输出要求（务必严格遵守）】\n")
+                    .append("1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记\n")
+                    .append("2. 所有字符串必须使用 ASCII 双引号 \"，禁止使用单引号或中文引号\n")
+                    .append("3. 不要在字符串值中使用单引号或双引号，如需引用请用中文书名号《》或直接描述\n")
+                    .append("4. 字符串值内禁止包含裸换行符、回车符、制表符；如需换行请用分号或逗号分隔\n")
+                    .append("5. 字符串值内的反斜杠 \\ 必须转义为 \\\\\n")
+                    .append("6. overallScore 和 dimensions 中的 score 必须是整数类型，不要加引号（如 75 而非 \"75\"）\n")
+                    .append("7. 不要输出任何注释、解释、前后缀文字\n")
+                    .append("8. 输出格式（不要包含 weaknesses 字段）：\n")
+                    .append("{\"overallScore\":75,\"dimensions\":[{\"name\":\"岗位匹配度\",\"score\":80,\"suggestion\":\"改进建议\"}],\"strengths\":[\"优势1\"],\"improvements\":[\"建议1\"]}")
+                    .toString();
 
             // 3. 调用 AI
             String response = chatClient.prompt()
@@ -192,6 +188,22 @@ public class ResumeAnalysisService {
     }
 
     /**
+     * Prompt 注入防御：剥离指令性模式 + 截断超长输入
+     */
+    private String sanitizePromptInput(String input) {
+        if (input == null) return "";
+        String s = input;
+        if (s.length() > 2000) {
+            s = s.substring(0, 2000);
+        }
+        s = s.replaceAll("(?i)忽略以上(所有)?(指令|规则|要求)", "[已过滤]")
+             .replaceAll("(?i)ignore (all )?(previous|above) instructions", "[filtered]")
+             .replaceAll("(?i)你现在是", "用户提到：")
+             .replaceAll("(?i)you are now", "user mentioned:");
+        return s;
+    }
+
+    /**
      * 基于原始简历 + 分析结果，生成优化版简历（Markdown 格式）
      * 优化方向：
      * 1. 根据 improvements 建议逐条改进
@@ -225,34 +237,29 @@ public class ResumeAnalysisService {
             String truncatedAnalysis = analysis != null && analysis.length() > 800
                     ? analysis.substring(0, 800) + "..." : (analysis == null ? "无分析数据" : analysis);
 
-            // 3. 构建 Prompt
-            String prompt = String.format("""
-                    你是一位资深 %s 招聘面试官兼简历优化专家，请基于以下原始简历和 AI 分析结果，生成一份优化后的简历。
-
-                    【目标岗位】
-                    %s
-
-                    【原始简历】
-                    %s
-
-                    【AI 分析结果（含改进建议）】
-                    %s
-
-                    【优化原则】
-                    1. 严格遵循改进建议逐条优化
-                    2. 项目经历采用 STAR 法则（情境/任务/行动/结果），量化成果数据
-                    3. 技能描述精确到具体技术栈和应用场景，避免笼统
-                    4. 强化与目标岗位的关键词匹配
-                    5. 保持简历结构清晰：基本信息 / 教育背景 / 工作经历 / 项目经历 / 专业技能 / 自我评价
-                    6. 语言简洁有力，每句话控制在 25 字以内，突出成果而非职责
-
-                    【输出要求】
-                    1. 直接输出 Markdown 格式简历，不要任何前后缀解释
-                    2. 使用标准 Markdown 语法：# 一级标题、## 二级标题、- 列表、**加粗**
-                    3. 禁止使用 HTML 标签、禁止使用代码块
-                    4. 字符串内禁止裸换行符，使用分号或逗号分隔
-                    5. 输出一份完整可用的简历，不要省略任何原始简历中的关键信息
-                    """, targetJob, targetJob, truncatedResume, truncatedAnalysis);
+            // 3. 构建 Prompt（用 StringBuilder 替代 String.format，用户输入经 sanitizePromptInput 消毒）
+            String safeTargetJob = sanitizePromptInput(targetJob);
+            String safeResume = sanitizePromptInput(truncatedResume);
+            String safeAnalysis = sanitizePromptInput(truncatedAnalysis);
+            String prompt = new StringBuilder()
+                    .append("你是一位资深 ").append(safeTargetJob).append(" 招聘面试官兼简历优化专家，请基于以下原始简历和 AI 分析结果，生成一份优化后的简历。\n\n")
+                    .append("【目标岗位】\n").append(safeTargetJob).append("\n\n")
+                    .append("【原始简历】\n").append(safeResume).append("\n\n")
+                    .append("【AI 分析结果（含改进建议）】\n").append(safeAnalysis).append("\n\n")
+                    .append("【优化原则】\n")
+                    .append("1. 严格遵循改进建议逐条优化\n")
+                    .append("2. 项目经历采用 STAR 法则（情境/任务/行动/结果），量化成果数据\n")
+                    .append("3. 技能描述精确到具体技术栈和应用场景，避免笼统\n")
+                    .append("4. 强化与目标岗位的关键词匹配\n")
+                    .append("5. 保持简历结构清晰：基本信息 / 教育背景 / 工作经历 / 项目经历 / 专业技能 / 自我评价\n")
+                    .append("6. 语言简洁有力，每句话控制在 25 字以内，突出成果而非职责\n\n")
+                    .append("【输出要求】\n")
+                    .append("1. 直接输出 Markdown 格式简历，不要任何前后缀解释\n")
+                    .append("2. 使用标准 Markdown 语法：# 一级标题、## 二级标题、- 列表、**加粗**\n")
+                    .append("3. 禁止使用 HTML 标签、禁止使用代码块\n")
+                    .append("4. 字符串内禁止裸换行符，使用分号或逗号分隔\n")
+                    .append("5. 输出一份完整可用的简历，不要省略任何原始简历中的关键信息")
+                    .toString();
 
             // 4. 调用 AI
             String response;

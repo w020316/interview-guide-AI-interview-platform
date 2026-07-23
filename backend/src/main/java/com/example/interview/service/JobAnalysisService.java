@@ -35,94 +35,78 @@ public class JobAnalysisService {
      */
     public String analyzeJobDescription(String jobDescription) {
         String truncatedJd = truncate(jobDescription, MAX_TEXT_LEN);
-        String prompt = String.format("""
-                你是一位资深 HR 和招聘专家，请深度分析以下岗位描述（JD）。
-
-                【岗位描述】
-                %s
-
-                请从以下维度拆解这个岗位：
-
-                【输出要求（务必严格遵守）】
-                1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记
-                2. 所有字符串必须使用 ASCII 双引号 "，禁止使用单引号或中文引号
-                3. 字符串值内禁止裸换行符、回车符、制表符；如需换行请用分号分隔
-                4. 不要输出任何注释、解释、前后缀文字
-                5. 输出格式：
-                {
-                  "jobTitle": "岗位名称",
-                  "summary": "一句话概括这个岗位做什么",
-                  "responsibilities": ["职责1", "职责2"],
-                  "hardSkills": ["硬技能1", "硬技能2"],
-                  "softSkills": ["软技能1", "软技能2"],
-                  "hiddenRequirements": ["JD没明说但HR会看重的隐性条件1"],
-                  "keywords": ["ATS关键词1", "关键词2"],
-                  "seniorityLevel": "初级/中级/高级",
-                  "salaryRange": "薪资范围预估（如无法判断写未知）",
-                  "matchTips": ["求职者应在简历中突出什么1", "建议2"]
-                }
-                """, truncatedJd);
+        String safeJd = sanitizePromptInput(truncatedJd);
+        String prompt = new StringBuilder()
+                .append("你是一位资深 HR 和招聘专家，请深度分析以下岗位描述（JD）。\n\n")
+                .append("【岗位描述】\n").append(safeJd).append("\n\n")
+                .append("请从以下维度拆解这个岗位：\n\n")
+                .append("【输出要求（务必严格遵守）】\n")
+                .append("1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记\n")
+                .append("2. 所有字符串必须使用 ASCII 双引号 \"，禁止使用单引号或中文引号\n")
+                .append("3. 字符串值内禁止裸换行符、回车符、制表符；如需换行请用分号分隔\n")
+                .append("4. 不要输出任何注释、解释、前后缀文字\n")
+                .append("5. 输出格式：\n")
+                .append("{\n")
+                .append("  \"jobTitle\": \"岗位名称\",\n")
+                .append("  \"summary\": \"一句话概括这个岗位做什么\",\n")
+                .append("  \"responsibilities\": [\"职责1\", \"职责2\"],\n")
+                .append("  \"hardSkills\": [\"硬技能1\", \"硬技能2\"],\n")
+                .append("  \"softSkills\": [\"软技能1\", \"软技能2\"],\n")
+                .append("  \"hiddenRequirements\": [\"JD没明说但HR会看重的隐性条件1\"],\n")
+                .append("  \"keywords\": [\"ATS关键词1\", \"关键词2\"],\n")
+                .append("  \"seniorityLevel\": \"初级/中级/高级\",\n")
+                .append("  \"salaryRange\": \"薪资范围预估（如无法判断写未知）\",\n")
+                .append("  \"matchTips\": [\"求职者应在简历中突出什么1\", \"建议2\"]\n")
+                .append("}")
+                .toString();
 
         return callAi(prompt, "jd-analyze");
     }
 
     /**
      * 差距诊断：简历 vs JD 逐条对比
-     *
-     * @param resumeText     简历文本
-     * @param jobDescription 岗位描述
-     * @return 诊断结果 JSON 字符串
      */
     public String diagnoseGap(String resumeText, String jobDescription) {
         String truncatedResume = truncate(resumeText, MAX_TEXT_LEN);
         String truncatedJd = truncate(jobDescription, MAX_TEXT_LEN);
-        String prompt = String.format("""
-                你是一位资深招聘面试官，请逐条对比以下简历和岗位要求，进行差距诊断。
-
-                【目标岗位描述】
-                %s
-
-                【候选人简历】
-                %s
-
-                请从岗位的每个核心要求出发，逐条判断候选人的匹配情况：
-                - ✅ 强证据（strong）：简历中有明确的经历/技能直接对应此要求
-                - ⚠️ 弱证据（weak）：沾边但写得不够出彩或不够直接
-                - ❌ 缺口（gap）：这个要求简历中完全没有素材，需要补充
-
-                【输出要求（务必严格遵守）】
-                1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记
-                2. 所有字符串必须使用 ASCII 双引号 "，禁止使用单引号或中文引号
-                3. 字符串值内禁止裸换行符、回车符、制表符
-                4. 不要输出任何注释、解释、前后缀文字
-                5. 输出格式：
-                {
-                  "overallMatchScore": 75,
-                  "summary": "一句话总结匹配情况",
-                  "items": [
-                    {
-                      "requirement": "岗位要求1",
-                      "status": "strong",
-                      "evidence": "简历中的对应证据",
-                      "suggestion": "如何更好地展示或补充"
-                    }
-                  ],
-                  "strengths": ["候选人的核心优势1"],
-                  "gaps": ["需要补充的缺口1"],
-                  "actionItems": ["下一步行动建议1"]
-                }
-                """, truncatedJd, truncatedResume);
+        String safeJd = sanitizePromptInput(truncatedJd);
+        String safeResume = sanitizePromptInput(truncatedResume);
+        String prompt = new StringBuilder()
+                .append("你是一位资深招聘面试官，请逐条对比以下简历和岗位要求，进行差距诊断。\n\n")
+                .append("【目标岗位描述】\n").append(safeJd).append("\n\n")
+                .append("【候选人简历】\n").append(safeResume).append("\n\n")
+                .append("请从岗位的每个核心要求出发，逐条判断候选人的匹配情况：\n")
+                .append("- ✅ 强证据（strong）：简历中有明确的经历/技能直接对应此要求\n")
+                .append("- ⚠️ 弱证据（weak）：沾边但写得不够出彩或不够直接\n")
+                .append("- ❌ 缺口（gap）：这个要求简历中完全没有素材，需要补充\n\n")
+                .append("【输出要求（务必严格遵守）】\n")
+                .append("1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记\n")
+                .append("2. 所有字符串必须使用 ASCII 双引号 \"，禁止使用单引号或中文引号\n")
+                .append("3. 字符串值内禁止裸换行符、回车符、制表符\n")
+                .append("4. 不要输出任何注释、解释、前后缀文字\n")
+                .append("5. 输出格式：\n")
+                .append("{\n")
+                .append("  \"overallMatchScore\": 75,\n")
+                .append("  \"summary\": \"一句话总结匹配情况\",\n")
+                .append("  \"items\": [\n")
+                .append("    {\n")
+                .append("      \"requirement\": \"岗位要求1\",\n")
+                .append("      \"status\": \"strong\",\n")
+                .append("      \"evidence\": \"简历中的对应证据\",\n")
+                .append("      \"suggestion\": \"如何更好地展示或补充\"\n")
+                .append("    }\n")
+                .append("  ],\n")
+                .append("  \"strengths\": [\"候选人的核心优势1\"],\n")
+                .append("  \"gaps\": [\"需要补充的缺口1\"],\n")
+                .append("  \"actionItems\": [\"下一步行动建议1\"]\n")
+                .append("}")
+                .toString();
 
         return callAi(prompt, "gap-diagnosis");
     }
 
     /**
      * 求职信/申请邮件/内推私信生成
-     *
-     * @param resumeText     简历文本
-     * @param jobDescription 岗位描述
-     * @param type           类型：coverLetter（求职信）/ email（申请邮件）/ referral（内推私信）
-     * @return Markdown 格式的文本
      */
     public String generateLetter(String resumeText, String jobDescription, String type) {
         String truncatedResume = truncate(resumeText, MAX_TEXT_LEN);
@@ -134,21 +118,18 @@ public class JobAnalysisService {
             default -> "一封正式的求职信（Cover Letter），结构包含：开场（说明应聘岗位和渠道）、核心匹配（2-3 段，每段对应一个岗位要求与简历证据的匹配）、结尾（表达热情和面试期望）。语气专业自信。";
         };
 
-        String prompt = String.format("""
-                你是一位求职辅导专家，请基于以下简历和岗位信息，生成%s
-
-                【目标岗位】
-                %s
-
-                【候选人简历】
-                %s
-
-                【输出要求】
-                1. 直接输出正文内容，不要任何前后缀解释
-                2. 基于简历中的真实经历，不要编造任何信息
-                3. 突出与岗位的匹配度，用量化数据说话
-                4. 语气自然得体，避免模板化套话
-                """, typeDesc, truncatedJd, truncatedResume);
+        String safeJd = sanitizePromptInput(truncatedJd);
+        String safeResume = sanitizePromptInput(truncatedResume);
+        String prompt = new StringBuilder()
+                .append("你是一位求职辅导专家，请基于以下简历和岗位信息，生成").append(typeDesc).append("\n\n")
+                .append("【目标岗位】\n").append(safeJd).append("\n\n")
+                .append("【候选人简历】\n").append(safeResume).append("\n\n")
+                .append("【输出要求】\n")
+                .append("1. 直接输出正文内容，不要任何前后缀解释\n")
+                .append("2. 基于简历中的真实经历，不要编造任何信息\n")
+                .append("3. 突出与岗位的匹配度，用量化数据说话\n")
+                .append("4. 语气自然得体，避免模板化套话")
+                .toString();
 
         String response = callAiRaw(prompt, "letter-" + type);
         // 剥离可能的 Markdown 代码块包裹
@@ -156,6 +137,22 @@ public class JobAnalysisService {
             response = response.replaceAll("^```(?:markdown|md)?\\s*\\n", "").replaceAll("\\n```\\s*$", "");
         }
         return response.trim();
+    }
+
+    /**
+     * Prompt 注入防御：剥离指令性模式 + 截断超长输入
+     */
+    private String sanitizePromptInput(String input) {
+        if (input == null) return "";
+        String s = input;
+        if (s.length() > 2000) {
+            s = s.substring(0, 2000);
+        }
+        s = s.replaceAll("(?i)忽略以上(所有)?(指令|规则|要求)", "[已过滤]")
+             .replaceAll("(?i)ignore (all )?(previous|above) instructions", "[filtered]")
+             .replaceAll("(?i)你现在是", "用户提到：")
+             .replaceAll("(?i)you are now", "user mentioned:");
+        return s;
     }
 
     // ─────────────────────────── 内部工具方法 ───────────────────────────
