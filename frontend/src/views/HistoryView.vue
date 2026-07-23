@@ -15,7 +15,7 @@
       </div>
       <div class="empty-title">暂无面试记录</div>
       <div class="empty-desc">完成一次模拟面试后，记录会出现在这里</div>
-      <button class="btn-primary" @click="$router.push('/interview')">前往面试</button>
+      <BaseButton variant="gradient" @click="$router.push('/interview')">前往面试</BaseButton>
     </div>
 
     <!-- 会话列表 -->
@@ -32,10 +32,9 @@
               <span class="status-badge" :class="statusClass(s.status)">{{ statusText(s.status) }}</span>
             </div>
           </div>
-          <button class="btn-ghost btn-sm" @click.stop="loadQuestions(s.sessionId)" :disabled="loadingId === s.sessionId">
-            <span v-if="loadingId === s.sessionId" class="spinner-sm"></span>
+          <BaseButton variant="ghost" size="sm" :loading="loadingId === s.sessionId" @click.stop="loadQuestions(s.sessionId)">
             {{ qMap[s.sessionId] ? '收起' : '查看题目' }}
-          </button>
+          </BaseButton>
         </div>
 
         <div v-if="qMap[s.sessionId]" class="question-list">
@@ -68,6 +67,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
+import { BaseButton } from '../components'
 
 interface Session {
   sessionId: string
@@ -384,68 +384,7 @@ function scoreColor(s?: number | null) {
   border-radius: 999px;
 }
 
-/* ── 按钮 ── */
-.btn-primary {
-  padding: 11px 24px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--brand-gradient);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.35);
-}
-
-.btn-ghost {
-  padding: 11px 22px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--c-text);
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn-ghost:hover:not(:disabled) {
-  border-color: var(--brand-primary);
-  color: var(--brand-primary);
-  background: var(--brand-primary-light);
-}
-
-.btn-ghost:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-sm {
-  padding: 7px 14px;
-  font-size: 13px;
-}
-
-.spinner-sm {
-  width: 13px;
-  height: 13px;
-  border: 2px solid rgba(15, 118, 110, 0.3);
-  border-top-color: var(--brand-primary);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* ── 按钮（已迁移至 BaseButton，保留响应式） ── */
 
 /* ── 响应式 ── */
 @media (max-width: 640px) {

@@ -10,6 +10,7 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ import java.util.Map;
  * - 通过 ObjectMapper 输出 JSON，避免手工拼接导致的安全/转义问题
  *
  * v1.8 起：所有 search/ask/import 均携带 userId，写入 metadata 并在检索时过滤
+ * v1.10 起：去重相似度阈值可配置（app.rag.dedup-similarity-threshold）
  */
 @Service
 public class RagSearchService {
@@ -34,11 +36,6 @@ public class RagSearchService {
     private static final String META_USER_ID = "userId";
     /** metadata 中共享知识标记（系统预置数据无 userId，标记为 shared） */
     private static final String META_SHARED = "shared";
-    /**
-     * 去重相似度阈值：相似度 >= 此值视为重复文档，跳过导入
-     * 0.90 对应 cosine distance <= 0.10，覆盖文本微调后重复的场景
-     */
-    private static final double DEDUP_SIMILARITY_THRESHOLD = 0.90;
 
     @Autowired
     private VectorStore vectorStore;
@@ -48,6 +45,13 @@ public class RagSearchService {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    /**
+     * 去重相似度阈值：相似度 >= 此值视为重复文档，跳过导入
+     * 通过 app.rag.dedup-similarity-threshold 配置，默认 0.90
+     */
+    @Value("${app.rag.dedup-similarity-threshold:0.90}")
+    private double dedupSimilarityThreshold;
 
     /**
      * 检索相关知识点（返回 JSON 数组字符串）
@@ -212,7 +216,7 @@ public class RagSearchService {
             SearchRequest dedupReq = SearchRequest.builder()
                     .query(text)
                     .topK(1)
-                    .similarityThreshold(DEDUP_SIMILARITY_THRESHOLD)
+                    .similarityThreshold(dedupSimilarityThreshold)
                     .filterExpression(b.eq(META_USER_ID, userId).build())
                     .build();
             List<Document> existing = vectorStore.similaritySearch(dedupReq);

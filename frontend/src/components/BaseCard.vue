@@ -21,14 +21,15 @@
 <script setup lang="ts">
 /**
  * 通用卡片组件
- * - 三种变体：default（白底+细边框）/ outlined（仅边框）/ elevated（带阴影）
+ * - 四种变体：default（白底+细边框）/ outlined（仅边框）/ elevated（带阴影）/ feature（特性卡，悬停顶部条延展）
  * - 支持 header/footer 插槽、title/subtitle 快捷属性
  * - hoverable 启用悬停上浮反馈，flat 去除阴影
+ * - v1.10 新增 feature variant，替代 HomeView feature-card
  *
  * 基于 variables.css 设计系统，替代各 View 内联的 .card / .panel
  */
 interface Props {
-  variant?: 'default' | 'outlined' | 'elevated'
+  variant?: 'default' | 'outlined' | 'elevated' | 'feature'
   tag?: string
   title?: string
   subtitle?: string
@@ -75,11 +76,41 @@ withDefaults(defineProps<Props>(), {
   box-shadow: none;
 }
 
+/* feature：特性卡，顶部品牌色细条，hover 时延展为满宽 */
+.base-card--feature {
+  position: relative;
+  border-color: var(--c-border-light);
+}
+.base-card--feature::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--transition-base);
+  z-index: 1;
+}
+.base-card--feature:hover {
+  border-color: var(--c-border);
+  box-shadow: var(--shadow-md);
+}
+.base-card--feature:hover::before {
+  transform: scaleX(1);
+}
+
 /* 悬停反馈 */
 .base-card.is-hoverable:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
   border-color: var(--brand-primary-200);
+}
+/* feature variant 已自带 hover 样式，避免双重 transform */
+.base-card--feature.is-hoverable:hover {
+  transform: none;
 }
 
 /* 头部 */

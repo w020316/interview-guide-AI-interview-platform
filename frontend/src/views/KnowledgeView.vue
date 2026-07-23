@@ -41,10 +41,9 @@
         <label>你的问题</label>
         <textarea v-model="question" rows="3" placeholder="例如：HashMap 的底层原理是什么？"></textarea>
       </div>
-      <button class="btn-primary" :disabled="loading" @click="ask">
-        <span v-if="loading" class="spinner"></span>
+      <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="ask">
         {{ loading ? '查询中…' : 'AI 知识问答' }}
-      </button>
+      </BaseButton>
 
       <div v-if="answer" class="answer-card fade-in-up">
         <div class="answer-head">
@@ -69,10 +68,9 @@
         <textarea v-model="importText" rows="10"
           placeholder="例如：&#10;HashMap 基于哈希表实现，JDK 8 后采用数组+链表+红黑树结构。&#10;ConcurrentHashMap 在 JDK 8 中使用 CAS + synchronized 实现。"></textarea>
       </div>
-      <button class="btn-primary" :disabled="importing" @click="importKnowledge">
-        <span v-if="importing" class="spinner"></span>
+      <BaseButton variant="gradient" :loading="importing" :disabled="importing" @click="importKnowledge">
         {{ importing ? '导入中…' : '批量导入' }}
-      </button>
+      </BaseButton>
 
       <div v-if="importResult" class="result-card fade-in-up" :class="importResult.success ? 'success' : 'error'">
         <span>{{ importResult.message }}</span>
@@ -91,10 +89,9 @@
             <option :value="90">低于 90 分</option>
           </select>
         </div>
-        <button class="btn-ghost btn-sm" :disabled="wrongLoading" @click="loadWrong">
-          <span v-if="wrongLoading" class="spinner-sm"></span>
+        <BaseButton variant="ghost" size="sm" :loading="wrongLoading" :disabled="wrongLoading" @click="loadWrong">
           {{ wrongLoading ? '加载中…' : '刷新' }}
-        </button>
+        </BaseButton>
       </div>
 
       <div v-if="wrongLoading" class="loading-hint">正在查询错题…</div>
@@ -236,6 +233,7 @@ import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
+import { BaseButton } from '../components'
 
 const md = new MarkdownIt({ html: false, linkify: true })
 

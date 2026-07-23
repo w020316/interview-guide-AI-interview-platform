@@ -75,10 +75,9 @@
           <div class="count-hint">建议 5 题，约 20-30 分钟（3-10 题）</div>
         </div>
       </div>
-      <button class="btn-primary" :disabled="loading" @click="startInterview">
-        <span v-if="loading" class="spinner"></span>
+      <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="startInterview">
         {{ loading ? '正在准备…' : '开始面试' }}
-      </button>
+      </BaseButton>
     </div>
 
     <!-- Step 2: 面试进行中 -->
@@ -115,11 +114,10 @@
           <div v-if="hintOpen" class="hint-body">
             <div class="stream-box" v-html="streamHtml"></div>
             <div class="hint-actions">
-              <button class="btn-ghost btn-sm" @click="streamHint" :disabled="streaming">
-                <span v-if="streaming" class="spinner-sm"></span>
+              <BaseButton variant="ghost" size="sm" :loading="streaming" :disabled="streaming" @click="streamHint">
                 {{ streaming ? '获取中…' : (streamContent ? '重新获取' : '获取 AI 提示') }}
-              </button>
-              <button v-if="streaming" class="btn-ghost btn-sm" @click="stopStream">停止</button>
+              </BaseButton>
+              <BaseButton v-if="streaming" variant="ghost" size="sm" @click="stopStream">停止</BaseButton>
             </div>
           </div>
         </div>
@@ -129,12 +127,11 @@
           <label>你的回答</label>
           <textarea v-model="userAnswer" rows="6" placeholder="请输入你的回答，可结合项目经验展开…"></textarea>
           <div class="action-row">
-            <button class="btn-primary" :disabled="evalLoading" @click="submitAnswer">
-              <span v-if="evalLoading" class="spinner"></span>
+            <BaseButton variant="gradient" :loading="evalLoading" :disabled="evalLoading" @click="submitAnswer">
               {{ evalLoading ? '评估中…' : '提交回答' }}
-            </button>
-            <button v-if="qIndex < questions.length - 1" class="btn-ghost" @click="nextQuestion">跳过本题</button>
-            <button v-if="qIndex === questions.length - 1" class="btn-success" @click="finishSession">结束面试</button>
+            </BaseButton>
+            <BaseButton v-if="qIndex < questions.length - 1" variant="ghost" @click="nextQuestion">跳过本题</BaseButton>
+            <BaseButton v-if="qIndex === questions.length - 1" variant="success" @click="finishSession">结束面试</BaseButton>
           </div>
         </div>
       </div>
@@ -184,8 +181,8 @@
           </ul>
         </div>
         <div class="action-row">
-          <button v-if="qIndex < questions.length - 1" class="btn-primary" @click="nextQuestion">下一题</button>
-          <button v-else class="btn-success" @click="finishSession">结束面试</button>
+          <BaseButton v-if="qIndex < questions.length - 1" variant="gradient" @click="nextQuestion">下一题</BaseButton>
+          <BaseButton v-else variant="success" @click="finishSession">结束面试</BaseButton>
         </div>
       </div>
     </div>
@@ -199,6 +196,7 @@ import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
+import { BaseButton } from '../components'
 
 // html: false 禁止 HTML 标签通过，linkify 自动识别链接
 const md = new MarkdownIt({ html: false, linkify: true })

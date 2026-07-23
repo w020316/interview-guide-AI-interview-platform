@@ -122,7 +122,7 @@
         </div>
         <div class="empty-title">暂无活动记录</div>
         <div class="empty-desc">开始使用后，最近活动会出现在这里</div>
-        <button class="btn-primary" @click="router.push('/resume')">开始使用</button>
+        <BaseButton variant="gradient" @click="router.push('/resume')">开始使用</BaseButton>
       </div>
     </section>
   </div>
@@ -133,6 +133,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
+import { BaseButton } from '../components'
 
 const router = useRouter()
 const stats = ref<any>(null)
@@ -470,28 +471,6 @@ function fmtRelative(iso: string): string {
   font-size: 13px;
   color: var(--c-text-secondary);
   margin-bottom: 20px;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 24px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--brand-gradient);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-brand);
-  font-family: inherit;
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.4);
 }
 
 /* ── 响应式 ── */

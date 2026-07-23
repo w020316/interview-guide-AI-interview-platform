@@ -58,9 +58,10 @@
         <p class="section-subtitle">从简历到面试，全链路 AI 辅助</p>
       </div>
       <div class="features">
-        <div v-for="(f, i) in features" :key="f.title"
-             class="feature-card fade-in-up"
-             :style="{ animationDelay: (i * 100) + 'ms' }">
+        <BaseCard v-for="(f, i) in features" :key="f.title"
+                  variant="feature"
+                  class="fade-in-up"
+                  :style="{ animationDelay: (i * 100) + 'ms' }">
           <div class="feature-icon-wrap">
             <svg class="feature-icon" viewBox="0 0 24 24" fill="none">
               <path :d="f.iconPath" stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -69,9 +70,9 @@
           <h3>{{ f.title }}</h3>
           <p>{{ f.desc }}</p>
           <div class="feature-tags">
-            <span v-for="t in f.tags" :key="t" class="tag">{{ t }}</span>
+            <BaseTag v-for="t in f.tags" :key="t">{{ t }}</BaseTag>
           </div>
-        </div>
+        </BaseCard>
       </div>
     </section>
 
@@ -102,12 +103,12 @@
         <div class="cta-content">
           <h2 class="cta-title">准备好开始你的面试之旅了吗？</h2>
           <p class="cta-desc">免费使用，无需信用卡，立即获得 AI 智能评估</p>
-          <button class="btn-primary btn-lg" @click="goTo('/login')">
+          <BaseButton variant="cta" size="lg" hoverable @click="goTo('/login')">
             立即开始
             <svg class="arrow-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-          </button>
+          </BaseButton>
         </div>
       </div>
     </section>
@@ -117,7 +118,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { isLoggedIn } from '../auth'
-import { BaseButton } from '../components'
+import { BaseButton, BaseCard, BaseTag } from '../components'
 
 const router = useRouter()
 
@@ -224,48 +225,14 @@ const steps = [
   margin-bottom: 48px;
 }
 
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 13px 26px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--brand-primary);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-sm);
-}
-
-.btn-primary:hover {
-  background: var(--brand-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.btn-primary:active {
-  transform: translateY(0);
-}
-
-/* arrow-icon 平移动画（Hero 区 BaseButton + CTA 区原生按钮共用） */
+/* arrow-icon 平移动画（Hero 区 + CTA 区 BaseButton 共用，通过 :deep 穿透） */
 .arrow-icon {
   transition: transform var(--transition-fast);
 }
 
-.hero-actions :deep(.base-btn):hover .arrow-icon {
+.hero-actions :deep(.base-btn):hover .arrow-icon,
+.cta-content :deep(.base-btn):hover .arrow-icon {
   transform: translateX(4px);
-}
-
-.btn-primary:hover .arrow-icon {
-  transform: translateX(4px);
-}
-
-.btn-lg {
-  padding: 15px 32px;
-  font-size: 16px;
 }
 
 /* ── Hero 数据展示（实色卡片，无玻璃态） ── */
@@ -328,43 +295,16 @@ const steps = [
   margin: 0;
 }
 
-/* ── 特性卡片（克制 hover，无图标旋转） ── */
+/* ── 特性卡片（使用 BaseCard feature variant） ── */
 .features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
 
-.feature-card {
-  background: var(--c-surface);
-  border: 1px solid var(--c-border-light);
-  border-radius: var(--radius-lg);
+/* feature-card 原 padding 28px 24px，BaseCard 默认 24px，通过 :deep 调整垂直 padding */
+.features :deep(.base-card--feature .base-card__body) {
   padding: 28px 24px;
-  transition: all var(--transition-base);
-  position: relative;
-  overflow: hidden;
-}
-
-.feature-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--brand-primary);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform var(--transition-base);
-}
-
-.feature-card:hover {
-  border-color: var(--c-border);
-  box-shadow: var(--shadow-md);
-}
-
-.feature-card:hover::before {
-  transform: scaleX(1);
 }
 
 .feature-icon-wrap {
@@ -384,14 +324,15 @@ const steps = [
   height: 22px;
 }
 
-.feature-card h3 {
+/* BaseCard 内的 h3/p 样式（原 .feature-card h3/p） */
+.features :deep(.base-card--feature h3) {
   font-size: 17px;
   font-weight: 600;
   color: var(--c-text);
   margin: 0 0 8px;
 }
 
-.feature-card p {
+.features :deep(.base-card--feature p) {
   font-size: 14px;
   line-height: 1.65;
   color: var(--c-text-secondary);
@@ -404,18 +345,11 @@ const steps = [
   gap: 6px;
 }
 
-.tag {
-  padding: 3px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--c-text-secondary);
-  background: var(--c-bg-alt);
-  border-radius: var(--radius-full);
-}
-
-.feature-card:hover .tag {
+/* feature 卡片 hover 时 tag 变为品牌色（原 .feature-card:hover .tag） */
+.features :deep(.base-card--feature:hover .base-tag) {
   background: var(--brand-primary-50);
   color: var(--brand-primary);
+  border-color: var(--brand-primary-100);
 }
 
 /* ── 工作流程 ── */
@@ -514,17 +448,6 @@ const steps = [
   margin: 0 0 28px;
 }
 
-.cta-card .btn-primary {
-  background: #fff;
-  color: var(--brand-primary);
-  box-shadow: var(--shadow-md);
-}
-
-.cta-card .btn-primary:hover {
-  background: var(--brand-primary-50);
-    transform: translateY(-1px);
-}
-
 @media (max-width: 768px) {
   .features, .steps {
     grid-template-columns: 1fr;
@@ -539,6 +462,6 @@ const steps = [
 @media (max-width: 480px) {
   .hero-actions { flex-direction: column; width: 100%; }
   .hero-actions :deep(.base-btn) { width: 100%; justify-content: center; }
-  .btn-primary { width: 100%; justify-content: center; }
+  .cta-content :deep(.base-btn) { width: 100%; justify-content: center; }
 }
 </style>

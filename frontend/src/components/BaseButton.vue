@@ -20,15 +20,16 @@
 <script setup lang="ts">
 /**
  * 通用按钮组件
- * - 三种变体：primary（品牌色）/ ghost（描边）/ success（绿色）
+ * - 五种变体：primary（品牌色纯色）/ gradient（品牌色渐变，原各 View .btn-primary）/ ghost（描边）/ success（绿色）/ cta（白底反色）
  * - 三种尺寸：sm / md / lg
  * - 支持 loading、disabled、block（块级宽度）
  * - v1.9 新增 shadow（阴影等级）和 hoverable（悬停上浮）prop，向后兼容
+ * - v1.10 新增 cta variant（HomeView CTA）和 gradient variant（替代各 View 渐变 .btn-primary）
  *
  * 基于 variables.css 设计系统，替代各 View 内联的 .btn-primary/.btn-ghost
  */
 interface Props {
-  variant?: 'primary' | 'ghost' | 'success'
+  variant?: 'primary' | 'gradient' | 'ghost' | 'success' | 'cta'
   size?: 'sm' | 'md' | 'lg'
   type?: 'button' | 'submit'
   disabled?: boolean
@@ -123,6 +124,35 @@ function handleClick(ev: MouseEvent) {
 }
 .base-btn--success:hover:not(:disabled) {
   filter: brightness(1.1);
+}
+
+/* CTA：白底反色，用于品牌色背景上的行动召唤（HomeView CTA 卡片） */
+.base-btn--cta {
+  background: #fff;
+  color: var(--brand-primary);
+  box-shadow: var(--shadow-md);
+}
+.base-btn--cta:hover:not(:disabled) {
+  background: var(--brand-primary-50);
+}
+.base-btn--cta:active:not(:disabled) {
+  background: var(--brand-primary-100);
+}
+
+/* gradient：品牌色渐变，替代各 View 原 .btn-primary（渐变 + 品牌阴影 + 上浮） */
+.base-btn--gradient {
+  background: var(--brand-gradient);
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+}
+.base-btn--gradient:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.4);
+}
+.base-btn--gradient:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.98);
 }
 
 /* 块级宽度 */

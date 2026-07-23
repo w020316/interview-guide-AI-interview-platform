@@ -17,10 +17,9 @@
       <div class="input-card">
         <label>粘贴岗位描述（JD）</label>
         <textarea v-model="jdText" rows="10" placeholder="把招聘网站上的岗位描述全文粘贴到这里..."></textarea>
-        <button class="btn-primary" :disabled="loading" @click="analyzeJd">
-          <span v-if="loading" class="spinner"></span>
+        <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="analyzeJd">
           {{ loading ? '分析中...' : '开始分析' }}
-        </button>
+        </BaseButton>
       </div>
 
       <div v-if="loading" class="loading-state">
@@ -113,10 +112,9 @@
             </div>
           </div>
         </div>
-        <button class="btn-primary" :disabled="gapLoading" @click="diagnoseGap">
-          <span v-if="gapLoading" class="spinner"></span>
+        <BaseButton variant="gradient" :loading="gapLoading" :disabled="gapLoading" @click="diagnoseGap">
           {{ gapLoading ? '诊断中...' : '开始诊断' }}
-        </button>
+        </BaseButton>
       </div>
 
       <div v-if="gapLoading" class="loading-state">
@@ -189,10 +187,9 @@
             <button :class="{ active: letterType === 'referral' }" @click="letterType = 'referral'">内推私信</button>
           </div>
         </div>
-        <button class="btn-primary" :disabled="letterLoading" @click="generateLetter">
-          <span v-if="letterLoading" class="spinner"></span>
+        <BaseButton variant="gradient" :loading="letterLoading" :disabled="letterLoading" @click="generateLetter">
           {{ letterLoading ? '生成中...' : '生成' }}
-        </button>
+        </BaseButton>
       </div>
 
       <div v-if="letterLoading" class="loading-state">
@@ -207,8 +204,8 @@
         <div class="letter-toolbar">
           <h4 class="block-title">{{ letterTypeLabel }}预览</h4>
           <div class="letter-actions">
-            <button class="btn-ghost btn-sm" @click="copyLetter">复制</button>
-            <button class="btn-ghost btn-sm" @click="downloadLetter">下载 .md</button>
+            <BaseButton variant="ghost" size="sm" @click="copyLetter">复制</BaseButton>
+            <BaseButton variant="ghost" size="sm" @click="downloadLetter">下载 .md</BaseButton>
           </div>
         </div>
         <div class="letter-preview" v-html="letterHtml"></div>
@@ -224,6 +221,7 @@ import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
+import { BaseButton } from '../components'
 
 const md = new MarkdownIt({ html: false, linkify: true })
 
