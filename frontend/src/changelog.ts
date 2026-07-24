@@ -10,9 +10,25 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.17.0'
+export const CURRENT_VERSION = '1.18.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.18.0',
+    date: '2026-07-24',
+    title: '版本 1.18.0 · Service 层测试全覆盖（SupabaseStorageService + ResumeParseService）',
+    items: [
+      '测试：新增 SupabaseStorageServiceTest，10 个用例覆盖文件上传全链路',
+      '测试：SupabaseStorageService 覆盖文件名清洗（路径穿越防御）、HTTP 2xx/4xx/5xx 响应、鉴权头（Bearer + x-upsert）、Content-Type fallback、请求体验证',
+      '测试：新增 ResumeParseServiceTest，16 个用例覆盖简历文件解析多格式分发',
+      '测试：ResumeParseService 覆盖 TXT/MD/MARKDOWN/HTML/HTM 五种格式解析、文件名空/null、不支持格式（.docx/.doc）、内容空/空白、大小写不敏感扩展名、HTML 去标签 + 空白压缩',
+      '测试：parseAndAnalyze 验证委托 ResumeAnalysisService.analyze 的调用链（含 HTML 去标签后传纯文本）',
+      '测试：SupabaseStorageService 使用反射注入 mock RestTemplate + ReflectionTestUtils 注入 @Value 字段',
+      '测试：ResumeParseService 使用 MockMultipartFile 构造真实文件内容，无需 mock 文件 IO',
+      '里程碑：8 个 Service 类全部覆盖测试，后端 Service 层测试全覆盖达成',
+      '测试统计：后端 230 tests passed（+26），前端 87 tests passed'
+    ]
+  },
   {
     version: '1.17.0',
     date: '2026-07-24',
