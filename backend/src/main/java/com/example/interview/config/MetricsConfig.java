@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Prometheus 自定义指标
- * - ai.call.count    AI 调用总次数（resume/question/evaluate 三种类型）
+ * - ai.call.count    AI 调用总次数（resume/question/evaluate/jobAnalysis/rag 五种类型）
  * - cache.hit.count  Redis 缓存命中
  * - cache.miss.count Redis 缓存未命中
  * - ai.call.duration AI 响应耗时分布
@@ -32,6 +32,18 @@ public class MetricsConfig {
     public Counter aiCallEvaluateCounter(MeterRegistry registry) {
         return Counter.builder("ai.call.count").tag("type", "evaluate")
                 .description("AI 回答评估调用次数").register(registry);
+    }
+
+    @Bean
+    public Counter aiCallJobAnalysisCounter(MeterRegistry registry) {
+        return Counter.builder("ai.call.count").tag("type", "jobAnalysis")
+                .description("AI 岗位分析调用次数（analyze/gap/letter）").register(registry);
+    }
+
+    @Bean
+    public Counter aiCallRagCounter(MeterRegistry registry) {
+        return Counter.builder("ai.call.count").tag("type", "rag")
+                .description("AI RAG 知识库问答调用次数").register(registry);
     }
 
     @Bean

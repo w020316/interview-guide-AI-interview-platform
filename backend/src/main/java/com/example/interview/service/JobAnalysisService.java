@@ -2,11 +2,16 @@ package com.example.interview.service;
 
 import com.example.interview.util.JsonRepairUtil;
 import com.example.interview.util.PromptSanitizer;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * 岗位分析服务（参考 Easy-Job-Tutor 项目设计）
@@ -21,6 +26,15 @@ public class JobAnalysisService {
 
     @Autowired
     private ChatClient chatClient;
+
+    /** v1.14：AI 调用计数器（type=jobAnalysis），埋点在 callAiRaw 统一覆盖三个公开方法 */
+    @Autowired
+    @Qualifier("aiCallJobAnalysisCounter")
+    private Counter jobAnalysisCounter;
+
+    /** v1.14：AI 响应耗时分布 */
+    @Autowired
+    private Timer aiCallTimer;
 
     /** AI 并发控制（与其他 Service 共享限流理念） */
     private static final java.util.concurrent.Semaphore AI_SEMAPHORE = new java.util.concurrent.Semaphore(5);
@@ -161,8 +175,9 @@ public class JobAnalysisService {
         return cleaned;
     }
 
-    /** 调用 AI 返回原始文本（带并发控制） */
+    /** 调用 AI 返回原始文本（带并发控制 + v1.14 指标埋点） */
     private String callAiRaw(String prompt, String logTag) {
+        long start = System.nanoTime();
         try {
             AI_SEMAPHORE.acquire();
             try {
@@ -180,6 +195,10 @@ public class JobAnalysisService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("AI 调用被中断", e);
+        } finally {
+            // v1.14：统一埋点，覆盖 analyze/gap/letter 三个公开方法
+            jobAnalysisCounter.increment();
+            aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
     }
 

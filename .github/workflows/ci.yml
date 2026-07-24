@@ -1,0 +1,79 @@
+name: CI
+
+# 持续集成：提交/合并前自动运行后端 Maven 测试 + 前端 Vitest 测试与构建
+# - 后端：Java 21 + Maven（@WebMvcTest + Mockito 单测，无需真实 DB/Redis）
+# - 前端：Node 20 + Vitest run（含覆盖率阈值）+ vite build 验证可产物
+# 任一环节失败即阻断，确保主干质量
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  backend-test:
+    name: Backend Maven Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: interview-guide/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run Maven test
+        # 测试均为 @WebMvcTest + Mockito，不依赖真实 PostgreSQL/Redis
+        # JWT_SECRET 等敏感变量使用占位值，测试不读取真实配置
+        env:
+          JWT_SECRET: ci-placeholder-secret-for-testing-only-not-for-production
+        run: mvn -B -ntp test
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: interview-guide/backend/target/surefire-reports
+          retention-days: 7
+
+  frontend-test:
+    name: Frontend Vitest + Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: interview-guide/frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: interview-guide/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest
+        run: npm run test:run
+
+      - name: Build verification
+        # 验证 TypeScript 编译 + Vite 产物可正常生成
+        env:
+          VITE_API_BASE_URL: https://ci-placeholder.example.com
+        run: npm run build

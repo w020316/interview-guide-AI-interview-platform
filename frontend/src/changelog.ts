@@ -10,9 +10,23 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.13.0'
+export const CURRENT_VERSION = '1.14.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.14.0',
+    date: '2026-07-24',
+    title: '版本 1.14.0 · AI 调用 Metrics 全链路埋点 + CI 自动化测试 + 组件测试补充',
+    items: [
+      '可观测性：MetricsConfig 新增 aiCallJobAnalysisCounter / aiCallRagCounter，AI 调用按类型计数（type=jobAnalysis/rag/resume）',
+      '可观测性：JobAnalysisService.callAiRaw 统一埋点，覆盖 analyze/gap/letter 三个公开方法的调用次数与耗时',
+      '可观测性：RagSearchService.answerWithRag 接入 Counter + Timer，RAG 问答调用全链路监控',
+      '工程化：新增 GitHub Actions CI 工作流（ci.yml），push/PR 自动触发后端 Maven test + 前端 Vitest + build 验证',
+      '工程化：CI 后端 job 上传 surefire-reports artifact，便于排查失败用例',
+      '测试：BaseCardTag.test.ts 新增 6 个交互测试用例（BaseCard feature 变体/flat 属性/feature+hoverable 组合，BaseTag aria-label 无障碍/.base-tag__text 包裹/close 事件 .stop 防冒泡）',
+      '测试统计：后端 151 tests passed，前端 87 tests passed（+6）'
+    ]
+  },
   {
     version: '1.13.0',
     date: '2026-07-23',

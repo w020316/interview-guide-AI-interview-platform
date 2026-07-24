@@ -2,6 +2,8 @@ package com.example.interview.service;
 
 import com.example.interview.util.PromptSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -10,6 +12,7 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * RAG 知识库服务
@@ -45,6 +49,15 @@ public class RagSearchService {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    /** v1.14：AI 调用计数器（type=rag），埋点在 answerWithRag */
+    @Autowired
+    @Qualifier("aiCallRagCounter")
+    private Counter ragCounter;
+
+    /** v1.14：AI 响应耗时分布 */
+    @Autowired
+    private Timer aiCallTimer;
 
     /**
      * 去重相似度阈值：相似度 >= 此值视为重复文档，跳过导入
@@ -111,54 +124,61 @@ public class RagSearchService {
             return "问题不能为空";
         }
 
-        // 1. 检索相关知识（按 userId 隔离）
-        String relatedKnowledge = "";
+        long start = System.nanoTime();
         try {
-            FilterExpressionBuilder b = new FilterExpressionBuilder();
-            SearchRequest req = SearchRequest.builder()
-                    .query(question)
-                    .topK(5)
-                    .filterExpression(b.or(
-                            b.eq(META_USER_ID, userId),
-                            b.eq(META_SHARED, "true")
-                    ).build())
-                    .build();
-            List<Document> docs = vectorStore.similaritySearch(req);
-            if (docs != null && !docs.isEmpty()) {
-                StringBuilder sb = new StringBuilder();
-                for (Document doc : docs) {
-                    sb.append("【参考】").append(doc.getText()).append("\n\n");
+            // 1. 检索相关知识（按 userId 隔离）
+            String relatedKnowledge = "";
+            try {
+                FilterExpressionBuilder b = new FilterExpressionBuilder();
+                SearchRequest req = SearchRequest.builder()
+                        .query(question)
+                        .topK(5)
+                        .filterExpression(b.or(
+                                b.eq(META_USER_ID, userId),
+                                b.eq(META_SHARED, "true")
+                        ).build())
+                        .build();
+                List<Document> docs = vectorStore.similaritySearch(req);
+                if (docs != null && !docs.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    for (Document doc : docs) {
+                        sb.append("【参考】").append(doc.getText()).append("\n\n");
+                    }
+                    relatedKnowledge = sb.toString();
                 }
-                relatedKnowledge = sb.toString();
+            } catch (Exception e) {
+                log.warn("RAG 检索失败 query='{}'：{}", question, e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("RAG 检索失败 query='{}'：{}", question, e.getMessage());
+
+            // 2. 构建 RAG Prompt（使用 StringBuilder 避免 String.format 注入风险）
+            StringBuilder promptBuilder = new StringBuilder()
+                    .append("你是一个 Java 后端面试助手，请根据以下参考资料回答问题。\n\n")
+                    .append("【参考资料】\n")
+                    .append(relatedKnowledge.isEmpty() ? "无" : relatedKnowledge)
+                    .append("\n【问题】\n")
+                    .append(sanitizePromptInput(question))
+                    .append("\n\n要求：\n")
+                    .append("1. 回答要准确、有条理\n")
+                    .append("2. 尽量引用参考资料\n")
+                    .append("3. 如果资料不足，明确说明\n");
+
+            // 3. 调用 AI 并做空值校验
+            String response = chatClient.prompt()
+                    .user(promptBuilder.toString())
+                    .call()
+                    .content();
+
+            if (response == null || response.isBlank()) {
+                log.warn("AI 返回内容为空，question='{}'", question);
+                return "AI 暂时无法生成回答，请稍后重试。";
+            }
+
+            return response;
+        } finally {
+            // v1.14：统一埋点
+            ragCounter.increment();
+            aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
-
-        // 2. 构建 RAG Prompt（使用 StringBuilder 避免 String.format 注入风险）
-        StringBuilder promptBuilder = new StringBuilder()
-                .append("你是一个 Java 后端面试助手，请根据以下参考资料回答问题。\n\n")
-                .append("【参考资料】\n")
-                .append(relatedKnowledge.isEmpty() ? "无" : relatedKnowledge)
-                .append("\n【问题】\n")
-                .append(sanitizePromptInput(question))
-                .append("\n\n要求：\n")
-                .append("1. 回答要准确、有条理\n")
-                .append("2. 尽量引用参考资料\n")
-                .append("3. 如果资料不足，明确说明\n");
-
-        // 3. 调用 AI 并做空值校验
-        String response = chatClient.prompt()
-                .user(promptBuilder.toString())
-                .call()
-                .content();
-
-        if (response == null || response.isBlank()) {
-            log.warn("AI 返回内容为空，question='{}'", question);
-            return "AI 暂时无法生成回答，请稍后重试。";
-        }
-
-        return response;
     }
 
     /**

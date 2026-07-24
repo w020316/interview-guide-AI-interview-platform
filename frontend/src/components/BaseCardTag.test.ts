@@ -56,6 +56,22 @@ describe('BaseCard', () => {
     const wrapper = mount(BaseCard, { props: { tag: 'article' } })
     expect(wrapper.element.tagName).toBe('ARTICLE')
   })
+
+  it('支持 feature 变体（v1.10 特性卡）', () => {
+    const wrapper = mount(BaseCard, { props: { variant: 'feature' } })
+    expect(wrapper.classes()).toContain('base-card--feature')
+  })
+
+  it('flat 属性应用 is-flat 类', () => {
+    const wrapper = mount(BaseCard, { props: { variant: 'elevated', flat: true } })
+    expect(wrapper.classes()).toContain('is-flat')
+  })
+
+  it('feature + hoverable 组合不产生双重 transform', () => {
+    const wrapper = mount(BaseCard, { props: { variant: 'feature', hoverable: true } })
+    expect(wrapper.classes()).toContain('base-card--feature')
+    expect(wrapper.classes()).toContain('is-hoverable')
+  })
 })
 
 describe('BaseTag', () => {
@@ -104,5 +120,26 @@ describe('BaseTag', () => {
   it('非 closable 时不渲染关闭按钮', () => {
     const wrapper = mount(BaseTag)
     expect(wrapper.find('.base-tag__close').exists()).toBe(false)
+  })
+
+  it('关闭按钮含 aria-label 无障碍属性', () => {
+    const wrapper = mount(BaseTag, { props: { closable: true } })
+    expect(wrapper.find('.base-tag__close').attributes('aria-label')).toBe('移除')
+  })
+
+  it('默认插槽内容包裹在 .base-tag__text 中', () => {
+    const wrapper = mount(BaseTag, { slots: { default: '内容文本' } })
+    expect(wrapper.find('.base-tag__text').exists()).toBe(true)
+    expect(wrapper.find('.base-tag__text').text()).toBe('内容文本')
+  })
+
+  it('close 事件携带 .stop 修饰不冒泡到根元素', async () => {
+    const wrapper = mount(BaseTag, { props: { closable: true } })
+    const closeBtn = wrapper.find('.base-tag__close')
+    await closeBtn.trigger('click')
+    // close 事件已触发
+    expect(wrapper.emitted('close')).toBeTruthy()
+    // 由于 @click.stop，根 span 不应触发 click 事件
+    expect(wrapper.emitted('click')).toBeFalsy()
   })
 })
