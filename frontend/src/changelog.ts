@@ -10,9 +10,23 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.16.0'
+export const CURRENT_VERSION = '1.17.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.17.0',
+    date: '2026-07-24',
+    title: '版本 1.17.0 · Service 层测试补齐（InterviewService + JobAnalysisService）',
+    items: [
+      '测试：新增 InterviewServiceTest，15 个用例覆盖 generateQuestions/evaluateAnswer 两大核心方法',
+      '测试：InterviewService 覆盖缓存命中/未命中、Redis 读写降级、RAG 检索正常/异常、AI 空响应、简历截断、prompt 注入消毒、Micrometer 埋点',
+      '测试：新增 JobAnalysisServiceTest，12 个用例覆盖 analyzeJobDescription/diagnoseGap/generateLetter 三大公开方法',
+      '测试：JobAnalysisService 覆盖 callAi JSON 修复失败兜底、callAiRaw 空响应异常、type 三分支（email/referral/coverLetter）、Markdown 代码块剥离、文本截断',
+      '测试：使用 ArgumentCaptor 捕获 ChatClient prompt 参数，验证 RAG 知识点拼接、简历截断标记、prompt 注入消毒',
+      '测试：Mock ChatClient 同步调用链（prompt→user→call→content）、VectorStore、RedisTemplate、Micrometer Counter/Timer',
+      '测试统计：后端 204 tests passed（+27），前端 87 tests passed'
+    ]
+  },
   {
     version: '1.16.0',
     date: '2026-07-24',

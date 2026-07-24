@@ -75,7 +75,7 @@ app:
     # 应用元数据，暴露到 /actuator/info 端点
     # 版本号与前端 changelog.ts 保持同步，修改时两处一起更新
     name: ${APP_INFO_NAME:interview-guide}
-    version: ${APP_INFO_VERSION:1.16.0}
+    version: ${APP_INFO_VERSION:1.17.0}
     description: ${APP_INFO_DESCRIPTION:AI 智能面试辅助平台后端}
     # 构建日期，CI 注入；未配置时 fallback 为当天
     build-date: ${APP_INFO_BUILD_DATE:}
