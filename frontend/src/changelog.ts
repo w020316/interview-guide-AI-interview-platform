@@ -10,9 +10,22 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.14.0'
+export const CURRENT_VERSION = '1.15.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.15.0',
+    date: '2026-07-24',
+    title: '版本 1.15.0 · ResumeController upload 全链路测试 + IDOR 防御测试 + SecurityConfig 鉴权策略测试',
+    items: [
+      '测试：ResumeControllerTest 新增 upload 端点 10 个用例（MockMultipartFile，覆盖空文件/超大/文件名空/扩展名非法/CT 非法/PDF magic bytes/合法 TXT/合法 PDF/解析 IllegalArgumentException/解析其他异常）',
+      '测试：ResumeControllerTest 新增 history/getById 4 个用例（列表/空列表/本人详情/IDOR 越权返回 400）',
+      '测试：新增 SecurityConfigTest，8 个用例验证 Spring Security 鉴权策略（permitAll /api/info + /actuator/health/info，authenticated /api/test-secure + /actuator/metrics，JWT 有效/无效/无 header 三态）',
+      '测试：SecurityConfigTest 使用 @Import(SecurityConfig+JwtAuthFilter) + TestSecureController 载体，@MockBean JwtUtil 控制 token 验证',
+      '修复：ResumeControllerTest mock RateLimitInterceptor 绕过 24 用例限流阈值（原 10 用例不超限，新增后需 mock）',
+      '测试统计：后端 173 tests passed（+22），前端 87 tests passed'
+    ]
+  },
   {
     version: '1.14.0',
     date: '2026-07-24',
