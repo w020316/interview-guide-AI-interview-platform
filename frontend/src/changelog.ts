@@ -10,9 +10,24 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.12.0'
+export const CURRENT_VERSION = '1.13.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.13.0',
+    date: '2026-07-23',
+    title: '版本 1.13.0 · Controller 测试全覆盖 + IDOR 防御测试 + /actuator/info 版本信息',
+    items: [
+      '测试：新增 KnowledgeController MockMvc 测试（19 用例，覆盖 search/ask/import/batch/wrong-questions/summary/recent 8 端点）',
+      '测试：新增 StatsController MockMvc 测试（4 用例，覆盖空数据/仅简历/含会话 N+1 修复路径/混合活动排序）',
+      '测试：新增 InterviewSessionController MockMvc 测试（20 用例，覆盖 create/list/get/finish/questions/answer 7 端点）',
+      '安全：InterviewSessionController 测试覆盖 5 个 IDOR 越权场景（非本人会话返回 403）',
+      '可观测性：新增 AppInfoContributor，/actuator/info 返回应用名称/版本/描述/构建日期',
+      '配置化：app.info.version 从环境变量 APP_INFO_VERSION 读取，与前端版本号同步',
+      '工程化：后端 pom.xml 版本从 1.0.0 同步至 1.13.0',
+      '测试统计：后端 151 tests passed（+43），前端 81 tests passed'
+    ]
+  },
   {
     version: '1.12.0',
     date: '2026-07-23',
