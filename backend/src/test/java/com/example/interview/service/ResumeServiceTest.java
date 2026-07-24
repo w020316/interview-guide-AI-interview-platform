@@ -80,14 +80,15 @@ class ResumeServiceTest {
     }
 
     @Test
-    @DisplayName("getByIdAndUser: 简历存在但属于他人时应抛异常（IDOR 防护）")
-    void getByIdAndUser_otherUser_shouldThrow() {
+    @DisplayName("getByIdAndUser: 简历存在但属于他人时应抛 AccessDeniedException（IDOR 防护，v1.16 语义修正）")
+    void getByIdAndUser_otherUser_shouldThrowAccessDenied() {
+        // v1.16：越权改抛 AccessDeniedException，GlobalExceptionHandler 映射为 HTTP 403
         ResumeEntity other = ResumeEntity.builder()
                 .id(2L).userId("bob").build();
         when(resumeRepository.findById(2L)).thenReturn(Optional.of(other));
         assertThatThrownBy(() -> service.getByIdAndUser(2L, "alice"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("无权访问");
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                .hasMessageContaining("无权访问该简历");
     }
 
     @Test

@@ -439,18 +439,30 @@ class ResumeControllerTest {
         }
 
         @Test
-        @DisplayName("getById 越权访问他人简历返回 400（IDOR 防御）")
-        void getById_otherUserResume_returns400() throws Exception {
-            // Service 层 getByIdAndUser 在 userId 不匹配时抛 IllegalArgumentException
-            // GlobalExceptionHandler @ResponseStatus(BAD_REQUEST) 使 HTTP 400
-            // （语义上 403 更准确，此处测试覆盖现状）
+        @DisplayName("getById 越权访问他人简历返回 403（IDOR 防御，v1.16 语义修正）")
+        void getById_otherUserResume_returns403() throws Exception {
+            // v1.16：Service 层 getByIdAndUser 越权改抛 AccessDeniedException
+            // GlobalExceptionHandler @ResponseStatus(FORBIDDEN) 映射为 HTTP 403
             when(resumeService.getByIdAndUser(1L, USER_ID))
-                    .thenThrow(new IllegalArgumentException("简历不存在或无权访问"));
+                    .thenThrow(new org.springframework.security.access.AccessDeniedException("无权访问该简历"));
 
             mockMvc.perform(get("/api/resume/1"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value(403))
+                    .andExpect(jsonPath("$.message").value("无权访问该资源"));
+        }
+
+        @Test
+        @DisplayName("getById 简历不存在返回 400（区分 404 与 403 语义）")
+        void getById_notFound_returns400() throws Exception {
+            // 简历不存在仍抛 IllegalArgumentException，映射为 400（与越权 403 区分）
+            when(resumeService.getByIdAndUser(999L, USER_ID))
+                    .thenThrow(new IllegalArgumentException("简历不存在：999"));
+
+            mockMvc.perform(get("/api/resume/999"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value(400))
-                    .andExpect(jsonPath("$.message").value("请求参数错误：简历不存在或无权访问"));
+                    .andExpect(jsonPath("$.message").value("请求参数错误：简历不存在：999"));
         }
     }
 }

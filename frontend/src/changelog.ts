@@ -10,9 +10,25 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.15.0'
+export const CURRENT_VERSION = '1.16.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.16.0',
+    date: '2026-07-24',
+    title: '版本 1.16.0 · IDOR 语义统一（越权返回 403）+ SSE 流式端点测试 + 错误处理修复',
+    items: [
+      '安全：ResumeService.getByIdAndUser 越权访问从 IllegalArgumentException（400）改为 AccessDeniedException（403），与 InterviewSessionController IDOR 防御策略对齐',
+      '安全：GlobalExceptionHandler 将 AccessDeniedException 统一映射为 HTTP 403 JSON 响应，前端可精确识别越权场景',
+      '测试：ResumeServiceTest 验证越权抛 AccessDeniedException（getByIdAndUser_otherUser_shouldThrowAccessDenied）',
+      '测试：ResumeControllerTest 新增 getById 越权返回 403 用例（getById_otherUserResume_returns403）+ 简历不存在返回 400 用例',
+      '测试：新增 InterviewControllerSseTest，3 个用例覆盖 /ask/stream SSE 流式端点（入参校验 error 事件 / 正常 token+done 流式推送 / AI 异常 error 事件）',
+      '测试：SSE 测试使用 MockMvc asyncDispatch 异步分发模式，mock ChatClient 链式调用（prompt→user→stream→content）返回预设 Flux',
+      '修复：SSE doOnError 发送 error 事件后改用 emitter.complete()，避免 completeWithError 导致 asyncDispatch 返回 500、前端 EventSource 无法读取错误内容',
+      '修复：Flux.subscribe 补充 onError 回调，消除 Reactor ErrorCallbackNotImplemented ERROR 日志',
+      '测试统计：后端 177 tests passed（+4），前端 87 tests passed'
+    ]
+  },
   {
     version: '1.15.0',
     date: '2026-07-24',

@@ -246,7 +246,13 @@ public class InterviewController {
                             log.warn("SSE 流式生成失败：{}", e.getMessage());
                             heartbeatRunning.set(false);
                             heartbeatFuture.cancel(false);
-                            emitter.completeWithError(e);
+                            // v1.16：发送 error 事件后 complete()，避免 completeWithError 导致
+                            // asyncDispatch 返回 500，前端 EventSource 无法读取错误内容
+                            try {
+                                emitter.send(SseEmitter.event().name("error").data("AI 服务异常，请重试"));
+                            } catch (IOException ignored) {
+                            }
+                            emitter.complete();
                         })
                         .doOnComplete(() -> {
                             heartbeatRunning.set(false);
@@ -265,6 +271,10 @@ public class InterviewController {
                                 heartbeatFuture.cancel(false);
                                 emitter.completeWithError(e);
                             }
+                        }, error -> {
+                            // doOnError 已发送 error 事件并 complete()，
+                            // 此处仅消费错误避免 Reactor 抛 ErrorCallbackNotImplemented
+                            log.debug("SSE 流式订阅错误已由 doOnError 处理：{}", error.getMessage());
                         });
             } catch (Exception e) {
                 log.error("SSE 流式回答异常 question='{}'", question, e);

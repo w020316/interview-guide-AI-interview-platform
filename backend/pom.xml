@@ -13,7 +13,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>interview-guide</artifactId>
-    <version>1.15.0</version>
+    <version>1.16.0</version>
     <name>interview-guide</name>
     <description>AI 智能面试辅助平台</description>
 
