@@ -10,9 +10,20 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.18.0'
+export const CURRENT_VERSION = '1.19.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.19.0',
+    date: '2026-08-30',
+    title: '版本 1.19.0 · 模拟面试新增「复盘报告」',
+    items: [
+      '新增功能：模拟面试结束后自动生成「面试复盘报告」，汇总本轮综合得分与「完整性 / 准确性 / 表达力」三维度表现',
+      '新增功能：报告按题目逐题回顾得分，一眼看清每道题的表现',
+      '新增功能：提炼出现次数最多的待改进点，并标注高频项，方便针对性补强',
+      '新增功能：报告支持一键查看历史面试记录，或直接开始下一次练习'
+    ]
+  },
   {
     version: '1.18.0',
     date: '2026-07-24',

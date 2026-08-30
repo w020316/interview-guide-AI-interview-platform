@@ -12,52 +12,7 @@
           <label>目标岗位</label>
           <BaseInput v-model="jobDesc" block list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
           <datalist id="job-suggestions">
-            <option value="Java 后端开发工程师" />
-            <option value="前端开发工程师" />
-            <option value="Python 后端开发工程师" />
-            <option value="Go 后端开发工程师" />
-            <option value="全栈开发工程师" />
-            <option value="iOS 开发工程师" />
-            <option value="Android 开发工程师" />
-            <option value="数据分析师" />
-            <option value="算法工程师" />
-            <option value="机器学习工程师" />
-            <option value="产品经理" />
-            <option value="项目经理" />
-            <option value="UI/UX 设计师" />
-            <option value="测试工程师" />
-            <option value="运维工程师" />
-            <option value="DevOps 工程师" />
-            <option value="数据库管理员" />
-            <option value="安全工程师" />
-            <option value="教师" />
-            <option value="医生" />
-            <option value="护士" />
-            <option value="药剂师" />
-            <option value="律师" />
-            <option value="会计师" />
-            <option value="审计师" />
-            <option value="财务经理" />
-            <option value="销售经理" />
-            <option value="市场专员" />
-            <option value="运营专员" />
-            <option value="人力资源专员" />
-            <option value="行政助理" />
-            <option value="翻译" />
-            <option value="编辑" />
-            <option value="记者" />
-            <option value="建筑师" />
-            <option value="土木工程师" />
-            <option value="机械工程师" />
-            <option value="电气工程师" />
-            <option value="化工工程师" />
-            <option value="供应链管理" />
-            <option value="采购专员" />
-            <option value="物流管理" />
-            <option value="客户经理" />
-            <option value="店长" />
-            <option value="厨师" />
-            <option value="摄影师" />
+            <option v-for="job in JOB_SUGGESTIONS" :key="job" :value="job" />
           </datalist>
         </div>
         <div class="field-row">
@@ -88,7 +43,7 @@
           <span class="progress-label">面试进度</span>
           <span class="progress-count">第 {{ qIndex + 1 }} / {{ questions.length }} 题</span>
         </div>
-        <div class="progress-bar">
+        <div class="progress-bar" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
           <div class="progress-fill" :style="{ width: progress + '%' }"></div>
         </div>
       </div>
@@ -103,15 +58,15 @@
 
         <!-- SSE 流式 AI 提示 -->
         <div class="hint-section">
-          <button class="hint-toggle" @click="hintOpen = !hintOpen">
-            <svg class="hint-icon" width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <button class="hint-toggle" :aria-expanded="hintOpen" aria-controls="hint-body" @click="hintOpen = !hintOpen">
+            <svg class="hint-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M9 21h6 M10 18h4 M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"
                 stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span>AI 实时提示</span>
             <span class="hint-arrow" :class="{ open: hintOpen }">▾</span>
           </button>
-          <div v-if="hintOpen" class="hint-body">
+          <div v-if="hintOpen" id="hint-body" class="hint-body">
             <div class="stream-box" v-html="streamHtml"></div>
             <div class="hint-actions">
               <BaseButton variant="ghost" size="sm" :loading="streaming" :disabled="streaming" @click="streamHint">
@@ -125,7 +80,8 @@
         <!-- 答题区 -->
         <div class="answer-section">
           <label>你的回答</label>
-          <BaseTextarea v-model="userAnswer" :rows="6" placeholder="请输入你的回答，可结合项目经验展开…" />
+          <BaseTextarea v-model="userAnswer" :rows="6" placeholder="请输入你的回答，可结合项目经验展开…（Ctrl+Enter 提交）"
+            @keydown.ctrl.enter="submitAnswer" @keydown.meta.enter="submitAnswer" />
           <div class="action-row">
             <BaseButton variant="gradient" :loading="evalLoading" :disabled="evalLoading" @click="submitAnswer">
               {{ evalLoading ? '评估中…' : '提交回答' }}
@@ -186,17 +142,96 @@
         </div>
       </div>
     </div>
+
+    <!-- Step 3: 面试复盘报告弹窗（Lollipop 式结构化复盘） -->
+    <Teleport to="body">
+      <Transition name="report-fade">
+        <div v-if="reportOpen && answeredCount" class="report-mask" @click.self="closeReportGoSetup">
+          <div class="report-modal" role="dialog" aria-modal="true" aria-label="面试复盘报告">
+            <div class="report-head">
+              <div>
+                <h3 class="report-title">模拟面试复盘报告</h3>
+                <p class="report-sub">基于本次 {{ answeredCount }} 道作答的结构化总结 · 灵感参考 AI 面试工具</p>
+              </div>
+              <button class="report-close" aria-label="关闭" @click="closeReportGoSetup">✕</button>
+            </div>
+
+            <!-- 综合得分 -->
+            <div class="report-overall">
+              <div class="overall-score" :style="{ color: scoreColor(reportAverages.overall) }">
+                {{ reportAverages.overall }}
+                <span class="overall-unit">分</span>
+              </div>
+              <div class="overall-summary">{{ reportSummary }}</div>
+            </div>
+
+            <!-- 四个维度 -->
+            <div class="report-dims">
+              <div v-for="d in [
+                { name: '综合', v: reportAverages.overall },
+                { name: '完整性', v: reportAverages.completeness },
+                { name: '准确性', v: reportAverages.accuracy },
+                { name: '表达力', v: reportAverages.expression }
+              ]" :key="d.name" class="report-dim">
+                <div class="dim-bar">
+                  <div class="dim-fill" :style="{ width: Math.max(0, Math.min(100, d.v)) + '%', background: scoreColor(d.v) }"></div>
+                </div>
+                <div class="dim-row">
+                  <span class="dim-name">{{ d.name }}</span>
+                  <span class="dim-value" :style="{ color: scoreColor(d.v) }">{{ d.v }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 逐题得分回顾 -->
+            <div class="report-block">
+              <div class="report-block-title">逐题得分</div>
+              <div class="report-questions">
+                <div v-for="(e, idx) in sessionEvals" :key="idx" class="report-question">
+                  <div class="rq-head">
+                    <span class="rq-index">{{ idx + 1 }}</span>
+                    <span class="rq-cat">{{ e.category }}</span>
+                    <span class="rq-score" :style="{ color: scoreColor(e.overallScore) }">{{ e.overallScore }} 分</span>
+                  </div>
+                  <div class="rq-text">{{ e.question }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 高频改进建议 -->
+            <div v-if="reportImprovements.length" class="report-block">
+              <div class="report-block-title">建议提升的要点</div>
+              <ul class="report-improve">
+                <li v-for="(imp, idx) in reportImprovements" :key="idx">
+                  <span class="imp-text">{{ imp.text }}</span>
+                  <span v-if="imp.times > 1" class="imp-times">×{{ imp.times }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <div class="report-actions">
+              <BaseButton variant="ghost" @click="closeReportGoHistory">查看历史记录</BaseButton>
+              <BaseButton variant="gradient" @click="closeReportGoSetup">完成，继续练习</BaseButton>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
+import { JOB_SUGGESTIONS } from '../utils/jobOptions'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
+
+const router = useRouter()
 
 // html: false 禁止 HTML 标签通过，linkify 自动识别链接
 const md = new MarkdownIt({ html: false, linkify: true })
@@ -236,6 +271,20 @@ const streaming = ref(false)
 const streamContent = ref('')
 const hintOpen = ref(false)
 
+// ── 面试复盘报告（Lollipop 式结构化复盘）──
+interface SessionEval {
+  question: string
+  category: string
+  difficulty: string
+  overallScore: number
+  completeness: number
+  accuracy: number
+  expression: number
+  improvements: string[]
+}
+const sessionEvals = ref<SessionEval[]>([])
+const reportOpen = ref(false)
+
 // AbortController 用于取消 SSE 流式请求
 let abortController: AbortController | null = null
 
@@ -245,6 +294,44 @@ const progress = computed(() =>
   Math.round(((qIndex.value + 1) / Math.max(questions.value.length, 1)) * 100)
 )
 const streamHtml = computed(() => sanitizeHtml(md.render(streamContent.value || '等待获取...')))
+
+// ── 复盘报告计算属性 ──
+const answeredCount = computed(() => sessionEvals.value.length)
+/** 各维度平均分 */
+const reportAverages = computed(() => {
+  const list = sessionEvals.value
+  const n = list.length
+  if (!n) return { overall: 0, completeness: 0, accuracy: 0, expression: 0 }
+  const mean = (k: keyof SessionEval) => Math.round(list.reduce((a, e) => a + (e[k] as number || 0), 0) / n)
+  return { overall: mean('overallScore'), completeness: mean('completeness'), accuracy: mean('accuracy'), expression: mean('expression') }
+})
+/** 汇总的待改进点：按出现次数排序、去重展示 */
+const reportImprovements = computed(() => {
+  const freq = new Map<string, number>()
+  for (const e of sessionEvals.value) {
+    for (const imp of e.improvements || []) {
+      const k = imp.trim()
+      if (k) freq.set(k, (freq.get(k) || 0) + 1)
+    }
+  }
+  return [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([text, cnt]) => ({ text, times: cnt }))
+})
+/** 基于均分的综合评价文案（智能生成，非硬编码 AI 调用，稳定可靠） */
+const reportSummary = computed(() => {
+  const { overall, completeness, accuracy, expression } = reportAverages.value
+  const dims = [
+    { name: '完整性', v: completeness },
+    { name: '准确性', v: accuracy },
+    { name: '表达力', v: expression }
+  ].sort((x, y) => y.v - x.v)
+  const weakest = dims[dims.length - 1]
+  const strongest = dims[0]
+  const level = overall >= 85 ? '优秀' : overall >= 70 ? '良好' : overall >= 60 ? '合格' : '待加强'
+  return `本轮共回答 ${answeredCount.value} 题，综合得分 ${overall} 分（${level}）。你的${strongest.name}是相对优势，建议继续保持；${weakest.name}是当前短板，可针对性多加练习。针对短板高频改进点，在下一次练习时有意识地调整，稳扎稳打即可稳步提升。`
+})
 
 function diffClass(d: string) {
   if (d === 'HARD') return 'tag-danger'
@@ -425,6 +512,20 @@ async function submitAnswer() {
     }) as unknown as string
     evalResult.value = safeParse<EvalResult>(data, {})
 
+    // 收集本次回答的评估结果，供面试结束后的综合复盘报告使用
+    if (evalResult.value && typeof evalResult.value.overallScore === 'number') {
+      sessionEvals.value.push({
+        question: currentQ.value.question,
+        category: currentQ.value.category,
+        difficulty: currentQ.value.difficulty,
+        overallScore: evalResult.value.overallScore,
+        completeness: evalResult.value.completeness ?? 0,
+        accuracy: evalResult.value.accuracy ?? 0,
+        expression: evalResult.value.expression ?? 0,
+        improvements: evalResult.value.improvements ?? []
+      })
+    }
+
     // 2. 持久化用户答案 + 评估分到后端（关联 questionId）
     //    失败不阻塞流程，仅记录日志（历史回顾会缺失本次答题记录）
     const questionId = currentQ.value.id
@@ -457,10 +558,14 @@ async function finishSession() {
   if (!sessionId.value) return
   try {
     await api.put(`/api/session/${sessionId.value}/finish`)
-    ElMessage.success('面试结束，结果已保存！')
-    sessionId.value = ''
-    qIndex.value = 0
-    questions.value = []
+    const hasReport = sessionEvals.value.length > 0
+    // 有作答记录则弹出综合复盘报告，否则仅提示完成
+    if (hasReport) {
+      reportOpen.value = true
+    } else {
+      ElMessage.success('面试结束，结果已保存！')
+    }
+    resetSession()
   } catch (e: unknown) {
     // 失败时提供"重试"与"强制退出"两个选项，避免用户卡死
     try {
@@ -470,13 +575,32 @@ async function finishSession() {
         { confirmButtonText: '强制退出', cancelButtonText: '重试', type: 'warning' }
       )
       // 用户选择强制退出，清本地状态
-      sessionId.value = ''
-      qIndex.value = 0
-      questions.value = []
+      resetSession()
     } catch {
       // 用户选择重试，不清理状态
     }
   }
+}
+
+/** 清空本地面试状态，进入报名准备页 */
+function resetSession() {
+  sessionId.value = ''
+  qIndex.value = 0
+  questions.value = []
+  userAnswer.value = ''
+  evalResult.value = null
+  streamContent.value = ''
+}
+
+/** 关闭报告并回到面试准备页（报告内容仍保留在本次会话内，可再次打开直到离开页面） */
+function closeReportGoSetup() {
+  reportOpen.value = false
+}
+
+/** 关闭报告并跳转历史回顾 */
+function closeReportGoHistory() {
+  reportOpen.value = false
+  router.push('/history')
 }
 
 // 组件卸载时取消流式请求
@@ -1063,6 +1187,245 @@ onUnmounted(() => {
   }
   .score-num {
     font-size: 26px;
+  }
+}
+</style>
+
+<!-- 复盘报告弹窗被 Teleport 到 body，需非 scoped 样式 -->
+<style>
+.report-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+}
+.report-modal {
+  width: 720px;
+  max-width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--c-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  padding: 28px 30px;
+  font-family: var(--font-sans);
+}
+.report-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.report-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--c-text);
+  margin: 0 0 4px;
+  letter-spacing: -0.4px;
+}
+.report-sub {
+  font-size: 12.5px;
+  color: var(--c-text-tertiary);
+  margin: 0;
+}
+.report-close {
+  border: none;
+  background: var(--c-bg-alt);
+  color: var(--c-text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+.report-close:hover {
+  background: var(--c-border);
+  color: var(--c-text);
+}
+.report-overall {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+.overall-score {
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -2px;
+  min-width: 96px;
+  text-align: center;
+}
+.overall-unit {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text-tertiary);
+  margin-left: 2px;
+}
+.overall-summary {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--c-text-secondary);
+}
+.report-dims {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.report-dim {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+.dim-bar {
+  height: 6px;
+  background: var(--c-bg-alt);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.dim-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+.dim-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.dim-name {
+  font-size: 12.5px;
+  color: var(--c-text-secondary);
+  font-weight: 500;
+}
+.dim-value {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+.report-block {
+  margin-bottom: 20px;
+}
+.report-block-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin-bottom: 10px;
+}
+.report-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.report-question {
+  background: var(--c-bg-alt);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
+.rq-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.rq-index {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--brand-primary-light);
+  color: var(--brand-primary);
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.rq-cat {
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+.rq-score {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+}
+.rq-text {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  line-height: 1.6;
+}
+.report-improve {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.report-improve li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(245, 158, 11, 0.05);
+  border-left: 3px solid var(--c-warning);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  line-height: 1.6;
+}
+.imp-times {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-warning);
+}
+.report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 6px;
+}
+.report-fade-enter-active,
+.report-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.report-fade-enter-from,
+.report-fade-leave-to {
+  opacity: 0;
+}
+@media (max-width: 640px) {
+  .report-modal {
+    padding: 20px;
+  }
+  .report-overall {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .report-dims {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>
