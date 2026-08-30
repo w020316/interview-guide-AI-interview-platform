@@ -61,6 +61,13 @@ management:
   endpoint:
     health:
       show-details: never
+  # 忽略 Redis 健康指示器：
+  # Upstash 免费 Redis 可能停用/失效，若纳入健康检查会让 /actuator/health 持续返回 DOWN，
+  # 导致 Render 健康检查失败并不断重启实例（表现为永远冷启动）。
+  # Redis 仅用于 AI 响应缓存，服务层已做降级，登录/鉴权不依赖 Redis，故排除以保障实例稳定。
+  health:
+    redis:
+      enabled: false
 
 app:
   jwt:

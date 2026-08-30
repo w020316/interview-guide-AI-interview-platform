@@ -263,6 +263,46 @@ function isColdStartError(e: unknown): boolean {
   return msg.includes('冷启动') || msg.includes('Network Error') || msg.includes('网络') || msg.includes('超时')
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/** 后端唤醒总预算与轮询间隔 */
+const MAX_WAKE_MS = 120000
+const WAKE_INTERVAL_MS = 4000
+
+/**
+ * 唤醒并等待后端就绪：轮询无鉴权接口 /api/info。
+ * 后端休眠时 Render 会返回启动页(HTML)或连接超时，均被统一拦截为错误，视为未就绪继续重试。
+ */
+async function waitBackendReady(): Promise<boolean> {
+  const start = Date.now()
+  while (Date.now() - start < MAX_WAKE_MS) {
+    try {
+      await api.get('/api/info', { timeout: 15000 })
+      return true
+    } catch {
+      await sleep(WAKE_INTERVAL_MS)
+    }
+  }
+  return false
+}
+
+/** 认证请求：先直接发送；遇冷启动/网络错误则唤醒后端后自动重试一次 */
+async function authWithRetry(url: string, payload: unknown): Promise<unknown> {
+  try {
+    return await api.post(url, payload)
+  } catch (e: unknown) {
+    if (!isColdStartError(e)) throw e
+    coldStartHint.value = true
+    const ready = await waitBackendReady()
+    if (!ready) {
+      throw new Error('后端服务唤醒超时（超过 120s），请刷新页面后重试')
+    }
+    return await api.post(url, payload)
+  }
+}
+
 async function handleLogin() {
   if (!loginForm.value.username || !loginForm.value.password)
     return ElMessage.warning('请填写用户名和密码')
@@ -270,7 +310,7 @@ async function handleLogin() {
   coldStartHint.value = false
   lastError.value = ''
   try {
-    const token = await api.post('/api/auth/login', loginForm.value) as unknown as string
+    const token = await authWithRetry('/api/auth/login', loginForm.value) as unknown as string
     setAuth(token, loginForm.value.username)
     // 记住用户名
     if (rememberMe.value) {
@@ -305,7 +345,7 @@ async function handleRegister() {
   coldStartHint.value = false
   lastError.value = ''
   try {
-    const token = await api.post('/api/auth/register', regForm.value) as unknown as string
+    const token = await authWithRetry('/api/auth/register', regForm.value) as unknown as string
     setAuth(token, regForm.value.username)
     ElMessage.success('注册成功')
     redirectAfterAuth()
