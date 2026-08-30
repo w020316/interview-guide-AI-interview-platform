@@ -94,4 +94,10 @@ function goBack() {
   justify-content: center;
   flex-wrap: wrap;
 }
+
+@media (max-width: 480px) {
+  .nf-title {
+    font-size: 72px;
+  }
+}
 </style>

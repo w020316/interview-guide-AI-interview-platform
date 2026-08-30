@@ -385,6 +385,11 @@ function fmtRelative(iso: string): string {
   text-decoration: underline;
 }
 
+.btn-link:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
 .activity-list {
   display: flex;
   flex-direction: column;

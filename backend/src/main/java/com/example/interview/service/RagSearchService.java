@@ -156,7 +156,7 @@ public class RagSearchService {
                     .append("【参考资料】\n")
                     .append(relatedKnowledge.isEmpty() ? "无" : relatedKnowledge)
                     .append("\n【问题】\n")
-                    .append(sanitizePromptInput(question))
+                    .append(PromptSanitizer.sanitize(question))
                     .append("\n\n要求：\n")
                     .append("1. 回答要准确、有条理\n")
                     .append("2. 尽量引用参考资料\n")
@@ -247,12 +247,4 @@ public class RagSearchService {
         }
     }
 
-    /**
-     * Prompt 注入防御：剥离可能的指令性换行和角色扮演标记
-     * - 移除 "忽略以上所有指令"、"你现在是" 等常见注入模式
-     * - 截断超长输入（防止 token 滥用）
-     */
-    private String sanitizePromptInput(String input) {
-        return PromptSanitizer.sanitize(input);
-    }
 }

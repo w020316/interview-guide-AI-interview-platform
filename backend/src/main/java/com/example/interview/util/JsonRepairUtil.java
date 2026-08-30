@@ -24,6 +24,13 @@ public final class JsonRepairUtil {
     private static final Logger log = LoggerFactory.getLogger(JsonRepairUtil.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /**
+     * 兜底 JSON：AI 返回无法解析时使用，保证前端不报错、JSONB 字段写入不失败。
+     * 各 Service / ResumeService 共享同一字面量，避免多处复制导致不一致。
+     */
+    public static final String FALLBACK_JSON =
+            "{\"overallScore\":0,\"dimensions\":[],\"strengths\":[],\"improvements\":[\"AI 返回内容无法解析，请稍后重试\"]}";
+
     /** 中文左单引号 ’  右单引号 ’ */
     private static final Pattern CN_SINGLE_QUOTE = Pattern.compile("[\u2018\u2019]");
     /** 中文左双引号 “  右双引号 ” */
@@ -194,8 +201,28 @@ public final class JsonRepairUtil {
         }
     }
 
+    /**
+     * 修复并兜底：修复后仍非法则返回 fallback（通常是 {@link #FALLBACK_JSON}）。
+     * 统一各 Service 中重复的 "repairAndLog + isValid + 兜底替换" 三段式调用。
+     *
+     * @param raw      AI 原始返回
+     * @param context  日志上下文标签
+     * @param fallback 修复失败时使用的兜底 JSON
+     * @return 合法 JSON 或 fallback
+     */
+    public static String repairOrFallback(String raw, String context, String fallback) {
+        String repaired = repairAndLog(raw, context);
+        if (isValid(repaired)) {
+            return repaired;
+        }
+        log.warn("AI 返回修复后仍非法，使用兜底 JSON。context={} raw(前200)={}",
+                context,
+                raw != null && raw.length() > 200 ? raw.substring(0, 200) + "..." : raw);
+        return fallback;
+    }
+
     /** 剥离 ```json ... ``` 或 ``` ... ``` 代码块 */
-    private static String stripMarkdownFence(String s) {
+    public static String stripMarkdownFence(String s) {
         String trimmed = s.trim();
         if (trimmed.startsWith("```")) {
             // 去掉首行 ```json 或 ```

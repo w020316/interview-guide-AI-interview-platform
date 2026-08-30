@@ -1,7 +1,9 @@
 package com.example.interview.service;
 
+import com.example.interview.util.HashUtil;
 import com.example.interview.util.JsonRepairUtil;
 import com.example.interview.util.PromptSanitizer;
+import com.example.interview.util.TextUtil;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
@@ -65,7 +67,7 @@ public class InterviewService {
         boolean cacheHit = false;
         try {
             // 1. 缓存命中（key 包含 userId 防跨用户串扰）
-            String cacheKey = QUESTION_CACHE + userId + ":" + sha256(resumeText + jobDescription + count);
+            String cacheKey = QUESTION_CACHE + userId + ":" + HashUtil.sha256Short(resumeText + jobDescription + count);
             try {
                 Object cached = redisTemplate.opsForValue().get(cacheKey);
                 if (cached != null) {
@@ -101,11 +103,10 @@ public class InterviewService {
                 log.warn("RAG 检索失败，跳过：{}", e.getMessage());
             }
 
-            // 3. 精简 Prompt（用 StringBuilder 替代 String.format，避免 % 注入；用户输入经 sanitizePromptInput 消毒）
-            String truncatedResume = resumeText.length() > MAX_RESUME_LEN
-                    ? resumeText.substring(0, MAX_RESUME_LEN) + "..." : resumeText;
-            String safeJobDesc = sanitizePromptInput(jobDescription);
-            String safeResume = sanitizePromptInput(truncatedResume);
+            // 3. 精简 Prompt（用 StringBuilder 替代 String.format，避免 % 注入；用户输入经 PromptSanitizer 消毒）
+            String truncatedResume = TextUtil.truncate(resumeText, MAX_RESUME_LEN);
+            String safeJobDesc = PromptSanitizer.sanitize(jobDescription);
+            String safeResume = PromptSanitizer.sanitize(truncatedResume);
             String prompt = new StringBuilder()
                     .append("你是一位资深的").append(safeJobDesc).append("面试官，请为候选人生成 ").append(count).append(" 道面试题。\n\n")
                     .append("【简历亮点】\n").append(safeResume).append("\n\n")
@@ -181,12 +182,12 @@ public class InterviewService {
     public String evaluateAnswer(String question, String userAnswer, String referenceAnswer) {
         long start = System.nanoTime();
         try {
-            // 用户输入经 sanitizePromptInput 消毒，避免 prompt 注入
+            // 用户输入经 PromptSanitizer 消毒，避免 prompt 注入
             String prompt = new StringBuilder()
                     .append("你是一位面试官，请评估以下回答。\n\n")
-                    .append("【面试题】\n").append(sanitizePromptInput(question)).append("\n\n")
-                    .append("【参考答案】\n").append(sanitizePromptInput(referenceAnswer == null ? "" : referenceAnswer)).append("\n\n")
-                    .append("【用户回答】\n").append(sanitizePromptInput(userAnswer)).append("\n\n")
+                    .append("【面试题】\n").append(PromptSanitizer.sanitize(question)).append("\n\n")
+                    .append("【参考答案】\n").append(PromptSanitizer.sanitize(referenceAnswer == null ? "" : referenceAnswer)).append("\n\n")
+                    .append("【用户回答】\n").append(PromptSanitizer.sanitize(userAnswer)).append("\n\n")
                     .append("请从完整性（30%）、准确性（40%）、表达能力（30%）三个维度评分，并给出改进建议。\n\n")
                     .append("【输出要求（务必严格遵守）】\n")
                     .append("1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记\n")
@@ -210,31 +211,6 @@ public class InterviewService {
         } finally {
             evaluateCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
-        }
-    }
-
-    /**
-     * Prompt 注入防御：剥离指令性模式 + 截断超长输入
-     * - 移除 "忽略以上所有指令"、"你现在是" 等常见注入模式
-     * - 截断至 2000 字符，防止 token 滥用
-     */
-    private String sanitizePromptInput(String input) {
-        return PromptSanitizer.sanitize(input);
-    }
-
-    /** SHA-256 哈希，用于生成无碰撞的缓存键 */
-    private static String sha256(String input) {
-        try {
-            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.substring(0, 32); // 取前 32 位足够防碰撞
-        } catch (Exception e) {
-            // 降级用 hashCode
-            return String.valueOf(input.hashCode());
         }
     }
 }

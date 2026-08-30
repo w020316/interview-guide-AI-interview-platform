@@ -1,7 +1,9 @@
 package com.example.interview.service;
 
+import com.example.interview.util.HashUtil;
 import com.example.interview.util.JsonRepairUtil;
 import com.example.interview.util.PromptSanitizer;
+import com.example.interview.util.TextUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
@@ -58,10 +60,6 @@ public class ResumeAnalysisService {
 
     private static final String CACHE_PREFIX = "resume:analysis:";
 
-    /** 兜底 JSON：AI 返回无法解析时使用，保证前端不报错 */
-    private static final String FALLBACK_JSON =
-            "{\"overallScore\":0,\"dimensions\":[],\"strengths\":[],\"improvements\":[\"AI 返回内容无法解析，请稍后重试\"]}";
-
     /**
      * 分析简历并给出评分和建议
      *
@@ -75,7 +73,7 @@ public class ResumeAnalysisService {
         boolean cacheHit = false;
         try {
             // 1. 缓存命中检查（key 包含 userId 防跨用户串扰）
-            String cacheKey = CACHE_PREFIX + userId + ":" + sha256(resumeText + "\u0001" + targetJob);
+            String cacheKey = CACHE_PREFIX + userId + ":" + HashUtil.sha256Short(resumeText + "\u0001" + targetJob);
             try {
                 Object cached = redisTemplate.opsForValue().get(cacheKey);
                 if (cached != null) {
@@ -91,9 +89,9 @@ public class ResumeAnalysisService {
                 cacheMissCounter.increment();
             }
 
-            // 2. 构建 Prompt（用 StringBuilder 替代 String.format，用户输入经 sanitizePromptInput 消毒）
-            String safeTargetJob = sanitizePromptInput(targetJob);
-            String safeResume = sanitizePromptInput(resumeText);
+            // 2. 构建 Prompt（用 StringBuilder 替代 String.format，用户输入经 PromptSanitizer 消毒）
+            String safeTargetJob = PromptSanitizer.sanitize(targetJob);
+            String safeResume = PromptSanitizer.sanitize(resumeText);
             String prompt = new StringBuilder()
                     .append("你是一位资深的").append(safeTargetJob).append("招聘面试官，请根据以下简历和目标岗位进行多维度分析。\n\n")
                     .append("【目标岗位】\n").append(safeTargetJob).append("\n\n")
@@ -133,7 +131,7 @@ public class ResumeAnalysisService {
             if (!JsonRepairUtil.isValid(cleaned)) {
                 log.warn("AI 返回修复后仍非法，使用兜底 JSON。原始返回前 200 字符：{}",
                         response.length() > 200 ? response.substring(0, 200) + "..." : response);
-                cleaned = FALLBACK_JSON;
+                cleaned = JsonRepairUtil.FALLBACK_JSON;
             }
 
             // 7. 写入缓存（30 分钟，Redis 不可用时静默跳过）
@@ -173,28 +171,6 @@ public class ResumeAnalysisService {
         });
     }
 
-    /** SHA-256 哈希，用于生成无碰撞的缓存键 */
-    private static String sha256(String input) {
-        try {
-            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.substring(0, 32);
-        } catch (Exception e) {
-            return String.valueOf(input.hashCode());
-        }
-    }
-
-    /**
-     * Prompt 注入防御：剥离指令性模式 + 截断超长输入
-     */
-    private String sanitizePromptInput(String input) {
-        return PromptSanitizer.sanitize(input);
-    }
-
     /**
      * 基于原始简历 + 分析结果，生成优化版简历（Markdown 格式）
      * 优化方向：
@@ -213,7 +189,7 @@ public class ResumeAnalysisService {
         long start = System.nanoTime();
         try {
             // 1. 缓存命中检查
-            String cacheKey = "resume:optimize:" + userId + ":" + sha256(resumeText + "\u0001" + targetJob + "\u0001" + (analysis == null ? "" : analysis));
+            String cacheKey = "resume:optimize:" + userId + ":" + HashUtil.sha256Short(resumeText + "\u0001" + targetJob + "\u0001" + (analysis == null ? "" : analysis));
             try {
                 Object cached = redisTemplate.opsForValue().get(cacheKey);
                 if (cached != null) {
@@ -224,15 +200,15 @@ public class ResumeAnalysisService {
             }
 
             // 2. 简历文本截断（避免 prompt 过长）
-            String truncatedResume = resumeText.length() > MAX_RESUME_LEN
-                    ? resumeText.substring(0, MAX_RESUME_LEN) + "..." : resumeText;
-            String truncatedAnalysis = analysis != null && analysis.length() > 800
-                    ? analysis.substring(0, 800) + "..." : (analysis == null ? "无分析数据" : analysis);
+            String truncatedResume = TextUtil.truncate(resumeText, MAX_RESUME_LEN);
+            String truncatedAnalysis = analysis == null
+                    ? "无分析数据"
+                    : TextUtil.truncate(analysis, 800);
 
-            // 3. 构建 Prompt（用 StringBuilder 替代 String.format，用户输入经 sanitizePromptInput 消毒）
-            String safeTargetJob = sanitizePromptInput(targetJob);
-            String safeResume = sanitizePromptInput(truncatedResume);
-            String safeAnalysis = sanitizePromptInput(truncatedAnalysis);
+            // 3. 构建 Prompt（用 StringBuilder 替代 String.format，用户输入经 PromptSanitizer 消毒）
+            String safeTargetJob = PromptSanitizer.sanitize(targetJob);
+            String safeResume = PromptSanitizer.sanitize(truncatedResume);
+            String safeAnalysis = PromptSanitizer.sanitize(truncatedAnalysis);
             String prompt = new StringBuilder()
                     .append("你是一位资深 ").append(safeTargetJob).append(" 招聘面试官兼简历优化专家，请基于以下原始简历和 AI 分析结果，生成一份优化后的简历。\n\n")
                     .append("【目标岗位】\n").append(safeTargetJob).append("\n\n")
@@ -270,11 +246,7 @@ public class ResumeAnalysisService {
                 throw new IllegalStateException("AI 返回内容为空，请稍后重试");
             }
 
-            String cleaned = response.trim();
-            // 剥离可能的 Markdown 代码块包裹
-            if (cleaned.startsWith("```")) {
-                cleaned = cleaned.replaceAll("^```(?:markdown|md)?\\s*\\n", "").replaceAll("\\n```\\s*$", "");
-            }
+            String cleaned = JsonRepairUtil.stripMarkdownFence(response).trim();
 
             // 6. 写入缓存（30 分钟）
             try {

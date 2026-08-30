@@ -126,7 +126,7 @@
       </div>
 
       <div v-if="gapResult && !gapLoading" class="result-section fade-in-up">
-        <div class="match-score-hero" :style="{ '--score-color': scoreColor(gapResult.overallMatchScore) }">
+        <div class="match-score-hero" :style="{ '--score-color': getScoreColor(gapResult.overallMatchScore, MATCH_THRESHOLDS) }">
           <div class="match-score-num">{{ gapResult.overallMatchScore ?? '-' }}</div>
           <div class="match-score-label">综合匹配度</div>
           <p class="match-summary">{{ gapResult.summary }}</p>
@@ -135,7 +135,19 @@
         <div v-if="gapResult.items?.length" class="block">
           <h4 class="block-title">逐条诊断</h4>
           <div v-for="(item, i) in gapResult.items" :key="i" class="gap-item" :class="gapStatusClass(item.status)">
-            <div class="gap-status-icon">{{ gapStatusIcon(item.status) }}</div>
+            <div class="gap-status-icon">
+              <svg v-if="item.status === 'strong'" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <svg v-else-if="item.status === 'weak'" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 9v4 M12 17h.01" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 6l12 12 M18 6L6 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
             <div class="gap-content">
               <div class="gap-requirement">{{ item.requirement }}</div>
               <div v-if="item.evidence" class="gap-evidence">证据：{{ item.evidence }}</div>
@@ -219,6 +231,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
+import { getScoreColor, MATCH_THRESHOLDS } from '../utils/score'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import { BaseButton, BaseTextarea } from '../components'
@@ -390,24 +403,10 @@ function formatDate() {
 }
 
 // ── 工具函数 ──
-function scoreColor(s?: number): string {
-  if (s == null) return 'var(--c-text-tertiary)'
-  if (s >= 80) return '#10b981'
-  if (s >= 60) return '#3b82f6'
-  if (s >= 40) return '#f59e0b'
-  return '#ef4444'
-}
-
 function gapStatusClass(status: string): string {
   if (status === 'strong') return 'gap-strong'
   if (status === 'weak') return 'gap-weak'
   return 'gap-missing'
-}
-
-function gapStatusIcon(status: string): string {
-  if (status === 'strong') return '✅'
-  if (status === 'weak') return '⚠️'
-  return '❌'
 }
 </script>
 
@@ -852,22 +851,27 @@ function gapStatusIcon(status: string): string {
 .gap-strong {
   background: rgba(16, 185, 129, 0.04);
   border-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
 }
 
 .gap-weak {
   background: rgba(245, 158, 11, 0.04);
   border-color: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
 }
 
 .gap-missing {
   background: rgba(239, 68, 68, 0.04);
   border-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
 }
 
 .gap-status-icon {
   font-size: 18px;
   flex-shrink: 0;
   line-height: 1.5;
+  display: inline-flex;
+  align-items: center;
 }
 
 .gap-content {

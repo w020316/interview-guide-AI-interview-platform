@@ -5,8 +5,20 @@
       <p>回顾历次模拟面试的题目、回答与评分</p>
     </header>
 
+    <!-- 加载骨架 -->
+    <div v-if="loading" class="session-list">
+      <div v-for="i in 3" :key="i" class="session-card skeleton-card">
+        <div class="session-head">
+          <div class="session-info">
+            <div class="skeleton skeleton-line w-40"></div>
+            <div class="skeleton skeleton-line w-60"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 空状态 -->
-    <div v-if="!sessions.length && !loading" class="empty-state fade-in">
+    <div v-else-if="!sessions.length" class="empty-state fade-in">
       <div class="empty-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
           <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2 M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2 M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 M9 12h6 M9 16h4"
@@ -21,7 +33,10 @@
     <!-- 会话列表 -->
     <div v-else class="session-list">
       <div v-for="s in sessions" :key="s.sessionId" class="session-card fade-in-up">
-        <div class="session-head" @click="toggleSession(s.sessionId)">
+        <div class="session-head" role="button" tabindex="0"
+          @click="toggleSession(s.sessionId)"
+          @keydown.enter="toggleSession(s.sessionId)"
+          @keydown.space.prevent="toggleSession(s.sessionId)">
           <div class="session-info">
             <div class="session-title">{{ s.jobDescription || '未指定岗位' }}</div>
             <div class="session-meta">
@@ -244,6 +259,48 @@ function scoreColor(s?: number | null) {
 
 .session-head:hover {
   background: var(--c-bg-alt);
+}
+
+.session-head:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -2px;
+}
+
+/* ── 加载骨架 ── */
+.skeleton-card {
+  cursor: default;
+}
+
+.skeleton-card .session-head {
+  cursor: default;
+}
+
+.skeleton-card .session-head:hover {
+  background: transparent;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--c-bg-alt) 25%, var(--c-border-light) 37%, var(--c-bg-alt) 63%);
+  background-size: 400% 100%;
+  animation: skeleton-loading 1.4s ease infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.skeleton-line {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line.w-40 { width: 40%; }
+.skeleton-line.w-60 { width: 60%; }
+
+.skeleton-line:last-child {
+  margin-bottom: 0;
 }
 
 .session-info {

@@ -8,27 +8,27 @@
     <!-- Tab 切换 -->
     <div class="tab-switch">
       <button :class="{ active: tab === 'ask' }" @click="tab = 'ask'">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         RAG 问答
       </button>
       <button :class="{ active: tab === 'import' }" @click="tab = 'import'">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
         导入知识
       </button>
       <button :class="{ active: tab === 'wrong' }" @click="switchTab('wrong')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 9v4 M12 17h.01 M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         错题总结
       </button>
       <button :class="{ active: tab === 'summary' }" @click="switchTab('summary')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M3 3v18h18 M7 14l4-4 4 4 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         题目汇总
@@ -82,7 +82,7 @@
       <div class="wrong-controls">
         <div class="field-row inline">
           <label>错题阈值</label>
-          <select v-model.number="threshold" @change="loadWrong">
+          <select v-model.number="threshold" aria-label="错题阈值" @change="loadWrong">
             <option :value="60">低于 60 分</option>
             <option :value="70">低于 70 分</option>
             <option :value="80">低于 80 分</option>
@@ -104,7 +104,7 @@
           <div class="wrong-head">
             <span v-if="q.category" class="tag tag-category">{{ q.category }}</span>
             <span v-if="q.difficulty" class="tag" :class="diffClass(q.difficulty)">{{ q.difficulty }}</span>
-            <span class="wrong-score" :style="{ color: scoreColor(q.evaluationScore) }">{{ q.evaluationScore }} 分</span>
+            <span class="wrong-score" :style="{ color: getScoreColor(q.evaluationScore) }">{{ q.evaluationScore }} 分</span>
             <span class="wrong-job">{{ q.jobDescription }}</span>
           </div>
           <h4 class="wrong-question">{{ q.question }}</h4>
@@ -152,7 +152,7 @@
             <div class="stat-name">错题数</div>
           </div>
           <div class="stat-card">
-            <div class="stat-num" :style="{ color: scoreColor(summary.averageScore) }">{{ summary.averageScore }}</div>
+            <div class="stat-num" :style="{ color: getScoreColor(summary.averageScore) }">{{ summary.averageScore }}</div>
             <div class="stat-name">平均分</div>
           </div>
         </div>
@@ -163,7 +163,7 @@
             <span>答题率</span>
             <span>{{ ratePercent }}%</span>
           </div>
-          <div class="rate-bar">
+          <div class="rate-bar" role="progressbar" :aria-valuenow="ratePercent" aria-valuemin="0" aria-valuemax="100">
             <div class="rate-fill" :style="{ width: ratePercent + '%' }"></div>
           </div>
         </div>
@@ -174,7 +174,7 @@
           <div v-for="(c, idx) in summary.byCategory" :key="idx" class="group-row">
             <div class="group-head">
               <span class="group-name">{{ c.category }}</span>
-              <span class="group-score" :style="{ color: scoreColor(c.avgScore) }">{{ c.avgScore }} 分</span>
+              <span class="group-score" :style="{ color: getScoreColor(c.avgScore) }">{{ c.avgScore }} 分</span>
             </div>
             <div class="group-bar">
               <div class="group-bar-fill" :style="{ width: (c.total ? (c.answered / c.total) * 100 : 0) + '%', background: getScoreGradient(c.avgScore) }"></div>
@@ -191,7 +191,7 @@
           <div v-for="(d, idx) in summary.byDifficulty" :key="idx" class="group-row">
             <div class="group-head">
               <span class="group-name">{{ diffLabel(d.difficulty) }}</span>
-              <span class="group-score" :style="{ color: scoreColor(d.avgScore) }">{{ d.avgScore }} 分</span>
+              <span class="group-score" :style="{ color: getScoreColor(d.avgScore) }">{{ d.avgScore }} 分</span>
             </div>
             <div class="group-bar">
               <div class="group-bar-fill" :style="{ width: (d.total ? (d.answered / d.total) * 100 : 0) + '%', background: getScoreGradient(d.avgScore) }"></div>
@@ -233,6 +233,7 @@ import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
+import { getScoreColor, getScoreGradient } from '../utils/score'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 
 const md = new MarkdownIt({ html: false, linkify: true })
@@ -392,21 +393,6 @@ function diffLabel(d?: string) {
   if (d === 'MEDIUM') return '中等'
   if (d === 'HARD') return '困难'
   return d || '未知'
-}
-
-function scoreColor(s?: number) {
-  if (s == null) return 'var(--c-text-tertiary)'
-  if (s >= 85) return '#10b981'
-  if (s >= 70) return '#3b82f6'
-  if (s >= 60) return '#f59e0b'
-  return '#ef4444'
-}
-
-function getScoreGradient(s: number) {
-  if (s >= 85) return 'linear-gradient(90deg, #10b981, #34d399)'
-  if (s >= 70) return 'linear-gradient(90deg, #3b82f6, #60a5fa)'
-  if (s >= 60) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-  return 'linear-gradient(90deg, #ef4444, #f87171)'
 }
 
 function formatTime(t?: string) {

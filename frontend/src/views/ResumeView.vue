@@ -26,52 +26,7 @@
           <label>目标岗位</label>
           <BaseInput v-model="targetJob" block list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
           <datalist id="job-suggestions">
-            <option value="Java 后端开发工程师" />
-            <option value="前端开发工程师" />
-            <option value="Python 后端开发工程师" />
-            <option value="Go 后端开发工程师" />
-            <option value="全栈开发工程师" />
-            <option value="iOS 开发工程师" />
-            <option value="Android 开发工程师" />
-            <option value="数据分析师" />
-            <option value="算法工程师" />
-            <option value="机器学习工程师" />
-            <option value="产品经理" />
-            <option value="项目经理" />
-            <option value="UI/UX 设计师" />
-            <option value="测试工程师" />
-            <option value="运维工程师" />
-            <option value="DevOps 工程师" />
-            <option value="数据库管理员" />
-            <option value="安全工程师" />
-            <option value="教师" />
-            <option value="医生" />
-            <option value="护士" />
-            <option value="药剂师" />
-            <option value="律师" />
-            <option value="会计师" />
-            <option value="审计师" />
-            <option value="财务经理" />
-            <option value="销售经理" />
-            <option value="市场专员" />
-            <option value="运营专员" />
-            <option value="人力资源专员" />
-            <option value="行政助理" />
-            <option value="翻译" />
-            <option value="编辑" />
-            <option value="记者" />
-            <option value="建筑师" />
-            <option value="土木工程师" />
-            <option value="机械工程师" />
-            <option value="电气工程师" />
-            <option value="化工工程师" />
-            <option value="供应链管理" />
-            <option value="采购专员" />
-            <option value="物流管理" />
-            <option value="客户经理" />
-            <option value="店长" />
-            <option value="厨师" />
-            <option value="摄影师" />
+            <option v-for="job in JOB_SUGGESTIONS" :key="job" :value="job" />
           </datalist>
         </div>
       </div>
@@ -278,6 +233,8 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
+import { getScoreColor, getScoreGradient } from '../utils/score'
+import { JOB_SUGGESTIONS } from '../utils/jobOptions'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import { BaseInput, BaseTextarea } from '../components'
@@ -479,22 +436,6 @@ async function pasteFromClipboard() {
     ElMessage.info('剪贴板访问被拒绝，请手动粘贴到文本框')
     tab.value = 'text'
   }
-}
-
-/** 评分对应颜色 */
-function getScoreColor(score: number): string {
-  if (score >= 85) return '#10b981'
-  if (score >= 70) return '#3b82f6'
-  if (score >= 60) return '#f59e0b'
-  return '#ef4444'
-}
-
-/** 评分对应渐变 */
-function getScoreGradient(score: number): string {
-  if (score >= 85) return 'linear-gradient(90deg, #10b981, #34d399)'
-  if (score >= 70) return 'linear-gradient(90deg, #3b82f6, #60a5fa)'
-  if (score >= 60) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-  return 'linear-gradient(90deg, #ef4444, #f87171)'
 }
 
 /** 综合评分主色 */

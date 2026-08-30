@@ -2,6 +2,7 @@ package com.example.interview.service;
 
 import com.example.interview.util.JsonRepairUtil;
 import com.example.interview.util.PromptSanitizer;
+import com.example.interview.util.TextUtil;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
@@ -49,8 +50,8 @@ public class JobAnalysisService {
      * @return 分析结果 JSON 字符串
      */
     public String analyzeJobDescription(String jobDescription) {
-        String truncatedJd = truncate(jobDescription, MAX_TEXT_LEN);
-        String safeJd = sanitizePromptInput(truncatedJd);
+        String truncatedJd = TextUtil.truncate(jobDescription, MAX_TEXT_LEN);
+        String safeJd = PromptSanitizer.sanitize(truncatedJd);
         String prompt = new StringBuilder()
                 .append("你是一位资深 HR 和招聘专家，请深度分析以下岗位描述（JD）。\n\n")
                 .append("【岗位描述】\n").append(safeJd).append("\n\n")
@@ -82,10 +83,10 @@ public class JobAnalysisService {
      * 差距诊断：简历 vs JD 逐条对比
      */
     public String diagnoseGap(String resumeText, String jobDescription) {
-        String truncatedResume = truncate(resumeText, MAX_TEXT_LEN);
-        String truncatedJd = truncate(jobDescription, MAX_TEXT_LEN);
-        String safeJd = sanitizePromptInput(truncatedJd);
-        String safeResume = sanitizePromptInput(truncatedResume);
+        String truncatedResume = TextUtil.truncate(resumeText, MAX_TEXT_LEN);
+        String truncatedJd = TextUtil.truncate(jobDescription, MAX_TEXT_LEN);
+        String safeJd = PromptSanitizer.sanitize(truncatedJd);
+        String safeResume = PromptSanitizer.sanitize(truncatedResume);
         String prompt = new StringBuilder()
                 .append("你是一位资深招聘面试官，请逐条对比以下简历和岗位要求，进行差距诊断。\n\n")
                 .append("【目标岗位描述】\n").append(safeJd).append("\n\n")
@@ -124,8 +125,8 @@ public class JobAnalysisService {
      * 求职信/申请邮件/内推私信生成
      */
     public String generateLetter(String resumeText, String jobDescription, String type) {
-        String truncatedResume = truncate(resumeText, MAX_TEXT_LEN);
-        String truncatedJd = truncate(jobDescription, 600);
+        String truncatedResume = TextUtil.truncate(resumeText, MAX_TEXT_LEN);
+        String truncatedJd = TextUtil.truncate(jobDescription, 600);
 
         String typeDesc = switch (type) {
             case "email" -> "一封专业的申请邮件（投递简历时发送给 HR），邮件需包含：邮件主题、简短问候、正文（说明应聘岗位、核心优势、求职意向）、结尾礼仪语。语气专业但不生硬。";
@@ -133,8 +134,8 @@ public class JobAnalysisService {
             default -> "一封正式的求职信（Cover Letter），结构包含：开场（说明应聘岗位和渠道）、核心匹配（2-3 段，每段对应一个岗位要求与简历证据的匹配）、结尾（表达热情和面试期望）。语气专业自信。";
         };
 
-        String safeJd = sanitizePromptInput(truncatedJd);
-        String safeResume = sanitizePromptInput(truncatedResume);
+        String safeJd = PromptSanitizer.sanitize(truncatedJd);
+        String safeResume = PromptSanitizer.sanitize(truncatedResume);
         String prompt = new StringBuilder()
                 .append("你是一位求职辅导专家，请基于以下简历和岗位信息，生成").append(typeDesc).append("\n\n")
                 .append("【目标岗位】\n").append(safeJd).append("\n\n")
@@ -147,18 +148,8 @@ public class JobAnalysisService {
                 .toString();
 
         String response = callAiRaw(prompt, "letter-" + type);
-        // 剥离可能的 Markdown 代码块包裹
-        if (response.startsWith("```")) {
-            response = response.replaceAll("^```(?:markdown|md)?\\s*\\n", "").replaceAll("\\n```\\s*$", "");
-        }
-        return response.trim();
-    }
-
-    /**
-     * Prompt 注入防御：剥离指令性模式 + 截断超长输入
-     */
-    private String sanitizePromptInput(String input) {
-        return PromptSanitizer.sanitize(input);
+        // 剥离可能的 Markdown 代码块包裹（复用 JsonRepairUtil 的健壮实现）
+        return JsonRepairUtil.stripMarkdownFence(response).trim();
     }
 
     // ─────────────────────────── 内部工具方法 ───────────────────────────
@@ -200,11 +191,5 @@ public class JobAnalysisService {
             jobAnalysisCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
-    }
-
-    /** 截断文本，避免 prompt 过长拖慢推理 */
-    private static String truncate(String text, int maxLen) {
-        if (text == null) return "";
-        return text.length() > maxLen ? text.substring(0, maxLen) + "..." : text;
     }
 }
