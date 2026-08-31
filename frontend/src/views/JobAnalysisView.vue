@@ -426,6 +426,7 @@ function gapStatusClass(status: string): string {
   color: var(--c-text);
   margin: 0 0 6px;
   letter-spacing: -0.5px;
+  font-family: var(--font-serif);
 }
 
 .page-header p {
@@ -687,9 +688,10 @@ function gapStatusClass(status: string): string {
 
 .result-summary h3 {
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--c-text);
   margin: 0 0 8px;
+  font-family: var(--font-serif);
 }
 
 .result-summary p {
@@ -713,31 +715,37 @@ function gapStatusClass(status: string): string {
   font-weight: 500;
   border-radius: 999px;
   letter-spacing: 0.3px;
+  border: 1px solid transparent;
 }
 
 .tag-info {
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
+  background: var(--brand-primary-50);
+  color: var(--brand-primary);
+  border: 1px solid var(--brand-primary-100);
 }
 
 .tag-success {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  border: 1px solid var(--c-accent-line);
 }
 
 .tag-hard {
   background: var(--brand-primary-50);
   color: var(--brand-primary);
+  border: 1px solid var(--brand-primary-100);
 }
 
 .tag-soft {
-  background: rgba(139, 92, 246, 0.1);
-  color: #7c3aed;
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  border: 1px solid var(--c-accent-line);
 }
 
 .tag-keyword {
-  background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
+  background: var(--brand-primary-50);
+  color: var(--brand-primary);
+  border: 1px solid var(--brand-primary-100);
 }
 
 /* ── 内容块 ── */
@@ -762,11 +770,12 @@ function gapStatusClass(status: string): string {
   font-weight: 600;
   color: var(--c-text);
   margin: 0 0 14px;
+  font-family: var(--font-serif);
 }
 
 .block-tips {
-  background: var(--brand-primary-50);
-  border-color: var(--brand-primary-100);
+  background: var(--c-accent-soft);
+  border-color: var(--c-accent-line);
 }
 
 .list-card {
@@ -794,10 +803,10 @@ function gapStatusClass(status: string): string {
   background: var(--c-text-tertiary);
 }
 
-.list-success li::before { background: #10b981; }
+.list-success li::before { background: var(--c-accent); }
 .list-warning li::before { background: #f59e0b; }
 .list-danger li::before { background: #ef4444; }
-.list-info li::before { background: #3b82f6; }
+.list-info li::before { background: var(--brand-primary); }
 
 .skill-tags {
   display: flex;
@@ -808,9 +817,10 @@ function gapStatusClass(status: string): string {
 /* ── 匹配度评分 ── */
 .match-score-hero {
   text-align: center;
-  padding: 32px;
+  padding: 30px 32px 32px;
   background: var(--c-surface);
   border: 1px solid var(--c-border-light);
+  border-top: 3px solid var(--c-accent);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   margin-bottom: 20px;
@@ -818,17 +828,25 @@ function gapStatusClass(status: string): string {
 
 .match-score-num {
   font-size: 48px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--score-color, var(--brand-primary));
   line-height: 1;
   margin-bottom: 4px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .match-score-label {
-  font-size: 14px;
-  color: var(--c-text-secondary);
-  font-weight: 500;
+  font-size: 13px;
+  color: var(--c-accent);
+  font-weight: 600;
   margin-bottom: 12px;
+  letter-spacing: 0.02em;
+}
+
+.match-score-label::before {
+  content: '★ ';
 }
 
 .match-summary {
@@ -849,15 +867,15 @@ function gapStatusClass(status: string): string {
 }
 
 .gap-strong {
-  background: rgba(16, 185, 129, 0.04);
-  border-color: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  background: var(--c-accent-soft);
+  border-color: var(--c-accent-line);
+  color: var(--c-accent);
 }
 
 .gap-weak {
-  background: rgba(245, 158, 11, 0.04);
-  border-color: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+  background: var(--brand-primary-50);
+  border-color: var(--brand-primary-100);
+  color: var(--brand-primary);
 }
 
 .gap-missing {

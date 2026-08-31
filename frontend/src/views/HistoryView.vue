@@ -67,7 +67,7 @@
               <div v-else class="q-answer q-answer-empty">
                 <span class="answer-label">未作答</span>
               </div>
-              <div v-if="q.evaluationScore != null" class="q-score" :style="{ color: scoreColor(q.evaluationScore) }">
+              <div v-if="q.evaluationScore != null" class="q-score num-display">
                 评分 {{ q.evaluationScore }} 分
               </div>
             </div>
@@ -164,14 +164,6 @@ function statusText(status: string) {
     ACTIVE: '进行中',
   }
   return map[status] || status
-}
-
-function scoreColor(s?: number | null) {
-  if (s == null) return 'var(--c-text-tertiary)'
-  if (s >= 85) return '#10b981'
-  if (s >= 70) return '#3b82f6'
-  if (s >= 60) return '#f59e0b'
-  return '#ef4444'
 }
 </script>
 
@@ -309,6 +301,7 @@ function scoreColor(s?: number | null) {
 }
 
 .session-title {
+  font-family: var(--font-serif);
   font-size: 15px;
   font-weight: 600;
   color: var(--c-text);
@@ -434,10 +427,12 @@ function scoreColor(s?: number | null) {
 
 .q-score {
   display: inline-block;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   padding: 2px 10px;
-  background: var(--c-bg-alt);
+  color: var(--c-accent);
+  background: var(--c-accent-soft);
+  border: 1px solid var(--c-accent-line);
   border-radius: 999px;
 }
 

@@ -278,6 +278,7 @@ function scoreBg(s?: number | null): string {
 .page-header h1 {
   font-size: 28px;
   font-weight: 700;
+  font-family: var(--font-serif);
   color: var(--c-text);
   margin: 0 0 6px;
   letter-spacing: -0.5px;
@@ -358,7 +359,10 @@ function scoreBg(s?: number | null): string {
 .score-num {
   font-size: 22px;
   font-weight: 800;
-  color: var(--c-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--c-accent);
   line-height: 1;
 }
 
@@ -469,6 +473,7 @@ function scoreBg(s?: number | null): string {
 .modal-header h3 {
   font-size: 18px;
   font-weight: 600;
+  font-family: var(--font-serif);
   margin: 0;
   color: var(--c-text);
 }
@@ -562,7 +567,10 @@ function scoreBg(s?: number | null): string {
 .score-value .score-num {
   font-size: 24px;
   font-weight: 800;
-  color: var(--c-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--c-accent);
 }
 
 .score-value .score-unit {
@@ -604,6 +612,9 @@ function scoreBg(s?: number | null): string {
 .dim-score {
   font-size: 14px;
   font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .dim-bar {
@@ -643,11 +654,17 @@ function scoreBg(s?: number | null): string {
 .detail-card h4 {
   font-size: 14px;
   font-weight: 600;
+  font-family: var(--font-serif);
   margin: 0 0 10px;
 }
 
+.detail-card-success {
+  border-color: var(--c-accent-line);
+  background: var(--c-accent-soft);
+}
+
 .detail-card-success h4 {
-  color: var(--c-success);
+  color: var(--c-accent);
 }
 
 .detail-card-warning h4 {
@@ -660,6 +677,24 @@ function scoreBg(s?: number | null): string {
   font-size: 13px;
   color: var(--c-text-secondary);
   line-height: 1.6;
+}
+
+.detail-card-success ul {
+  list-style: none;
+  padding-left: 18px;
+}
+
+.detail-card-success li {
+  position: relative;
+  padding-left: 4px;
+}
+
+.detail-card-success li::before {
+  content: '★';
+  position: absolute;
+  left: -16px;
+  color: var(--c-accent);
+  font-size: 10px;
 }
 
 .raw-detail {

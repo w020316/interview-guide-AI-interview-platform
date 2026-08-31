@@ -1,52 +1,93 @@
 <template>
   <div class="home">
-    <!-- Hero 区 -->
+    <!-- Hero 区：左文右卡，不对称编辑式构图 -->
     <section class="hero">
-      <div class="hero-content fade-in-up">
-        <div class="hero-badge">
-          <span class="badge-dot"></span>
-          <span>AI 驱动 · 智能面试准备平台</span>
-        </div>
-        <h1 class="hero-title">
-          让每一次面试<br />
-          <span class="text-gradient">都有备而来</span>
-        </h1>
-        <p class="hero-subtitle">
-          上传简历获得 AI 多维度评分，生成个性化面试题，
-          <br />
-          实时流式提示与自动评估，助你高效备战求职季
-        </p>
-        <div class="hero-actions">
-          <BaseButton variant="primary" size="lg" shadow="sm" hoverable @click="goTo('/resume')">
-            <span>开始简历分析</span>
-            <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </BaseButton>
-          <BaseButton variant="ghost" size="lg" hoverable @click="goTo('/interview')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            <span>模拟面试</span>
-          </BaseButton>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="hero-badge fade-in-up">
+            <span class="badge-dot"></span>
+            <span>AI 驱动 · 智能面试准备平台</span>
+          </div>
+          <h1 class="hero-title fade-in-up" style="animation-delay: 80ms">
+            让每一次面试<br />
+            <span class="hero-em">都有备而来</span>
+          </h1>
+          <p class="hero-subtitle fade-in-up" style="animation-delay: 160ms">
+            上传简历获得 AI 多维度评分，生成个性化面试题，
+            实时流式提示与自动评估，助你高效备战求职季。
+          </p>
+          <div class="hero-actions fade-in-up" style="animation-delay: 240ms">
+            <BaseButton variant="primary" size="lg" shadow="sm" hoverable @click="goTo('/resume')">
+              <span>开始简历分析</span>
+              <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </BaseButton>
+            <BaseButton variant="ghost" size="lg" hoverable @click="goTo('/interview')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <span>模拟面试</span>
+            </BaseButton>
+          </div>
+
+          <!-- Hero 数据展示：等宽琥珀金数字，评分面板质感 -->
+          <div class="hero-stats fade-in-up" style="animation-delay: 320ms">
+            <div class="stat">
+              <div class="stat-num num-display">4</div>
+              <div class="stat-label">评分维度</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <div class="stat-num num-display">100<span class="stat-unit">%</span></div>
+              <div class="stat-label">岗位匹配分析</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <div class="stat-num num-display">∞</div>
+              <div class="stat-label">无限次面试</div>
+            </div>
+          </div>
         </div>
 
-        <!-- Hero 数据展示 -->
-        <div class="hero-stats">
-          <div class="stat">
-            <div class="stat-num">4</div>
-            <div class="stat-label">评分维度</div>
+        <!-- 视觉锚点：准备度评分卡 -->
+        <div class="hero-visual fade-in-up" style="animation-delay: 200ms" aria-hidden="true">
+          <div class="ring"></div>
+          <div class="visual-card">
+            <div class="visual-head">
+              <span class="visual-title">本轮准备度</span>
+              <span class="visual-ready">
+                <span class="ready-dot"></span>已就绪
+              </span>
+            </div>
+            <div class="visual-score">
+              <div class="score-big num-display">86</div>
+              <div class="score-meta">综合评估 · 击败 78% 求职者</div>
+            </div>
+            <div class="visual-rows">
+              <div class="v-row">
+                <span class="v-label">技术匹配</span>
+                <div class="v-bar"><i class="v-fill" style="--w: 92%"></i></div>
+                <span class="v-val num-display">92</span>
+              </div>
+              <div class="v-row">
+                <span class="v-label">表述清晰</span>
+                <div class="v-bar"><i class="v-fill" style="--w: 88%"></i></div>
+                <span class="v-val num-display">88</span>
+              </div>
+              <div class="v-row">
+                <span class="v-label">项目含金</span>
+                <div class="v-bar"><i class="v-fill" style="--w: 78%"></i></div>
+                <span class="v-val num-display">78</span>
+              </div>
+            </div>
+            <div class="visual-cta">
+              <span class="visual-star">★</span>
+              <span>双向奔赴的岗位在等你</span>
+            </div>
           </div>
-          <div class="stat-divider"></div>
-          <div class="stat">
-            <div class="stat-num">3</div>
-            <div class="stat-label">岗位分析</div>
-          </div>
-          <div class="stat-divider"></div>
-          <div class="stat">
-            <div class="stat-num">∞</div>
-            <div class="stat-label">面试次数</div>
-          </div>
+          <div class="visual-chip chip-a">面试题 <b>已就绪</b></div>
+          <div class="visual-chip chip-b">复盘 <b>有报告</b></div>
         </div>
       </div>
     </section>
@@ -166,15 +207,21 @@ const steps = [
   padding: 0 24px;
 }
 
-/* ── Hero（去除光晕/网格/玻璃态，纯色 + 排版） ── */
+/* ── Hero：左文右卡不对称网格 ── */
 .hero {
   position: relative;
-  text-align: center;
-  padding: 72px 0 56px;
+  padding: 64px 0 48px;
   overflow: hidden;
 }
 
-.hero-content {
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.06fr 0.94fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.hero-copy {
   position: relative;
   z-index: 1;
 }
@@ -190,7 +237,7 @@ const steps = [
   background: var(--brand-primary-50);
   border: 1px solid var(--brand-primary-100);
   border-radius: var(--radius-full);
-  margin-bottom: 24px;
+  margin-bottom: 22px;
 }
 
 .badge-dot {
@@ -201,31 +248,49 @@ const steps = [
 }
 
 .hero-title {
-  font-size: clamp(36px, 6vw, 56px);
+  font-size: clamp(34px, 5vw, 52px);
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 1.14;
   letter-spacing: -1.5px;
   color: var(--c-text);
-  margin: 0 0 20px;
+  margin: 0 0 18px;
+}
+
+/* 强调短语：琥珀金 + 衬线，斩获感 */
+.hero-em {
+  color: var(--c-accent);
+  position: relative;
+  white-space: nowrap;
+}
+
+.hero-em::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  height: 8px;
+  background: var(--c-accent-line);
+  opacity: 0.5;
+  z-index: -1;
+  border-radius: 2px;
 }
 
 .hero-subtitle {
   font-size: 16px;
   line-height: 1.7;
   color: var(--c-text-secondary);
-  max-width: 580px;
-  margin: 0 auto 32px;
+  max-width: 520px;
+  margin: 0 0 28px;
 }
 
 .hero-actions {
   display: flex;
   gap: 12px;
-  justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 48px;
+  margin-bottom: 36px;
 }
 
-/* arrow-icon 平移动画（Hero 区 + CTA 区 BaseButton 共用，通过 :deep 穿透） */
 .arrow-icon {
   transition: transform var(--transition-fast);
 }
@@ -235,12 +300,12 @@ const steps = [
   transform: translateX(4px);
 }
 
-/* ── Hero 数据展示（实色卡片，无玻璃态） ── */
+/* Hero 数据展示 */
 .hero-stats {
   display: inline-flex;
   align-items: center;
-  gap: 28px;
-  padding: 18px 32px;
+  gap: 26px;
+  padding: 16px 28px;
   background: var(--c-surface);
   border: 1px solid var(--c-border-light);
   border-radius: var(--radius-lg);
@@ -253,10 +318,13 @@ const steps = [
 
 .stat-num {
   font-size: 26px;
-  font-weight: 700;
-  color: var(--brand-primary);
-  line-height: 1;
   margin-bottom: 4px;
+}
+
+.stat-unit {
+  font-size: 15px;
+  color: var(--c-text-tertiary);
+  font-weight: 600;
 }
 
 .stat-label {
@@ -269,6 +337,191 @@ const steps = [
   width: 1px;
   height: 28px;
   background: var(--c-border);
+}
+
+/* ── 视觉锚点：准备度评分卡 ── */
+.hero-visual {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 360px;
+}
+
+.ring {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border: 1px dashed var(--brand-primary-200);
+  border-radius: 50%;
+  animation: spin 26s linear infinite;
+}
+
+.ring::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  box-shadow: 0 4px 10px rgba(180, 83, 9, 0.4);
+}
+
+.visual-card {
+  position: relative;
+  z-index: 1;
+  width: 300px;
+  padding: 22px 22px 18px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+}
+
+.visual-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.visual-title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.visual-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-accent);
+  background: var(--c-accent-soft);
+  border-radius: var(--radius-full);
+}
+
+.ready-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-accent);
+}
+
+.visual-score {
+  text-align: center;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid var(--c-border-light);
+}
+
+.score-big {
+  font-size: 52px;
+  font-weight: 700;
+}
+
+.score-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+
+.visual-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0 12px;
+}
+
+.v-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.v-label {
+  width: 52px;
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  flex-shrink: 0;
+}
+
+.v-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--brand-primary-50);
+  overflow: hidden;
+}
+
+.v-fill {
+  display: block;
+  height: 100%;
+  width: var(--w, 80%);
+  border-radius: 3px;
+  background: var(--brand-primary);
+}
+
+.v-val {
+  font-size: 13px;
+  width: 26px;
+  text-align: right;
+  color: var(--c-accent);
+}
+
+.visual-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0 0 0;
+  border-top: 1px solid var(--c-border-light);
+}
+
+.visual-star {
+  color: var(--c-accent);
+  font-size: 14px;
+}
+
+.visual-cta span:last-child {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+}
+
+/* 浮动小标 */
+.visual-chip {
+  position: absolute;
+  z-index: 2;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+}
+
+.visual-chip b {
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.chip-a {
+  top: 12%;
+  left: 4%;
+  animation: fadeInUp 0.5s var(--transition-bounce) both 0.5s;
+}
+
+.chip-b {
+  bottom: 14%;
+  right: 2%;
+  animation: fadeInUp 0.5s var(--transition-bounce) both 0.7s;
 }
 
 /* ── 通用 Section ── */
@@ -295,14 +548,13 @@ const steps = [
   margin: 0;
 }
 
-/* ── 特性卡片（使用 BaseCard feature variant） ── */
+/* ── 特性卡片 ── */
 .features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
 
-/* feature-card 原 padding 28px 24px，BaseCard 默认 24px，通过 :deep 调整垂直 padding */
 .features :deep(.base-card--feature .base-card__body) {
   padding: 28px 24px;
 }
@@ -324,7 +576,6 @@ const steps = [
   height: 22px;
 }
 
-/* BaseCard 内的 h3/p 样式（原 .feature-card h3/p） */
 .features :deep(.base-card--feature h3) {
   font-size: 17px;
   font-weight: 600;
@@ -345,7 +596,6 @@ const steps = [
   gap: 6px;
 }
 
-/* feature 卡片 hover 时 tag 变为品牌色（原 .feature-card:hover .tag） */
 .features :deep(.base-card--feature:hover .base-tag) {
   background: var(--brand-primary-50);
   color: var(--brand-primary);
@@ -415,9 +665,9 @@ const steps = [
   line-height: 1.6;
 }
 
-/* ── CTA 区（品牌色实色，无紫青渐变） ── */
+/* ── CTA 区 ── */
 .cta-section {
-  padding: 56px 0 80px;
+  padding: 40px 0 80px;
 }
 
 .cta-card {
@@ -448,20 +698,57 @@ const steps = [
   margin: 0 0 28px;
 }
 
+/* 桌面端 */
+@media (min-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1.06fr 0.94fr;
+  }
+}
+
+@media (max-width: 1023px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .hero-visual {
+    order: -1;
+  }
+}
+
 @media (max-width: 768px) {
   .features, .steps {
     grid-template-columns: 1fr;
+  }
+  .hero {
+    padding-top: 40px;
   }
   .hero-stats {
     gap: 16px;
     padding: 14px 20px;
   }
-  .stat-num { font-size: 22px; }
+  .stat-num {
+    font-size: 22px;
+  }
 }
 
 @media (max-width: 480px) {
-  .hero-actions { flex-direction: column; width: 100%; }
-  .hero-actions :deep(.base-btn) { width: 100%; justify-content: center; }
-  .cta-content :deep(.base-btn) { width: 100%; justify-content: center; }
+  .hero-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .hero-actions :deep(.base-btn),
+  .cta-content :deep(.base-btn) {
+    width: 100%;
+    justify-content: center;
+  }
+  .ring {
+    width: 240px;
+    height: 240px;
+  }
+  .visual-card {
+    width: 260px;
+  }
+  .chip-a { left: 0; }
+  .chip-b { right: 0; }
 }
 </style>

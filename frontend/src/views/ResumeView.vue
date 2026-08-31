@@ -565,6 +565,7 @@ function formatDate() {
 .page-header h1 {
   font-size: 28px;
   font-weight: 700;
+  font-family: var(--font-serif);
   color: var(--c-text);
   margin: 0 0 6px;
   letter-spacing: -0.5px;
@@ -950,7 +951,10 @@ function formatDate() {
 .score-num {
   font-size: 32px;
   font-weight: 800;
-  color: var(--c-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--c-accent);
   display: block;
   line-height: 1;
 }
@@ -963,6 +967,7 @@ function formatDate() {
 .score-meta h3 {
   font-size: 18px;
   font-weight: 600;
+  font-family: var(--font-serif);
   color: var(--c-text);
   margin: 0 0 4px;
 }
@@ -977,6 +982,7 @@ function formatDate() {
 .block-title {
   font-size: 16px;
   font-weight: 600;
+  font-family: var(--font-serif);
   color: var(--c-text);
   margin: 0 0 16px;
 }
@@ -1011,6 +1017,9 @@ function formatDate() {
 .dim-score {
   font-size: 16px;
   font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .dim-bar {
@@ -1068,18 +1077,21 @@ function formatDate() {
 }
 
 .strengths-icon {
-  background: #d1fae5;
-  color: #059669;
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  border: 1px solid var(--c-accent-line);
 }
 
 .improvements-icon {
-  background: #fef3c7;
-  color: #d97706;
+  background: var(--c-accent-soft);
+  color: var(--c-warning);
+  border: 1px solid var(--c-accent-line);
 }
 
 .card-head h4 {
   font-size: 15px;
   font-weight: 600;
+  font-family: var(--font-serif);
   color: var(--c-text);
   margin: 0;
 }
@@ -1107,6 +1119,18 @@ function formatDate() {
   height: 5px;
   border-radius: 50%;
   background: var(--c-text-tertiary);
+}
+
+.analysis-card.strengths .analysis-list li::before {
+  content: '★';
+  background: transparent;
+  border: none;
+  color: var(--c-accent);
+  font-size: 11px;
+  width: auto;
+  height: auto;
+  top: 7px;
+  left: 1px;
 }
 
 .empty-hint {
@@ -1189,6 +1213,7 @@ function formatDate() {
 .optimize-title {
   font-size: 18px;
   font-weight: 600;
+  font-family: var(--font-serif);
   color: var(--c-text);
   margin: 0 0 6px;
 }

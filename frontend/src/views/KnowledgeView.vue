@@ -422,6 +422,7 @@ function formatTime(t?: string) {
   color: var(--c-text);
   margin: 0 0 6px;
   letter-spacing: -0.5px;
+  font-family: var(--font-serif);
 }
 
 .page-header p {
@@ -622,6 +623,7 @@ function formatTime(t?: string) {
   font-weight: 600;
   margin: 0;
   color: var(--c-text);
+  font-family: var(--font-serif);
 }
 
 .answer-body {
@@ -672,9 +674,9 @@ function formatTime(t?: string) {
 }
 
 .result-card.success {
-  background: var(--c-success-light);
-  color: var(--c-success);
-  border: 1px solid var(--c-success);
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  border: 1px solid var(--c-accent-line);
 }
 
 .result-card.error {
@@ -706,8 +708,10 @@ function formatTime(t?: string) {
 }
 
 .result-summary strong {
-  color: var(--c-danger);
+  color: var(--c-accent);
   font-weight: 600;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .wrong-card {
@@ -742,32 +746,39 @@ function formatTime(t?: string) {
   font-weight: 500;
   border-radius: 999px;
   letter-spacing: 0.3px;
+  border: 1px solid transparent;
 }
 
 .tag-category {
   background: var(--brand-primary-light);
   color: var(--brand-primary);
+  border-color: var(--brand-primary-100);
 }
 
 .tag-success {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  border-color: var(--c-accent-line);
 }
 
 .tag-warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
+  background: var(--brand-primary-50);
+  color: var(--brand-primary);
+  border-color: var(--brand-primary-100);
 }
 
 .tag-danger {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.08);
   color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.18);
 }
 
 .wrong-score {
   font-size: 14px;
   font-weight: 700;
   margin-left: auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .wrong-job {
@@ -777,11 +788,12 @@ function formatTime(t?: string) {
 
 .wrong-question {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--c-text);
   margin: 0 0 14px;
   line-height: 1.5;
   letter-spacing: -0.2px;
+  font-family: var(--font-serif);
 }
 
 .wrong-body {
@@ -851,8 +863,10 @@ function formatTime(t?: string) {
   font-weight: 700;
   line-height: 1;
   margin-bottom: 6px;
-  letter-spacing: -1px;
+  letter-spacing: -0.02em;
   color: var(--c-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-name {
@@ -879,20 +893,22 @@ function formatTime(t?: string) {
 }
 
 .rate-bar-head span:last-child {
-  color: var(--brand-primary);
+  color: var(--c-accent);
   font-weight: 600;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .rate-bar {
   height: 8px;
-  background: var(--c-bg-alt);
+  background: var(--brand-primary-50);
   border-radius: 999px;
   overflow: hidden;
 }
 
 .rate-fill {
   height: 100%;
-  background: var(--brand-gradient);
+  background: var(--brand-primary);
   border-radius: 999px;
   transition: width 0.6s ease;
 }
@@ -908,6 +924,7 @@ function formatTime(t?: string) {
   margin: 0 0 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--c-border-light);
+  font-family: var(--font-serif);
 }
 
 .group-row {
@@ -930,6 +947,8 @@ function formatTime(t?: string) {
 .group-score {
   font-size: 13px;
   font-weight: 600;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .group-bar {

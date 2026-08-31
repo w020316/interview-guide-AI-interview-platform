@@ -514,6 +514,8 @@ async function handleRegister() {
 }
 
 .aside-stat-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 22px;
   font-weight: 700;
   color: #fff;
@@ -750,16 +752,16 @@ async function handleRegister() {
   margin-top: 2px;
 }
 
-/* ── 冷启动提示 ── */
+/* ── 冷启动提示（v4：琥珀浅底编辑风） ── */
 .cold-start-hint {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #fef3c7;
-  border: 1px solid #fcd34d;
+  background: var(--c-accent-soft);
+  border: 1px solid var(--c-accent-line);
   border-radius: var(--radius-md);
-  color: #92400e;
+  color: var(--c-accent-hover);
   font-size: 12px;
   line-height: 1.5;
   animation: pulse-hint 2s ease-in-out infinite;
@@ -767,7 +769,7 @@ async function handleRegister() {
 
 .cold-start-hint svg {
   flex-shrink: 0;
-  color: #d97706;
+  color: var(--c-accent);
 }
 
 @keyframes pulse-hint {

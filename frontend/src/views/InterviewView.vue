@@ -103,28 +103,28 @@
         </div>
         <div class="eval-scores">
           <div class="score-item">
-            <div class="score-num" :style="{ color: scoreColor(evalResult.overallScore) }">
+            <div class="score-num num-display">
               {{ evalResult.overallScore ?? '-' }}
             </div>
             <div class="score-name">综合</div>
           </div>
           <div class="score-divider"></div>
           <div class="score-item">
-            <div class="score-num" :style="{ color: scoreColor(evalResult.completeness) }">
+            <div class="score-num num-display">
               {{ evalResult.completeness ?? '-' }}
             </div>
             <div class="score-name">完整性</div>
           </div>
           <div class="score-divider"></div>
           <div class="score-item">
-            <div class="score-num" :style="{ color: scoreColor(evalResult.accuracy) }">
+            <div class="score-num num-display">
               {{ evalResult.accuracy ?? '-' }}
             </div>
             <div class="score-name">准确性</div>
           </div>
           <div class="score-divider"></div>
           <div class="score-item">
-            <div class="score-num" :style="{ color: scoreColor(evalResult.expression) }">
+            <div class="score-num num-display">
               {{ evalResult.expression ?? '-' }}
             </div>
             <div class="score-name">表达力</div>
@@ -151,7 +151,7 @@
             <div class="report-head">
               <div>
                 <h3 class="report-title">模拟面试复盘报告</h3>
-                <p class="report-sub">基于本次 {{ answeredCount }} 道作答的结构化总结 · 灵感参考 AI 面试工具</p>
+                <p class="report-sub"><span class="report-star" aria-hidden="true">★</span> 基于本次 {{ answeredCount }} 道作答的结构化总结 · 灵感参考 AI 面试工具</p>
               </div>
               <button class="report-close" aria-label="关闭" @click="closeReportGoSetup">✕</button>
             </div>
@@ -893,14 +893,14 @@ onUnmounted(() => {
 
 .progress-bar {
   height: 8px;
-  background: var(--c-bg-alt);
+  background: var(--brand-primary-50);
   border-radius: 999px;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: var(--brand-gradient);
+  background: var(--brand-primary);
   border-radius: 999px;
   transition: width 0.4s ease;
 }
@@ -1146,8 +1146,8 @@ onUnmounted(() => {
 }
 
 .improve-list {
-  background: rgba(245, 158, 11, 0.05);
-  border-left: 3px solid var(--c-warning);
+  background: var(--c-accent-soft);
+  border-left: 3px solid var(--c-accent);
   padding: 14px 18px;
   border-radius: var(--radius-sm);
   margin-bottom: 20px;
@@ -1156,7 +1156,7 @@ onUnmounted(() => {
 .improve-title {
   font-size: 13px;
   font-weight: 600;
-  color: #92400e;
+  color: var(--c-accent-hover);
   margin-bottom: 8px;
 }
 
@@ -1234,6 +1234,10 @@ onUnmounted(() => {
   color: var(--c-text-tertiary);
   margin: 0;
 }
+.report-star {
+  color: var(--c-accent);
+  margin-right: 3px;
+}
 .report-close {
   border: none;
   background: var(--c-bg-alt);
@@ -1295,7 +1299,7 @@ onUnmounted(() => {
 }
 .dim-bar {
   height: 6px;
-  background: var(--c-bg-alt);
+  background: var(--brand-primary-50);
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 10px;
@@ -1387,8 +1391,8 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  background: rgba(245, 158, 11, 0.05);
-  border-left: 3px solid var(--c-warning);
+  background: var(--c-accent-soft);
+  border-left: 3px solid var(--c-accent);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
   font-size: 13px;

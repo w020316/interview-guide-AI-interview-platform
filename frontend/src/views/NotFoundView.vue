@@ -74,6 +74,12 @@ function goBack() {
   letter-spacing: -3px;
 }
 
+/* v4：404 作为大号数值展示，用等宽 + 琥珀金突出 */
+.nf-title .text-gradient-static {
+  font-family: var(--font-mono);
+  color: var(--c-accent);
+}
+
 .nf-subtitle {
   font-size: 24px;
   font-weight: 700;

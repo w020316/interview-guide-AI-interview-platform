@@ -23,7 +23,7 @@
           </svg>
         </div>
         <div class="stat-info">
-          <div class="stat-value">{{ stats?.resumeCount ?? 0 }}</div>
+          <div class="stat-value num-display">{{ stats?.resumeCount ?? 0 }}</div>
           <div class="stat-label">简历数量</div>
         </div>
       </div>
@@ -36,7 +36,7 @@
           </svg>
         </div>
         <div class="stat-info">
-          <div class="stat-value">{{ stats?.sessionCount ?? 0 }}</div>
+          <div class="stat-value num-display">{{ stats?.sessionCount ?? 0 }}</div>
           <div class="stat-label">面试会话</div>
         </div>
       </div>
@@ -49,7 +49,7 @@
           </svg>
         </div>
         <div class="stat-info">
-          <div class="stat-value">{{ stats?.finishedSessionCount ?? 0 }}</div>
+          <div class="stat-value num-display">{{ stats?.finishedSessionCount ?? 0 }}</div>
           <div class="stat-label">已完成面试</div>
         </div>
       </div>
@@ -62,7 +62,7 @@
           </svg>
         </div>
         <div class="stat-info">
-          <div class="stat-value">{{ formatScore(stats?.avgResumeScore) }}</div>
+          <div class="stat-value num-display">{{ formatScore(stats?.avgResumeScore) }}</div>
           <div class="stat-label">简历平均分</div>
         </div>
       </div>
@@ -76,7 +76,8 @@
           <p>基于所有已完成面试题目的 AI 评分</p>
         </div>
         <div class="banner-score">
-          <span class="banner-score-num">{{ formatScore(stats?.avgInterviewScore) }}</span>
+          <span class="banner-star">★</span>
+          <span class="banner-score-num num-display">{{ formatScore(stats?.avgInterviewScore) }}</span>
           <span class="banner-score-unit">分</span>
         </div>
       </div>
@@ -252,13 +253,13 @@ function fmtRelative(iso: string): string {
 }
 
 .stat-icon-finished {
-  background: var(--c-success-light);
-  color: var(--c-success);
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
 }
 
 .stat-icon-score {
-  background: var(--c-warning-light);
-  color: var(--c-warning);
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
 }
 
 .stat-info {
@@ -266,10 +267,11 @@ function fmtRelative(iso: string): string {
   min-width: 0;
 }
 
+/* 数值：等宽 + 琥珀金（num-display 语义，强调斩获感） */
 .stat-value {
   font-size: 24px;
   font-weight: 700;
-  color: var(--c-text);
+  color: var(--c-accent);
   line-height: 1.1;
   margin-bottom: 4px;
 }
@@ -294,13 +296,14 @@ function fmtRelative(iso: string): string {
   height: 14px;
 }
 
-/* ── 平均分横幅 ── */
+/* ── 平均分横幅（v4：琥珀浅底编辑风） ── */
 .score-banner {
-  background: var(--brand-gradient);
+  background: var(--c-accent-soft);
+  border: 1px solid var(--c-accent-line);
   border-radius: var(--radius-xl);
   padding: 24px 32px;
   margin-bottom: 32px;
-  box-shadow: var(--shadow-brand);
+  box-shadow: var(--shadow-sm);
 }
 
 .banner-content {
@@ -313,32 +316,38 @@ function fmtRelative(iso: string): string {
 .banner-text h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #fff;
+  color: var(--c-text);
   margin: 0 0 4px;
 }
 
 .banner-text p {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--c-text-secondary);
   margin: 0;
 }
 
 .banner-score {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 6px;
+}
+
+.banner-star {
+  color: var(--c-accent);
+  font-size: 22px;
+  line-height: 1;
 }
 
 .banner-score-num {
   font-size: 36px;
   font-weight: 800;
-  color: #fff;
+  color: var(--c-accent);
   line-height: 1;
 }
 
 .banner-score-unit {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--c-accent-hover);
 }
 
 /* ── 最近活动 ── */
