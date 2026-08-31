@@ -309,12 +309,14 @@ watch(result, (val) => {
     return
   }
   // 直接尝试解析
+  let parseFailMessage: string | null = null
   try {
     JSON.parse(val)
     parseError.value = ''
     return
   } catch (e) {
-    // 解析失败，走前端兜底修复
+    // 解析失败，走前端兜底修复；捕获错误信息供后续展示（catch 作用域外不可访问）
+    parseFailMessage = e instanceof Error ? e.message : String(e)
   }
 
   if (isRepairing) return // 避免递归
@@ -326,7 +328,7 @@ watch(result, (val) => {
     // 用 nextTick 重置标志位
     setTimeout(() => { isRepairing = false }, 0)
   } else {
-    parseError.value = 'AI 返回内容无法解析为标准 JSON，可在下方查看原始返回。错误：' + (e as Error).message
+    parseError.value = 'AI 返回内容无法解析为标准 JSON，可在下方查看原始返回。错误：' + (parseFailMessage ?? '未知错误')
     isRepairing = false
   }
 })

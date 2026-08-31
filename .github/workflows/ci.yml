@@ -70,8 +70,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Vitest
-        run: npm run test:run
+      - name: Type check (vue-tsc)
+        # 类型错误在 CI 阶段即可捕获，避免 vite build（esbuild 去类型）静默放行
+        run: npx vue-tsc --noEmit
+
+      - name: Run Vitest (with coverage threshold 80%)
+        run: npm run coverage
 
       - name: Build verification
         # 验证 TypeScript 编译 + Vite 产物可正常生成

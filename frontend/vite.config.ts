@@ -45,10 +45,10 @@ export default defineConfig(({ mode }) => {
         include: ['src/utils/**', 'src/api/**', 'src/auth.ts'],
         exclude: ['src/**/*.test.ts', 'src/**/*.spec.ts', 'src/main.ts'],
         thresholds: {
-          statements: 60,
-          branches: 60,
-          functions: 60,
-          lines: 60,
+          statements: 80,
+          branches: 80,
+          functions: 80,
+          lines: 80,
         }
       }
     }
