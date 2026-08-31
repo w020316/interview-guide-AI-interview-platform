@@ -53,7 +53,7 @@
               </svg>
               <span>学习中心</span>
             </router-link>
-            <router-link to="/history" class="nav-link" :class="{ active: route.path === '/history' }">
+            <router-link v-if="authState.token" to="/history" class="nav-link" :class="{ active: route.path === '/history' }">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M12 8v4l3 3 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -202,7 +202,7 @@ async function logout() {
   align-items: center;
   height: 64px;
   padding: 0 32px;
-  gap: 32px;
+  gap: 20px;
 }
 
 .nav-brand {
@@ -257,7 +257,7 @@ async function logout() {
 .nav-menu {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex: 1;
 }
 
@@ -265,7 +265,7 @@ async function logout() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 7px 12px;
   font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 500;
@@ -273,6 +273,7 @@ async function logout() {
   text-decoration: none;
   border-radius: var(--radius-md);
   transition: color var(--transition-fast), background-color var(--transition-fast);
+  white-space: nowrap;
 }
 
 .nav-link svg {

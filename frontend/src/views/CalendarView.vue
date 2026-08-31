@@ -86,15 +86,35 @@
             </div>
             <div class="event-time num-display">{{ fmtDateTime(e.interviewAt) }}</div>
             <div v-if="e.location || e.interviewer" class="event-meta">
-              <span v-if="e.location">📍 {{ e.location }}</span>
-              <span v-if="e.interviewer">· {{ e.interviewer }}</span>
+              <span v-if="e.location" class="meta-item">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {{ e.location }}
+              </span>
+              <span v-if="e.interviewer" class="meta-item">· {{ e.interviewer }}</span>
             </div>
             <div v-if="e.note" class="event-note">{{ e.note }}</div>
           </div>
           <div class="event-actions">
-            <button class="icon-btn" aria-label="标记完成" title="标记完成" @click="setStatus(e, 'DONE')">✔</button>
-            <button class="icon-btn" aria-label="编辑" title="编辑" @click="openEdit(e)">✎</button>
-            <button class="icon-btn danger" aria-label="删除" title="删除" @click="remove(e)">✕</button>
+            <button class="icon-btn" aria-label="标记完成" title="标记完成" @click="setStatus(e, 'DONE')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="icon-btn" aria-label="编辑" title="编辑" @click="openEdit(e)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="icon-btn danger" aria-label="删除" title="删除" @click="remove(e)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -359,7 +379,8 @@ onMounted(load)
 .event-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .event-title { font-family: var(--font-serif); font-size: 15px; font-weight: 600; color: var(--c-text); }
 .event-time { font-size: 13px; color: var(--c-info); margin-top: 4px; }
-.event-meta { font-size: 12px; color: var(--c-text-tertiary); margin-top: 4px; }
+.event-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--c-text-tertiary); margin-top: 4px; }
+.meta-item { display: inline-flex; align-items: center; gap: 3px; }
 .event-note { font-size: 12px; color: var(--c-text-secondary); margin-top: 4px; white-space: pre-wrap; }
 .event-actions { display: flex; gap: 4px; align-items: flex-start; }
 .icon-btn { width: 28px; height: 28px; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: transparent; color: var(--c-text-secondary); cursor: pointer; transition: all var(--transition-fast); font-size: 13px; }

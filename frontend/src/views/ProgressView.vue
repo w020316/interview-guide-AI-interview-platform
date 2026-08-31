@@ -41,7 +41,7 @@
         <span class="section-note">单次面试综合得分（各题平均分）</span>
       </div>
       <div class="chart-wrap">
-        <svg v-if="chart.points.length" :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart" role="img" aria-label="面试得分走势折线图">
+        <svg v-if="!loading && chart.points.length" :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart" role="img" aria-label="面试得分走势折线图">
           <!-- 横向参考线 + 刻度 -->
           <line
             v-for="t in chart.yTicks"
@@ -64,10 +64,11 @@
             <title>{{ p.label }} · {{ p.score }} 分 · {{ p.jobTitle }}</title>
           </g>
         </svg>
-        <div v-else class="empty-inline">
+        <div v-else-if="!loading" class="empty-inline">
           <p>暂无面试记录，完成一次模拟面试后这里会呈现你的成长曲线。</p>
           <BaseButton variant="gradient" @click="$router.push('/interview')">开始第一次模拟面试</BaseButton>
         </div>
+        <div v-else class="chart-skeleton"></div>
       </div>
     </section>
 
@@ -77,7 +78,7 @@
         <h2>维度掌握度</h2>
         <span class="section-note">按题目分类统计平均得分</span>
       </div>
-      <div v-if="categoryStats.length" class="dim-list">
+      <div v-if="!loading && categoryStats.length" class="dim-list">
         <div v-for="c in categoryStats" :key="c.category" class="dim-item">
           <div class="dim-head">
             <span class="dim-cat">{{ c.category }}</span>
@@ -95,8 +96,13 @@
           </div>
         </div>
       </div>
-      <div v-else class="empty-inline">
+      <div v-else-if="!loading" class="empty-inline">
         <p>暂无答题数据可分析，去完成几道面试题吧。</p>
+      </div>
+      <div v-else class="dim-list dim-skeleton">
+        <div v-for="i in 3" :key="i">
+          <div class="skeleton skeleton-line w-40"></div>
+        </div>
       </div>
     </section>
   </div>
@@ -214,6 +220,14 @@ onMounted(async () => {
 
 .empty-inline { text-align: center; padding: 36px 16px; color: var(--c-text-tertiary); }
 .empty-inline p { margin: 0 0 16px; font-size: 14px; }
+
+/* 加载骨架 */
+.chart-skeleton { height: 200px; border-radius: var(--radius-md); background: linear-gradient(90deg, var(--c-bg-alt) 25%, var(--c-border-light) 37%, var(--c-bg-alt) 63%); background-size: 400% 100%; animation: skeleton-loading 1.4s ease infinite; }
+.dim-skeleton { gap: 16px; }
+.dim-skeleton .skeleton-line { margin-bottom: 12px; }
+.skeleton { width: 100%; height: 14px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--c-bg-alt) 25%, var(--c-border-light) 37%, var(--c-bg-alt) 63%); background-size: 400% 100%; animation: skeleton-loading 1.4s ease infinite; }
+.skeleton-line.w-40 { width: 40%; }
+@keyframes skeleton-loading { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 @media (max-width: 768px) {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }

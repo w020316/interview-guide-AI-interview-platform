@@ -22,7 +22,7 @@
         </svg>
       </div>
       <div class="empty-title">还没有收藏</div>
-      <div class="empty-desc">在历史记录或模拟面试中点亮 ♥，题目就会沉淀到这里</div>
+      <div class="empty-desc">在历史记录或模拟面试中收藏题目，就会沉淀到这里</div>
       <BaseButton variant="gradient" @click="$router.push('/history')">前往历史记录</BaseButton>
     </div>
 
