@@ -102,7 +102,7 @@ class InterviewServiceTest {
             String cached = "[{\"question\":\"cached\"}]";
             when(valueOperations.get(anyString())).thenReturn(cached);
 
-            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT);
+            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "");
 
             assertThat(result).isEqualTo(cached);
             // 缓存命中不应调用 AI
@@ -117,7 +117,7 @@ class InterviewServiceTest {
         void generateQuestions_cacheMiss_callsAiAndWritesCache() {
             when(valueOperations.get(anyString())).thenReturn(null);
 
-            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT);
+            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "");
 
             assertThat(result).isEqualTo(AI_RAW_RESPONSE);
             verify(chatClient).prompt();
@@ -131,7 +131,7 @@ class InterviewServiceTest {
         void generateQuestions_redisReadError_fallsBackToAi() {
             when(valueOperations.get(anyString())).thenThrow(new RuntimeException("Redis 连接失败"));
 
-            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT);
+            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "");
 
             assertThat(result).isEqualTo(AI_RAW_RESPONSE);
             verify(chatClient).prompt();
@@ -143,7 +143,7 @@ class InterviewServiceTest {
             doThrow(new RuntimeException("Redis 写入失败"))
                     .when(valueOperations).set(anyString(), any(), anyLong(), any());
 
-            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT);
+            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "");
 
             assertThat(result).isEqualTo(AI_RAW_RESPONSE);
         }
@@ -154,7 +154,7 @@ class InterviewServiceTest {
             when(vectorStore.similaritySearch(any(SearchRequest.class)))
                     .thenThrow(new RuntimeException("pgvector 超时"));
 
-            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT);
+            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "");
 
             assertThat(result).isEqualTo(AI_RAW_RESPONSE);
             verify(chatClient).prompt();
@@ -166,7 +166,7 @@ class InterviewServiceTest {
             Document doc = new Document("Spring Boot 自动装配原理");
             when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(doc));
 
-            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT);
+            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "");
 
             assertThat(result).isEqualTo(AI_RAW_RESPONSE);
             // 验证 AI prompt 中包含 RAG 检索到的知识点
@@ -180,7 +180,7 @@ class InterviewServiceTest {
         void generateQuestions_aiEmptyResponse_throwsException() {
             when(callResponseSpec.content()).thenReturn("");
 
-            assertThatThrownBy(() -> service.generateQuestions(USER_ID, RESUME, JOB, COUNT))
+            assertThatThrownBy(() -> service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", ""))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("AI 返回内容为空");
             // 异常也走 finally 埋点
@@ -192,7 +192,7 @@ class InterviewServiceTest {
         void generateQuestions_aiNullResponse_throwsException() {
             when(callResponseSpec.content()).thenReturn(null);
 
-            assertThatThrownBy(() -> service.generateQuestions(USER_ID, RESUME, JOB, COUNT))
+            assertThatThrownBy(() -> service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", ""))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("AI 返回内容为空");
         }
@@ -202,7 +202,7 @@ class InterviewServiceTest {
         void generateQuestions_longResume_truncatedInPrompt() {
             String longResume = "A".repeat(1000);
 
-            service.generateQuestions(USER_ID, longResume, JOB, COUNT);
+            service.generateQuestions(USER_ID, longResume, JOB, COUNT, "", "");
 
             // 验证传给 AI 的 prompt 包含截断标记 "..."
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
@@ -213,7 +213,7 @@ class InterviewServiceTest {
         @Test
         @DisplayName("简历未超长时不截断")
         void generateQuestions_shortResume_notTruncated() {
-            service.generateQuestions(USER_ID, RESUME, JOB, COUNT);
+            service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "");
 
             // 短简历不应包含截断标记
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);

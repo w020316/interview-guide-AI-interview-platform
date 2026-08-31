@@ -131,7 +131,7 @@ class InterviewControllerTest {
         @Test
         @DisplayName("合法入参返回 200 + 面试题结果")
         void questions_validInput_returns200() throws Exception {
-            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5))
+            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5, "", ""))
                     .thenReturn("{\"questions\":[]}");
 
             String body = objectMapper.writeValueAsString(Map.of(
@@ -148,7 +148,7 @@ class InterviewControllerTest {
         @Test
         @DisplayName("count 为负数时夹紧为 1 仍返回 200")
         void questions_negativeCount_clampedTo1() throws Exception {
-            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 1))
+            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 1, "", ""))
                     .thenReturn("[]");
 
             String body = objectMapper.writeValueAsString(Map.of(
@@ -164,7 +164,7 @@ class InterviewControllerTest {
         @Test
         @DisplayName("count 超过 20 时夹紧为 20 仍返回 200")
         void questions_countOver20_clampedTo20() throws Exception {
-            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 20))
+            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 20, "", ""))
                     .thenReturn("[]");
 
             String body = objectMapper.writeValueAsString(Map.of(
@@ -180,7 +180,7 @@ class InterviewControllerTest {
         @Test
         @DisplayName("count 缺失时默认 5 仍返回 200")
         void questions_missingCount_defaultsTo5() throws Exception {
-            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5))
+            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5, "", ""))
                     .thenReturn("[]");
 
             String body = objectMapper.writeValueAsString(Map.of(

@@ -80,9 +80,10 @@ public class InterviewController {
     }
 
     /**
-     * 生成面试题
+     * 生成面试题（支持跨场自适应出题）
      * POST /api/interview/questions
-     * Body: {"resumeText": "...", "jobDescription": "...", "count": 5}
+     * Body: {"resumeText": "...", "jobDescription": "...", "count": 5,
+     *        "difficulty": "EASY|MEDIUM|HARD"(可选), "focusCategories": "技术基础,项目深挖"(可选)}
      */
     @PostMapping("/questions")
     public Result<String> generateQuestions(@RequestBody Map<String, Object> request) {
@@ -102,8 +103,13 @@ public class InterviewController {
             return Result.error(400, "简历和岗位描述不能为空");
         }
 
+        // 跨场自适应：难度偏置 + 弱项聚焦（可选，空则走默认）
+        String difficulty = request.get("difficulty") == null ? "" : request.get("difficulty").toString();
+        String focusCategories = request.get("focusCategories") == null ? "" : request.get("focusCategories").toString();
+
         String userId = currentUserId();
-        String result = interviewService.generateQuestions(userId, resumeText, jobDescription, count);
+        String result = interviewService.generateQuestions(
+                userId, resumeText, jobDescription, count, difficulty, focusCategories);
         return Result.success(result);
     }
 

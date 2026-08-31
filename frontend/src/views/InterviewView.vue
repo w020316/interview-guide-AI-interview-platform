@@ -29,6 +29,16 @@
           </div>
           <div class="count-hint">建议 5 题，约 20-30 分钟（3-10 题）</div>
         </div>
+        <div class="field-row">
+          <label>难度偏好 <span class="optional">（自适应按历史成绩）</span></label>
+          <div class="difficulty-pref">
+            <button v-for="o in DIFF_OPTIONS" :key="o.value" type="button"
+              class="pref-btn" :class="{ active: difficultyPref === o.value }"
+              @click="difficultyPref = o.value">
+              {{ o.label }}
+            </button>
+          </div>
+        </div>
       </div>
       <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="startInterview">
         {{ loading ? '正在准备…' : '开始面试' }}
@@ -80,7 +90,22 @@
         <!-- 答题区 -->
         <div class="answer-section">
           <label>你的回答</label>
-          <BaseTextarea v-model="userAnswer" :rows="6" placeholder="请输入你的回答，可结合项目经验展开…（Ctrl+Enter 提交）"
+          <!-- 语音作答入口 -->
+          <div v-if="speechSupported" class="speech-bar">
+            <BaseButton variant="ghost" size="sm" :class="{ 'is-recording': speechRecording }"
+              :loading="speechRecording" @click="toggleSpeech">
+              <svg v-if="!speechRecording" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 1 1-6 0V5a3 3 0 0 1 3-3z M19 10v1a7 7 0 0 1-14 0v-1 M12 18.5V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span v-else class="rec-dot" aria-hidden="true"></span>
+              {{ speechRecording ? '语音识别中… 再点一下结束' : '语音作答' }}
+            </BaseButton>
+            <span v-if="speechFeedback" class="speech-feedback">{{ speechFeedback }}</span>
+          </div>
+          <div v-else class="speech-bar speech-unsupported">
+            <span>当前浏览器不支持语音识别，请使用 Chrome/Edge 开启语音作答与表达分析</span>
+          </div>
+          <BaseTextarea v-model="userAnswer" :rows="6" placeholder="请输入你的回答，可结合项目经验展开…（Ctrl+Enter 提交，或用上方语音作答）"
             @keydown.ctrl.enter="submitAnswer" @keydown.meta.enter="submitAnswer" />
           <div class="action-row">
             <BaseButton variant="gradient" :loading="evalLoading" :disabled="evalLoading" @click="submitAnswer">
@@ -210,6 +235,7 @@
             </div>
 
             <div class="report-actions">
+              <BaseButton variant="ghost" @click="exportPdf">导出 PDF</BaseButton>
               <BaseButton variant="ghost" @click="closeReportGoHistory">查看历史记录</BaseButton>
               <BaseButton variant="gradient" @click="closeReportGoSetup">完成，继续练习</BaseButton>
             </div>
@@ -228,9 +254,19 @@ import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
 import { JOB_SUGGESTIONS } from '../utils/jobOptions'
 import renderMarkdown from '../utils/markdown'
+import { exportReportToPdf } from '../utils/reportPdf'
+import { createSpeechRecorder, isSpeechSupported } from '../utils/speech'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 
 const router = useRouter()
+
+/** 难度偏好选项：''=自适应（按历史成绩），其余向对应难度倾斜 */
+const DIFF_OPTIONS = [
+  { value: '', label: '自适应' },
+  { value: 'EASY', label: '打基础' },
+  { value: 'MEDIUM', label: '稳中有升' },
+  { value: 'HARD', label: '挑战自我' },
+]
 
 interface Question {
   id?: number
@@ -251,6 +287,7 @@ interface EvalResult {
 const jobDesc = ref('')
 const resumeText = ref('')
 const count = ref(5)
+const difficultyPref = ref('')
 const loading = ref(false)
 const sessionId = ref('')
 const questions = ref<Question[]>([])
@@ -261,6 +298,13 @@ const evalResult = ref<EvalResult | null>(null)
 const streaming = ref(false)
 const streamContent = ref('')
 const hintOpen = ref(false)
+
+// ── 语音作答（ASR）──
+const speechSupported = isSpeechSupported()
+const speechRecording = ref(false)
+const speechFeedback = ref('')
+// 识别器仅在打开语音时按需创建，避免占用麦克风资源
+let speechRec: ReturnType<typeof createSpeechRecorder> | null = null
 
 // ── 面试复盘报告（Lollipop 式结构化复盘）──
 interface SessionEval {
@@ -345,6 +389,105 @@ function safeParse<T>(str: string, fallback: T): T {
   try { return JSON.parse(str) as T } catch { return fallback }
 }
 
+interface CategoryStat { category: string; total: number; avgScore: number }
+interface TrendPoint { score?: number }
+
+/**
+ * 跨场自适应出题目标：
+ * - 用户手动选难度（EASY/MEDIUM/HARD）时直接采用，并附带聚焦弱项
+ * - 选「自适应」时按历史平均分推断难度，并聚焦历史弱项分类
+ * 任一步骤失败均降级为默认值，不阻塞面试创建
+ */
+async function resolveAdaptiveTarget(): Promise<{ difficulty: string; focusCategories: string }> {
+  let difficulty = difficultyPref.value
+  let focusCategories = ''
+  try {
+    // 聚焦历史薄弱分类（avgScore < 70 且有一定样本量的前 3 项）
+    const summary = await api.get('/api/knowledge/question-summary') as unknown as { byCategory?: CategoryStat[] }
+    const weak = (summary?.byCategory || [])
+      .filter((c) => c.total >= 1 && (c.avgScore ?? 100) < 70)
+      .sort((a, b) => (a.avgScore ?? 100) - (b.avgScore ?? 100))
+      .slice(0, 3)
+      .map((c) => c.category)
+    focusCategories = weak.join(',')
+
+    // 自适应时按历史平均分推断难度
+    if (!difficulty) {
+      const trend = await api.get('/api/stats/trend') as unknown as TrendPoint[]
+      const scores = trend.map((p) => p.score ?? 0)
+      if (scores.length >= 1) {
+        const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+        if (avg < 62) difficulty = 'EASY'
+        else if (avg > 82) difficulty = 'HARD'
+        else difficulty = 'MEDIUM'
+      }
+    }
+  } catch (e: unknown) {
+    console.warn('自适应出题目标解析失败，使用默认：', e)
+  }
+  return { difficulty, focusCategories }
+}
+
+// ── 语音作答：录制转写 + 表达分析 ──
+function ensureSpeechRec() {
+  if (!speechRec) {
+    speechRec = createSpeechRecorder({
+      onFinalText: (text) => {
+        // 将识别好的文本追加到回答输入框（失败时保留已有文本）
+        userAnswer.value = (userAnswer.value.trim() ? userAnswer.value.trim() + '\n' : '') + text.trim()
+      },
+      onMetrics: (metrics) => {
+        speechFeedback.value =
+          `语速 ${metrics.rateVerdict}（${metrics.ratePerMin} 字/分）· 时长 ${metrics.durationSec.toFixed(0)}s` +
+          (metrics.pauseCount ? ` · 停顿 ${metrics.pauseCount} 次` : '')
+      },
+      onError: (msg) => {
+        speechRecording.value = false
+        ElMessage.error(msg)
+      },
+    })
+  }
+  return speechRec!
+}
+
+function toggleSpeech() {
+  const rec = ensureSpeechRec()
+  if (rec.isRecording()) {
+    speechRecording.value = false
+    speechFeedback.value = ''
+    rec.stop()
+    return
+  }
+  speechFeedback.value = ''
+  const ok = rec.start()
+  if (!ok) {
+    ElMessage.error('语音识别启动失败，请允许麦克风权限后重试')
+    return
+  }
+  speechRecording.value = true
+}
+
+// ── 导出复盘报告 PDF ──
+function exportPdf() {
+  if (!sessionEvals.value.length) return
+  const a = reportAverages.value
+  exportReportToPdf({
+    jobTitle: jobDesc.value.trim() || '未指定岗位',
+    answeredCount: answeredCount.value,
+    overall: a.overall,
+    completeness: a.completeness,
+    accuracy: a.accuracy,
+    expression: a.expression,
+    questions: sessionEvals.value.map((e) => ({
+      question: e.question,
+      category: e.category,
+      overallScore: e.overallScore,
+    })),
+    improvements: reportImprovements.value.map((i) => i.text),
+    summary: reportSummary.value,
+  })
+}
+
 async function startInterview() {
   if (!jobDesc.value.trim()) return ElMessage.warning('请填写目标岗位')
   if (loading.value) return // 防止重复点击
@@ -356,9 +499,10 @@ async function startInterview() {
       { jobDescription: jobDesc.value }, { timeout: AI_TIMEOUT }) as unknown as { sessionId: string }
     createdSessionId = sess.sessionId
 
-    // 2. 生成面试题
+    // 2. 生成面试题（跨场自适应：按历史成绩推断难度 + 聚焦薄弱分类）
+    const { difficulty, focusCategories } = await resolveAdaptiveTarget()
     const qs = await api.post('/api/interview/questions',
-      { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value },
+      { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value, difficulty, focusCategories },
       { timeout: AI_TIMEOUT }) as unknown as string
 
     // 3. 解析题目（失败时清理已创建的会话，防孤儿会话）
@@ -612,6 +756,8 @@ function closeReportGoHistory() {
 // 组件卸载时取消流式请求
 onUnmounted(() => {
   abortController?.abort()
+  // 组件卸载时释放麦克风资源，避免持续占用
+  if (speechRec?.isRecording()) speechRec.cancel()
 })
 </script>
 
@@ -762,6 +908,68 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--c-text-tertiary);
   margin-top: 2px;
+}
+
+/* ── 难度偏好（自适应出题）── */
+.difficulty-pref {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pref-btn {
+  padding: 8px 18px;
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+}
+.pref-btn:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+.pref-btn.active {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── 语音作答 ── */
+.speech-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.speech-feedback {
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+.speech-unsupported {
+  font-size: 12px;
+  color: var(--c-danger);
+}
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--c-danger);
+  display: inline-block;
+  margin-right: 6px;
+  animation: rec-blink 1s ease-in-out infinite;
+}
+.speech-bar :deep(.base-btn).is-recording {
+  border-color: var(--c-danger);
+  color: var(--c-danger);
+}
+@keyframes rec-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
 }
 
 /* ── 按钮 ── */

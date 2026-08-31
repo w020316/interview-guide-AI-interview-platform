@@ -34,11 +34,32 @@
       </div>
     </section>
 
+    <!-- 目标达成提示 -->
+    <section v-if="goalHint" class="goal-card fade-in-up">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" stroke="var(--brand-primary)" stroke-width="2"/>
+        <path d="M8 12.2l2.4 2.4L16.5 8.3" stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <div class="goal-title">{{ goalHint.title }}</div>
+        <div class="goal-text">{{ goalHint.text }}</div>
+      </div>
+    </section>
+
     <!-- 折线图 -->
     <section class="chart-card fade-in-up">
-      <div class="section-head">
-        <h2>得分走势</h2>
-        <span class="section-note">单次面试综合得分（各题平均分）</span>
+      <div class="section-head chart-head">
+        <div>
+          <h2>得分走势</h2>
+          <span class="section-note">按「{{ dimensionLabel }}」维度展示综合得分{{ dimension === 'DAY' ? '（各题平均分）' : '（平均分）' }}</span>
+        </div>
+        <div class="dim-switch" role="group" aria-label="趋势维度">
+          <button v-for="o in DIMENSIONS" :key="o.value" type="button"
+            :class="{ active: dimension === o.value }"
+            :aria-pressed="dimension === o.value" @click="setDimension(o.value)">
+            {{ o.label }}
+          </button>
+        </div>
       </div>
       <div class="chart-wrap">
         <svg v-if="!loading && chart.points.length" :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="line-chart" role="img" aria-label="面试得分走势折线图">
@@ -118,6 +139,13 @@ import { buildLineChart, computeTrendStats } from '../utils/scoreTrend'
 
 interface CategoryStat { category: string; total: number; avgScore: number }
 
+/** 趋势维度切换：DAY=按次，WEEK=按周聚合，MONTH=按月聚合 */
+const DIMENSIONS = [
+  { value: 'DAY', label: '按次' },
+  { value: 'WEEK', label: '按周' },
+  { value: 'MONTH', label: '按月' },
+]
+
 const chartWidth = 720
 const chartHeight = 260
 const padX = 40
@@ -126,6 +154,27 @@ const padY = 24
 const rawPoints = ref<TrendPoint[]>([])
 const categoryStats = ref<CategoryStat[]>([])
 const loading = ref(true)
+const dimension = ref('DAY')
+
+const dimensionLabel = computed(() => DIMENSIONS.find((d) => d.value === dimension.value)?.label || '按次')
+
+/**
+ * 目标达成提示：
+ * - 数据不足时提示沉淀目标
+ * - 有趋势时依据「最新一次相对上一次」给出鼓励/提醒
+ */
+const goalHint = computed(() => {
+  const pts = rawPoints.value
+  const n = pts.length
+  if (n === 0) return { title: '积累第一次数据', text: '完成一次模拟面试后，这里会呈现你的成长趋势与目标达成情况。' }
+  if (n < 2) return { title: '再迈一步即可看到趋势', text: `当前已记录 ${n} 次面试，再完成 ${2 - n} 次即可开启趋势对比与目标追踪。` }
+  const last = pts[n - 1]
+  const prev = pts[n - 2]
+  const delta = (last.score ?? 0) - (prev.score ?? 0)
+  if (delta > 0) return { title: '目标达成中，稳中有升', text: `最新一次（${last.label}）较上次提升 ${delta} 分，继续保持节奏冲刺目标分。` }
+  if (delta < 0) return { title: '略有回落，及时复盘', text: `最新一次（${last.label}）较上次下降 ${Math.abs(delta)} 分，建议回看复盘报告的薄弱维度针对性加练。` }
+  return { title: '平台期，寻求突破', text: `最新一次（${last.label}）与上次持平，可尝试挑战更高难度题目或聚焦薄弱分类。` }
+})
 
 const stats = computed(() => computeTrendStats(rawPoints.value))
 const chart = computed(() => buildLineChart(rawPoints.value, {
@@ -164,10 +213,32 @@ function barWidth(score: number): string {
   return `${Math.max(4, Math.min(100, Math.round(score)))}%`
 }
 
+/** 切换趋势维度（按次/按周/按月） */
+function setDimension(v: string) {
+  if (dimension.value === v) return
+  dimension.value = v
+  loadTrend(v)
+}
+
+/** 按指定维度加载趋势数据 */
+async function loadTrend(dim: string) {
+  const prev = rawPoints.value
+  rawPoints.value = []
+  loading.value = true
+  try {
+    rawPoints.value = await api.get(`/api/stats/trend?dimension=${encodeURIComponent(dim)}`) as unknown as TrendPoint[]
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '加载成长数据失败'))
+    rawPoints.value = prev
+  } finally {
+    loading.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     const [trend, summary] = await Promise.all([
-      api.get('/api/stats/trend') as unknown as TrendPoint[],
+      api.get('/api/stats/trend?dimension=DAY') as unknown as TrendPoint[],
       api.get('/api/knowledge/question-summary') as unknown as { byCategory?: CategoryStat[] },
     ])
     rawPoints.value = trend || []
@@ -198,6 +269,53 @@ onMounted(async () => {
 .section-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 18px; }
 .section-head h2 { font-size: 18px; font-weight: 600; color: var(--c-text); margin: 0; }
 .section-note { font-size: 12px; color: var(--c-text-tertiary); }
+
+/* ── 维度切换 ── */
+.chart-head {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.dim-switch {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--c-bg-alt);
+  border-radius: 999px;
+  padding: 4px;
+}
+.dim-switch button {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  color: var(--c-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.dim-switch button.active {
+  background: var(--c-surface);
+  color: var(--brand-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── 目标达成提示 ── */
+.goal-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--brand-primary) 10%, var(--c-surface)), var(--c-surface));
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 35%, var(--c-border-light));
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.goal-card svg { flex-shrink: 0; margin-top: 2px; }
+.goal-title { font-size: 15px; font-weight: 600; color: var(--c-text); margin-bottom: 3px; }
+.goal-text { font-size: 13px; color: var(--c-text-secondary); line-height: 1.6; }
 
 .chart-wrap { width: 100%; overflow-x: auto; }
 .line-chart { width: 100%; min-width: 560px; height: auto; display: block; }

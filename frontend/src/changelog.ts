@@ -10,9 +10,20 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.20.0'
+export const CURRENT_VERSION = '1.21.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.21.0',
+    date: '2026-08-31',
+    title: '版本 1.21.0 · 跨场实战升级（难度自适应 + 语音作答 + 趋势维度 + 复盘导出）',
+    items: [
+      '新增功能：语音作答，面试中可用语音直接回答（支持 Chrome/Edge），自动转写为文字并计算语速、停顿次数，实时给出表达改进建议',
+      '新增功能：成长趋势支持按 周 / 月 维度查看得分走势（日均各题平均分、周/月平均分），并智能提示距离目标分数的差距与达成路径',
+      '新增功能：复盘报告支持一键导出为 PDF，保存到本地或打印分享，答题记录随报告完整留存',
+      '新增功能：跨场题目自动生成，支持自定义难度偏好（简单/中等/困难）并按历史成绩自适应调节难度分布，聚焦薄弱环节'
+    ]
+  },
   {
     version: '1.20.0',
     date: '2026-08-31',

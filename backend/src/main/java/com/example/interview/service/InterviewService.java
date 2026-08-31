@@ -61,13 +61,17 @@ public class InterviewService {
     /**
      * 生成面试题
      * @param userId 用户 ID（用于缓存隔离，防跨用户串扰）
+     * @param difficulty 难度偏置：EASY/MEDIUM/HARD/空。为空时按默认 3:5:2 分布；否则向该难度倾斜（跨场自适应）
+     * @param focusCategories 需要重点考察的薄弱分类（逗号分隔）。为空时不额外聚焦（跨场自适应）
      */
-    public String generateQuestions(String userId, String resumeText, String jobDescription, int count) {
+    public String generateQuestions(String userId, String resumeText, String jobDescription, int count,
+                                    String difficulty, String focusCategories) {
         long start = System.nanoTime();
         boolean cacheHit = false;
         try {
-            // 1. 缓存命中（key 包含 userId 防跨用户串扰）
-            String cacheKey = QUESTION_CACHE + userId + ":" + HashUtil.sha256Short(resumeText + jobDescription + count);
+            // 1. 缓存命中（key 包含 userId 防跨用户串扰；难度/聚焦项纳入 key，保证不同自适应产出不同题目）
+            String cacheKey = QUESTION_CACHE + userId + ":" + HashUtil.sha256Short(
+                    resumeText + jobDescription + count + "|d=" + difficulty + "|f=" + focusCategories);
             try {
                 Object cached = redisTemplate.opsForValue().get(cacheKey);
                 if (cached != null) {
@@ -107,14 +111,17 @@ public class InterviewService {
             String truncatedResume = TextUtil.truncate(resumeText, MAX_RESUME_LEN);
             String safeJobDesc = PromptSanitizer.sanitize(jobDescription);
             String safeResume = PromptSanitizer.sanitize(truncatedResume);
+            String safeFocus = PromptSanitizer.sanitize(focusCategories == null || focusCategories.isBlank() ? "" : focusCategories);
+            String safeDiff = PromptSanitizer.sanitize(difficulty == null ? "" : difficulty.trim().toUpperCase());
             String prompt = new StringBuilder()
                     .append("你是一位资深的").append(safeJobDesc).append("面试官，请为候选人生成 ").append(count).append(" 道面试题。\n\n")
                     .append("【简历亮点】\n").append(safeResume).append("\n\n")
                     .append("【参考知识点】\n").append(relatedKnowledge.isEmpty() ? "无" : relatedKnowledge).append("\n\n")
                     .append("【出题原则】\n")
-                    .append("1. 题目与岗位高度相关，覆盖核心技能与项目经验\n")
-                    .append("2. 难度分布：简单 30%、中等 50%、困难 20%\n")
-                    .append("3. 分类覆盖：技术基础、项目深挖、场景设计、行为面试（按岗位调整）\n\n")
+                    .append("1. 题目与岗位高度相关，覆盖核心技能、项目经验、行为与场景\n")
+                    .append(buildDifficultyRule(safeDiff))
+                    .append(buildFocusRule(safeFocus))
+                    .append("3. 每道题须标注唯一的 difficulty（EASY/MEDIUM/HARD）与 category\n\n")
                     .append("【输出要求（务必严格遵守）】\n")
                     .append("1. 直接输出 JSON 数组，不要 Markdown 代码块、不要 ```json 标记\n")
                     .append("2. 字符串必须用 ASCII 双引号 \"，禁止单引号或中文引号\n")
@@ -162,6 +169,26 @@ public class InterviewService {
                 log.debug("面试题缓存命中");
             }
         }
+    }
+
+    /**
+     * 难度自适应规则：给定目标难度，输出对应的难度分布约束行
+     */
+    private String buildDifficultyRule(String diff) {
+        return switch (diff) {
+            case "EASY" -> "2. 难度分布：简单 60%、中等 30%、困难 10%（候选基础较薄弱，以打牢基础为主）\n";
+            case "HARD" -> "2. 难度分布：简单 10%、中等 30%、困难 60%（候选基础扎实，提高挑战性）\n";
+            case "MEDIUM" -> "2. 难度分布：简单 15%、中等 60%、困难 25%（候选中等水平，适度深化）\n";
+            default -> "2. 难度分布：简单 30%、中等 50%、困难 20%\n";
+        };
+    }
+
+    /**
+     * 弱项聚焦规则：给定重点考察分类，产出一行约束
+     */
+    private String buildFocusRule(String focus) {
+        if (focus == null || focus.isBlank()) return "";
+        return "2. 优先考察以下薄弱分类（至少覆盖其中 2/3）：" + focus + "\n";
     }
 
     /**

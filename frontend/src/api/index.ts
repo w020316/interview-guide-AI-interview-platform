@@ -171,7 +171,13 @@ api.interceptors.response.use(
         cfg.__retried = true
         return wakeBackend()
           .then(() => api.request(cfg))
-          .catch(() => Promise.reject(error))
+          .catch(() => {
+            // 唤醒失败：将网络错误映射为友好提示后再 reject，避免暴露原始 Network Error
+            const friendly = error.message === 'Network Error'
+              ? '网络连接失败，请检查网络后重试（后端服务可能正在冷启动）'
+              : (error.message || '请求失败')
+            return Promise.reject(new Error(friendly))
+          })
       }
     }
     // 网络层错误（DNS/连接失败）
