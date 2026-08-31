@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { clearAuth, isTokenValid } from '../auth'
 
 /**
@@ -37,8 +37,10 @@ function isAiRequest(url: string | undefined): boolean {
   if (!url) return false
   return url.includes('/resume/analyze') ||
          url.includes('/resume/upload') ||
+         url.includes('/session/create') ||
          url.includes('/interview/generate') ||
          url.includes('/interview/evaluate') ||
+         url.includes('/interview/questions') ||
          url.includes('/interview/stream') ||
          url.includes('/knowledge/ask')
 }
@@ -159,6 +161,19 @@ api.interceptors.response.use(
     if (contentType.includes('text/html') || (typeof respData === 'string' && respData.includes('<html'))) {
       error.message = '后端服务未响应，Render 免费层可能正在冷启动，请等待 30-60s 后重试'
     }
+    // 冷启动自动重试：网络层失败（无 HTTP 响应）时，先唤醒后端再重放一次原请求
+    // Render 免费层休眠后首次请求会在唤醒完成前被判定为网络错误，重试可避免直接失败
+    if (!error.response && (error.message === 'Network Error' || error.code === 'ECONNABORTED')) {
+      const cfg = error.config as (InternalAxiosRequestConfig & { __retried?: boolean }) | undefined
+      const url = cfg?.url || ''
+      // 排除：无法重试、已重试过、唤醒自身、登录/注册（登录页已有冷启动唤醒+重试逻辑）
+      if (cfg && !cfg.__retried && !url.includes('/api/info') && !isAuthRequest(url)) {
+        cfg.__retried = true
+        return wakeBackend()
+          .then(() => api.request(cfg))
+          .catch(() => Promise.reject(error))
+      }
+    }
     // 网络层错误（DNS/连接失败）
     if (error.message === 'Network Error') {
       error.message = '网络连接失败，请检查网络后重试（后端服务可能正在冷启动）'
@@ -166,5 +181,10 @@ api.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+/** 后台唤醒后端（Render 免费层冷启动），使用裸 axios 避免拦截器自递归 */
+async function wakeBackend(): Promise<void> {
+  await axios.get(`${apiBaseUrl}/api/info`, { timeout: 100000 })
+}
 
 export default api

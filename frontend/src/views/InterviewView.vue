@@ -278,6 +278,8 @@ const reportOpen = ref(false)
 
 // AbortController 用于取消 SSE 流式请求
 let abortController: AbortController | null = null
+// 冷启动重试标记：AI 提示流在 Render 冷启动网络断开时，唤醒后端后自动重试一次
+let hintColdRetried = false
 
 const currentQ = computed(() => questions.value[qIndex.value])
 // 修复进度条：第一题不为 0%，最后一题能到 100%
@@ -396,6 +398,7 @@ async function startInterview() {
 
 async function streamHint() {
   if (!currentQ.value) return
+  hintColdRetried = false
   // 防重入：若上一次流仍在，先 abort 并等待退出
   if (streaming.value) {
     abortController?.abort()
@@ -471,8 +474,20 @@ async function streamHint() {
   } catch (e: unknown) {
     if ((e as Error).name === 'AbortError') {
       // 用户主动取消或超时，静默
-    } else if (e instanceof TypeError) {
-      ElMessage.error('网络连接失败，请检查网络后重试')
+    } else if (e instanceof TypeError && !hintColdRetried) {
+      // 冷启动自动重试：网络层断开（后端休眠），唤醒后再试一次
+      hintColdRetried = true
+      try {
+        ElMessage.info('后端服务正在冷启动（30-60s），正在唤醒，请稍候...')
+        const wake = new AbortController()
+        const wakeTimer = setTimeout(() => wake.abort(), 100000)
+        await fetch(`${apiBaseUrl}/api/info`, { signal: wake.signal })
+        clearTimeout(wakeTimer)
+        await streamHint()
+        return
+      } catch {
+        ElMessage.error('唤醒后端失败，请检查网络后重试')
+      }
     } else {
       ElMessage.error(getErrMessage(e, '流式请求失败'))
     }
