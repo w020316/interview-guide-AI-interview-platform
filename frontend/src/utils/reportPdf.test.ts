@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { buildReportHtml, type ReportExportPayload } from './reportPdf'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { buildReportHtml, exportReportToPdf, type ReportExportPayload } from './reportPdf'
 
 function basePayload(): ReportExportPayload {
   return {
@@ -52,5 +52,40 @@ describe('reportPdf - buildReportHtml', () => {
     const html = buildReportHtml({ ...basePayload(), questions: [], improvements: [] })
     expect(html).toContain('无逐题记录')
     expect(html).toContain('暂无高频改进点')
+  })
+})
+
+describe('reportPdf - exportReportToPdf', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('window.open 被拦截时回退到隐藏 iframe 兜底打印', () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null as unknown as Window)
+    const append = vi.spyOn(document.body, 'appendChild')
+    vi.useFakeTimers()
+    exportReportToPdf(basePayload())
+    expect(open).toHaveBeenCalled()
+    expect(append).toHaveBeenCalled()
+    // 推进定时器，确认打印流程不会抛错
+    vi.advanceTimersByTime(2000)
+  })
+
+  it('window.open 返回窗口时写入 HTML 并在延迟后触发打印', () => {
+    const win = {
+      document: { open: vi.fn(), write: vi.fn(), close: vi.fn() },
+      focus: vi.fn(),
+      print: vi.fn(),
+    }
+    vi.spyOn(window, 'open').mockReturnValue(win as unknown as Window)
+    vi.useFakeTimers()
+    exportReportToPdf(basePayload())
+    expect(win.document.open).toHaveBeenCalled()
+    expect(win.document.write).toHaveBeenCalledWith(expect.stringContaining('<!DOCTYPE html>'))
+    expect(win.document.close).toHaveBeenCalled()
+    vi.advanceTimersByTime(400)
+    expect(win.focus).toHaveBeenCalled()
+    expect(win.print).toHaveBeenCalled()
   })
 })

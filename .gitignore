@@ -15,6 +15,7 @@ frontend/.env.local
 .idea/
 .vscode/
 *.iml
+.tmp/
 
 # 敏感信息
 .env
