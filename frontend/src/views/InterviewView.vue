@@ -227,19 +227,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
 import { JOB_SUGGESTIONS } from '../utils/jobOptions'
-import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
+import renderMarkdown from '../utils/markdown'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 
 const router = useRouter()
-
-// html: false 禁止 HTML 标签通过，linkify 自动识别链接
-const md = new MarkdownIt({ html: false, linkify: true })
-
-// DOMPurify 消毒：阻止 javascript: 协议等 XSS 向量
-function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, { FORBID_TAGS: ['style', 'iframe'], FORBID_ATTR: ['onerror', 'onload'] })
-}
 
 interface Question {
   id?: number
@@ -293,7 +284,7 @@ const currentQ = computed(() => questions.value[qIndex.value])
 const progress = computed(() =>
   Math.round(((qIndex.value + 1) / Math.max(questions.value.length, 1)) * 100)
 )
-const streamHtml = computed(() => sanitizeHtml(md.render(streamContent.value || '等待获取...')))
+const streamHtml = computed(() => renderMarkdown(streamContent.value || '等待获取...'))
 
 // ── 复盘报告计算属性 ──
 const answeredCount = computed(() => sessionEvals.value.length)
@@ -1027,12 +1018,81 @@ onUnmounted(() => {
   margin-bottom: 0;
 }
 
+.stream-box :deep(h1),
+.stream-box :deep(h2),
+.stream-box :deep(h3),
+.stream-box :deep(h4) {
+  font-family: var(--font-sans);
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--c-text);
+  margin: 12px 0 6px;
+}
+
+.stream-box :deep(h1) { font-size: 17px; }
+.stream-box :deep(h2) { font-size: 16px; padding-bottom: 4px; border-bottom: 1px solid var(--c-border-light); }
+.stream-box :deep(h3) { font-size: 15px; }
+.stream-box :deep(h4) { font-size: 14px; }
+
+.stream-box :deep(> h1:first-child),
+.stream-box :deep(> h2:first-child),
+.stream-box :deep(> h3:first-child) {
+  margin-top: 0;
+}
+
+.stream-box :deep(strong) {
+  font-weight: 650;
+  color: var(--c-text);
+}
+
+.stream-box :deep(ul),
+.stream-box :deep(ol) {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+
+.stream-box :deep(li) {
+  margin: 2px 0;
+}
+
+.stream-box :deep(li) > ul,
+.stream-box :deep(li) > ol {
+  margin: 2px 0;
+}
+
+.stream-box :deep(blockquote) {
+  margin: 6px 0 10px;
+  padding: 2px 12px;
+  border-left: 3px solid var(--c-primary-soft);
+  color: var(--c-text-secondary);
+}
+
 .stream-box :deep(code) {
   background: var(--c-bg-alt);
   padding: 2px 6px;
   border-radius: 4px;
   font-family: var(--font-mono);
   font-size: 13px;
+}
+
+.stream-box :deep(pre) {
+  background: var(--c-bg-alt);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  margin: 6px 0 10px;
+}
+
+.stream-box :deep(pre code) {
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+}
+
+.stream-box :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--c-border-light);
+  margin: 10px 0;
 }
 
 .hint-actions {

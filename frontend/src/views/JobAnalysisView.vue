@@ -232,11 +232,8 @@ import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
 import { getScoreColor, MATCH_THRESHOLDS } from '../utils/score'
-import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
+import renderMarkdown from '../utils/markdown'
 import { BaseButton, BaseTextarea } from '../components'
-
-const md = new MarkdownIt({ html: false, linkify: true })
 
 // ── 公共状态 ──
 const tab = ref<'analyze' | 'gap' | 'letter'>('analyze')
@@ -255,13 +252,7 @@ const gapResult = ref<Record<string, any> | null>(null)
 const letterLoading = ref(false)
 const letterType = ref<'coverLetter' | 'email' | 'referral'>('coverLetter')
 const letterResult = ref('')
-const letterHtml = computed(() => {
-  if (!letterResult.value) return ''
-  return DOMPurify.sanitize(md.render(letterResult.value), {
-    FORBID_TAGS: ['style', 'iframe'],
-    FORBID_ATTR: ['onerror', 'onload']
-  })
-})
+const letterHtml = computed(() => renderMarkdown(letterResult.value))
 const letterTypeLabel = computed(() => {
   if (letterType.value === 'email') return '申请邮件'
   if (letterType.value === 'referral') return '内推私信'

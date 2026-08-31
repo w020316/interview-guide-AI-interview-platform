@@ -230,13 +230,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
+import renderMarkdown from '../utils/markdown'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { getScoreColor, getScoreGradient } from '../utils/score'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
-
-const md = new MarkdownIt({ html: false, linkify: true })
 
 type Tab = 'ask' | 'import' | 'wrong' | 'summary'
 const tab = ref<Tab>('ask')
@@ -289,10 +286,7 @@ interface Summary {
 const summary = ref<Summary | null>(null)
 const summaryLoading = ref(false)
 
-const renderedAnswer = computed(() =>
-  DOMPurify.sanitize(md.render(answer.value || '*等待提问...*'),
-    { FORBID_TAGS: ['style', 'iframe'], FORBID_ATTR: ['onerror', 'onload'] })
-)
+const renderedAnswer = computed(() => renderMarkdown(answer.value || '*等待提问...*'))
 const ratePercent = computed(() => {
   if (!summary.value || !summary.value.totalQuestions) return 0
   return Math.round((summary.value.answeredQuestions / summary.value.totalQuestions) * 100)

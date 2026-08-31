@@ -235,11 +235,8 @@ import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
 import { getScoreColor, getScoreGradient } from '../utils/score'
 import { JOB_SUGGESTIONS } from '../utils/jobOptions'
-import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
+import renderMarkdown from '../utils/markdown'
 import { BaseInput, BaseTextarea } from '../components'
-
-const md = new MarkdownIt({ html: false, linkify: true })
 
 interface AnalysisResult {
   overallScore: number
@@ -264,13 +261,7 @@ const optimizing = ref(false)
 const optimizedMarkdown = ref('')
 const optimizeView = ref<'preview' | 'source'>('preview')
 
-const optimizedHtml = computed(() => {
-  if (!optimizedMarkdown.value) return ''
-  return DOMPurify.sanitize(md.render(optimizedMarkdown.value), {
-    FORBID_TAGS: ['style', 'iframe'],
-    FORBID_ATTR: ['onerror', 'onload']
-  })
-})
+const optimizedHtml = computed(() => renderMarkdown(optimizedMarkdown.value))
 
 const parsed = computed<AnalysisResult>(() => {
   if (!result.value) {
