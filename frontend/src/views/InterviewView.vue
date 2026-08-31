@@ -39,6 +39,15 @@
             </button>
           </div>
         </div>
+        <!-- 错题本带入聚焦项时的提示 -->
+        <Transition name="fade">
+          <div v-if="focusNote" class="focus-note" role="status">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3a4 4 0 0 1 4 4c0 2-4 4-4 6m0 8h.01M12 19v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>{{ focusNote }}</span>
+          </div>
+        </Transition>
       </div>
       <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="startInterview">
         {{ loading ? '正在准备…' : '开始面试' }}
@@ -208,6 +217,20 @@
               </div>
             </div>
 
+            <!-- 多轮成绩对比（进阶） -->
+            <div v-if="historyCompareLoaded && answeredCount" class="report-block report-compare">
+              <div class="report-block-title">与历史成绩对比</div>
+              <div class="compare-line">
+                <span class="compare-badge" :class="reportCompare.status">{{ compareStatusLabel }}</span>
+                <span class="compare-text">{{ reportCompare.hint }}</span>
+              </div>
+              <div class="compare-target">
+                下一轮目标：综合
+                <b :style="{ color: scoreColor(nextTarget) }">{{ nextTarget }} 分</b>
+                。可在准备页提高难度或聚焦薄弱分类，逐步达成。
+              </div>
+            </div>
+
             <!-- 逐题得分回顾 -->
             <div class="report-block">
               <div class="report-block-title">逐题得分</div>
@@ -248,17 +271,31 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
 import { JOB_SUGGESTIONS } from '../utils/jobOptions'
 import renderMarkdown from '../utils/markdown'
-import { exportReportToPdf } from '../utils/reportPdf'
 import { createSpeechRecorder, isSpeechSupported } from '../utils/speech'
+import { compareWithHistory, suggestNextTarget } from '../utils/reportCompare'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 
 const router = useRouter()
+const route = useRoute()
+
+/**
+ * 从错题本等入口带入的聚焦参数：
+ * - focus：需重点考察的薄弱分类（逗号分隔），作为本次出题的 focusCategories
+ * - job：预填目标岗位
+ * - count：预填题目数量
+ * - difficulty：预填难度偏好
+ * 仅在携带 query 时生效；直接进入面试页时为空，走历史自适应逻辑。
+ */
+const FOCUS_OVERRIDE = typeof route.query.focus === 'string' ? route.query.focus.trim() : ''
+const routeJob = typeof route.query.job === 'string' ? route.query.job : ''
+const routeCount = typeof route.query.count === 'string' ? Number(route.query.count) : NaN
+const routeDiff = typeof route.query.difficulty === 'string' ? route.query.difficulty : ''
 
 /** 难度偏好选项：''=自适应（按历史成绩），其余向对应难度倾斜 */
 const DIFF_OPTIONS = [
@@ -284,11 +321,13 @@ interface EvalResult {
   improvements?: string[]
 }
 
-const jobDesc = ref('')
+const jobDesc = ref(routeJob)
 const resumeText = ref('')
-const count = ref(5)
-const difficultyPref = ref('')
+const count = ref(!Number.isNaN(routeCount) ? Math.min(10, Math.max(3, routeCount)) : 5)
+const difficultyPref = ref(routeDiff && DIFF_OPTIONS.some((o) => o.value === routeDiff) ? routeDiff : '')
 const loading = ref(false)
+/** 由错题本带入聚焦项时的提示文案 */
+const focusNote = computed(() => FOCUS_OVERRIDE ? `已聚焦薄弱分类：${FOCUS_OVERRIDE}` : '')
 const sessionId = ref('')
 const questions = ref<Question[]>([])
 const qIndex = ref(0)
@@ -319,6 +358,24 @@ interface SessionEval {
 }
 const sessionEvals = ref<SessionEval[]>([])
 const reportOpen = ref(false)
+
+// ── 复盘报告进阶：多轮成绩对比 ──
+/** 历史各场综合得分（不含本轮，从 trend 过滤当前会话） */
+const historyScores = ref<number[]>([])
+const historyCompareLoaded = ref(false)
+/** 与历史对比结论 */
+const reportCompare = computed(() => compareWithHistory(reportAverages.value.overall, historyScores.value))
+/** 下一轮目标分 */
+const nextTarget = computed(() => suggestNextTarget(reportAverages.value.overall))
+/** 对比状态的中文标签 */
+const compareStatusLabel = computed(() => {
+  switch (reportCompare.value.status) {
+    case 'improved': return '进步'
+    case 'declined': return '待加强'
+    case 'steady': return '持平'
+    default: return '首次'
+  }
+})
 
 // AbortController 用于取消 SSE 流式请求
 let abortController: AbortController | null = null
@@ -390,7 +447,7 @@ function safeParse<T>(str: string, fallback: T): T {
 }
 
 interface CategoryStat { category: string; total: number; avgScore: number }
-interface TrendPoint { score?: number }
+interface TrendPoint { score?: number; sessionId?: string }
 
 /**
  * 跨场自适应出题目标：
@@ -400,19 +457,27 @@ interface TrendPoint { score?: number }
  */
 async function resolveAdaptiveTarget(): Promise<{ difficulty: string; focusCategories: string }> {
   let difficulty = difficultyPref.value
-  let focusCategories = ''
-  try {
-    // 聚焦历史薄弱分类（avgScore < 70 且有一定样本量的前 3 项）
-    const summary = await api.get('/api/knowledge/question-summary') as unknown as { byCategory?: CategoryStat[] }
-    const weak = (summary?.byCategory || [])
-      .filter((c) => c.total >= 1 && (c.avgScore ?? 100) < 70)
-      .sort((a, b) => (a.avgScore ?? 100) - (b.avgScore ?? 100))
-      .slice(0, 3)
-      .map((c) => c.category)
-    focusCategories = weak.join(',')
+  let focusCategories = FOCUS_OVERRIDE
 
-    // 自适应时按历史平均分推断难度
-    if (!difficulty) {
+  // 从错题本等入口带入聚焦项时直接采用，不再拉取历史分类
+  if (!focusCategories) {
+    try {
+      // 聚焦历史薄弱分类（avgScore < 70 且有一定样本量的前 3 项）
+      const summary = await api.get('/api/knowledge/question-summary') as unknown as { byCategory?: CategoryStat[] }
+      focusCategories = (summary?.byCategory || [])
+        .filter((c) => c.total >= 1 && (c.avgScore ?? 100) < 70)
+        .sort((a, b) => (a.avgScore ?? 100) - (b.avgScore ?? 100))
+        .slice(0, 3)
+        .map((c) => c.category)
+        .join(',')
+    } catch (e: unknown) {
+      console.warn('聚焦薄弱分类解析失败，忽略：', e)
+    }
+  }
+
+  // 自适应时按历史平均分推断难度（仅当用户未手动指定）
+  if (!difficulty) {
+    try {
       const trend = await api.get('/api/stats/trend') as unknown as TrendPoint[]
       const scores = trend.map((p) => p.score ?? 0)
       if (scores.length >= 1) {
@@ -421,9 +486,9 @@ async function resolveAdaptiveTarget(): Promise<{ difficulty: string; focusCateg
         else if (avg > 82) difficulty = 'HARD'
         else difficulty = 'MEDIUM'
       }
+    } catch (e: unknown) {
+      console.warn('难度推断失败，使用默认：', e)
     }
-  } catch (e: unknown) {
-    console.warn('自适应出题目标解析失败，使用默认：', e)
   }
   return { difficulty, focusCategories }
 }
@@ -467,25 +532,28 @@ function toggleSpeech() {
   speechRecording.value = true
 }
 
-// ── 导出复盘报告 PDF ──
+// ── 导出复盘报告 PDF（按需动态加载，减小面试页首屏包体） ──
 function exportPdf() {
   if (!sessionEvals.value.length) return
   const a = reportAverages.value
-  exportReportToPdf({
-    jobTitle: jobDesc.value.trim() || '未指定岗位',
-    answeredCount: answeredCount.value,
-    overall: a.overall,
-    completeness: a.completeness,
-    accuracy: a.accuracy,
-    expression: a.expression,
-    questions: sessionEvals.value.map((e) => ({
-      question: e.question,
-      category: e.category,
-      overallScore: e.overallScore,
-    })),
-    improvements: reportImprovements.value.map((i) => i.text),
-    summary: reportSummary.value,
-  })
+  // 动态 import：仅在点击导出时拉取 PDF 生成模块，避免其进入 Interview 首屏 chunk
+  void import('../utils/reportPdf').then(({ exportReportToPdf }) => {
+    exportReportToPdf({
+      jobTitle: jobDesc.value.trim() || '未指定岗位',
+      answeredCount: answeredCount.value,
+      overall: a.overall,
+      completeness: a.completeness,
+      accuracy: a.accuracy,
+      expression: a.expression,
+      questions: sessionEvals.value.map((e) => ({
+        question: e.question,
+        category: e.category,
+        overallScore: e.overallScore,
+      })),
+      improvements: reportImprovements.value.map((i) => i.text),
+      summary: reportSummary.value,
+    })
+  }).catch(() => ElMessage.error('导出 PDF 模块加载失败，请重试'))
 }
 
 async function startInterview() {
@@ -704,14 +772,37 @@ function nextQuestion() {
   }
 }
 
-async function finishSession() {
-  if (!sessionId.value) return
+/**
+ * 拉取历史各场得分用于复盘对比。
+ * 通过 trend(DAY) 获取已完成会话，并剔除当前会话（避免把本轮算进基数）。
+ * 失败时降级为“无历史”，不影响报告展示。
+ */
+async function loadHistoryCompare(currentSessionId: string) {
+  historyCompareLoaded.value = false
   try {
-    await api.put(`/api/session/${sessionId.value}/finish`)
+    const trend = await api.get('/api/stats/trend', { params: { dimension: 'DAY' } }) as unknown as TrendPoint[]
+    historyScores.value = (trend || [])
+      .filter((p) => p.sessionId !== currentSessionId)
+      .map((p) => p.score ?? 0)
+  } catch (e: unknown) {
+    console.warn('历史成绩加载失败，跳过对比：', e)
+    historyScores.value = []
+  } finally {
+    historyCompareLoaded.value = true
+  }
+}
+
+async function finishSession() {
+  const finishedSessionId = sessionId.value
+  if (!finishedSessionId) return
+  try {
+    await api.put(`/api/session/${finishedSessionId}/finish`)
     const hasReport = sessionEvals.value.length > 0
     // 有作答记录则弹出综合复盘报告，否则仅提示完成
     if (hasReport) {
       reportOpen.value = true
+      // 拉取历史成绩用于“多轮对比”展示（在当前会话 id 被清空前传入）
+      loadHistoryCompare(finishedSessionId)
     } else {
       ElMessage.success('面试结束，结果已保存！')
     }
@@ -936,6 +1027,18 @@ onUnmounted(() => {
   border-color: var(--brand-primary);
   color: #fff;
   font-weight: 600;
+}
+.focus-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--brand-primary);
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  line-height: 1.5;
 }
 
 /* ── 语音作答 ── */
@@ -1615,6 +1718,38 @@ onUnmounted(() => {
   font-weight: 600;
   color: var(--c-text);
   margin-bottom: 10px;
+}
+.compare-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.compare-badge {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  color: #fff;
+}
+.compare-badge.improved { background: #10b981; }
+.compare-badge.steady { background: #3b82f6; }
+.compare-badge.declined { background: #f59e0b; }
+.compare-badge.unknown { background: var(--c-text-tertiary); }
+.compare-text {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+}
+.compare-target {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  line-height: 1.6;
 }
 .report-questions {
   display: flex;

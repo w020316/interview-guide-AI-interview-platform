@@ -1,8 +1,16 @@
 <template>
   <div class="book-page">
-    <header class="page-header">
-      <h1>错题本</h1>
-      <p>评分低于阈值的题目，重点回顾薄弱题型</p>
+    <header class="page-header head-row">
+      <div>
+        <h1>错题本</h1>
+        <p>评分低于阈值的题目，重点回顾薄弱题型</p>
+      </div>
+      <BaseButton v-if="items.length" variant="gradient" @click="retryWeak">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        针对错题重新练习
+      </BaseButton>
     </header>
 
     <!-- 阈值筛选 -->
@@ -87,9 +95,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton, BaseTag, FavoriteToggle } from '../components'
+import { extractWeakCategories, mostFrequentJob } from '../utils/weakCategories'
 
 interface WrongQuestion {
   id: number
@@ -102,6 +112,8 @@ interface WrongQuestion {
   sessionId?: string | null
   jobDescription?: string | null
 }
+
+const router = useRouter()
 
 const threshold = ref(60)
 const items = ref<WrongQuestion[]>([])
@@ -123,6 +135,27 @@ async function load() {
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载错题失败'))
   } finally { loading.value = false }
+}
+
+/**
+ * 针对错题重新练习：
+ * 聚合错题中最薄弱的前 3 个分类作为聚焦项，并带上出现最多的岗位，
+ * 携带 query 跳转到面试准备页，由 InterviewView 预填岗位并聚焦薄弱分类出题。
+ */
+function retryWeak() {
+  if (!items.value.length) {
+    ElMessage.warning('当前阈值下暂无错题可重练')
+    return
+  }
+  const focus = extractWeakCategories(items.value)
+  const job = mostFrequentJob(items.value)
+  if (!focus.length) {
+    ElMessage.warning('错题缺少分类信息，无法聚焦薄弱项')
+    return
+  }
+  const query: Record<string, string> = { focus: focus.join(',') }
+  if (job) query.job = job
+  router.push({ path: '/interview', query })
 }
 
 function difficultyVariant(d: string) {
