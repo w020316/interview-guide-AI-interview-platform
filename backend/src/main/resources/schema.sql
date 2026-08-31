@@ -62,6 +62,36 @@ CREATE TABLE IF NOT EXISTS knowledge_doc (
 );
 CREATE INDEX IF NOT EXISTS idx_knowledge_doc_category ON knowledge_doc(category);
 
+-- 错题收藏表（收藏夹：对面试题做快照，便于集中回看，按用户隔离）
+CREATE TABLE IF NOT EXISTS favorite_question (
+    id               BIGSERIAL PRIMARY KEY,
+    user_id          VARCHAR(64) NOT NULL,
+    session_id       VARCHAR(64),
+    question_id      BIGINT,
+    question         TEXT NOT NULL,
+    category         VARCHAR(50),
+    difficulty       VARCHAR(20),
+    reference_answer TEXT,
+    user_answer      TEXT,
+    evaluation_score INT,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_favorite_user_id ON favorite_question(user_id);
+
+-- 面试日历表（求职面试规划日程，按用户隔离）
+CREATE TABLE IF NOT EXISTS interview_event (
+    id           BIGSERIAL PRIMARY KEY,
+    user_id      VARCHAR(64) NOT NULL,
+    title        VARCHAR(200) NOT NULL,
+    interviewer   VARCHAR(100),
+    location     VARCHAR(200),
+    note         TEXT,
+    interview_at TIMESTAMP NOT NULL,
+    status       VARCHAR(20) DEFAULT 'UPCOMING',
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_interview_event_user_id ON interview_event(user_id);
+
 -- 预置知识数据
 INSERT INTO knowledge_doc (category, title, content, source) VALUES
 ('Java 基础', 'HashMap 原理', 'HashMap 基于哈希表实现，JDK 8 后采用数组+链表+红黑树结构。', 'JavaGuide'),

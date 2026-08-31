@@ -175,4 +175,70 @@ class StatsControllerTest {
                 .andExpect(jsonPath("$.data.recentActivities[0].type").value("resume"))
                 .andExpect(jsonPath("$.data.recentActivities[1].type").value("interview"));
     }
+
+    // ── GET /api/stats/trend ──
+
+    @Test
+    @DisplayName("trend: 无已完成会话返回空列表")
+    void trend_noFinished_returnsEmpty() throws Exception {
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/stats/trend"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("trend: 已完成会话按时间升序聚合成数据点")
+    void trend_finished_returnsPoints() throws Exception {
+        InterviewSessionEntity s1 = InterviewSessionEntity.builder()
+                .id(1L).sessionId("s1").userId(USER_ID)
+                .jobDescription("Java 后端").status("FINISHED")
+                .createdAt(LocalDateTime.now().minusDays(2))
+                .build();
+        InterviewQuestionEntity q1 = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("s1").evaluationScore(70).build();
+        InterviewQuestionEntity q2 = InterviewQuestionEntity.builder()
+                .id(2L).sessionId("s1").evaluationScore(80).build();
+
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(List.of(s1));
+        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(List.of("s1")))
+                .thenReturn(List.of(q1, q2));
+
+        mockMvc.perform(get("/api/stats/trend"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].score").value(75.0))
+                .andExpect(jsonPath("$.data[0].questionCount").value(2))
+                .andExpect(jsonPath("$.data[0].sessionId").value("s1"));
+    }
+
+    @Test
+    @DisplayName("trend: 无评分记录的正处于会话不产生数据点")
+    void trend_noScores_skipsPoint() throws Exception {
+        InterviewSessionEntity finished = InterviewSessionEntity.builder()
+                .id(1L).sessionId("s1").userId(USER_ID)
+                .jobDescription("Java 后端").status("FINISHED")
+                .createdAt(LocalDateTime.now())
+                .build();
+        InterviewSessionEntity ongoing = InterviewSessionEntity.builder()
+                .id(2L).sessionId("s2").userId(USER_ID)
+                .jobDescription("前端").status("ONGOING")
+                .createdAt(LocalDateTime.now().minusDays(1))
+                .build();
+
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
+                .thenReturn(List.of(finished, ongoing));
+        // 仅 finished 会话有题但无评分
+        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(List.of("s1", "s2")))
+                .thenReturn(List.of(InterviewQuestionEntity.builder().id(1L).sessionId("s1").build()));
+
+        mockMvc.perform(get("/api/stats/trend"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
 }

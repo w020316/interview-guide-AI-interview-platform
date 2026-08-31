@@ -24,7 +24,9 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      # 生产表通过 schema.sql + SchemaInitializer（启动时幂等建表）维护，
+      # 不使用 validate，避免新增实体/表在部署时因尚未手动建表而启动失败。
+      ddl-auto: none
 
   # Redis（Upstash，TLS 连接）
   data:

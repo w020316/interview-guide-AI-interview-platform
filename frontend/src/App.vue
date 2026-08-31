@@ -46,6 +46,13 @@
               </svg>
               <span>模拟面试</span>
             </router-link>
+            <router-link v-if="authState.token" to="/learning" class="nav-link" :class="{ active: route.path === '/learning' || route.path === '/calendar' || route.path === '/wrong-book' || route.path === '/favorites' || route.path === '/progress' }">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M22 10L12 5 2 10l10 5 10-5z M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5 M22 10v6"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>学习中心</span>
+            </router-link>
             <router-link to="/history" class="nav-link" :class="{ active: route.path === '/history' }">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M12 8v4l3 3 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
@@ -70,6 +77,21 @@
           </nav>
 
           <div class="nav-actions">
+            <button
+              class="theme-toggle"
+              :aria-label="theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'"
+              :title="theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'"
+              @click="toggleTheme"
+            >
+              <svg v-if="theme === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z M12 3v2 M12 19v2 M3 12h2 M17 12h2 M5.6 5.6l1.4 1.4 M17 17l1.4 1.4 M5.6 18.4L7 17"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
             <template v-if="authState.token">
               <div class="user-chip">
                 <span class="user-avatar">{{ (authState.username || '?').charAt(0).toUpperCase() }}</span>
@@ -134,10 +156,15 @@ import { authState, clearAuth } from './auth'
 import api from './api'
 import ChangelogDialog from './components/ChangelogDialog.vue'
 import { CURRENT_VERSION } from './changelog'
+import { theme, toggleTheme as toggle } from './theme'
 
 const router = useRouter()
 const route = useRoute()
 const showChangelog = ref(false)
+
+function toggleTheme() {
+  toggle()
+}
 
 async function logout() {
   try {
@@ -279,6 +306,31 @@ async function logout() {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+}
+
+/* 主题切换按钮 */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--c-text-secondary);
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+.theme-toggle:hover {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+  background: var(--brand-primary-50);
+}
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
 }
 
 .user-chip {

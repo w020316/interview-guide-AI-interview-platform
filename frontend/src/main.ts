@@ -3,8 +3,13 @@ import App from './App.vue'
 import router from './router/index'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import 'element-plus/theme-chalk/dark/css-vars.css'
 import './styles/variables.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import { initTheme } from './theme'
+
+// 在任何渲染前应用主题，避免首屏闪烁
+initTheme()
 
 const app = createApp(App)
 

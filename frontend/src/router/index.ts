@@ -9,6 +9,11 @@ const routes = [
   { path: '/job',       component: () => import('../views/JobAnalysisView.vue'), meta: { requiresAuth: true  } },
   { path: '/interview', component: () => import('../views/InterviewView.vue'),meta: { requiresAuth: true  } },
   { path: '/history',   component: () => import('../views/HistoryView.vue'),   meta: { requiresAuth: true  } },
+  { path: '/learning',  component: () => import('../views/LearningView.vue'),   meta: { requiresAuth: true  } },
+  { path: '/calendar',  component: () => import('../views/CalendarView.vue'),   meta: { requiresAuth: true  } },
+  { path: '/wrong-book',component: () => import('../views/WrongBookView.vue'),  meta: { requiresAuth: true  } },
+  { path: '/favorites', component: () => import('../views/FavoritesView.vue'),  meta: { requiresAuth: true  } },
+  { path: '/progress',  component: () => import('../views/ProgressView.vue'),   meta: { requiresAuth: true  } },
   { path: '/profile',   component: () => import('../views/ProfileView.vue'),   meta: { requiresAuth: true  } },
   { path: '/knowledge', component: () => import('../views/KnowledgeView.vue'), meta: { requiresAuth: true  } },
   // 404 兜底：未匹配路径显示 404 页

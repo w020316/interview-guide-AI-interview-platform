@@ -327,3 +327,84 @@ h1, h2, h3, .serif {
   font-family: var(--font-serif);
   letter-spacing: -0.01em;
 }
+
+/* ══════════════════════════════════════════════════════════
+   v4 暗色主题（Calm Momentum · Dark）
+   通过 <html data-theme="dark"> 生效；暖深色 + 提亮青绿/琥珀，
+   保持编辑风对比与清晰度。仅覆盖色板与阴影，字体/间距/圆角沿用亮色。
+   ══════════════════════════════════════════════════════════ */
+[data-theme='dark'] {
+  /* 品牌色：提亮以便在深底上保持可读 */
+  --brand-primary: #14b8a6;
+  --brand-primary-hover: #2dd4bf;
+  --brand-primary-active: #0d9488;
+  --brand-primary-light: #12322e;
+  --brand-primary-50: #0e2e2b;
+  --brand-primary-100: #16423d;
+  --brand-primary-200: #1e554f;
+  --brand-gradient: linear-gradient(135deg, #0d9488 0%, #134e4a 100%);
+  --brand-gradient-soft: linear-gradient(135deg, #12322e 0%, #211d1a 100%);
+  --brand-glow: 0 4px 14px rgba(20, 184, 166, 0.18);
+  --brand-glow-strong: 0 8px 24px rgba(20, 184, 166, 0.28);
+
+  /* 语义色：提亮 */
+  --c-success: #34d399;
+  --c-success-light: #0f2f24;
+  --c-warning: #fbbf24;
+  --c-warning-light: #332b10;
+  --c-danger: #f87171;
+  --c-danger-light: #341210;
+  --c-info: #60a5fa;
+  --c-info-light: #12233a;
+
+  /* 琥珀金点缀：提亮 */
+  --c-accent: #fbbf24;
+  --c-accent-hover: #f59e0b;
+  --c-accent-soft: #3a2f0d;
+  --c-accent-line: #7c5f17;
+
+  /* 中性色：暖深色系 */
+  --c-bg: #171412;
+  --c-bg-alt: #211d1a;
+  --c-bg-soft: #171412;
+  --c-surface: #211d1a;
+  --c-surface-elevated: #28231f;
+  --c-border: #332d27;
+  --c-border-light: #28231f;
+  --c-border-strong: #3f3832;
+  --c-text: #f5f5f4;
+  --c-text-secondary: #d6d3d1;
+  --c-text-tertiary: #a8a29e;
+  --c-text-quaternary: #78716c;
+
+  /* 阴影：深色下改用黑色，层次更分明 */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 4px -1px rgba(0, 0, 0, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 4px 6px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -1px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+  --shadow-2xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --shadow-brand: 0 2px 8px rgba(20, 184, 166, 0.18);
+}
+
+/* 深色下正文纸纹改为浅色发丝网点，保持质感 */
+[data-theme='dark'] body {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.03) 1px, transparent 0);
+}
+
+/* 深色下网格/网点背景提亮 */
+[data-theme='dark'] .bg-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+[data-theme='dark'] .bg-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
+/* 深色下文字选区 */
+[data-theme='dark'] ::selection {
+  background: var(--brand-primary-200);
+  color: #0b2321;
+}
