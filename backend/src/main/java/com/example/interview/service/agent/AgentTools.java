@@ -1,19 +1,18 @@
 package com.example.interview.service.agent;
 
-import com.example.interview.repository.JobPostingRepository;
 import com.example.interview.service.InterviewEventService;
 import com.example.interview.service.InterviewSessionService;
 import com.example.interview.service.RagSearchService;
 import com.example.interview.service.job.JobAgentService;
 import com.example.interview.entity.InterviewEventEntity;
 import com.example.interview.entity.InterviewQuestionEntity;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
-import org.springframework.data.domain.Page;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
 
 /**
  * 智能体工具层（Career Copilot 的能力集）
@@ -24,12 +23,22 @@ import java.util.Map;
  * 设计约束：
  * - 只读安全：全部为查询操作，无写接口，接受用户输入仅作检索参数
  * - 结果裁剪：限制条数与字符长度，防止单次工具调用撑爆上下文
+ * - 提示词层工具协议：因 B.AI 网关不支持 API 级 function calling（tools 参数返回 400），
+ *   工具通过 ToolSpec 注册表以文本协议暴露给模型，dispatch() 统一执行
  */
 public class AgentTools {
 
     private static final int MAX_TEXT_LEN = 1500;
 
+    /** 工具规格：名称、用途描述、参数说明、执行器（paramsJson 原文 + 解析后的键值对 → 结果文本） */
+    public record ToolSpec(String name, String description, String paramsDoc,
+                           BiFunction<String, Map<String, Object>, String> executor) {
+    }
+
     private final String userId;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Map<String, ToolSpec> registry = new LinkedHashMap<>();
+
     private final JobAgentService jobAgentService;
     private final InterviewSessionService interviewSessionService;
     private final InterviewEventService interviewEventService;
@@ -45,21 +54,61 @@ public class AgentTools {
         this.interviewSessionService = interviewSessionService;
         this.interviewEventService = interviewEventService;
         this.ragSearchService = ragSearchService;
+        registerTools();
     }
 
-    /** 1. 岗位检索 */
-    @Tool(description = "搜索招聘平台聚合的岗位信息（秋招/社招/实习）。当用户想找工作、看岗位、查企业招聘信息时调用。" +
-            "返回岗位列表：标题、企业、地点、薪资、学历要求、截止日期、申请链接。")
-    public String searchJobs(
-            @ToolParam(description = "关键词：岗位名/企业名/标签，可为空", required = false) String keyword,
-            @ToolParam(description = "行业：互联网/金融/制造/能源/教育/医疗/快消/通信/硬件等，可为空", required = false) String industry,
-            @ToolParam(description = "职位类型：技术/产品/运营/设计/市场/职能/金融等，可为空", required = false) String jobType,
-            @ToolParam(description = "工作地点，如：深圳/杭州/北京，可为空", required = false) String location,
-            @ToolParam(description = "招聘类型：AUTUMN秋招/SPRING春招/INTERN实习/SOCIAL社招，默认 AUTUMN", required = false) String recruitType) {
+    private void registerTools() {
+        registry.put("searchJobs", new ToolSpec("searchJobs",
+                "搜索招聘平台聚合的岗位信息（秋招/社招/实习），返回岗位列表：标题、企业、地点、薪资、截止日期、申请链接",
+                "keyword(可选,岗位名/企业名/标签), industry(可选,如:互联网/金融/制造/能源), jobType(可选,如:技术/产品/运营), location(可选,如:深圳), recruitType(可选,AUTUMN/SPRING/INTERN/SOCIAL,默认AUTUMN)",
+                (raw, params) -> searchJobs(str(params, "keyword"), str(params, "industry"),
+                        str(params, "jobType"), str(params, "location"), str(params, "recruitType"))));
+        registry.put("searchKnowledge", new ToolSpec("searchKnowledge",
+                "检索平台知识库中的面试知识点（Java/Spring/数据库/中间件等），用于回答技术面试题",
+                "query(必填,要检索的知识主题)",
+                (raw, params) -> searchKnowledge(str(params, "query"))));
+        registry.put("getMyInterviewStats", new ToolSpec("getMyInterviewStats",
+                "获取当前用户的模拟面试统计：总题数、错题数、平均分、各分类掌握度，用于薄弱点分析",
+                "无参数",
+                (raw, params) -> getMyInterviewStats()));
+        registry.put("listWrongQuestions", new ToolSpec("listWrongQuestions",
+                "获取当前用户最近答错/低分的面试题列表（含题目、分类、得分），用于针对性复习",
+                "limit(可选,最多返回条数,默认8)",
+                (raw, params) -> listWrongQuestions(intVal(params, "limit"))));
+        registry.put("getUpcomingInterviews", new ToolSpec("getUpcomingInterviews",
+                "获取当前用户面试日历中的面试安排（企业、时间、状态）",
+                "无参数",
+                (raw, params) -> getUpcomingInterviews()));
+    }
+
+    /** 全部工具规格（按注册顺序，用于生成提示词协议） */
+    public Map<String, ToolSpec> all() {
+        return registry;
+    }
+
+    /** 按动作名执行工具；未知动作返回错误提示 */
+    public String dispatch(String action, String paramsJson) {
+        ToolSpec spec = registry.get(action);
+        if (spec == null) {
+            return "错误：未知工具 " + action + "，可用工具：" + String.join("/", registry.keySet());
+        }
+        Map<String, Object> params = parseParams(paramsJson);
         try {
-            Page<com.example.interview.entity.JobPostingEntity> page = jobAgentService.search(
-                    keyword, industry, jobType, location,
-                    (recruitType == null || recruitType.isBlank()) ? "AUTUMN" : recruitType.toUpperCase(),
+            return spec.executor().apply(paramsJson, params);
+        } catch (Exception e) {
+            return "工具执行失败：" + e.getMessage();
+        }
+    }
+
+    // ---------- 具体工具实现 ----------
+
+    /** 1. 岗位检索 */
+    public String searchJobs(String keyword, String industry, String jobType, String location, String recruitType) {
+        try {
+            var page = jobAgentService.search(
+                    blankToNull(keyword), blankToNull(industry), blankToNull(jobType), blankToNull(location),
+                    (recruitType == null || recruitType.isBlank() || "null".equalsIgnoreCase(recruitType))
+                            ? "AUTUMN" : recruitType.toUpperCase(),
                     null, 0, 8);
             List<com.example.interview.entity.JobPostingEntity> items = page.getContent();
             if (items.isEmpty()) {
@@ -88,11 +137,8 @@ public class AgentTools {
     }
 
     /** 2. 知识库检索（RAG） */
-    @Tool(description = "检索平台知识库中的面试知识点（Java/Spring/数据库/中间件/八股文等）。" +
-            "当用户问技术知识点、面试题解法、概念解释时调用，返回最相关的知识片段。")
-    public String searchKnowledge(
-            @ToolParam(description = "要检索的知识主题或问题，如：Redis 持久化") String query) {
-        if (query == null || query.isBlank()) {
+    public String searchKnowledge(String query) {
+        if (query == null || query.isBlank() || "null".equalsIgnoreCase(query)) {
             return "检索主题不能为空";
         }
         try {
@@ -104,8 +150,6 @@ public class AgentTools {
     }
 
     /** 3. 面试表现统计 */
-    @Tool(description = "获取当前用户的模拟面试表现统计：总题数、已答题数、错题数、平均分、按分类/难度的掌握度。" +
-            "当用户问自己的面试表现、薄弱点、成绩时调用。")
     public String getMyInterviewStats() {
         try {
             Map<String, Object> summary = interviewSessionService.questionSummary(userId);
@@ -124,10 +168,7 @@ public class AgentTools {
     }
 
     /** 4. 错题列表 */
-    @Tool(description = "获取当前用户最近答错/低分的面试题列表（含题目、分类、得分）。" +
-            "当用户想回顾错题、针对性复习时调用。")
-    public String listWrongQuestions(
-            @ToolParam(description = "最多返回条数，默认 8", required = false) Integer limit) {
+    public String listWrongQuestions(Integer limit) {
         try {
             int n = (limit == null || limit < 1 || limit > 15) ? 8 : limit;
             List<InterviewQuestionEntity> wrong = interviewSessionService.listWrongQuestionsByUser(userId, 60);
@@ -147,8 +188,6 @@ public class AgentTools {
     }
 
     /** 5. 面试日历 */
-    @Tool(description = "获取当前用户面试日历中的面试安排（企业、时间、状态）。" +
-            "当用户问面试安排、日程规划时调用。")
     public String getUpcomingInterviews() {
         try {
             List<InterviewEventEntity> events = interviewEventService.listByUser(userId);
@@ -167,6 +206,42 @@ public class AgentTools {
     }
 
     // ---------- 私有辅助 ----------
+
+    private Map<String, Object> parseParams(String paramsJson) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        if (paramsJson == null || paramsJson.isBlank()) {
+            return params;
+        }
+        try {
+            var node = objectMapper.readTree(paramsJson);
+            if (node.isObject()) {
+                node.fields().forEachRemaining(e -> params.put(e.getKey(), e.getValue().isValueNode()
+                        ? e.getValue().asText() : e.getValue().toString()));
+            }
+        } catch (Exception ignored) {
+            // 参数解析失败按空参数处理
+        }
+        return params;
+    }
+
+    private static String str(Map<String, Object> params, String key) {
+        Object v = params.get(key);
+        return v == null ? null : v.toString();
+    }
+
+    private static Integer intVal(Map<String, Object> params, String key) {
+        Object v = params.get(key);
+        if (v == null) return null;
+        try {
+            return Integer.valueOf(v.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static String blankToNull(String s) {
+        return (s == null || s.isBlank() || "null".equalsIgnoreCase(s)) ? null : s.trim();
+    }
 
     @SuppressWarnings("unchecked")
     private static void appendStats(StringBuilder sb, String label, Object stats) {

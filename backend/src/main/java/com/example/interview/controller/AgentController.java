@@ -45,6 +45,9 @@ public class AgentController {
 
     private static final Logger log = LoggerFactory.getLogger(AgentController.class);
 
+    /** SSE 会话准备/事件推送专用线程池（虚拟线程，随用随建） */
+    private final java.util.concurrent.ExecutorService sseExecutor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+
     private final AgentService agentService;
 
     public AgentController(AgentService agentService) {
@@ -117,7 +120,7 @@ public class AgentController {
             }
         });
 
-        agentService.sseExecutor().submit(() -> {
+        sseExecutor.submit(() -> {
             try {
                 // 会话解析/创建（校验在 executor 线程做，含 DB 操作）
                 AgentService.AgentStreamSession session;

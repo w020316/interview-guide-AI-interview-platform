@@ -8,36 +8,44 @@ import com.example.interview.service.InterviewEventService;
 import com.example.interview.service.InterviewSessionService;
 import com.example.interview.service.RagSearchService;
 import com.example.interview.service.job.JobAgentService;
+import com.example.interview.util.JsonRepairUtil;
 import com.example.interview.util.PromptSanitizer;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.Disposable;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 智能体编排服务（Career Copilot 核心）
  *
+ * 自研 ReAct 循环（提示词层工具协议）：
+ * 因 B.AI 网关不支持 API 级 function calling（带 tools 参数返回 400），
+ * 工具以文本协议写入提示词，模型输出 {"action":...,"params":{...}} 动作 JSON
+ * （经 JsonRepairUtil 修复解析），本地执行工具后将观察结果回填，最多 6 轮。
+ *
  * 职责：
  * 1. 会话与记忆管理：创建会话、装配最近 12 条历史消息窗口
- * 2. System Prompt 构建：智能体人设 + 工具使用指引 + 用户画像（薄弱分类/成绩预注入，减少工具调用轮次）
- * 3. 工具注册：每请求构造 AgentTools 实例（绑定 userId），交由 Spring AI 内部 ReAct 循环执行
- * 4. 流式输出：SSE 逐 token 推送（start/token/done/error 事件 + 15s 心跳保活）
+ * 2. System Prompt 构建：智能体人设 + 工具协议 + 用户画像（预注入，减少工具调用轮次）
+ * 3. 决策循环：模型决策 → 工具执行 → 观察回填 → 直到给出最终回答
+ * 4. 流式输出：最终回答分块经 SSE 推送（start/token/done/error 事件 + 心跳由 Controller 管理）
  * 5. 消息落库：对话完成后保存 USER/ASSISTANT 消息（失败仅记日志，不影响响应）
  */
 @Service
@@ -47,6 +55,9 @@ public class AgentService {
 
     /** 对话记忆窗口：最近 12 条消息（约 6 轮对话） */
     private static final int HISTORY_WINDOW = 12;
+
+    /** ReAct 最大工具调用轮次 */
+    private static final int MAX_TOOL_ROUNDS = 6;
 
     /** 标题截断长度 */
     private static final int TITLE_MAX_LEN = 30;
@@ -58,10 +69,10 @@ public class AgentService {
     private final InterviewSessionService interviewSessionService;
     private final InterviewEventService interviewEventService;
     private final RagSearchService ragSearchService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /** SSE 并发控制（与面试问答相同的令牌机制，信号量保护虚拟线程） */
+    /** SSE 并发控制（与面试问答相同的令牌机制，信号量保护线程资源） */
     private final Semaphore sseSemaphore = new Semaphore(20, true);
-    private final ExecutorService sseExecutor = Executors.newVirtualThreadPerTaskExecutor();
     private final ScheduledExecutorService heartbeat = new ScheduledThreadPoolExecutor(1);
 
     public AgentService(ChatClient chatClient,
@@ -81,7 +92,7 @@ public class AgentService {
     }
 
     /**
-     * 流式对话
+     * 流式对话会话准备
      *
      * @param conversationId 会话 ID，null 则新建会话
      * @param message        用户消息（经 PromptSanitizer 消毒）
@@ -99,51 +110,153 @@ public class AgentService {
     }
 
     /**
-     * 执行流式生成（由 Controller 调用，回调通过 listener 推送 SSE）
+     * 执行 ReAct 决策循环并分块推送最终回答（异步执行，回调线程安全由 Controller 保证）
      */
     public Disposable runStream(AgentStreamSession session,
                                 java.util.function.Consumer<String> onToken,
                                 Runnable onComplete,
                                 java.util.function.Consumer<String> onError) {
+        return Mono.fromRunnable(() -> executeLoop(session, onToken, onComplete, onError))
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe();
+    }
+
+    /** ReAct 主循环 */
+    private void executeLoop(AgentStreamSession session,
+                             java.util.function.Consumer<String> onToken,
+                             Runnable onComplete,
+                             java.util.function.Consumer<String> onError) {
         AgentConversationEntity conversation = session.conversation();
         String safeMessage = PromptSanitizer.sanitize(session.userMessage());
-
-        // 注册当前用户绑定的工具实例
         AgentTools tools = new AgentTools(conversation.getUserId(), jobAgentService,
                 interviewSessionService, interviewEventService, ragSearchService);
 
+        StringBuilder emitted = new StringBuilder();
+        List<String> steps = new ArrayList<>();
         try {
-            var spec = chatClient.prompt()
-                    .system(session.systemPrompt())
-                    .messages(toMessages(session.history()))
-                    .user(safeMessage)
-                    .tools(tools);
+            String finalAnswer = null;
+            for (int round = 0; round < MAX_TOOL_ROUNDS && finalAnswer == null; round++) {
+                String prompt = buildIterationPrompt(safeMessage, tools, steps);
+                String content = callModel(session, prompt, true);
+                Action action = parseAction(content, tools);
+                if (action != null) {
+                    log.info("智能体工具调用 round={}: action={}", round + 1, action.action());
+                    String observation = tools.dispatch(action.action(), action.paramsJson());
+                    steps.add("调用工具 " + action.action() + "(" + action.paramsJson() + ")\n观察结果：" + observation);
+                } else {
+                    finalAnswer = content;
+                }
+            }
+            // 轮次耗尽仍未得到最终回答：强制收尾
+            if (finalAnswer == null) {
+                finalAnswer = callModel(session, buildFinalPrompt(safeMessage, steps), false);
+            }
+            if (finalAnswer == null || finalAnswer.isBlank()) {
+                finalAnswer = "抱歉，这次没能生成回答，请重试或换个问法。";
+            }
 
-            StringBuilder reply = new StringBuilder();
-            return spec.stream()
-                    .content()
-                    .doOnNext(token -> {
-                        reply.append(token);
-                        onToken.accept(token);
-                    })
-                    .doOnComplete(() -> {
-                        onComplete.run();
-                        saveMessages(conversation, session.userMessage(), reply.toString());
-                    })
-                    .doOnError(e -> {
-                        log.warn("智能体流式生成失败：{}", e.getMessage());
-                        onError.accept("AI 服务异常，请重试");
-                        // 部分内容也落库，保证上下文连续
-                        if (!reply.isEmpty()) {
-                            saveMessages(conversation, session.userMessage(), reply.toString());
-                        }
-                    })
-                    .subscribe();
+            // 分块推送，模拟流式体验
+            for (String chunk : splitChunks(finalAnswer)) {
+                emitted.append(chunk);
+                onToken.accept(chunk);
+            }
+            onComplete.run();
+            saveMessages(conversation, session.userMessage(), finalAnswer);
         } catch (Exception e) {
-            log.warn("智能体启动失败：{}", e.getMessage());
-            onError.accept("智能体启动失败：" + e.getMessage());
+            log.warn("智能体流式生成失败：{}", e.getMessage());
+            onError.accept("AI 服务异常，请重试");
+            if (!emitted.isEmpty()) {
+                saveMessages(conversation, session.userMessage(), emitted.toString());
+            }
+        }
+    }
+
+    /** 单轮决策调用：allowAction=false 时禁止输出动作 JSON */
+    private String callModel(AgentStreamSession session, String prompt, boolean allowAction) {
+        var spec = chatClient.prompt()
+                .system(session.systemPrompt())
+                .messages(toMessages(session.history()))
+                .user(prompt);
+        if (!allowAction) {
+            // 收尾调用：温度更低、限制长度，确保输出面向用户的最终回答
+            spec = spec.options(OpenAiChatOptions.builder().temperature(0.4).maxTokens(1500).build());
+        }
+        String content = spec.call().content();
+        return content == null ? "" : content.trim();
+    }
+
+    /** 解析模型输出是否为工具动作 JSON（严格：仅当整段内容是 JSON 且 action 匹配注册表） */
+    private Action parseAction(String content, AgentTools tools) {
+        if (content == null || content.isBlank()) {
             return null;
         }
+        String trimmed = content.trim();
+        if (!trimmed.startsWith("{")) {
+            return null; // 直接回答
+        }
+        try {
+            String repaired = JsonRepairUtil.repair(trimmed);
+            JsonNode node = objectMapper.readTree(repaired);
+            JsonNode actionNode = node.get("action");
+            if (actionNode == null || !actionNode.isTextual()) {
+                return null;
+            }
+            String action = actionNode.asText();
+            if (!tools.all().containsKey(action)) {
+                return null; // 未知动作视为回答失败，交给下一轮
+            }
+            JsonNode paramsNode = node.get("params");
+            String paramsJson = paramsNode == null ? "{}" : paramsNode.toString();
+            return new Action(action, paramsJson);
+        } catch (Exception e) {
+            log.warn("动作 JSON 解析失败，视为最终回答：{}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String buildIterationPrompt(String userMessage, AgentTools tools, List<String> steps) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("【用户消息】\n").append(userMessage).append("\n\n");
+        if (!steps.isEmpty()) {
+            sb.append("【已执行的工具调用与观察结果】\n");
+            for (int i = 0; i < steps.size(); i++) {
+                sb.append("第 ").append(i + 1).append(" 步：\n").append(steps.get(i)).append("\n");
+            }
+            sb.append("\n");
+        }
+        sb.append("【可用工具】\n");
+        int i = 1;
+        for (var spec : tools.all().values()) {
+            sb.append(i++).append(". ").append(spec.name()).append(" - ").append(spec.description())
+                    .append("\n   参数：").append(spec.paramsDoc()).append("\n");
+        }
+        sb.append("\n【输出规则（严格遵守）】\n");
+        sb.append("- 若需要调用工具：仅输出一行 JSON（标准双引号），格式：{\"action\":\"工具名\",\"params\":{\"参数名\":\"值\"}}\n");
+        sb.append("- 若已有足够信息：直接输出面向用户的最终回答（中文、结构化，不要输出 JSON，不要解释你的决策过程）\n");
+        if (!steps.isEmpty()) {
+            sb.append("- 已有观察结果时优先基于观察结果回答，不要重复调用相同工具\n");
+        }
+        return sb.toString();
+    }
+
+    /** 轮次耗尽后的收尾提示词（禁止再调工具） */
+    private String buildFinalPrompt(String userMessage, List<String> steps) {
+        StringBuilder sb = new StringBuilder("【用户消息】\n").append(userMessage).append("\n\n");
+        sb.append("【已收集的观察结果】\n");
+        for (String s : steps) {
+            sb.append(s).append("\n");
+        }
+        sb.append("\n请基于以上信息直接给出最终回答（中文、结构化），不要再调用任何工具。");
+        return sb.toString();
+    }
+
+    private List<String> splitChunks(String text) {
+        List<String> chunks = new ArrayList<>();
+        int size = 40;
+        for (int i = 0; i < text.length(); i += size) {
+            chunks.add(text.substring(i, Math.min(i + size, text.length())));
+        }
+        return chunks;
     }
 
     public boolean tryAcquire() {
@@ -158,8 +271,9 @@ public class AgentService {
         return heartbeat;
     }
 
-    public ExecutorService sseExecutor() {
-        return sseExecutor;
+    /** 取消当前流（Controller 断连时调用）；ReAct 循环本身在 boundedElastic 上原子执行 */
+    public void cancel(AtomicBoolean cancelled) {
+        cancelled.set(true);
     }
 
     // ---------- 会话管理 ----------
@@ -223,7 +337,7 @@ public class AgentService {
     }
 
     /**
-     * System Prompt：人设 + 工具指引 + 用户画像（预注入薄弱分类与成绩，减少工具调用轮次）
+     * System Prompt：人设 + 用户画像（预注入薄弱分类与成绩，减少工具调用轮次）
      */
     private String buildSystemPrompt(String userId) {
         StringBuilder sb = new StringBuilder();
@@ -233,7 +347,7 @@ public class AgentService {
         sb.append("3. 分析用户的面试表现、找出薄弱点并制定复习计划\n");
         sb.append("4. 查看用户的面试日程\n\n");
         sb.append("【工作准则】\n");
-        sb.append("- 需要用户数据（岗位/统计/错题/日程/知识点）时主动调用对应工具，不要凭空编造\n");
+        sb.append("- 需要用户数据（岗位/统计/错题/日程/知识点）时按协议调用工具，不要凭空编造数据\n");
         sb.append("- 工具返回空结果时如实告知，并给出可操作的建议\n");
         sb.append("- 回答简洁、结构化，岗位推荐用列表并附申请链接；复习计划给出具体行动项\n");
         sb.append("- 使用中文回答\n\n");
@@ -283,12 +397,14 @@ public class AgentService {
         return clean.length() <= max ? clean : clean.substring(0, max);
     }
 
-    /**
-     * 一次流式对话的载体（会话 + 系统提示 + 历史 + 用户消息）
-     */
+    /** 一次流式对话的载体（会话 + 系统提示 + 历史 + 用户消息） */
     public record AgentStreamSession(AgentConversationEntity conversation,
                                      String systemPrompt,
                                      List<AgentMessageEntity> history,
                                      String userMessage) {
+    }
+
+    /** 模型决策出的工具动作 */
+    record Action(String action, String paramsJson) {
     }
 }
