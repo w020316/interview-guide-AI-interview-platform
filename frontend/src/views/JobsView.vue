@@ -65,6 +65,13 @@
       <div class="loading-text">正在加载岗位信息...</div>
     </div>
 
+    <!-- 错误态（与空态区分：加载失败可重试） -->
+    <div v-else-if="loadError" class="empty-state">
+      <div class="empty-icon">⚠️</div>
+      <p>岗位数据加载失败，可能是后端正在冷启动，请稍后重试</p>
+      <BaseButton variant="gradient" @click="fetchJobs">重新加载</BaseButton>
+    </div>
+
     <!-- 空态 -->
     <div v-else-if="jobs.length === 0" class="empty-state">
       <div class="empty-icon">🔍</div>
@@ -210,6 +217,7 @@ const recruitTabs = [
 ]
 
 const loading = ref(false)
+const loadError = ref(false)
 const refreshing = ref(false)
 const jobs = ref<JobPosting[]>([])
 const total = ref(0)
@@ -239,6 +247,7 @@ function showDetail(job: JobPosting) {
 
 async function fetchJobs() {
   loading.value = true
+  loadError.value = false
   try {
     const res = await api.get('/api/jobs', {
       params: {
@@ -252,9 +261,12 @@ async function fetchJobs() {
         size: pageSize,
       },
     })
-    jobs.value = res.data?.data?.items || []
-    total.value = res.data?.data?.total || 0
+    // axios 拦截器已解包 Result.data，此处直接取分页结构 {total,page,size,items}
+    const data = res as unknown as { total: number; items: JobPosting[] }
+    jobs.value = data?.items || []
+    total.value = data?.total || 0
   } catch (e) {
+    loadError.value = true
     ElMessage.error(getErrMessage(e, '岗位加载失败'))
   } finally {
     loading.value = false
@@ -264,7 +276,7 @@ async function fetchJobs() {
 async function fetchMeta() {
   try {
     const res = await api.get('/api/jobs/meta')
-    meta.value = res.data?.data || { industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null }
+    meta.value = (res as unknown as JobsMeta) || { industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null }
   } catch {
     // 元数据加载失败不阻断主列表
   }
