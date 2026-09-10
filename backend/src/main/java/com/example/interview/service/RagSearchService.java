@@ -67,6 +67,16 @@ public class RagSearchService {
     private double dedupSimilarityThreshold;
 
     /**
+     * 向量库最大文档数（生产为内存 SimpleVectorStore，无上限会累积导致 512MB 容器 OOM）
+     * 计数器与向量库同生命周期（重启同清零），超限后拒绝新增并提示
+     */
+    @Value("${app.rag.max-documents:500}")
+    private int maxDocuments;
+
+    /** 已入库文档计数（与内存向量库同生命周期） */
+    private final java.util.concurrent.atomic.AtomicInteger storedDocs = new java.util.concurrent.atomic.AtomicInteger(0);
+
+    /**
      * 检索相关知识点（返回 JSON 数组字符串）
      * v1.8：按 userId 隔离，仅返回该用户导入的 + 系统预置共享文档
      *
@@ -215,7 +225,18 @@ public class RagSearchService {
                 log.info("知识库导入：{} 条全部重复或为空，跳过", documents.size());
                 return 0;
             }
+            // 容量上限保护：内存向量库无限累积会导致容器 OOM
+            int remaining = maxDocuments - storedDocs.get();
+            if (remaining <= 0) {
+                log.warn("知识库导入被拒绝：已达容量上限 {} 条", maxDocuments);
+                return 0;
+            }
+            if (docs.size() > remaining) {
+                log.warn("知识库导入裁剪：请求 {} 条，仅剩 {} 条容量", docs.size(), remaining);
+                docs = new ArrayList<>(docs.subList(0, remaining));
+            }
             vectorStore.add(docs);
+            storedDocs.addAndGet(docs.size());
             if (skipped > 0) {
                 log.info("知识库导入：{} 条新增，{} 条重复跳过", docs.size(), skipped);
             }

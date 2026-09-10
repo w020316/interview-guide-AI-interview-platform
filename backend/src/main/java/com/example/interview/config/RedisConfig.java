@@ -2,13 +2,18 @@ package com.example.interview.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import java.net.URI;
+import java.time.Duration;
 
 /**
  * Redis 缓存配置（容错实现，保证应用启动不依赖 Redis）
@@ -17,20 +22,26 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
  * Redis 自动装配在创建 LettuceConnectionFactory bean 时会对主机做 DNS 解析并抛出
  * {@link java.net.UnknownHostException}，导致整个 Spring 上下文无法启动（表现为后端永远冷启动/崩溃重启）。
  *
- * <p>因此这里不再依赖 Spring 自动装配，改为显式构造一个指向 127.0.0.1 的回退连接工厂：
- * 本机地址必然可解析，启动绝不会因 Redis 失败；Redis 实际不可用时连接发生在首次调用，
- * 由各服务层的 try/catch 降级兜底（Redis 仅用于 AI 响应缓存，不影响登录/鉴权）。
+ * <p>因此这里不依赖 Spring 自动装配，而是显式解析 spring.data.redis.url（REDIS_URL）：
+ * - 支持 redis:// 与 rediss://（Upstash TLS）协议，含内嵌用户名密码
+ * - 解析失败或未配置时回退 127.0.0.1（本机地址必然可解析，启动绝不因 Redis 失败）
+ * - Redis 实际不可用时连接发生在首次调用，由各服务层 try/catch 降级兜底
+ *   （Redis 仅用于 AI 响应缓存，不影响登录/鉴权）
+ *
+ * <p>v1.23.1 修复：此前工厂硬编码 127.0.0.1，导致生产 REDIS_URL 从未生效、AI 缓存 100% 未命中。
  */
 @Configuration
 public class RedisConfig {
 
     private static final Logger log = LoggerFactory.getLogger(RedisConfig.class);
 
+    /** 与 spring.data.redis.url 同源（application.yml 中由 REDIS_URL 注入） */
+    @Value("${spring.data.redis.url:}")
+    private String redisUrl;
+
     @Bean
     public RedisTemplate<String, Object> redisTemplate() {
-        // 使用本机地址构造工厂：保证启动时主机可解析，连接延迟到首次使用
-        RedisStandaloneConfiguration cfg = new RedisStandaloneConfiguration("127.0.0.1", 6379);
-        LettuceConnectionFactory factory = new LettuceConnectionFactory(cfg);
+        LettuceConnectionFactory factory = buildFactory(redisUrl);
         factory.setShutdownTimeout(1000L);
         factory.afterPropertiesSet();
 
@@ -42,5 +53,50 @@ public class RedisConfig {
         template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
         template.afterPropertiesSet();
         return template;
+    }
+
+    /**
+     * 解析 Redis URL 构造连接工厂；任何解析异常都安全回退到本机地址（保证启动成功）
+     */
+    private LettuceConnectionFactory buildFactory(String url) {
+        try {
+            if (url != null && !url.isBlank() && url.startsWith("redis")) {
+                URI uri = new URI(url.trim());
+                String host = uri.getHost();
+                if (host == null || host.isBlank()) {
+                    throw new IllegalArgumentException("Redis URL 缺少 host");
+                }
+                boolean ssl = "rediss".equalsIgnoreCase(uri.getScheme());
+                int port = uri.getPort() == -1 ? (ssl ? 6380 : 6379) : uri.getPort();
+
+                RedisStandaloneConfiguration cfg = new RedisStandaloneConfiguration(host, port);
+                String userInfo = uri.getUserInfo();
+                if (userInfo != null && !userInfo.isBlank()) {
+                    int sep = userInfo.indexOf(':');
+                    if (sep >= 0) {
+                        cfg.setUsername(userInfo.substring(0, sep));
+                        cfg.setPassword(userInfo.substring(sep + 1));
+                    } else {
+                        cfg.setUsername(userInfo);
+                    }
+                }
+
+                // SD Redis 3.2 的 useSsl() 无 boolean 重载，按协议条件构造
+                LettuceClientConfiguration clientCfg = ssl
+                        ? LettuceClientConfiguration.builder()
+                                .commandTimeout(Duration.ofSeconds(5))
+                                .useSsl()
+                                .build()
+                        : LettuceClientConfiguration.builder()
+                                .commandTimeout(Duration.ofSeconds(5))
+                                .build();
+                log.info("Redis 缓存连接目标：{}:{} (ssl={})", host, port, ssl);
+                return new LettuceConnectionFactory(cfg, clientCfg);
+            }
+        } catch (Exception e) {
+            log.warn("REDIS_URL 解析失败（{}），回退本机 Redis：{}", e.getMessage(), url);
+        }
+        log.info("Redis 未配置或解析失败，回退本机 127.0.0.1:6379（服务层会降级兜底）");
+        return new LettuceConnectionFactory(new RedisStandaloneConfiguration("127.0.0.1", 6379));
     }
 }
