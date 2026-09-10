@@ -92,6 +92,11 @@
 ---
 
 ## 六、遗留与 Backlog
+- ~~AI 模型可用性核查~~ ✅ 已验证（v1.25.1，2026-09-10）：
+  B.AI 网站正常（chat.b.ai 渲染正常、GLM 5.3 Flash 首页标记「限时免费 4+」）；
+  模型排行榜 GLM-5.3-Flash 第 1（Zhipu AI）、Qwen3.8-Flash 第 2（Alibaba），
+  当前降级链配置（GLM-5.3-Flash 主 → Qwen3.8-Flash 次 → Agnes 兜底）恰为前两名免费模型，无需更换；
+  生产端到端实测：注册测试账号调用 /api/interview/evaluate 返回高质量结构化评分 JSON（RDB/AOF 机制、刷盘策略、混合持久化等专业内容准确），AI 链路真实可用
 - ~~B3 题目全量载入内存~~ ✅ 已改数据库聚合查询（62a4bda，v1.23.3：count/avg/GROUP BY，活动列表只取近 10 条）
 - ~~P3：死代码 retryRequest、meta 手拼 JSON、异常信息回显、LIKE 转义等 8 项~~ ✅ 处置完成（v1.23.3）：
   retryRequest 已删除（262b958）；AgentController meta 改 ObjectMapper 序列化（62a4bda）；
