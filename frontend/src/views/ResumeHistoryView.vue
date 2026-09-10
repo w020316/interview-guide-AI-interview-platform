@@ -1,9 +1,25 @@
 <template>
   <div class="resume-history-page">
-    <header class="page-header">
-      <h1>简历历史</h1>
-      <p>查看历次简历分析的结果与评分变化</p>
+    <header class="page-header page-head-row">
+      <div>
+        <h1>简历历史</h1>
+        <p>查看历次简历分析的结果与评分变化</p>
+      </div>
+      <button v-if="resumes.length >= 2 && !compareMode" class="compare-toggle" @click="toggleCompareMode">
+        多版本对比
+      </button>
     </header>
+
+    <!-- 对比模式工具条 -->
+    <div v-if="compareMode" class="compare-bar" role="status">
+      <span class="compare-hint">
+        {{ selectedIds.length < 2 ? '选择两个版本进行对比' : '已选择 2 个版本，可开始对比' }}
+      </span>
+      <button class="compare-btn primary" :disabled="selectedIds.length !== 2 || compareLoading" @click="startCompare">
+        {{ compareLoading ? '加载中…' : '开始对比' }}
+      </button>
+      <button class="compare-btn" @click="toggleCompareMode">取消</button>
+    </div>
 
     <!-- 空状态 -->
     <div v-if="!loading && loadError" class="empty-state fade-in">
@@ -36,8 +52,14 @@
     <!-- 简历列表 -->
     <div v-else-if="resumes.length" class="resume-list">
       <div v-for="(r, idx) in resumes" :key="r.id"
-           class="resume-card fade-in-up" :style="{ animationDelay: (idx * 80) + 'ms' }"
-           @click="openDetail(r)">
+           class="resume-card fade-in-up" :class="{ 'is-selected': compareMode && selectedIds.includes(r.id) }"
+           :style="{ animationDelay: (idx * 80) + 'ms' }"
+           @click="onCardClick(r)">
+        <span v-if="compareMode" class="pick-dot" :class="{ on: selectedIds.includes(r.id) }" aria-hidden="true">
+          <svg v-if="selectedIds.includes(r.id)" width="11" height="11" viewBox="0 0 24 24" fill="none">
+            <path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
         <div class="card-score" :style="{ background: scoreBg(r.overallScore) }">
           <span class="score-num">{{ r.overallScore ?? '—' }}</span>
           <span class="score-unit" v-if="r.overallScore != null">分</span>
@@ -125,6 +147,56 @@
         </div>
       </div>
     </div>
+
+    <!-- 多版本对比弹窗（v1.25.0） -->
+    <div v-if="compareOpen && compareData" class="modal-backdrop" @click.self="compareOpen = false">
+      <div class="modal fade-in-up compare-modal">
+        <div class="modal-header">
+          <h3>简历版本对比</h3>
+          <button class="modal-close" @click="compareOpen = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="cmp-versions">
+            <div class="cmp-ver">
+              <span class="cmp-tag">版本 A（较早）</span>
+              <div class="cmp-job">{{ compareData.a.targetJob || '未指定岗位' }}</div>
+              <div class="cmp-date">{{ fmtDate(compareData.a.createdAt || '') }}</div>
+              <div class="cmp-score" :style="{ color: scoreColor(compareData.a.overallScore) }">
+                {{ compareData.a.overallScore }}<small>分</small>
+              </div>
+            </div>
+            <div class="cmp-arrow" :class="overallDir">
+              {{ overallDiffText }}
+            </div>
+            <div class="cmp-ver">
+              <span class="cmp-tag b">版本 B（较晚）</span>
+              <div class="cmp-job">{{ compareData.b.targetJob || '未指定岗位' }}</div>
+              <div class="cmp-date">{{ fmtDate(compareData.b.createdAt || '') }}</div>
+              <div class="cmp-score" :style="{ color: scoreColor(compareData.b.overallScore) }">
+                {{ compareData.b.overallScore }}<small>分</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="cmp-dims">
+            <div class="cmp-row cmp-head">
+              <span>维度</span><span>版本 A</span><span>版本 B</span><span>变化</span>
+            </div>
+            <div v-for="row in compareResult.rows" :key="row.name" class="cmp-row">
+              <span class="cmp-name">{{ row.name }}</span>
+              <span :style="{ color: scoreColor(row.a ?? undefined) }">{{ row.a ?? '—' }}</span>
+              <span :style="{ color: scoreColor(row.b ?? undefined) }">{{ row.b ?? '—' }}</span>
+              <span class="cmp-diff" :class="row.better">
+                {{ row.diff == null ? '—' : row.diff === 0 ? '持平' : (row.diff > 0 ? `+${row.diff}` : `${row.diff}`) }}
+              </span>
+            </div>
+            <p v-if="!compareResult.rows.length" class="cmp-empty">两个版本均无维度明细，仅综合分可比</p>
+          </div>
+
+          <div v-if="summaryText" class="cmp-summary">{{ summaryText }}</div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -134,6 +206,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
+import { compareResume, type ResumeVersion, type DimDiff } from '../utils/resumeCompare'
 import { BaseButton } from '../components'
 
 const router = useRouter()
@@ -271,6 +344,112 @@ function scoreBg(s?: number | null): string {
   if (s >= 60) return 'linear-gradient(135deg, #fef3c7, #fde68a)'
   return 'linear-gradient(135deg, #fee2e2, #fecaca)'
 }
+
+// ── 多版本对比（v1.25.0）──
+const compareMode = ref(false)
+const selectedIds = ref<number[]>([])
+const compareOpen = ref(false)
+const compareLoading = ref(false)
+const compareData = ref<{ a: ResumeVersion; b: ResumeVersion } | null>(null)
+
+function toggleCompareMode() {
+  compareMode.value = !compareMode.value
+  selectedIds.value = []
+}
+
+/** 对比模式下点击卡片切换选中态；普通模式打开详情 */
+function onCardClick(r: Resume) {
+  if (compareMode.value) {
+    const arr = selectedIds.value
+    const i = arr.indexOf(r.id)
+    if (i >= 0) arr.splice(i, 1)
+    else if (arr.length < 2) arr.push(r.id)
+    else ElMessage.info('最多选择两个版本进行对比')
+  } else {
+    openDetail(r)
+  }
+}
+
+/** 解析简历记录为对比版本（综合分 + 维度，数字强制转换） */
+function parseVersion(r: Resume): ResumeVersion {
+  let obj: { overallScore?: unknown; dimensions?: Array<{ name?: unknown; score?: unknown }> } = {}
+  try {
+    obj = JSON.parse(r.analysisResult || '{}')
+  } catch {
+    // 解析失败保持空对象，仅综合分可比
+  }
+  const num = (v: unknown): number =>
+    typeof v === 'number' ? v : typeof v === 'string' ? (Number(v) || 0) : 0
+  return {
+    id: r.id,
+    targetJob: r.targetJob,
+    createdAt: r.createdAt,
+    overallScore: num(obj.overallScore),
+    dimensions: Array.isArray(obj.dimensions)
+      ? obj.dimensions.map((d) => ({ name: String(d?.name ?? ''), score: num(d?.score) }))
+      : [],
+  }
+}
+
+async function startCompare() {
+  if (selectedIds.value.length !== 2 || compareLoading.value) return
+  compareLoading.value = true
+  try {
+    // 按 createdAt 升序确定 A（较早）→ B（较晚）
+    const picked = resumes.value
+      .filter((r) => selectedIds.value.includes(r.id))
+      .sort((x, y) => new Date(x.createdAt).getTime() - new Date(y.createdAt).getTime())
+    const versions: ResumeVersion[] = []
+    for (const r of picked) {
+      try {
+        const data = await api.get(`/api/resume/${r.id}`) as unknown as Resume
+        if (data.analysisResult) {
+          const { repaired, valid } = repairAndCheck(data.analysisResult)
+          if (valid) data.analysisResult = repaired
+        }
+        versions.push(parseVersion(data))
+      } catch {
+        versions.push(parseVersion(r)) // 详情加载失败时降级用列表快照
+      }
+    }
+    compareData.value = { a: versions[0], b: versions[1] }
+    compareOpen.value = true
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '加载对比数据失败'))
+  } finally {
+    compareLoading.value = false
+  }
+}
+
+const compareResult = computed(() =>
+  compareData.value
+    ? compareResume(compareData.value.a, compareData.value.b)
+    : { overallDiff: 0, rows: [] as DimDiff[] },
+)
+
+const overallDiffText = computed(() => {
+  const d = compareResult.value.overallDiff
+  if (d > 0) return `↑ +${d}`
+  if (d < 0) return `↓ ${d}`
+  return '持平'
+})
+
+const overallDir = computed(() => {
+  const d = compareResult.value.overallDiff
+  return d > 0 ? 'up' : d < 0 ? 'down' : 'flat'
+})
+
+const summaryText = computed(() => {
+  if (!compareData.value) return ''
+  const { overallDiff, rows } = compareResult.value
+  const up = rows.filter((r) => r.better === 'b').map((r) => r.name)
+  const down = rows.filter((r) => r.better === 'a').map((r) => r.name)
+  const parts: string[] = []
+  parts.push(overallDiff >= 0 ? `综合分较早期版本${overallDiff === 0 ? '持平' : `提升 ${overallDiff} 分`}` : `综合分下降 ${-overallDiff} 分`)
+  if (up.length) parts.push(`${up.join('、')}有提升`)
+  if (down.length) parts.push(`${down.join('、')}有所回落，可针对性优化`)
+  return parts.join('；') + '。'
+})
 </script>
 
 <style scoped>
@@ -296,6 +475,208 @@ function scoreBg(s?: number | null): string {
   font-size: 14px;
   color: var(--c-text-secondary);
   margin: 0;
+}
+
+/* ── 多版本对比（v1.25.0）── */
+.page-head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.compare-toggle {
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: var(--brand-primary);
+  background: var(--brand-primary-light);
+  border: 1px solid var(--brand-primary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.compare-toggle:hover {
+  background: var(--brand-primary);
+  color: #fff;
+}
+.compare-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+.compare-hint {
+  flex: 1;
+  font-size: 13px;
+  color: var(--c-text-secondary);
+}
+.compare-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.compare-btn.primary {
+  color: #fff;
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+.compare-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.resume-card.is-selected {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px var(--brand-primary-light);
+}
+.pick-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid var(--c-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+.pick-dot.on {
+  border-color: var(--brand-primary);
+  background: var(--brand-primary);
+}
+.compare-modal {
+  max-width: 680px;
+}
+.cmp-versions {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  background: var(--c-bg-alt);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+.cmp-ver {
+  text-align: center;
+  min-width: 0;
+}
+.cmp-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-tertiary);
+  background: var(--c-surface);
+  padding: 2px 10px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+}
+.cmp-tag.b {
+  color: var(--brand-primary);
+}
+.cmp-job {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmp-date {
+  font-size: 11.5px;
+  color: var(--c-text-tertiary);
+  margin-bottom: 8px;
+}
+.cmp-score {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+.cmp-score small {
+  font-size: 14px;
+  font-weight: 600;
+  margin-left: 2px;
+}
+.cmp-arrow {
+  font-size: 20px;
+  font-weight: 800;
+  padding: 8px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cmp-arrow.up { color: #10b981; background: rgba(16, 185, 129, 0.1); }
+.cmp-arrow.down { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+.cmp-arrow.flat { color: var(--c-text-tertiary); background: var(--c-surface); }
+.cmp-dims {
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.cmp-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--c-text);
+  align-items: center;
+}
+.cmp-row + .cmp-row {
+  border-top: 1px solid var(--c-border-light);
+}
+.cmp-row.cmp-head {
+  background: var(--c-bg-alt);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-secondary);
+}
+.cmp-name {
+  font-weight: 500;
+}
+.cmp-diff {
+  font-weight: 700;
+  text-align: right;
+}
+.cmp-diff.b { color: #10b981; }
+.cmp-diff.a { color: #ef4444; }
+.cmp-diff.tie { color: var(--c-text-tertiary); }
+.cmp-empty {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--c-text-tertiary);
+  text-align: center;
+}
+.cmp-summary {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--c-text-secondary);
+  background: var(--c-accent-soft);
+  border-left: 3px solid var(--c-accent);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+@media (max-width: 640px) {
+  .cmp-versions {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .cmp-arrow {
+    justify-self: center;
+  }
 }
 
 /* ── 空状态 ── */
