@@ -16,7 +16,7 @@ permissions:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 4
     steps:
       - name: Ping backend health
         env:
@@ -26,11 +26,21 @@ jobs:
           TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "[$TS] 开始保活 ping → $BACKEND_URL/api/info"
           # --fail: HTTP 非 2xx 退出码非 0
-          # --max-time: 总超时 30 秒（避免卡住整个 workflow）
+          # --max-time: 总超时 100 秒——Render 冷启动常超 30s（旧值 30s 时
+          #   唤醒请求本身被判失败，保活永远报错且无法与冷启动共存）
           # --silent --show-error: 静默成功，仅失败时打印错误
-          RESPONSE=$(curl --fail --max-time 30 --silent --show-error "$BACKEND_URL/api/info" || echo "PING_FAILED")
-          echo "响应: $RESPONSE"
-          if [[ "$RESPONSE" == "PING_FAILED" ]]; then
+          # 失败自动重试 1 次（首次唤醒 + 二次确认存活）
+          ping_once() {
+            curl --fail --max-time 100 --silent --show-error "$BACKEND_URL/api/info"
+          }
+          RESPONSE=$(ping_once || echo "PING_FAILED_1")
+          if [[ "$RESPONSE" == PING_FAILED_1* ]]; then
+            echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] 首次 ping 失败（可能正在冷启动），10s 后重试"
+            sleep 10
+            RESPONSE=$(ping_once || echo "PING_FAILED_2")
+          fi
+          echo "响应: ${RESPONSE:0:200}"
+          if [[ "$RESPONSE" == PING_FAILED* ]]; then
             echo "::error::后端 ping 失败，请检查 Render 服务状态"
             exit 1
           fi
