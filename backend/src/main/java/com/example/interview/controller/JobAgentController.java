@@ -66,7 +66,7 @@ public class JobAgentController {
             @RequestParam(required = false) String industry,
             @RequestParam(required = false) String jobType,
             @RequestParam(required = false) String location,
-            @RequestParam(required = false, defaultValue = "AUTUMN") String recruitType,
+            @RequestParam(required = false) String recruitType,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String degree,
             @RequestParam(required = false) String experience,
