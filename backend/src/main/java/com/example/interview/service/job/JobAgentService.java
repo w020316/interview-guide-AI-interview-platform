@@ -164,19 +164,50 @@ public class JobAgentService {
     }
 
     /**
-     * 多条件筛选搜索
+     * 多条件筛选搜索（Specification 动态查询）
+     * 说明：不使用 @Query 的 ":param IS NULL OR" 模式——PostgreSQL 无法推断
+     * NULL 参数类型导致生产 500（H2 本地正常），Specification 无此问题。
      *
      * @param recruitType AUTUMN 秋招 / SPRING 春招 / SOCIAL 社招 / INTERN 实习 / null 全部
      */
     public Page<JobPostingEntity> search(String keyword, String industry, String jobType,
                                          String location, String recruitType, String source,
                                          int page, int size) {
-        return repository.search(
-                blankToNull(keyword), blankToNull(industry), blankToNull(jobType),
-                blankToNull(location), blankToNull(recruitType), blankToNull(source),
-                PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50)));
+        var spec = org.springframework.data.jpa.domain.Specification.where(emptySpec());
+        if (!isBlank(keyword)) {
+            String kw = keyword.trim().toLowerCase();
+            spec = spec.and((root, query, cb) -> cb.or(
+                    cb.like(cb.lower(root.get("title")), "%" + kw + "%"),
+                    cb.like(cb.lower(root.get("companyName")), "%" + kw + "%"),
+                    cb.like(cb.lower(root.get("tags")), "%" + kw + "%")));
+        }
+        if (!isBlank(industry)) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("industry"), industry.trim()));
+        }
+        if (!isBlank(jobType)) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("jobType"), jobType.trim()));
+        }
+        if (!isBlank(location)) {
+            spec = spec.and((root, query, cb) -> cb.like(root.get("location"), "%" + location.trim() + "%"));
+        }
+        if (!isBlank(recruitType)) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("recruitType"), recruitType.trim()));
+        }
+        if (!isBlank(source)) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("platform"), source.trim()));
+        }
+        spec = spec.and((root, query, cb) -> cb.isTrue(root.get("active")));
+        // 排序：临期优先（截止日期升序，空截止日期排后），再按更新时间倒序
+        var pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50),
+                org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Order.asc("deadline"),
+                        org.springframework.data.domain.Sort.Order.desc("updatedAt")));
+        return repository.findAll(spec, pageable);
     }
 
+    private static org.springframework.data.jpa.domain.Specification<JobPostingEntity> emptySpec() {
+        return (root, query, cb) -> cb.conjunction();
+    }
     /** 筛选面板元数据：行业/职位类型/来源/各招聘类型数量/最近更新时间 */
     public Map<String, Object> meta() {
         Map<String, Object> meta = new LinkedHashMap<>();
