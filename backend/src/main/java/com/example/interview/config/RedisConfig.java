@@ -6,14 +6,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.net.URI;
-import java.time.Duration;
 
 /**
  * Redis 缓存配置（容错实现，保证应用启动不依赖 Redis）
@@ -41,9 +39,19 @@ public class RedisConfig {
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate() {
-        LettuceConnectionFactory factory = buildFactory(redisUrl);
-        factory.setShutdownTimeout(1000L);
-        factory.afterPropertiesSet();
+        LettuceConnectionFactory factory;
+        try {
+            factory = buildFactory(redisUrl);
+            factory.setShutdownTimeout(1000L);
+            factory.afterPropertiesSet();
+        } catch (Exception e) {
+            // v1.25.1 修复：bean 初始化失败不能拖垮整个应用（此前 REDIS_URL 生效时
+            // 不可变 client config 触发 IllegalStateException → 崩溃循环）
+            log.error("Redis 工厂初始化失败（{}），回退本机 Redis（服务层降级兜底）", e.getMessage());
+            factory = new LettuceConnectionFactory(new RedisStandaloneConfiguration("127.0.0.1", 6379));
+            factory.setShutdownTimeout(1000L);
+            factory.afterPropertiesSet();
+        }
 
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(factory);
@@ -57,6 +65,13 @@ public class RedisConfig {
 
     /**
      * 解析 Redis URL 构造连接工厂；任何解析异常都安全回退到本机地址（保证启动成功）
+     *
+     * <p>v1.25.1 修复：改用「单参构造 + 公共 setter」。
+     * 此前通过 {@code new LettuceConnectionFactory(cfg, LettuceClientConfiguration.builder()...build())}
+     * 传入不可变配置，而 factory 的所有公共 setter（setShutdownTimeout 等）内部都要求
+     * MutableLettuceClientConfiguration（SD Redis 3.3.6 中为包私有类，公共 API 无法构造），
+     * 导致 REDIS_URL 生效时启动即抛 IllegalStateException → 崩溃循环。
+     * 单参构造的 factory 内部自建 mutable 配置，setUseSsl/setTimeout 安全可用。
      */
     private LettuceConnectionFactory buildFactory(String url) {
         try {
@@ -81,17 +96,11 @@ public class RedisConfig {
                     }
                 }
 
-                // SD Redis 3.2 的 useSsl() 无 boolean 重载，按协议条件构造
-                LettuceClientConfiguration clientCfg = ssl
-                        ? LettuceClientConfiguration.builder()
-                                .commandTimeout(Duration.ofSeconds(5))
-                                .useSsl()
-                                .build()
-                        : LettuceClientConfiguration.builder()
-                                .commandTimeout(Duration.ofSeconds(5))
-                                .build();
+                LettuceConnectionFactory factory = new LettuceConnectionFactory(cfg);
+                factory.setUseSsl(ssl);
+                factory.setTimeout(5000L);
                 log.info("Redis 缓存连接目标：{}:{} (ssl={})", host, port, ssl);
-                return new LettuceConnectionFactory(cfg, clientCfg);
+                return factory;
             }
         } catch (Exception e) {
             log.warn("REDIS_URL 解析失败（{}），回退本机 Redis：{}", e.getMessage(), url);
