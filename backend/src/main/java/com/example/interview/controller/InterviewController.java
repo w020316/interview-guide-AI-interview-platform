@@ -193,6 +193,9 @@ public class InterviewController {
         }
 
         // 客户端断开或超时时取消 AI 订阅并释放令牌（仅在成功获取令牌后注册）
+        // v1.23.1 修复：仅在 onCompletion 释放。此前 onError/onTimeout 也释放，
+        // 而容器超时/错误路径会先 onError 再 onCompletion，导致信号量重复释放、
+        // 可用许可只增不减，SSE 并发上限逐渐失效
         emitter.onCompletion(() -> {
             heartbeatRunning.set(false);
             sseSemaphore.release();
@@ -202,7 +205,6 @@ public class InterviewController {
         });
         emitter.onTimeout(() -> {
             heartbeatRunning.set(false);
-            sseSemaphore.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -210,7 +212,6 @@ public class InterviewController {
         });
         emitter.onError(e -> {
             heartbeatRunning.set(false);
-            sseSemaphore.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }

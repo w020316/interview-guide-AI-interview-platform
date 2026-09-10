@@ -9,6 +9,7 @@ import org.springframework.ai.chat.prompt.ChatOptions;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 多模型降级链 ChatModel
@@ -53,15 +54,28 @@ public class FallbackChatModel implements ChatModel {
 
     @Override
     public Flux<ChatResponse> stream(Prompt prompt) {
-        Flux<ChatResponse> flux = Flux.defer(() -> delegates.get(0).stream(prompt));
-        for (int i = 1; i < delegates.size(); i++) {
-            final int idx = i;
-            flux = flux.onErrorResume(e -> {
-                log.warn("AI 模型 {} 流式调用失败，尝试降级：{}", names.get(idx), e.getMessage());
-                return Flux.defer(() -> delegates.get(idx).stream(prompt));
-            });
-        }
-        return flux;
+        return Flux.defer(() -> {
+            // v1.23.1 修复（P2）：仅当尚未向下游发出任何 token 时才允许降级。
+            // 此前 onErrorResume 作用于整条流，流中途失败也会切换模型重发，
+            // 导致前半段旧模型内容与新模型内容拼接错乱
+            AtomicBoolean firstTokenSent = new AtomicBoolean(false);
+            Flux<ChatResponse> flux = delegates.get(0).stream(prompt)
+                    .doOnNext(resp -> firstTokenSent.set(true));
+            for (int i = 1; i < delegates.size(); i++) {
+                final int idx = i;
+                flux = flux.onErrorResume(e -> {
+                    if (firstTokenSent.get()) {
+                        log.warn("AI 模型 {} 流式输出中途失败（已发出 token，不降级）：{}", names.get(idx - 1), e.getMessage());
+                        return Flux.error(e);
+                    }
+                    log.warn("AI 模型 {} 流式调用失败（未发出 token），尝试降级：{}", names.get(idx - 1), e.getMessage());
+                    Flux<ChatResponse> next = Flux.defer(() -> delegates.get(idx).stream(prompt))
+                            .doOnNext(resp -> firstTokenSent.set(true));
+                    return next;
+                });
+            }
+            return flux;
+        });
     }
 
     @Override

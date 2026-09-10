@@ -231,10 +231,12 @@ public class InterviewService {
                     .append("{\"overallScore\":75,\"completeness\":70,\"accuracy\":80,\"expression\":75,\"strengths\":[\"优点1\"],\"weaknesses\":[\"不足1\"],\"improvements\":[\"建议1\"]}")
                     .toString();
 
-            String response = chatClient.prompt()
-                    .user(prompt)
-                    .call()
-                    .content();
+            // v1.23.1：纳入全局 AI 并发闸门（此前 evaluateAnswer 未受保护）
+            String response = com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                    chatClient.prompt()
+                            .user(prompt)
+                            .call()
+                            .content());
 
             if (response == null || response.isBlank()) {
                 throw new IllegalStateException("AI 返回内容为空，请稍后重试");

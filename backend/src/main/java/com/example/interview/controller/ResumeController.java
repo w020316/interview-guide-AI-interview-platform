@@ -247,20 +247,36 @@ public class ResumeController {
             return Result.error(400, "请输入有效的 URL（以 http:// 或 https:// 开头）");
         }
 
-        // 防止 SSRF：禁止访问内网地址
-        if (lowerUrl.contains("localhost") || lowerUrl.contains("127.0.0.1")
-                || lowerUrl.contains("192.168.") || lowerUrl.contains("10.")
-                || lowerUrl.contains("172.16.") || lowerUrl.contains("0.0.0.0")) {
-            return Result.error(400, "不支持访问内网地址");
+        // 防止 SSRF：域名解析后校验全部 IP 均为公网地址
+        // v1.23.1 加固：字符串黑名单可被十进制 IP/重定向/DNS 重绑定绕过，
+        // 改为 DNS 解析级校验 + 禁止 Jsoup 跟随重定向
+        try {
+            java.net.URI uri = java.net.URI.create(url.trim());
+            String host = uri.getHost();
+            if (host == null || host.isBlank()) {
+                return Result.error(400, "URL 缺少主机名");
+            }
+            java.net.InetAddress[] addresses = java.net.InetAddress.getAllByName(host);
+            for (java.net.InetAddress addr : addresses) {
+                if (addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress()
+                        || addr.isAnyLocalAddress() || addr.isMulticastAddress()) {
+                    return Result.error(400, "不支持访问内网地址");
+                }
+            }
+        } catch (java.net.UnknownHostException e) {
+            return Result.error(400, "域名无法解析，请检查 URL");
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, "URL 格式不正确");
         }
 
         String userId = currentUserId();
         try {
-            // 抓取 URL 页面（限制 10 秒超时，模拟浏览器 UA）
+            // 抓取 URL 页面（限制 10 秒超时，模拟浏览器 UA，禁止跟随重定向防 SSRF 绕过）
             org.jsoup.nodes.Document doc = Jsoup.connect(url)
                     .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                     .timeout(10_000)
                     .maxBodySize(5 * 1024 * 1024) // 5MB 上限
+                    .followRedirects(false)
                     .get();
 
             // 提取纯文本

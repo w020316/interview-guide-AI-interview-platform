@@ -97,6 +97,8 @@ public class AgentController {
             return emitter;
         }
 
+        // v1.23.1 修复：仅在 onCompletion 释放信号量（onError/onTimeout 路径随后
+        // 也会触发 onCompletion），避免重复 release 导致并发上限逐渐失效
         emitter.onCompletion(() -> {
             heartbeatRunning.set(false);
             agentService.release();
@@ -106,7 +108,6 @@ public class AgentController {
         });
         emitter.onTimeout(() -> {
             heartbeatRunning.set(false);
-            agentService.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -114,7 +115,6 @@ public class AgentController {
         });
         emitter.onError(e -> {
             heartbeatRunning.set(false);
-            agentService.release();
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }

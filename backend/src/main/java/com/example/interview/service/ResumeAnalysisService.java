@@ -113,11 +113,12 @@ public class ResumeAnalysisService {
                     .append("{\"overallScore\":75,\"dimensions\":[{\"name\":\"岗位匹配度\",\"score\":80,\"suggestion\":\"改进建议\"}],\"strengths\":[\"优势1\"],\"improvements\":[\"建议1\"]}")
                     .toString();
 
-            // 3. 调用 AI
-            String response = chatClient.prompt()
-                    .user(prompt)
-                    .call()
-                    .content();
+            // 3. 调用 AI（v1.23.1：纳入全局 AI 并发闸门）
+            String response = com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                    chatClient.prompt()
+                            .user(prompt)
+                            .call()
+                            .content());
 
             // 4. AI 响应空值校验
             if (response == null || response.isBlank()) {
@@ -142,7 +143,7 @@ public class ResumeAnalysisService {
             }
 
             // 8. 简历文本向量化存入向量库
-            storeResumeEmbedding(cacheKey, resumeText);
+            storeResumeEmbedding(cacheKey, userId, resumeText);
 
             return cleaned;
         } finally {
@@ -153,15 +154,17 @@ public class ResumeAnalysisService {
 
     /**
      * 将简历存入向量库，用于后续面试题生成（异步执行，避免 embedding 不可用时阻塞主请求）
+     * v1.23.1：id 改用 UUID（cacheKey 含冒号，切回 pgvector 时非法）；metadata 补 userId 便于隔离
      */
-    private void storeResumeEmbedding(String resumeId, String resumeText) {
+    private void storeResumeEmbedding(String resumeId, String userId, String resumeText) {
         // 用虚拟线程异步执行，避免 embedding 不可用时阻塞主请求
         Thread.startVirtualThread(() -> {
             try {
                 Document doc = Document.builder()
-                        .id(resumeId)
+                        .id(java.util.UUID.randomUUID().toString())
                         .text(resumeText)
-                        .metadata(Map.of("type", "resume", "resumeId", resumeId))
+                        .metadata(Map.of("type", "resume", "resumeId", resumeId,
+                                "userId", userId))
                         .build();
                 vectorStore.add(List.of(doc));
             } catch (Exception e) {

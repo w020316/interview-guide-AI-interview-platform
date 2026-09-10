@@ -76,6 +76,9 @@ public class RagSearchService {
     /** 已入库文档计数（与内存向量库同生命周期） */
     private final java.util.concurrent.atomic.AtomicInteger storedDocs = new java.util.concurrent.atomic.AtomicInteger(0);
 
+    /** 单批去重检查次数上限：每次检查 = 1 次 embedding 调用，批量大时限流保护（超出部分直接导入） */
+    private static final int DEDUP_CHECK_LIMIT = 50;
+
     /**
      * 检索相关知识点（返回 JSON 数组字符串）
      * v1.8：按 userId 隔离，仅返回该用户导入的 + 系统预置共享文档
@@ -172,11 +175,12 @@ public class RagSearchService {
                     .append("2. 尽量引用参考资料\n")
                     .append("3. 如果资料不足，明确说明\n");
 
-            // 3. 调用 AI 并做空值校验
-            String response = chatClient.prompt()
-                    .user(promptBuilder.toString())
-                    .call()
-                    .content();
+            // 3. 调用 AI 并做空值校验（v1.23.1：纳入全局 AI 并发闸门）
+            String response = com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                    chatClient.prompt()
+                            .user(promptBuilder.toString())
+                            .call()
+                            .content());
 
             if (response == null || response.isBlank()) {
                 log.warn("AI 返回内容为空，question='{}'", question);
@@ -209,13 +213,15 @@ public class RagSearchService {
             FilterExpressionBuilder b = new FilterExpressionBuilder();
             List<Document> docs = new ArrayList<>();
             int skipped = 0;
+            int dedupChecks = 0;
             for (String text : documents) {
                 if (text == null || text.isBlank()) continue;
-                // 去重预检：搜索该用户已有文档中是否存在高度相似的
-                if (isDuplicate(text, userId, b)) {
+                // 去重预检：搜索该用户已有文档中是否存在高度相似的（每批最多 50 次，超出直接导入）
+                if (dedupChecks < DEDUP_CHECK_LIMIT && isDuplicate(text, userId, b)) {
                     skipped++;
                     continue;
                 }
+                dedupChecks++;
                 docs.add(Document.builder()
                         .text(text)
                         .metadata(Map.of("type", "knowledge", META_USER_ID, userId))

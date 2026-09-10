@@ -96,12 +96,12 @@ function checkVersion() {
 }
 
 function handleClose() {
-  if (dontShowAgain.value) {
-    try {
-      localStorage.setItem(STORAGE_KEY, CURRENT_VERSION)
-    } catch {
-      // 忽略写入失败
-    }
+  // v1.23.1 修复（P1）：任何主动关闭（我知道了/×/ESC）均记录当前版本。
+  // 此前仅勾选「不再提醒」才写入，导致直接关闭的用户每次路由切换/刷新都重复弹窗
+  try {
+    localStorage.setItem(STORAGE_KEY, CURRENT_VERSION)
+  } catch {
+    // 忽略写入失败
   }
   emit('update:visible', false)
 }
