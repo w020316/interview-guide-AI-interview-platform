@@ -74,21 +74,9 @@ export function getErrMessage(e: unknown, fallback: string): string {
 }
 
 /**
- * 自动重试（仅对 GET 请求和网络错误重试，POST 不重试避免重复写入）
+ * 冷启动自动重试已在响应拦截器中实现（wakeBackend + 重放原请求），
+ * 此处不再保留独立重试函数，避免双路径重试叠加。
  */
-async function retryRequest(config: any, retryCount = 1): Promise<any> {
-  try {
-    return await api.request(config)
-  } catch (err: any) {
-    const isNetworkError = err.message === 'Network Error' || err.code === 'ECONNABORTED'
-    const canRetry = retryCount > 0 && isNetworkError && (config.method || 'get').toLowerCase() === 'get'
-    if (canRetry) {
-      await new Promise(r => setTimeout(r, 1500)) // 1.5s 后重试
-      return retryRequest(config, retryCount - 1)
-    }
-    throw err
-  }
-}
 
 // 请求拦截器：自动注入 JWT token + Content-Type
 api.interceptors.request.use((config) => {
