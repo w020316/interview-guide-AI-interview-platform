@@ -327,6 +327,7 @@ async function analyzeJd() {
       { jobDescription: jdText.value },
       { timeout: AI_TIMEOUT }) as unknown as string
     jdResult.value = repairAndParse<Record<string, any>>(data, { error: '解析失败' })
+    if (jdResult.value?.error) ElMessage.warning('AI 返回内容解析失败，请重试')
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '分析失败'))
   } finally { loading.value = false }
@@ -343,6 +344,7 @@ async function diagnoseGap() {
       { resumeText: resumeText.value, jobDescription: jdText.value },
       { timeout: AI_TIMEOUT }) as unknown as string
     gapResult.value = repairAndParse<Record<string, any>>(data, { error: '解析失败' })
+    if (gapResult.value?.error) ElMessage.warning('AI 返回内容解析失败，请重试')
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '诊断失败'))
   } finally { gapLoading.value = false }

@@ -6,7 +6,13 @@
     </header>
 
     <!-- 空状态 -->
-    <div v-if="!loading && !resumes.length" class="empty-state fade-in">
+    <div v-if="!loading && loadError" class="empty-state fade-in">
+      <div class="empty-icon">⚠️</div>
+      <div class="empty-title">加载失败</div>
+      <div class="empty-desc">简历历史加载失败，请检查网络后重试</div>
+      <button class="retry-btn" @click="loadResumes">重新加载</button>
+    </div>
+    <div v-else-if="!loading && !resumes.length" class="empty-state fade-in">
       <div class="empty-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6"
@@ -151,6 +157,7 @@ interface AnalysisResult {
 }
 
 const resumes = ref<Resume[]>([])
+const loadError = ref(false)
 const loading = ref(true)
 const detailVisible = ref(false)
 const detailLoading = ref(false)
@@ -165,6 +172,7 @@ async function loadResumes() {
     const data = await api.get('/api/resume/history') as unknown as Resume[]
     resumes.value = data || []
   } catch (e: unknown) {
+    loadError.value = true
     ElMessage.error(getErrMessage(e, '加载简历历史失败'))
   } finally {
     loading.value = false
@@ -733,4 +741,7 @@ function scoreBg(s?: number | null): string {
     max-height: 90vh;
   }
 }
+
+.retry-btn { padding: 8px 20px; border: 1px solid var(--c-accent); background: transparent; color: var(--c-accent); border-radius: var(--radius-md); cursor: pointer; font-size: 14px; transition: all 0.2s; }
+.retry-btn:hover { background: var(--c-accent-soft); }
 </style>

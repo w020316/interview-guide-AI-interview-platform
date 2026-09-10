@@ -135,11 +135,23 @@ async function scrollToBottom() {
   }
 }
 
+/** 会话接口 401/403 统一处理：清除登录态并跳转（与 api 拦截器行为一致） */
+function handleAuthFailure(status: number): boolean {
+  if (status === 401 || status === 403) {
+    ElMessage.error('登录已过期，请重新登录')
+    clearAuth()
+    window.location.href = '/login?redirect=' + encodeURIComponent('/agent')
+    return true
+  }
+  return false
+}
+
 async function fetchConversations() {
   try {
     const res = await fetch(`${apiBaseUrl}/api/agent/conversations`, {
       headers: { Authorization: `Bearer ${authState.token}` },
     })
+    if (handleAuthFailure(res.status)) return
     if (!res.ok) return
     const body = await res.json()
     conversations.value = body?.data || []
@@ -154,6 +166,7 @@ async function loadConversation(id: number) {
     const res = await fetch(`${apiBaseUrl}/api/agent/conversations/${id}/messages`, {
       headers: { Authorization: `Bearer ${authState.token}` },
     })
+    if (handleAuthFailure(res.status)) return
     if (!res.ok) throw new Error('load failed')
     const body = await res.json()
     const items: Array<{ role: string; content: string }> = body?.data || []
@@ -181,6 +194,7 @@ async function removeConversation(id: number) {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${authState.token}` },
     })
+    if (handleAuthFailure(res.status)) return
     if (!res.ok) throw new Error('delete failed')
     if (conversationId.value === id) {
       newConversation()

@@ -39,6 +39,12 @@
     </div>
 
     <!-- 空状态 -->
+    <div v-else-if="loadError" class="empty-state fade-in">
+      <div class="empty-icon">⚠️</div>
+      <div class="empty-title">加载失败</div>
+      <div class="empty-desc">错题数据加载失败，请检查网络后重试</div>
+      <button class="retry-btn" @click="load">重新加载</button>
+    </div>
     <div v-else-if="!items.length" class="empty-state fade-in">
       <div class="empty-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -118,6 +124,7 @@ const router = useRouter()
 const threshold = ref(60)
 const items = ref<WrongQuestion[]>([])
 const total = ref(0)
+const loadError = ref(false)
 const loading = ref(true)
 
 onMounted(() => load())
@@ -133,6 +140,7 @@ async function load() {
     items.value = data?.questions || []
     total.value = data?.total || items.value.length
   } catch (e: unknown) {
+    loadError.value = true
     ElMessage.error(getErrMessage(e, '加载错题失败'))
   } finally { loading.value = false }
 }
@@ -215,4 +223,7 @@ function difficultyText(d: string) {
   .book-head { flex-wrap: wrap; }
   .book-meta, .book-body { margin-left: 0; }
 }
+
+.retry-btn { padding: 8px 20px; border: 1px solid var(--c-accent); background: transparent; color: var(--c-accent); border-radius: var(--radius-md); cursor: pointer; font-size: 14px; transition: all 0.2s; }
+.retry-btn:hover { background: var(--c-accent-soft); }
 </style>

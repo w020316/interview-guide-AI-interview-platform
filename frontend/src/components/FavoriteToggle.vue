@@ -44,10 +44,20 @@ const props = defineProps<{
 const favorited = ref(false)
 const loading = ref(false)
 
+// 模块级共享缓存：同页 N 个实例挂载时只发 1 次请求（修复 N+1 问题）
+// toggle 成功后置空，保证下次挂载拿到最新收藏集
+let favIdsPromise: Promise<number[]> | null = null
+function fetchFavIds(): Promise<number[]> {
+  if (!favIdsPromise) {
+    favIdsPromise = api.get('/api/favorite/ids') as unknown as Promise<number[]>
+  }
+  return favIdsPromise
+}
+
 async function loadState() {
   if (!props.questionId) return
   try {
-    const ids = (await api.get('/api/favorite/ids')) as unknown as number[]
+    const ids = await fetchFavIds()
     favorited.value = Array.isArray(ids) && ids.includes(props.questionId)
   } catch {
     /* 静默：加载失败不阻塞列表展示 */
@@ -69,6 +79,7 @@ async function onToggle() {
       evaluationScore: props.evaluationScore,
     })) as unknown as { favorited: boolean }
     favorited.value = res.favorited
+    favIdsPromise = null
     ElMessage.success(res.favorited ? '已收藏' : '已取消收藏')
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '收藏操作失败'))

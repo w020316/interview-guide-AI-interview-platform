@@ -18,6 +18,12 @@
     </div>
 
     <!-- 空状态 -->
+    <div v-else-if="loadError" class="empty-state fade-in">
+      <div class="empty-icon">⚠️</div>
+      <div class="empty-title">加载失败</div>
+      <div class="empty-desc">历史记录加载失败，请检查网络后重试</div>
+      <button class="retry-btn" @click="loadHistory">重新加载</button>
+    </div>
     <div v-else-if="!sessions.length" class="empty-state fade-in">
       <div class="empty-icon">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
@@ -101,6 +107,7 @@ interface Question {
 const sessions = ref<Session[]>([])
 const qMap = ref<Record<string, Question[]>>({})
 const loadingId = ref('')
+const loadError = ref(false)
 const loading = ref(false)
 
 onMounted(() => loadHistory())
@@ -112,6 +119,7 @@ async function loadHistory() {
     const data = await api.get('/api/session/list') as unknown as Session[]
     sessions.value = data || []
   } catch (e: unknown) {
+    loadError.value = true
     ElMessage.error(getErrMessage(e, '加载历史失败'))
   } finally { loading.value = false }
 }
@@ -453,4 +461,7 @@ function statusText(status: string) {
     white-space: normal;
   }
 }
+
+.retry-btn { padding: 8px 20px; border: 1px solid var(--c-accent); background: transparent; color: var(--c-accent); border-radius: var(--radius-md); cursor: pointer; font-size: 14px; transition: all 0.2s; }
+.retry-btn:hover { background: var(--c-accent-soft); }
 </style>
