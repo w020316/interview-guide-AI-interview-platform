@@ -233,6 +233,10 @@ function tagList(tags: string | null): string[] {
   return tags.split(/[,，]/).map((s) => s.trim()).filter(Boolean).slice(0, 4)
 }
 
+function showDetail(job: JobPosting) {
+  detail.value = job
+}
+
 async function fetchJobs() {
   loading.value = true
   try {
