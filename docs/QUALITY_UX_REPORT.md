@@ -1,7 +1,7 @@
 # 质量评估与体验评估报告（v1.23.1）
 
 > 评估日期：2026-09-10 · 评估方式：静态审查（双代理）+ 浏览器实测（674px 视口）+ 线上 API 验证
-> 修复版本：7 个 commit（5121387 → de183f3），均已推送并部署验证
+> 修复版本：8 个 commit（5121387 → 9dcbd83），均已推送并部署验证
 
 ---
 
@@ -61,10 +61,23 @@
 | # | 问题 | 方案 | 预期效果 | 难度 | 优先级 |
 |---|------|------|----------|------|--------|
 | 1 | 题目生成 2-3 分钟无进度反馈 | 生成阶段分步推送状态（连接后端→检索知识→生成中 N/3） | 等待感知时长下降，流失减少 | 中 | P1 |
-| 2 | 更新弹窗疑似重复弹出（实测两次导航均弹） | 核查"我知道了"是否写入 localStorage；验证关闭逻辑 | 消除打扰 | 低 | P1 |
+| 2 | ~~更新弹窗疑似重复弹出（实测两次导航均弹）~~ ✅ 已修复（9dcbd83） | 任何主动关闭（我知道了/×/ESC）均写入 localStorage 版本号 | 消除打扰 | 低 | P1 |
 | 3 | AI 分析类接口无乐观 loading 骨架 | 骨架屏替代 spinner | 感知速度提升 | 低 | P2 |
 | 4 | 简历上传后不能直接一键"开始面试" | 分析页完成后 CTA 直达模拟面试（预填岗位） | 核心路径减 2 步 | 低 | P2 |
 | 5 | 招聘广场无订阅/收藏 | 岗位收藏 + 截止日期前站内提醒 | 回访动力 | 中 | P3 |
+
+### 4.1 收尾修复（commit 9dcbd83，v1.23.1）
+
+| # | 问题 | 修复方案 | 文件 |
+|---|------|----------|------|
+| 1 | AI 并发闸门覆盖不全：evaluateAnswer/analyze/RAG 调用未受保护，免费模型限流窗口下并发压力放大 | 新增进程级 `AiConcurrencyGuard`（5 许可），所有同步 AI 调用统一纳入 | [AiConcurrencyGuard.java](../backend/src/main/java/com/example/interview/ai/AiConcurrencyGuard.java) |
+| 2 | SSE 信号量重复释放：onError/onTimeout 与 onCompletion 双路径 release，可用许可只增不减，20 并发上限逐渐失效 | 仅在 onCompletion 释放（容器错误/超时路径必触发 onCompletion） | [InterviewController.java](../backend/src/main/java/com/example/interview/controller/InterviewController.java), [AgentController.java](../backend/src/main/java/com/example/interview/controller/AgentController.java) |
+| 3 | 简历 URL 导入 SSRF 可绕过：字符串黑名单可被十进制 IP/DNS 重绑定/重定向绕过 | 改为 DNS 解析级校验全部 IP 均为公网地址 + Jsoup 禁止跟随重定向 | [ResumeController.java](../backend/src/main/java/com/example/interview/controller/ResumeController.java) |
+| 4 | 流式降级内容拼接错乱：流中途失败切换模型重发，前半段旧模型内容与新模型内容混杂 | 仅在未发出任何 token 前才允许降级，已出 token 则直接报错 | [FallbackChatModel.java](../backend/src/main/java/com/example/interview/ai/FallbackChatModel.java) |
+| 5 | 向量库文档 id 含冒号（cacheKey），切回 pgvector 时非法；metadata 缺 userId 隔离字段 | id 改用 UUID，metadata 补 userId | [ResumeAnalysisService.java](../backend/src/main/java/com/example/interview/service/ResumeAnalysisService.java) |
+| 6 | RAG 去重检查无上限，批量大时 embedding 调用放大 | 单批去重检查上限 50 次，超出部分直接导入 | [RagSearchService.java](../backend/src/main/java/com/example/interview/service/RagSearchService.java) |
+
+回归验证：后端 264 测试全过 · 前端 220 测试全过 · 前端构建成功（30.03s）
 
 ## 五、新功能 Roadmap 建议
 
