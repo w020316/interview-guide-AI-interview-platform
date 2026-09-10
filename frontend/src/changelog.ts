@@ -10,9 +10,19 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.23.2'
+export const CURRENT_VERSION = '1.24.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.24.0',
+    date: '2026-09-10',
+    title: '版本 1.24.0 · 招聘广场岗位收藏与截止提醒',
+    items: [
+      '新增功能：岗位收藏，点击岗位卡片 ♥ 即可收藏，新增「我的收藏」集中查看',
+      '新增功能：截止提醒，收藏岗位截止前 7 天自动横幅提醒，不再错过秋招申请',
+      '体验升级：收藏快照保存，岗位下架后收藏记录仍可回看'
+    ]
+  },
   {
     version: '1.23.2',
     date: '2026-09-10',

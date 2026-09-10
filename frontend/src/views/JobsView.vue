@@ -14,12 +14,24 @@
         @click="switchTab(t.value)"
       >
         {{ t.label }}
-        <span v-if="recruitCounts[t.value]" class="tab-count">{{ recruitCounts[t.value] }}</span>
+        <span v-if="t.value === 'FAVORITE' && favCount" class="tab-count">{{ favCount }}</span>
+        <span v-else-if="t.value !== 'FAVORITE' && recruitCounts[t.value]" class="tab-count">{{ recruitCounts[t.value] }}</span>
       </button>
     </div>
 
-    <!-- 筛选栏 -->
-    <div class="filter-card">
+    <!-- 收藏岗位截止提醒横幅（v1.23.3：收藏岗位 7 天内截止时站内提醒） -->
+    <div v-if="remindJobs.length && !favoriteMode" class="ddl-banner" role="status">
+      <span class="ddl-banner-icon">⏰</span>
+      <span class="ddl-banner-text">
+        {{ remindJobs.length }} 个收藏岗位将于 {{ remindJobs[0].daysLeft === 0 ? '今天' : `${remindJobs[0].daysLeft} 天内` }}截止
+        <template v-if="remindJobs.length > 1">（最近：{{ remindJobs[0].title }} · {{ remindJobs[0].companyName }}）</template>
+        <template v-else>（{{ remindJobs[0].title }} · {{ remindJobs[0].companyName }}）</template>
+      </span>
+      <button class="ddl-banner-action" @click="switchTab('FAVORITE')">查看收藏</button>
+    </div>
+
+    <!-- 筛选栏（收藏模式无筛选与分页） -->
+    <div v-if="!favoriteMode" class="filter-card">
       <div class="filter-row">
         <input
           v-model="keyword"
@@ -73,14 +85,15 @@
     </div>
 
     <!-- 空态 -->
-    <div v-else-if="jobs.length === 0" class="empty-state">
+    <div v-else-if="displayJobs.length === 0" class="empty-state">
       <div class="empty-icon">🔍</div>
-      <p>暂无匹配的岗位，试试调整筛选条件或刷新数据</p>
+      <p v-if="favoriteMode">暂无收藏岗位，在岗位卡片上点击 ♥ 收藏感兴趣的岗位，截止前会在此提醒</p>
+      <p v-else>暂无匹配的岗位，试试调整筛选条件或刷新数据</p>
     </div>
 
     <!-- 岗位列表 -->
     <div v-else class="job-list fade-in-up">
-      <div v-for="job in jobs" :key="job.id" class="job-card" @click="showDetail(job)">
+      <div v-for="job in displayJobs" :key="job.id" class="job-card" @click="showDetail(job)">
         <div class="job-card-main">
           <div class="job-card-header">
             <span class="job-title">{{ job.title }}</span>
@@ -100,6 +113,19 @@
           </div>
         </div>
         <div class="job-card-side">
+          <button
+            class="fav-btn"
+            :class="{ active: favIds.has(job.id) }"
+            :aria-label="favIds.has(job.id) ? '取消收藏' : '收藏该岗位'"
+            :title="favIds.has(job.id) ? '取消收藏' : '收藏该岗位，截止前站内提醒'"
+            @click.stop="toggleFavorite(job)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                :fill="favIds.has(job.id) ? 'currentColor' : 'none'"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
           <span class="deadline" :class="deadlineClass(job.deadline)">
             {{ deadlineText(job.deadline) }}
           </span>
@@ -118,7 +144,7 @@
     </div>
 
     <!-- 分页 -->
-    <div v-if="total > pageSize" class="pagination">
+    <div v-if="!favoriteMode && total > pageSize" class="pagination">
       <button :disabled="page === 0 || loading" @click="goPage(page - 1)">上一页</button>
       <span class="page-info">第 {{ page + 1 }} / {{ totalPages }} 页 · 共 {{ total }} 条</span>
       <button :disabled="page >= totalPages - 1 || loading" @click="goPage(page + 1)">下一页</button>
@@ -213,8 +239,25 @@ const recruitTabs = [
   { value: 'SPRING', label: '春招' },
   { value: 'INTERN', label: '实习' },
   { value: 'SOCIAL', label: '社招' },
+  { value: 'FAVORITE', label: '我的收藏' },
   { value: '', label: '全部' },
 ]
+
+/** 收藏岗位快照（后端 /api/jobs/favorite 返回） */
+interface JobFavorite {
+  id: number
+  jobId: number
+  title: string
+  companyName: string
+  platform: string | null
+  location: string | null
+  salary: string | null
+  deadline: string | null
+  applyUrl: string | null
+  daysLeft?: number
+  expired?: boolean
+  remind?: boolean
+}
 
 const loading = ref(false)
 const loadError = ref(false)
@@ -235,6 +278,71 @@ const source = ref('')
 const meta = ref<JobsMeta>({ industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null })
 const recruitCounts = computed(() => meta.value.recruitCounts || {})
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+
+// ── 岗位收藏（v1.23.3）──
+const favIds = ref<Set<number>>(new Set())
+const favList = ref<JobFavorite[]>([])
+const favCount = ref(0)
+const favoriteMode = computed(() => recruitType.value === 'FAVORITE')
+/** 收藏岗位截止 7 天内的提醒列表（横幅数据源） */
+const remindJobs = computed(() => favList.value.filter((f) => f.remind))
+
+/** 收藏模式渲染快照卡片；普通模式渲染搜索结果 */
+const displayJobs = computed<JobPosting[]>(() => {
+  if (!favoriteMode.value) return jobs.value
+  return favList.value.map((f) => ({
+    id: f.jobId,
+    platform: f.platform || '',
+    externalId: '',
+    title: f.title,
+    companyName: f.companyName,
+    industry: null,
+    jobType: null,
+    location: f.location,
+    salary: f.salary,
+    degree: null,
+    experience: null,
+    recruitType: null,
+    deadline: f.deadline,
+    applyUrl: f.applyUrl,
+    description: null,
+    requirements: null,
+    tags: null,
+  }))
+})
+
+/** 拉取我的收藏（快照列表，同时得到 favIds / count / 提醒数据） */
+async function loadFavorites() {
+  try {
+    const res = await api.get('/api/jobs/favorite') as unknown as { items?: JobFavorite[] }
+    favList.value = res?.items || []
+    favCount.value = favList.value.length
+    favIds.value = new Set(favList.value.map((f) => f.jobId))
+  } catch {
+    // 收藏数据加载失败不阻断岗位列表
+  }
+}
+
+/** 收藏/取消收藏（快照式：取消后该岗位的提醒同步消失） */
+async function toggleFavorite(job: JobPosting) {
+  try {
+    const res = await api.post('/api/jobs/favorite/toggle', { jobId: job.id }) as unknown as { favorited: boolean; count: number }
+    const ids = new Set(favIds.value)
+    if (res.favorited) {
+      ids.add(job.id)
+      ElMessage.success('已收藏，截止前会提醒你')
+    } else {
+      ids.delete(job.id)
+      ElMessage.success('已取消收藏')
+    }
+    favIds.value = ids
+    favCount.value = res.count ?? favIds.value.size
+    // 刷新快照列表（提醒横幅与收藏 Tab 数据同步）
+    loadFavorites()
+  } catch (e) {
+    ElMessage.error(getErrMessage(e, '收藏操作失败'))
+  }
+}
 
 function tagList(tags: string | null): string[] {
   if (!tags) return []
@@ -289,7 +397,11 @@ function applyFilters() {
 
 function switchTab(value: string) {
   recruitType.value = value
-  applyFilters()
+  if (value === 'FAVORITE') {
+    loadFavorites()
+  } else {
+    applyFilters()
+  }
 }
 
 function goPage(p: number) {
@@ -336,6 +448,8 @@ function formatTime(iso: string): string {
 onMounted(() => {
   fetchJobs()
   fetchMeta()
+  // 收藏数据用于提醒横幅与 Tab 计数（失败静默，不阻断岗位列表）
+  loadFavorites()
 })
 </script>
 
@@ -386,6 +500,70 @@ onMounted(() => {
   margin-left: 4px;
   font-size: 12px;
   opacity: 0.8;
+}
+
+/* ── 收藏截止提醒横幅（v1.23.3）── */
+.ddl-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+.ddl-banner-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.ddl-banner-text {
+  flex: 1;
+  min-width: 200px;
+  font-size: 13px;
+  color: #991b1b;
+  line-height: 1.5;
+}
+.ddl-banner-action {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+.ddl-banner-action:hover {
+  background: #b91c1c;
+}
+
+/* ── 岗位收藏按钮（v1.23.3）── */
+.fav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-color, #e5e5e5);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary, #999);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.fav-btn:hover {
+  color: #e11d48;
+  border-color: #fda4af;
+  background: #fff1f2;
+}
+.fav-btn.active {
+  color: #e11d48;
+  border-color: #fda4af;
+  background: #fff1f2;
 }
 
 .filter-card {
