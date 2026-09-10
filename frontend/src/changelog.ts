@@ -10,9 +10,19 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.24.0'
+export const CURRENT_VERSION = '1.25.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.25.0',
+    date: '2026-09-10',
+    title: '版本 1.25.0 · 面试报告分享卡片 + 简历多版本对比',
+    items: [
+      '新增功能：面试复盘报告一键生成分享卡片，成绩海报可直接保存 PNG 分享',
+      '新增功能：简历历史支持多版本对比，勾选两个版本查看综合分与各维度提升/回落',
+      '体验升级：对比结果附一句话总结，直指可优化的维度'
+    ]
+  },
   {
     version: '1.24.0',
     date: '2026-09-10',

@@ -279,6 +279,7 @@
             </div>
 
             <div class="report-actions">
+              <BaseButton variant="ghost" :loading="sharing" @click="shareCard">分享卡片</BaseButton>
               <BaseButton variant="ghost" @click="exportPdf">导出 PDF</BaseButton>
               <BaseButton variant="ghost" @click="closeReportGoHistory">查看历史记录</BaseButton>
               <BaseButton variant="gradient" @click="closeReportGoSetup">完成，继续练习</BaseButton>
@@ -624,6 +625,27 @@ function exportPdf() {
       summary: reportSummary.value,
     })
   }).catch(() => ElMessage.error('导出 PDF 模块加载失败，请重试'))
+}
+
+// ── 生成分享卡片（v1.25.0：canvas 成绩海报 + PNG 下载，动态加载） ──
+const sharing = ref(false)
+function shareCard() {
+  if (sharing.value) return
+  if (!sessionEvals.value.length) return
+  sharing.value = true
+  const a = reportAverages.value
+  void import('../utils/reportShare').then(({ generateShareCard }) =>
+    generateShareCard({
+      jobTitle: jobDesc.value.trim() || '未指定岗位',
+      answeredCount: answeredCount.value,
+      overall: a.overall,
+      completeness: a.completeness,
+      accuracy: a.accuracy,
+      expression: a.expression,
+    }),
+  ).then(() => ElMessage.success('分享卡片已生成并下载'))
+    .catch((e: unknown) => ElMessage.error((e as Error)?.message || '分享卡片生成失败，请重试'))
+    .finally(() => { sharing.value = false })
 }
 
 async function startInterview() {
