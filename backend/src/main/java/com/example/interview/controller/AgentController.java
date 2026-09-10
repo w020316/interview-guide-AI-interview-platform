@@ -45,6 +45,9 @@ public class AgentController {
 
     private static final Logger log = LoggerFactory.getLogger(AgentController.class);
 
+    /** SSE meta 事件 JSON 序列化（线程安全，避免手拼 JSON 转义不全） */
+    private static final com.fasterxml.jackson.databind.ObjectMapper META_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
+
     /** SSE 会话准备/事件推送专用线程池（虚拟线程，随用随建） */
     private final java.util.concurrent.ExecutorService sseExecutor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
 
@@ -134,9 +137,11 @@ public class AgentController {
                 }
 
                 // 通知前端会话 ID（新建会话时前端需要保存）
-                emitter.send(SseEmitter.event().name("meta").data(
-                        "{\"conversationId\":" + session.conversation().getId()
-                                + ",\"title\":\"" + session.conversation().getTitle().replace("\"", "'") + "\"}"));
+                // v1.23.3：ObjectMapper 序列化，替换手拼 JSON（title 含特殊字符时手拼会产生非法 JSON）
+                Map<String, Object> meta = new LinkedHashMap<>();
+                meta.put("conversationId", session.conversation().getId());
+                meta.put("title", session.conversation().getTitle());
+                emitter.send(SseEmitter.event().name("meta").data(META_MAPPER.writeValueAsString(meta)));
 
                 emitter.send(SseEmitter.event().name("start").data(""));
                 heartbeatRunning.set(true);

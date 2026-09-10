@@ -1,6 +1,5 @@
 package com.example.interview.controller;
 
-import com.example.interview.entity.InterviewQuestionEntity;
 import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.entity.ResumeEntity;
 import com.example.interview.interceptor.RateLimitInterceptor;
@@ -31,15 +30,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * {@link StatsController} MockMvc 集成测试
  *
- * <p>覆盖 GET /api/stats/dashboard 端点。
+ * <p>覆盖 GET /api/stats/dashboard 与 GET /api/stats/trend 端点。
  * Controller 直接注入 Repository（无 Service 层），故 @MockBean 三个 Repository。
+ *
+ * <p>v1.23.3：实现改为数据库聚合（count/avg/GROUP BY），
+ * 测试按新数据访问契约 mock；业务断言（计数/均分/排序/截断）与重构前保持一致。
  *
  * <p>测试场景：
  * <ul>
  *   <li>空数据：返回 0 计数 + 空活动列表</li>
  *   <li>有简历无面试：简历计数 + 简历平均分</li>
- *   <li>有面试会话：会话计数 + 已完成数 + 面试平均分（含 N+1 修复路径）</li>
+ *   <li>有面试会话：会话计数 + 已完成数 + 面试平均分（聚合查询路径）</li>
  *   <li>混合数据：最近活动合并排序 + 截断到 10 条</li>
+ *   <li>trend：按会话 GROUP BY 聚合、无评分会话不产生数据点</li>
  * </ul>
  */
 @WebMvcTest(controllers = StatsController.class,
@@ -81,10 +84,13 @@ class StatsControllerTest {
     @Test
     @DisplayName("空数据返回 200 + 全 0 计数")
     void dashboard_emptyData_returns200() throws Exception {
-        when(resumeRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
-                .thenReturn(List.of());
-        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
-                .thenReturn(List.of());
+        when(resumeRepository.countByUserId(USER_ID)).thenReturn(0L);
+        when(resumeRepository.avgOverallScoreByUserId(USER_ID)).thenReturn(null);
+        when(resumeRepository.findTop10ByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(List.of());
+        when(sessionRepository.countByUserId(USER_ID)).thenReturn(0L);
+        when(sessionRepository.countByUserIdAndStatus(USER_ID, "FINISHED")).thenReturn(0L);
+        when(sessionRepository.findTop10ByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(List.of());
+        when(questionRepository.avgEvaluationScoreByUserId(USER_ID)).thenReturn(null);
 
         mockMvc.perform(get("/api/stats/dashboard"))
                 .andExpect(status().isOk())
@@ -102,10 +108,13 @@ class StatsControllerTest {
                 .id(1L).userId(USER_ID).targetJob("Java 后端")
                 .overallScore(80).createdAt(LocalDateTime.now())
                 .build();
-        when(resumeRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
-                .thenReturn(List.of(r));
-        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
-                .thenReturn(List.of());
+        when(resumeRepository.countByUserId(USER_ID)).thenReturn(1L);
+        when(resumeRepository.avgOverallScoreByUserId(USER_ID)).thenReturn(80.0);
+        when(resumeRepository.findTop10ByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(List.of(r));
+        when(sessionRepository.countByUserId(USER_ID)).thenReturn(0L);
+        when(sessionRepository.countByUserIdAndStatus(USER_ID, "FINISHED")).thenReturn(0L);
+        when(sessionRepository.findTop10ByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(List.of());
+        when(questionRepository.avgEvaluationScoreByUserId(USER_ID)).thenReturn(null);
 
         mockMvc.perform(get("/api/stats/dashboard"))
                 .andExpect(status().isOk())
@@ -117,7 +126,7 @@ class StatsControllerTest {
     }
 
     @Test
-    @DisplayName("有面试会话返回 200 + 会话计数 + 面试平均分（N+1 修复路径）")
+    @DisplayName("有面试会话返回 200 + 会话计数 + 面试平均分（聚合查询路径）")
     void dashboard_withSessions_returns200() throws Exception {
         ResumeEntity r = ResumeEntity.builder()
                 .id(1L).userId(USER_ID).targetJob("Java 后端")
@@ -128,15 +137,14 @@ class StatsControllerTest {
                 .jobDescription("Java 后端").status("FINISHED")
                 .createdAt(LocalDateTime.now())
                 .build();
-        InterviewQuestionEntity q = InterviewQuestionEntity.builder()
-                .id(1L).sessionId("s1").evaluationScore(85).build();
 
-        when(resumeRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
-                .thenReturn(List.of(r));
-        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
-                .thenReturn(List.of(s));
-        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(List.of("s1")))
-                .thenReturn(List.of(q));
+        when(resumeRepository.countByUserId(USER_ID)).thenReturn(1L);
+        when(resumeRepository.avgOverallScoreByUserId(USER_ID)).thenReturn(75.0);
+        when(resumeRepository.findTop10ByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(List.of(r));
+        when(sessionRepository.countByUserId(USER_ID)).thenReturn(1L);
+        when(sessionRepository.countByUserIdAndStatus(USER_ID, "FINISHED")).thenReturn(1L);
+        when(sessionRepository.findTop10ByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(List.of(s));
+        when(questionRepository.avgEvaluationScoreByUserId(USER_ID)).thenReturn(85.0);
 
         mockMvc.perform(get("/api/stats/dashboard"))
                 .andExpect(status().isOk())
@@ -160,12 +168,13 @@ class StatsControllerTest {
                 .createdAt(LocalDateTime.now().minusHours(1))
                 .build();
 
-        when(resumeRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
-                .thenReturn(List.of(r));
-        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
-                .thenReturn(List.of(s));
-        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(any()))
-                .thenReturn(List.of());
+        when(resumeRepository.countByUserId(USER_ID)).thenReturn(1L);
+        when(resumeRepository.avgOverallScoreByUserId(USER_ID)).thenReturn(80.0);
+        when(resumeRepository.findTop10ByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(List.of(r));
+        when(sessionRepository.countByUserId(USER_ID)).thenReturn(1L);
+        when(sessionRepository.countByUserIdAndStatus(USER_ID, "FINISHED")).thenReturn(0L);
+        when(sessionRepository.findTop10ByUserIdOrderByCreatedAtDesc(USER_ID)).thenReturn(List.of(s));
+        when(questionRepository.avgEvaluationScoreByUserId(USER_ID)).thenReturn(null);
 
         mockMvc.perform(get("/api/stats/dashboard"))
                 .andExpect(status().isOk())
@@ -181,7 +190,7 @@ class StatsControllerTest {
     @Test
     @DisplayName("trend: 无已完成会话返回空列表")
     void trend_noFinished_returnsEmpty() throws Exception {
-        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
+        when(sessionRepository.findByUserIdAndStatusOrderByCreatedAtAsc(USER_ID, "FINISHED"))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/stats/trend"))
@@ -198,15 +207,13 @@ class StatsControllerTest {
                 .jobDescription("Java 后端").status("FINISHED")
                 .createdAt(LocalDateTime.now().minusDays(2))
                 .build();
-        InterviewQuestionEntity q1 = InterviewQuestionEntity.builder()
-                .id(1L).sessionId("s1").evaluationScore(70).build();
-        InterviewQuestionEntity q2 = InterviewQuestionEntity.builder()
-                .id(2L).sessionId("s1").evaluationScore(80).build();
 
-        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
+        when(sessionRepository.findByUserIdAndStatusOrderByCreatedAtAsc(USER_ID, "FINISHED"))
                 .thenReturn(List.of(s1));
-        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(List.of("s1")))
-                .thenReturn(List.of(q1, q2));
+        // GROUP BY 聚合：s1 两题 70/80 → 平均 75
+        // 注意 List.of(Object[]) 会被当作 varargs 展开，需显式指定泛型
+        when(questionRepository.avgScoreGroupBySession(List.of("s1")))
+                .thenReturn(List.<Object[]>of(new Object[]{"s1", 75.0, 2L}));
 
         mockMvc.perform(get("/api/stats/trend"))
                 .andExpect(status().isOk())
@@ -218,24 +225,19 @@ class StatsControllerTest {
     }
 
     @Test
-    @DisplayName("trend: 无评分记录的正处于会话不产生数据点")
+    @DisplayName("trend: 无评分记录的会话不产生数据点")
     void trend_noScores_skipsPoint() throws Exception {
         InterviewSessionEntity finished = InterviewSessionEntity.builder()
                 .id(1L).sessionId("s1").userId(USER_ID)
                 .jobDescription("Java 后端").status("FINISHED")
                 .createdAt(LocalDateTime.now())
                 .build();
-        InterviewSessionEntity ongoing = InterviewSessionEntity.builder()
-                .id(2L).sessionId("s2").userId(USER_ID)
-                .jobDescription("前端").status("ONGOING")
-                .createdAt(LocalDateTime.now().minusDays(1))
-                .build();
 
-        when(sessionRepository.findByUserIdOrderByCreatedAtDesc(USER_ID))
-                .thenReturn(List.of(finished, ongoing));
-        // 仅 finished 会话有题但无评分
-        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(List.of("s1", "s2")))
-                .thenReturn(List.of(InterviewQuestionEntity.builder().id(1L).sessionId("s1").build()));
+        when(sessionRepository.findByUserIdAndStatusOrderByCreatedAtAsc(USER_ID, "FINISHED"))
+                .thenReturn(List.of(finished));
+        // 聚合查询仅返回有评分的会话；s1 无评分 → 无聚合行
+        when(questionRepository.avgScoreGroupBySession(List.of("s1")))
+                .thenReturn(List.of());
 
         mockMvc.perform(get("/api/stats/trend"))
                 .andExpect(status().isOk())

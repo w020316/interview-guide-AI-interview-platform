@@ -2,7 +2,6 @@ package com.example.interview.controller;
 
 import com.example.interview.common.Result;
 import com.example.interview.dto.DashboardStats;
-import com.example.interview.entity.InterviewQuestionEntity;
 import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.entity.ResumeEntity;
 import com.example.interview.repository.InterviewQuestionRepository;
@@ -21,12 +20,10 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 用户统计接口
@@ -58,51 +55,29 @@ public class StatsController {
 
     /**
      * 个人中心仪表盘统计
+     * v1.23.3：统计走数据库聚合（count/avg），活动列表只取近 10 条，
+     * 不再将该用户全部简历/会话/题目实体加载进内存
      */
     @GetMapping("/dashboard")
     public Result<DashboardStats> dashboard() {
         String userId = currentUserId();
 
-        // 简历数据
-        List<ResumeEntity> resumes = resumeRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        long resumeCount = resumes.size();
-        Double avgResumeScore = resumes.stream()
-                .map(ResumeEntity::getOverallScore)
-                .filter(s -> s != null)
-                .mapToInt(Integer::intValue)
-                .average()
-                .stream()
-                .boxed()
-                .findFirst()
-                .orElse(null);
+        // 简历数据（count/avg 由数据库聚合；活动列表仅取近 10 条）
+        long resumeCount = resumeRepository.countByUserId(userId);
+        Double avgResumeScore = resumeRepository.avgOverallScoreByUserId(userId);
+        List<ResumeEntity> recentResumes = resumeRepository.findTop10ByUserIdOrderByCreatedAtDesc(userId);
 
-        // 面试会话数据
-        List<InterviewSessionEntity> sessions = sessionRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        long sessionCount = sessions.size();
-        long finishedCount = sessions.stream()
-                .filter(s -> "FINISHED".equals(s.getStatus()))
-                .count();
+        // 面试会话数据（数据库聚合）
+        long sessionCount = sessionRepository.countByUserId(userId);
+        long finishedCount = sessionRepository.countByUserIdAndStatus(userId, "FINISHED");
+        List<InterviewSessionEntity> recentSessions = sessionRepository.findTop10ByUserIdOrderByCreatedAtDesc(userId);
 
-        // 计算面试题平均分（单次批量查询，避免 N+1）
-        Double avgInterviewScore = null;
-        if (!sessions.isEmpty()) {
-            List<String> sessionIds = sessions.stream().map(InterviewSessionEntity::getSessionId).toList();
-            // 一次 IN 查询获取所有会话的题目，避免循环 N+1
-            List<InterviewQuestionEntity> allQ = questionRepository.findBySessionIdInOrderByCreatedAtDesc(sessionIds);
-            avgInterviewScore = allQ.stream()
-                    .map(InterviewQuestionEntity::getEvaluationScore)
-                    .filter(s -> s != null)
-                    .mapToInt(Integer::intValue)
-                    .average()
-                    .stream()
-                    .boxed()
-                    .findFirst()
-                    .orElse(null);
-        }
+        // 全部题目平均分：数据库子查询聚合（此前需加载全部会话+题目实体）
+        Double avgInterviewScore = questionRepository.avgEvaluationScoreByUserId(userId);
 
-        // 构建最近活动列表（最多 10 条，简历 + 面试混合按时间倒序）
+        // 构建最近活动列表（近 10 条，简历 + 面试混合按时间倒序）
         List<DashboardStats.RecentActivity> activities = new ArrayList<>();
-        for (ResumeEntity r : resumes) {
+        for (ResumeEntity r : recentResumes) {
             activities.add(new DashboardStats.RecentActivity(
                     "resume",
                     "简历分析 · " + (r.getTargetJob() == null ? "未指定岗位" : r.getTargetJob()),
@@ -110,7 +85,7 @@ public class StatsController {
                     r.getCreatedAt() == null ? "" : r.getCreatedAt().format(ISO)
             ));
         }
-        for (InterviewSessionEntity s : sessions) {
+        for (InterviewSessionEntity s : recentSessions) {
             activities.add(new DashboardStats.RecentActivity(
                     "interview",
                     "模拟面试 · " + (s.getJobDescription() == null ? "未指定岗位" : s.getJobDescription()),
@@ -146,33 +121,30 @@ public class StatsController {
             @RequestParam(value = "dimension", defaultValue = "DAY") String dimension) {
         String userId = currentUserId();
 
-        // 已完成会话，按时间升序
-        List<InterviewSessionEntity> finished = sessionRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .filter(s -> "FINISHED".equals(s.getStatus()))
-                .sorted(Comparator.comparing(InterviewSessionEntity::getCreatedAt))
-                .toList();
+        // 已完成会话，按时间升序（数据库按状态过滤，避免全量加载后内存筛选）
+        List<InterviewSessionEntity> finished =
+                sessionRepository.findByUserIdAndStatusOrderByCreatedAtAsc(userId, "FINISHED");
         if (finished.isEmpty()) {
             return Result.success(List.of());
         }
 
-        // 单次批量查询所有题，避免 N+1
+        // 按会话聚合平均分与已评分题数（数据库 GROUP BY，不再加载全部题目实体）
         List<String> sessionIds = finished.stream().map(InterviewSessionEntity::getSessionId).toList();
-        List<InterviewQuestionEntity> allQuestions =
-                questionRepository.findBySessionIdInOrderByCreatedAtDesc(sessionIds);
-        Map<String, List<InterviewQuestionEntity>> bySession = allQuestions.stream()
-                .collect(Collectors.groupingBy(InterviewQuestionEntity::getSessionId));
+        Map<String, double[]> scoreBySession = new java.util.HashMap<>(); // [avg, count]
+        for (Object[] row : questionRepository.avgScoreGroupBySession(sessionIds)) {
+            String sid = (String) row[0];
+            double avg = ((Number) row[1]).doubleValue();
+            long cnt = ((Number) row[2]).longValue();
+            scoreBySession.put(sid, new double[]{avg, cnt});
+        }
 
-        // 1. 先计算每个会话的综合得分（跳过无评分记录的会话）
+        // 1. 计算每个会话的综合得分（跳过无评分记录的会话，与聚合查询结果对齐）
         List<SessionPoint> sessionPoints = new ArrayList<>();
         for (InterviewSessionEntity s : finished) {
-            var qs = bySession.getOrDefault(s.getSessionId(), List.of());
-            var scored = qs.stream()
-                    .map(InterviewQuestionEntity::getEvaluationScore)
-                    .filter(score -> score != null)
-                    .toList();
-            if (scored.isEmpty()) continue; // 无评分记录不产生数据点
-            double avg = scored.stream().mapToInt(Integer::intValue).average().orElse(0);
-            sessionPoints.add(new SessionPoint(s, Math.round(avg * 10) / 10.0, scored.size()));
+            double[] agg = scoreBySession.get(s.getSessionId());
+            if (agg == null) continue; // 无评分记录不产生数据点
+            double avg = Math.round(agg[0] * 10) / 10.0;
+            sessionPoints.add(new SessionPoint(s, avg, (int) agg[1]));
         }
         if (sessionPoints.isEmpty()) {
             return Result.success(List.of());
