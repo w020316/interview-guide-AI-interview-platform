@@ -8,6 +8,7 @@ const routes = [
   { path: '/resume/history', component: () => import('../views/ResumeHistoryView.vue'), meta: { requiresAuth: true } },
   { path: '/job',       component: () => import('../views/JobAnalysisView.vue'), meta: { requiresAuth: true  } },
   { path: '/jobs',      component: () => import('../views/JobsView.vue'),        meta: { requiresAuth: true  } },
+  { path: '/agent',     component: () => import('../views/AgentView.vue'),       meta: { requiresAuth: true  } },
   { path: '/interview', component: () => import('../views/InterviewView.vue'),meta: { requiresAuth: true  } },
   { path: '/history',   component: () => import('../views/HistoryView.vue'),   meta: { requiresAuth: true  } },
   { path: '/learning',  component: () => import('../views/LearningView.vue'),   meta: { requiresAuth: true  } },

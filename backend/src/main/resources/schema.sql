@@ -120,6 +120,25 @@ CREATE INDEX IF NOT EXISTS idx_job_posting_deadline ON job_posting(deadline);
 CREATE INDEX IF NOT EXISTS idx_job_posting_recruit_type ON job_posting(recruit_type);
 CREATE INDEX IF NOT EXISTS idx_job_posting_active ON job_posting(active);
 
+-- 智能体会话与消息表（Career Copilot，v1.23.0）
+CREATE TABLE IF NOT EXISTS agent_conversation (
+    id          BIGSERIAL   PRIMARY KEY,
+    user_id     VARCHAR(64) NOT NULL,
+    title       VARCHAR(60) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_agent_conv_user ON agent_conversation(user_id);
+
+CREATE TABLE IF NOT EXISTS agent_message (
+    id              BIGSERIAL   PRIMARY KEY,
+    conversation_id BIGINT      NOT NULL REFERENCES agent_conversation(id) ON DELETE CASCADE,
+    role            VARCHAR(20) NOT NULL,
+    content         TEXT        NOT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_agent_msg_conv ON agent_message(conversation_id);
+
 -- 预置知识数据
 INSERT INTO knowledge_doc (category, title, content, source) VALUES
 ('Java 基础', 'HashMap 原理', 'HashMap 基于哈希表实现，JDK 8 后采用数组+链表+红黑树结构。', 'JavaGuide'),

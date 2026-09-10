@@ -46,6 +46,13 @@
               </svg>
               <span>招聘广场</span>
             </router-link>
+            <router-link v-if="authState.token" to="/agent" class="nav-link" :class="{ active: route.path === '/agent' }">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2a7 7 0 0 1 4 12.7V17a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-2.3A7 7 0 0 1 12 2z M9 21h6"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>智能体</span>
+            </router-link>
             <router-link to="/interview" class="nav-link" :class="{ active: route.path === '/interview' }">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"

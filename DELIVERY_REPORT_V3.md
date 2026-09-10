@@ -248,3 +248,40 @@ Unexpected token ''', ..."gestion": '项目 '教材ING"... is not valid JSON
 
 - Render 环境变量需新增 AI_BAI_API_KEY（render.yaml 已声明，sync:false 需在 Dashboard 填入）
 - 前端版本号 changelog 1.22.0 与后端 APP_INFO_VERSION 已同步
+
+---
+
+## 九、v1.23.0 增量交付（2026-09-10）：Career Copilot 求职智能体
+
+> 设计文档：docs/AGENT_DESIGN.md（需求分析/架构/技术选型/测试策略完整版）
+
+### 9.1 功能概述
+
+对话式求职智能体，自然语言直达平台能力，支持自主决策调用 5 大工具：
+
+| 工具 | 能力来源 | 场景 |
+|------|----------|------|
+| searchJobs | 招聘智能体（v1.22.0） | 找岗位/查企业/秋招推荐 |
+| searchKnowledge | 知识库 RAG | 技术面试题解答 |
+| getMyInterviewStats | 面试统计 | 薄弱点分析 |
+| listWrongQuestions | 错题本 | 针对性复习 |
+| getUpcomingInterviews | 面试日历 | 日程规划 |
+
+### 9.2 核心实现
+
+- **编排**：AgentService（记忆窗口 12 条 + System Prompt 用户画像预注入 + SSE 心跳流式）
+- **工具**：AgentTools（@Tool 注解，每请求实例绑定 userId 避免 ThreadLocal 跨线程串扰；结果裁剪 ≤1500 字符防上下文爆炸）
+- **协议**：AgentController（/api/agent/chat/stream SSE + 会话 CRUD，复用 v1.16 心跳保活与 error 优雅完成模式）
+- **存储**：agent_conversation / agent_message 表（SchemaInitializer 幂等建表）
+- **模型**：复用 v1.22.0 降级链，GLM-5.3-Flash 原生 function calling
+
+### 9.3 测试记录
+
+- 后端：AgentToolsTest（11 用例：裁剪/空数据/异常降级）+ AgentControllerTest（3 用例：认证/防越权/异步 SSE）✅
+- 全量回归：后端 264 测试通过；前端 220 测试通过 + vue-tsc 0 错误 ✅
+- 新增前端 agentSse 解析器 7 用例（跨块缓冲/心跳注释/CRLF/flush）✅
+
+### 9.4 安全与可靠性设计
+
+- 工具全只读；userId 从 JWT 提取，会话归属校验防 IDOR；用户输入 PromptSanitizer 消毒
+- SSE 并发信号量保护（20）；对话落库失败不影响响应

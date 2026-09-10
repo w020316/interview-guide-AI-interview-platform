@@ -10,9 +10,21 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.22.0'
+export const CURRENT_VERSION = '1.23.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.23.0',
+    date: '2026-09-10',
+    title: '版本 1.23.0 · 新增「Career Copilot」求职智能体',
+    items: [
+      '新增功能：AI 智能体对话，自然语言直达平台能力——找岗位、查知识、析薄弱、排日程，无需页面跳转',
+      '新增功能：智能体可自主调用 5 大工具（岗位检索/知识库问答/面试统计/错题回顾/面试日程），自动组合完成复杂任务',
+      '新增功能：多轮会话记忆，对话历史自动保存，支持会话切换与删除，上下文追问更连贯',
+      '新增功能：个性化画像预注入，智能体基于你的真实练习数据（薄弱分类/平均分）给出针对性建议',
+      '体验升级：SSE 流式输出 + 思考状态提示，响应过程实时可见'
+    ]
+  },
   {
     version: '1.22.0',
     date: '2026-09-10',
