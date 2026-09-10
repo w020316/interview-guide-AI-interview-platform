@@ -97,5 +97,11 @@
   retryRequest 已删除（262b958）；AgentController meta 改 ObjectMapper 序列化（62a4bda）；
   LIKE 转义经复查当前代码已无 LIKE 查询（自然消解）；异常信息回显核实为设计内校验反馈渠道
   （内部异常走通用兜底文案），无需修改
+- ~~keepalive 超时过短~~ ✅ 已修复（e234c20，v1.25.1）：curl 30s → 100s + 失败重试，
+  冷启动超 30s 时旧配置必失败导致保活失效；修复后手动触发验证转绿（7s 成功）
+- ~~v1.24.0 Render 部署失败（启动崩溃循环）~~ ✅ 已修复（638f365，v1.25.1）：
+  REDIS_URL 生效时 Lettuce 不可变配置触发 IllegalStateException，
+  改用单参构造 + 公共 setter，redisTemplate bean 初始化增加本机回退兜底；
+  修复后 /api/info 7s 响应，Live = e234c20
 - 375/768 真机视口复核、Safari/Edge 实机回归（浏览器自动化无法调整视口尺寸，需人工）
-- SUS 57.5 → 80：v1.23.2 改进已上线，待真机走查复测
+- SUS 57.5 → 80：v1.23.2/v1.24.0/v1.25.0 改进均已上线，待真机走查复测
