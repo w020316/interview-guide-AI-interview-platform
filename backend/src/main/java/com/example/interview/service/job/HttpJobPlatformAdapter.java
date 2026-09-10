@@ -42,9 +42,19 @@ public class HttpJobPlatformAdapter implements JobPlatformAdapter {
     private final JobAgentProperties properties;
     private final ObjectMapper objectMapper;
 
+    /** 第三方 HTTP 拉取连接/读取超时（毫秒）：防挂死 endpoint 无限阻塞刷新互斥锁 */
+    private static final int CONNECT_TIMEOUT_MS = 3000;
+    private static final int READ_TIMEOUT_MS = 10000;
+
+    private final RestClient restClient;
+
     public HttpJobPlatformAdapter(JobAgentProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
         this.objectMapper = objectMapper;
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        factory.setReadTimeout(READ_TIMEOUT_MS);
+        this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
     @Override
@@ -99,7 +109,6 @@ public class HttpJobPlatformAdapter implements JobPlatformAdapter {
         if (!isEnabled(platformKey)) {
             return List.of();
         }
-        RestClient restClient = RestClient.create();
         String body = restClient.get()
                 .uri(cfg.getEndpoint())
                 .header("Authorization", cfg.getApiKey() == null ? "" : "Bearer " + cfg.getApiKey())
@@ -112,7 +121,6 @@ public class HttpJobPlatformAdapter implements JobPlatformAdapter {
     public List<JobDto> fetchChannel(JobAgentProperties.ChannelConfig channel) {
         String name = channel.getName() == null || channel.getName().isBlank()
                 ? "第三方渠道" : channel.getName().trim();
-        RestClient restClient = RestClient.create();
         String body = restClient.get()
                 .uri(channel.getEndpoint())
                 .header("Authorization", channel.getApiKey() == null ? "" : "Bearer " + channel.getApiKey())
