@@ -285,3 +285,10 @@ Unexpected token ''', ..."gestion": '项目 '教材ING"... is not valid JSON
 
 - 工具全只读；userId 从 JWT 提取，会话归属校验防 IDOR；用户输入 PromptSanitizer 消毒
 - SSE 并发信号量保护（20）；对话落库失败不影响响应
+
+### 9.5 上线验证与两处关键修复
+
+1. **B.AI 不支持 API 级 function calling**（实测 glm-5.3-flash / qwen3.8-flash 带 tools 参数均 400 Invalid request body）→ 改为自研 ReAct 提示词层工具协议（模型输出动作 JSON → JsonRepairUtil 修复 → 本地 dispatch → 观察回填，最多 6 轮）
+2. **岗位筛选生产 500**：@Query ":param IS NULL" 模式 PostgreSQL 无法推断 NULL 参数类型（H2 本地正常）→ 改用 JpaSpecificationExecutor 动态查询（commit c187875）
+
+线上最终验证：智能体自主调用 searchJobs → 返回结构化岗位表格（含申请链接），多轮会话记忆生效，SSE 分块输出正常；前端 pages.dev 已含 AgentView（1.23.0）。
