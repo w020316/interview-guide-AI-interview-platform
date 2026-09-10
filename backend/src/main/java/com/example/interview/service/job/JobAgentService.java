@@ -207,11 +207,13 @@ public class JobAgentService {
                                          int page, int size) {
         var spec = org.springframework.data.jpa.domain.Specification.where(emptySpec());
         if (!isBlank(keyword)) {
-            String kw = keyword.trim().toLowerCase();
+            // 转义 LIKE 通配符（% _ \），避免用户输入破坏精确匹配语义
+            String kw = escapeLike(keyword.trim().toLowerCase());
+            String pattern = "%" + kw + "%";
             spec = spec.and((root, query, cb) -> cb.or(
-                    cb.like(cb.lower(root.get("title")), "%" + kw + "%"),
-                    cb.like(cb.lower(root.get("companyName")), "%" + kw + "%"),
-                    cb.like(cb.lower(root.get("tags")), "%" + kw + "%")));
+                    cb.like(cb.lower(root.get("title")), pattern, '\\'),
+                    cb.like(cb.lower(root.get("companyName")), pattern, '\\'),
+                    cb.like(cb.lower(root.get("tags")), pattern, '\\')));
         }
         if (!isBlank(industry)) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("industry"), industry.trim()));
@@ -286,7 +288,8 @@ public class JobAgentService {
         return s == null || s.isBlank();
     }
 
-    private static String blankToNull(String s) {
-        return (s == null || s.isBlank()) ? null : s.trim();
+    /** LIKE 通配符转义（防止用户输入 % _ \ 破坏匹配语义） */
+    private static String escapeLike(String s) {
+        return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }
