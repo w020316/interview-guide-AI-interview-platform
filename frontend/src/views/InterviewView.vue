@@ -52,6 +52,27 @@
       <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="startInterview">
         {{ loading ? '正在准备…' : '开始面试' }}
       </BaseButton>
+
+      <!-- 生成分步进度（v1.23.2 优化①：消除 2-3 分钟生成的"黑盒等待"） -->
+      <div v-if="loading" class="gen-progress" role="status" aria-live="polite">
+        <div class="gen-steps">
+          <div v-for="(s, i) in GEN_STEPS" :key="s" class="gen-step"
+            :class="{ active: genStep === i + 1, done: genStep > i + 1 }">
+            <span class="gen-dot">
+              <svg v-if="genStep > i + 1" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span v-else class="gen-dot-inner" :class="{ pulse: genStep === i + 1 }"></span>
+            </span>
+            <span class="gen-label">{{ s }}</span>
+            <span v-if="genStep === i + 1" class="gen-elapsed">{{ genElapsed }}s</span>
+          </div>
+        </div>
+        <div class="gen-bar" aria-hidden="true">
+          <div class="gen-bar-fill" :style="{ width: genProgress + '%' }"></div>
+        </div>
+        <p class="gen-tip">题目由 AI 生成，通常需要 2-3 分钟，请保持页面打开，完成后自动进入答题</p>
+      </div>
     </div>
 
     <!-- Step 2: 面试进行中 -->
@@ -279,6 +300,7 @@ import { JOB_SUGGESTIONS } from '../utils/jobOptions'
 import renderMarkdown from '../utils/markdown'
 import { createSpeechRecorder, isSpeechSupported } from '../utils/speech'
 import { compareWithHistory, suggestNextTarget } from '../utils/reportCompare'
+import { nextGenProgress } from '../utils/genProgress'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 
 const router = useRouter()
@@ -323,9 +345,57 @@ interface EvalResult {
 
 const jobDesc = ref(routeJob)
 const resumeText = ref('')
+
+// 简历分析页"带着这份简历去模拟面试"带入的简历摘要（v1.23.2 优化③，读取后即清除）
+const PREFILL_RESUME_KEY = 'interview_prefill_resume'
+try {
+  const prefillResume = sessionStorage.getItem(PREFILL_RESUME_KEY)
+  if (prefillResume) {
+    resumeText.value = prefillResume
+    sessionStorage.removeItem(PREFILL_RESUME_KEY)
+  }
+} catch {
+  /* sessionStorage 不可用时忽略 */
+}
+
 const count = ref(!Number.isNaN(routeCount) ? Math.min(10, Math.max(3, routeCount)) : 5)
 const difficultyPref = ref(routeDiff && DIFF_OPTIONS.some((o) => o.value === routeDiff) ? routeDiff : '')
 const loading = ref(false)
+
+// ── 生成分步进度（v1.23.2 优化①）──
+/** 生成流程各阶段文案，genStep 取值 1-4 对应数组下标 0-3 */
+const GEN_STEPS = ['连接后端服务', '分析历史成绩', 'AI 生成题目（约 2-3 分钟）', '保存题目'] as const
+const genStep = ref(0)
+const genElapsed = ref(0)
+/** AI 生成阶段的感知进度条：渐近逼近 95%，完成后置 100 */
+const genProgress = ref(0)
+let genTimer: ReturnType<typeof setInterval> | null = null
+
+function startGenProgress() {
+  genStep.value = 1
+  genElapsed.value = 0
+  genProgress.value = 4
+  if (genTimer) clearInterval(genTimer)
+  genTimer = setInterval(() => {
+    genElapsed.value++
+    // AI 生成阶段（step 3）驱动感知进度，渐近 95% 避免提前到 100
+    if (genStep.value >= 3) {
+      genProgress.value = nextGenProgress(genProgress.value)
+    }
+  }, 1000)
+}
+
+function stopGenProgress(success = false) {
+  if (genTimer) {
+    clearInterval(genTimer)
+    genTimer = null
+  }
+  if (success) {
+    genStep.value = GEN_STEPS.length + 1 // 全部打勾
+    genProgress.value = 100
+  }
+}
+
 /** 由错题本带入聚焦项时的提示文案 */
 const focusNote = computed(() => FOCUS_OVERRIDE ? `已聚焦薄弱分类：${FOCUS_OVERRIDE}` : '')
 const sessionId = ref('')
@@ -561,6 +631,7 @@ async function startInterview() {
   if (loading.value) return // 防止重复点击
   loading.value = true
   let createdSessionId = ''
+  startGenProgress()
   try {
     // 1. 先创建会话（但不立即设置到响应式状态）
     const sess = await api.post('/api/session/create',
@@ -568,10 +639,13 @@ async function startInterview() {
     createdSessionId = sess.sessionId
 
     // 2. 生成面试题（跨场自适应：按历史成绩推断难度 + 聚焦薄弱分类）
+    genStep.value = 2
     const { difficulty, focusCategories } = await resolveAdaptiveTarget()
+    genStep.value = 3
     const qs = await api.post('/api/interview/questions',
       { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value, difficulty, focusCategories },
       { timeout: AI_TIMEOUT }) as unknown as string
+    genStep.value = 4
 
     // 3. 解析题目（失败时清理已创建的会话，防孤儿会话）
     const parsed = safeParse<Question[]>(qs, [])
@@ -605,7 +679,10 @@ async function startInterview() {
     if (createdSessionId) {
       api.put(`/api/session/${createdSessionId}/finish`).catch(() => {})
     }
-  } finally { loading.value = false }
+  } finally {
+    loading.value = false
+    stopGenProgress()
+  }
 }
 
 async function streamHint() {
@@ -853,6 +930,8 @@ onUnmounted(() => {
   abortController?.abort()
   // 组件卸载时释放麦克风资源，避免持续占用
   if (speechRec?.isRecording()) speechRec.cancel()
+  // 清理生成进度计时器
+  stopGenProgress()
 })
 </script>
 
@@ -1042,6 +1121,96 @@ onUnmounted(() => {
   border: 1px solid var(--c-border-light);
   border-radius: var(--radius-md);
   padding: 10px 14px;
+  line-height: 1.5;
+}
+
+/* ── 生成分步进度（v1.23.2 优化①）── */
+.gen-progress {
+  margin-top: 16px;
+  padding: 16px 18px;
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+}
+.gen-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.gen-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--c-text-tertiary);
+  transition: color var(--transition-fast);
+}
+.gen-step.active,
+.gen-step.done {
+  color: var(--c-text);
+}
+.gen-step.active .gen-label {
+  font-weight: 600;
+  color: var(--brand-primary);
+}
+.gen-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid var(--c-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--brand-primary);
+  transition: all var(--transition-fast);
+}
+.gen-step.done .gen-dot {
+  border-color: var(--brand-primary);
+  background: var(--brand-primary);
+  color: #fff;
+}
+.gen-step.active .gen-dot {
+  border-color: var(--brand-primary);
+}
+.gen-dot-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--c-border);
+}
+.gen-dot-inner.pulse {
+  background: var(--brand-primary);
+  animation: gen-pulse 1.2s ease-in-out infinite;
+}
+@keyframes gen-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
+}
+.gen-elapsed {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.gen-bar {
+  height: 6px;
+  background: var(--brand-primary-50);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.gen-bar-fill {
+  height: 100%;
+  background: var(--brand-gradient);
+  border-radius: 999px;
+  transition: width 1s linear;
+}
+.gen-tip {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--c-text-tertiary);
   line-height: 1.5;
 }
 

@@ -83,13 +83,23 @@
       </div>
     </div>
 
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading-state">
-      <div class="loading-card">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">AI 正在分析你的简历</div>
-        <div class="loading-hint">首次调用需冷启动，最长约 1-2 分钟</div>
+    <!-- 加载状态：骨架屏（v1.23.2 优化②，按结果布局占位，降低等待焦虑） -->
+    <div v-if="loading" class="loading-state" role="status" aria-live="polite">
+      <div class="skeleton-hero">
+        <div class="skeleton skeleton-circle"></div>
+        <div class="skeleton-hero-lines">
+          <div class="skeleton skeleton-line" style="width: 30%"></div>
+          <div class="skeleton skeleton-line" style="width: 52%"></div>
+        </div>
       </div>
+      <div class="skeleton-grid">
+        <div v-for="i in 4" :key="i" class="skeleton-card">
+          <div class="skeleton skeleton-line" style="width: 42%"></div>
+          <div class="skeleton skeleton-bar"></div>
+          <div class="skeleton skeleton-line" style="width: 88%"></div>
+        </div>
+      </div>
+      <div class="skeleton-hint">AI 正在分析你的简历 · 首次调用需冷启动，最长约 1-2 分钟</div>
     </div>
 
     <!-- 分析结果 -->
@@ -116,6 +126,17 @@
           <h3>综合评分</h3>
           <p>{{ scoreLevel }}</p>
         </div>
+      </div>
+
+      <!-- 一键直达模拟面试（v1.23.2 优化③：核心路径减 2 步） -->
+      <div class="next-action">
+        <button class="btn-to-interview" :disabled="!resumeText" @click="goInterview">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5 3l14 9-14 9V3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          带着这份简历去模拟面试
+        </button>
+        <p class="next-hint">自动携带简历摘要{{ targetJob ? `与目标岗位「${targetJob}」` : '' }}，AI 将据此定制面试题</p>
       </div>
 
       <!-- 维度评分 -->
@@ -230,6 +251,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
@@ -243,6 +265,24 @@ interface AnalysisResult {
   dimensions: Array<{ name: string; score: number; suggestion: string }>
   strengths: string[]
   improvements: string[]
+}
+
+const router = useRouter()
+
+/** 简历摘要预填的 sessionStorage 键（与 InterviewView 约定一致） */
+const PREFILL_RESUME_KEY = 'interview_prefill_resume'
+
+/**
+ * 携带简历摘要与目标岗位直达模拟面试（v1.23.2 优化③）
+ * 简历文本经 sessionStorage 传递（URL 不宜携带长文本），截断 4000 字防超限
+ */
+function goInterview() {
+  try {
+    sessionStorage.setItem(PREFILL_RESUME_KEY, resumeText.value.slice(0, 4000))
+  } catch {
+    /* 存储不可用时降级：仅预填岗位 */
+  }
+  router.push('/interview' + (targetJob.value ? `?job=${encodeURIComponent(targetJob.value)}` : ''))
 }
 
 const tab = ref('upload')
@@ -869,6 +909,66 @@ function formatDate() {
   color: var(--c-text-tertiary);
 }
 
+/* ── 加载骨架屏（v1.23.2 优化②）── */
+.skeleton-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-lg);
+  margin-bottom: 16px;
+}
+.skeleton-circle {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skeleton-hero-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.skeleton-line {
+  height: 14px;
+}
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-lg);
+}
+.skeleton-bar {
+  height: 8px;
+  border-radius: 999px;
+}
+.skeleton-hint {
+  text-align: center;
+  font-size: 13px;
+  color: var(--c-text-tertiary);
+}
+@media (max-width: 640px) {
+  .skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+  .skeleton-circle {
+    width: 72px;
+    height: 72px;
+  }
+}
+
 /* ── 结果区 ── */
 .result-section {
   margin-top: 40px;
@@ -967,6 +1067,49 @@ function formatDate() {
   font-size: 14px;
   color: var(--c-text-secondary);
   margin: 0;
+}
+
+/* ── 一键直达模拟面试（v1.23.2 优化③）── */
+.next-action {
+  margin: 20px 0 28px;
+  padding: 18px 22px;
+  background: var(--brand-primary-light);
+  border: 1px solid var(--brand-primary);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.btn-to-interview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: #fff;
+  background: var(--brand-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+}
+.btn-to-interview:hover:not(:disabled) {
+  background: var(--brand-primary-hover);
+  transform: translateY(-1px);
+}
+.btn-to-interview:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.next-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--c-text-secondary);
+  line-height: 1.5;
 }
 
 /* ── 维度评分 ── */

@@ -10,9 +10,19 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.23.0'
+export const CURRENT_VERSION = '1.23.2'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.23.2',
+    date: '2026-09-10',
+    title: '版本 1.23.2 · 等待体验优化',
+    items: [
+      '体验升级：面试题生成全程分步进度展示（连接→分析→生成→保存）+ 已用时长与进度条，告别 2-3 分钟黑盒等待',
+      '体验升级：简历分析等待页改为骨架屏，加载布局一目了然',
+      '新增功能：简历分析完成后可一键「带着简历去模拟面试」，自动携带简历摘要与目标岗位'
+    ]
+  },
   {
     version: '1.23.0',
     date: '2026-09-10',
