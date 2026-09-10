@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 第三方招聘平台 HTTP 适配器（智联招聘/前程无忧/BOSS直聘）
+ * 第三方招聘平台 HTTP 适配器（智联招聘/前程无忧/BOSS直聘 + 通用渠道）
  *
  * 背景：主流招聘平台官方均未开放公开的岗位查询 API，本适配器对接第三方
  * 招聘数据聚合服务（返回 JSON 岗位数组）实现岗位获取：
@@ -23,6 +23,9 @@ import java.util.List;
  *
  * 字段名做了宽容映射（title/jobName、company/companyName、deadline/closeTime 等均可），
  * 未配置 endpoint 时 isEnabled()=false，调度自动跳过。
+ *
+ * v1.26.0：新增通用 channels 渠道（name + endpoint + 可选 apiKey），
+ * 任意招聘聚合服务配置即接入，无需改代码；与预置 platforms 平台统一拉取与失败隔离。
  */
 @Component
 public class HttpJobPlatformAdapter implements JobPlatformAdapter {
@@ -52,8 +55,11 @@ public class HttpJobPlatformAdapter implements JobPlatformAdapter {
 
     @Override
     public boolean isEnabled() {
-        return properties.getPlatforms().values().stream()
+        boolean anyPlatform = properties.getPlatforms().values().stream()
                 .anyMatch(p -> p.getEndpoint() != null && !p.getEndpoint().isBlank());
+        boolean anyChannel = properties.getChannels().stream()
+                .anyMatch(c -> c.getEndpoint() != null && !c.getEndpoint().isBlank());
+        return anyPlatform || anyChannel;
     }
 
     /** 指定平台是否已配置 endpoint */
@@ -73,6 +79,17 @@ public class HttpJobPlatformAdapter implements JobPlatformAdapter {
                 log.warn("平台 {} 岗位拉取失败：{}", entry.getKey(), e.getMessage());
             }
         }
+        // v1.26.0：通用渠道拉取（name 即入库 platform）
+        for (JobAgentProperties.ChannelConfig channel : properties.getChannels()) {
+            if (channel.getEndpoint() == null || channel.getEndpoint().isBlank()) {
+                continue;
+            }
+            try {
+                all.addAll(fetchChannel(channel));
+            } catch (Exception e) {
+                log.warn("渠道 {} 岗位拉取失败：{}", channel.getName(), e.getMessage());
+            }
+        }
         return all;
     }
 
@@ -86,6 +103,19 @@ public class HttpJobPlatformAdapter implements JobPlatformAdapter {
         String body = restClient.get()
                 .uri(cfg.getEndpoint())
                 .header("Authorization", cfg.getApiKey() == null ? "" : "Bearer " + cfg.getApiKey())
+                .retrieve()
+                .body(String.class);
+        return parseJobs(name, body);
+    }
+
+    /** 拉取通用渠道岗位（v1.26.0） */
+    public List<JobDto> fetchChannel(JobAgentProperties.ChannelConfig channel) {
+        String name = channel.getName() == null || channel.getName().isBlank()
+                ? "第三方渠道" : channel.getName().trim();
+        RestClient restClient = RestClient.create();
+        String body = restClient.get()
+                .uri(channel.getEndpoint())
+                .header("Authorization", channel.getApiKey() == null ? "" : "Bearer " + channel.getApiKey())
                 .retrieve()
                 .body(String.class);
         return parseJobs(name, body);
@@ -107,6 +137,19 @@ public class HttpJobPlatformAdapter implements JobPlatformAdapter {
             } catch (Exception e) {
                 // 单平台失败不影响其他平台
                 log.warn("平台 {} 岗位拉取失败：{}", name, e.getMessage());
+            }
+        }
+        // v1.26.0：通用渠道按渠道名分组入库
+        for (JobAgentProperties.ChannelConfig channel : properties.getChannels()) {
+            if (channel.getEndpoint() == null || channel.getEndpoint().isBlank()) {
+                continue;
+            }
+            String name = channel.getName() == null || channel.getName().isBlank()
+                    ? "第三方渠道" : channel.getName().trim();
+            try {
+                result.put(name, fetchChannel(channel));
+            } catch (Exception e) {
+                log.warn("渠道 {} 岗位拉取失败：{}", name, e.getMessage());
             }
         }
         return result;
@@ -191,6 +234,7 @@ public class HttpJobPlatformAdapter implements JobPlatformAdapter {
             case "SPRING", "春招" -> "SPRING";
             case "SOCIAL", "社招", "社会招聘" -> "SOCIAL";
             case "INTERN", "实习" -> "INTERN";
+            case "TARGETED", "定向", "专项", "专项招聘", "定向选调", "选调", "定向招聘", "计划单列" -> "TARGETED";
             default -> "AUTUMN";
         };
     }

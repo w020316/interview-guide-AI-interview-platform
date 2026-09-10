@@ -10,9 +10,21 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.25.0'
+export const CURRENT_VERSION = '1.26.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.26.0',
+    date: '2026-09-10',
+    title: '版本 1.26.0 · 招聘广场全面扩容',
+    items: [
+      '新增功能：岗位规模扩容至 56+ 条精选数据，新增春招/社招/实习/定向专项四大频道',
+      '新增功能：定向专项频道，收录选调生、国企专项、地方引才等计划',
+      '新增功能：行业覆盖扩展至教育/医疗/快消/游戏/汽车/物流/咨询/传媒等 15+ 行业，社招岗位含经验分层',
+      '新增功能：学历、经验筛选器，支持按自身条件快速定位岗位',
+      '体验升级：支持配置任意第三方招聘数据聚合渠道，岗位数据持续扩充'
+    ]
+  },
   {
     version: '1.25.0',
     date: '2026-09-10',

@@ -51,6 +51,14 @@
           <option value="">全部来源</option>
           <option v-for="s in meta.sources" :key="s" :value="s">{{ s }}</option>
         </select>
+        <select v-model="degree" class="filter-input">
+          <option value="">学历不限</option>
+          <option v-for="d in meta.degrees" :key="d" :value="d">{{ d }}</option>
+        </select>
+        <select v-model="experience" class="filter-input">
+          <option value="">经验不限</option>
+          <option v-for="e in meta.experiences" :key="e" :value="e">{{ e }}</option>
+        </select>
         <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="applyFilters">
           搜索
         </BaseButton>
@@ -230,6 +238,8 @@ interface JobsMeta {
   industries: string[]
   jobTypes: string[]
   sources: string[]
+  degrees?: string[]
+  experiences?: string[]
   recruitCounts: Record<string, number>
   lastUpdatedAt: string | null
 }
@@ -239,6 +249,7 @@ const recruitTabs = [
   { value: 'SPRING', label: '春招' },
   { value: 'INTERN', label: '实习' },
   { value: 'SOCIAL', label: '社招' },
+  { value: 'TARGETED', label: '定向专项' },
   { value: 'FAVORITE', label: '我的收藏' },
   { value: '', label: '全部' },
 ]
@@ -274,6 +285,8 @@ const industry = ref('')
 const jobType = ref('')
 const location = ref('')
 const source = ref('')
+const degree = ref('')
+const experience = ref('')
 
 const meta = ref<JobsMeta>({ industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null })
 const recruitCounts = computed(() => meta.value.recruitCounts || {})
@@ -365,6 +378,8 @@ async function fetchJobs() {
         location: location.value || undefined,
         recruitType: recruitType.value || undefined,
         source: source.value || undefined,
+        degree: degree.value || undefined,
+        experience: experience.value || undefined,
         page: page.value,
         size: pageSize,
       },

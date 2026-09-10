@@ -109,7 +109,7 @@ public class AgentTools {
                     blankToNull(keyword), blankToNull(industry), blankToNull(jobType), blankToNull(location),
                     (recruitType == null || recruitType.isBlank() || "null".equalsIgnoreCase(recruitType))
                             ? "AUTUMN" : recruitType.toUpperCase(),
-                    null, 0, 8);
+                    null, null, null, 0, 8);
             List<com.example.interview.entity.JobPostingEntity> items = page.getContent();
             if (items.isEmpty()) {
                 return "未找到匹配岗位。建议：放宽筛选条件，或提示用户在「招聘广场」页手动刷新数据。";

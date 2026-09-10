@@ -34,6 +34,14 @@ public interface JobPostingRepository extends JpaRepository<JobPostingEntity, Lo
     @Query("SELECT DISTINCT j.platform FROM JobPostingEntity j WHERE j.active = true ORDER BY j.platform")
     List<String> findDistinctPlatforms();
 
+    /** 筛选面板元数据：有效岗位的学历要求去重列表（v1.26.0） */
+    @Query("SELECT DISTINCT j.degree FROM JobPostingEntity j WHERE j.active = true AND j.degree IS NOT NULL ORDER BY j.degree")
+    List<String> findDistinctDegrees();
+
+    /** 筛选面板元数据：有效岗位的经验要求去重列表（v1.26.0） */
+    @Query("SELECT DISTINCT j.experience FROM JobPostingEntity j WHERE j.active = true AND j.experience IS NOT NULL ORDER BY j.experience")
+    List<String> findDistinctExperiences();
+
     /** 各招聘类型数量统计（秋招/社招/实习 Tab 角标） */
     @Query("SELECT j.recruitType, COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.recruitType IS NOT NULL GROUP BY j.recruitType")
     List<Object[]> countByRecruitType();

@@ -107,8 +107,8 @@ app:
     max-concurrent: ${SSE_MAX_CONCURRENT:20}
   job-agent:
     # v1.22.0 招聘信息智能体
-    # 内置秋招精选数据源始终启用；第三方平台（智联招聘/前程无忧/BOSS直聘）对接
-    # 需配置对应数据服务的 endpoint（OpenAI 聚合类招聘数据 API），为空则跳过该平台
+    # 内置精选数据源始终启用；第三方平台（智联招聘/前程无忧/BOSS直聘）对接
+    # 需配置对应数据服务的 endpoint（聚合类招聘数据 API），为空则跳过该平台
     platforms:
       zhaopin:
         endpoint: ${JOB_ZHAOPIN_ENDPOINT:}
@@ -119,6 +119,10 @@ app:
       boss:
         endpoint: ${JOB_BOSS_ENDPOINT:}
         api-key: ${JOB_BOSS_API_KEY:}
+    # v1.26.0 通用招聘数据渠道（可任意扩展，name 即展示名与入库 platform 标识）
+    # 环境变量等价写法（索引从 0 开始）：
+    #   APP_JOB_AGENT_CHANNELS_0_NAME / _ENDPOINT / _API_KEY
+    channels: []
     # 定时刷新：每 6 小时拉取一次各平台岗位
     refresh-fixed-delay-ms: ${JOB_REFRESH_DELAY:21600000}
   rag:

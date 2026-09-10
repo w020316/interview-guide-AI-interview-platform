@@ -52,7 +52,7 @@ class AgentToolsTest {
                 .title("Java 后端").companyName("腾讯").location("深圳")
                 .salary("25k").degree("本科").deadline(LocalDate.of(2026, 10, 1))
                 .applyUrl("https://join.qq.com").build();
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job)));
 
         String out = newTools().searchJobs("java", null, null, null, null);
@@ -62,7 +62,7 @@ class AgentToolsTest {
     @Test
     @DisplayName("searchJobs：空结果返回引导文案")
     void searchJobsEmpty() {
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
         String out = newTools().searchJobs("不存在的岗位", null, null, null, null);
         assertThat(out).contains("未找到匹配岗位");
@@ -71,7 +71,7 @@ class AgentToolsTest {
     @Test
     @DisplayName("searchJobs：异常时返回降级文案而非抛出")
     void searchJobsError() {
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
                 .thenThrow(new RuntimeException("db down"));
         String out = newTools().searchJobs(null, null, null, null, null);
         assertThat(out).contains("暂时不可用");
@@ -141,7 +141,7 @@ class AgentToolsTest {
         StringBuilder longText = new StringBuilder("x".repeat(3000));
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .title(longText.toString()).companyName("T").build();
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job)));
         String out = newTools().searchJobs(null, null, null, null, null);
         assertThat(out.length()).isLessThan(1600);

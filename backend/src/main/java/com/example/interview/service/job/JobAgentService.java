@@ -198,10 +198,12 @@ public class JobAgentService {
      * 说明：不使用 @Query 的 ":param IS NULL OR" 模式——PostgreSQL 无法推断
      * NULL 参数类型导致生产 500（H2 本地正常），Specification 无此问题。
      *
-     * @param recruitType AUTUMN 秋招 / SPRING 春招 / SOCIAL 社招 / INTERN 实习 / null 全部
+     * @param recruitType AUTUMN 秋招 / SPRING 春招 / SOCIAL 社招 / INTERN 实习 /
+     *                    TARGETED 定向专项 / null 全部
      */
     public Page<JobPostingEntity> search(String keyword, String industry, String jobType,
                                          String location, String recruitType, String source,
+                                         String degree, String experience,
                                          int page, int size) {
         var spec = org.springframework.data.jpa.domain.Specification.where(emptySpec());
         if (!isBlank(keyword)) {
@@ -226,6 +228,13 @@ public class JobAgentService {
         if (!isBlank(source)) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("platform"), source.trim()));
         }
+        // v1.26.0：学历/经验精确筛选（值来自 meta 中的去重列表，与入库值一致）
+        if (!isBlank(degree)) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("degree"), degree.trim()));
+        }
+        if (!isBlank(experience)) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("experience"), experience.trim()));
+        }
         spec = spec.and((root, query, cb) -> cb.isTrue(root.get("active")));
         // 排序：临期优先（截止日期升序，空截止日期排后），再按更新时间倒序
         var pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50),
@@ -238,12 +247,14 @@ public class JobAgentService {
     private static org.springframework.data.jpa.domain.Specification<JobPostingEntity> emptySpec() {
         return (root, query, cb) -> cb.conjunction();
     }
-    /** 筛选面板元数据：行业/职位类型/来源/各招聘类型数量/最近更新时间 */
+    /** 筛选面板元数据：行业/职位类型/学历/经验/来源/各招聘类型数量/最近更新时间 */
     public Map<String, Object> meta() {
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("industries", repository.findDistinctIndustries());
         meta.put("jobTypes", repository.findDistinctJobTypes());
         meta.put("sources", repository.findDistinctPlatforms());
+        meta.put("degrees", repository.findDistinctDegrees());
+        meta.put("experiences", repository.findDistinctExperiences());
 
         Map<String, Long> recruitCounts = new LinkedHashMap<>();
         for (Object[] row : repository.countByRecruitType()) {

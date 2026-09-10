@@ -41,7 +41,7 @@ public interface JobPlatformAdapter {
             String salary,
             String degree,
             String experience,
-            String recruitType,   // AUTUMN / SPRING / SOCIAL / INTERN
+            String recruitType,   // AUTUMN 秋招 / SPRING 春招 / SOCIAL 社招 / INTERN 实习 / TARGETED 定向专项
             LocalDate deadline,
             String applyUrl,
             String description,
