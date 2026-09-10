@@ -63,7 +63,32 @@ public class SchemaInitializer implements CommandLineRunner {
                     + "interview_at TIMESTAMP NOT NULL, "
                     + "status VARCHAR(20) DEFAULT 'UPCOMING', "
                     + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-            "CREATE INDEX IF NOT EXISTS idx_interview_event_user_id ON interview_event(user_id)"
+            "CREATE INDEX IF NOT EXISTS idx_interview_event_user_id ON interview_event(user_id)",
+            "CREATE TABLE IF NOT EXISTS job_posting ("
+                    + "id BIGSERIAL PRIMARY KEY, "
+                    + "platform VARCHAR(50) NOT NULL, "
+                    + "external_id VARCHAR(128) NOT NULL, "
+                    + "title VARCHAR(200) NOT NULL, "
+                    + "company_name VARCHAR(200) NOT NULL, "
+                    + "industry VARCHAR(50), "
+                    + "job_type VARCHAR(50), "
+                    + "location VARCHAR(100), "
+                    + "salary VARCHAR(100), "
+                    + "degree VARCHAR(50), "
+                    + "experience VARCHAR(50), "
+                    + "recruit_type VARCHAR(20), "
+                    + "deadline DATE, "
+                    + "apply_url VARCHAR(500), "
+                    + "description TEXT, "
+                    + "requirements TEXT, "
+                    + "tags VARCHAR(500), "
+                    + "active BOOLEAN NOT NULL DEFAULT TRUE, "
+                    + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "CONSTRAINT uk_job_posting_platform_external UNIQUE (platform, external_id))",
+            "CREATE INDEX IF NOT EXISTS idx_job_posting_deadline ON job_posting(deadline)",
+            "CREATE INDEX IF NOT EXISTS idx_job_posting_recruit_type ON job_posting(recruit_type)",
+            "CREATE INDEX IF NOT EXISTS idx_job_posting_active ON job_posting(active)"
     };
 
     @Override

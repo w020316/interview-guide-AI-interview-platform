@@ -13,7 +13,17 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
-      # ── Agnes AI ──
+      # ── AI 模型降级链（v1.22.0）──
+      # 主模型：B.AI GLM-5.3-Flash（免费）；次模型：B.AI Qwen3.8-Flash（免费）；兜底：Agnes AI
+      - key: AI_BAI_API_KEY
+        sync: false
+      - key: AI_BAI_BASE_URL
+        value: https://api.b.ai
+      - key: AI_BAI_CHAT_MODEL
+        value: glm-5.3-flash
+      - key: AI_BAI_CHAT_MODEL_SECONDARY
+        value: qwen3.8-flash
+      # ── Agnes AI（兜底模型 + 知识库 Embedding）──
       - key: AI_API_KEY
         sync: false
       - key: AI_BASE_URL

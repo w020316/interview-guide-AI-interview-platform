@@ -10,9 +10,20 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.21.0'
+export const CURRENT_VERSION = '1.22.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.22.0',
+    date: '2026-09-10',
+    title: '版本 1.22.0 · AI 主模型升级 B.AI + 新增「招聘广场」智能体模块',
+    items: [
+      '新增功能：招聘广场，聚合秋招精选与主流招聘平台岗位信息，支持按行业、职位类型、工作地点、数据来源多条件筛选与关键词搜索',
+      '新增功能：秋招信息专场，展示企业名称、岗位要求、申请截止日期与倒计时提醒，一键直达官方申请入口',
+      '新增功能：岗位数据定时自动更新（每 6 小时）+ 手动刷新，过期岗位自动下架，确保信息实时有效',
+      '新增功能：AI 智能分类，自动为岗位标注行业、职位类型与标签'
+    ]
+  },
   {
     version: '1.21.0',
     date: '2026-08-31',

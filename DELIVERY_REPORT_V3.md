@@ -214,3 +214,37 @@ Unexpected token ''', ..."gestion": '项目 '教材ING"... is not valid JSON
 ✅ **已部署**：代码已推送，Vercel 自动部署中
 
 **项目状态：可交付**
+
+---
+
+## 八、v1.22.0 增量交付（2026-09-10）：AI 主模型升级 B.AI + 招聘广场智能体
+
+### 8.1 AI 模型降级链
+
+调研 B.AI 平台（https://chat.b.ai/key）免费模型后选定最优组合：
+
+| 顺位 | 提供方 | 模型 | 费用 | 选型依据 |
+|------|--------|------|------|----------|
+| 1（主） | B.AI | GLM-5.3-Flash | 0 Credits（限免） | 320B/18B 激活、1M 上下文、多模态；Terminal-Bench 2.1 84.3、Toolathlon 78.4，agentic/编码/JSON 输出能力最强 |
+| 2（次） | B.AI | Qwen3.8-Flash | 0 Credits（限免） | 多模态、1M 上下文；SWE-bench Pro 62.5，免费兜底 |
+| 3（兜底） | Agnes AI | agnes-2.0-flash | 免费 | 原主模型自动降为末位；继续承担知识库 Embedding（text-embedding-3-small） |
+
+实现：FallbackChatModel（call/stream 双通道自动降级）+ AiProviderProperties（app.ai.chain 可配置）；主模型失败自动切换次模型。两个 B.AI 模型均已实测 200 可用。
+
+### 8.2 招聘信息智能体（三模块）
+
+1. **平台对接模块**：JobPlatformAdapter 适配器体系 — 内置秋招精选数据源（18 家企业 2027 届校招，含官方申请入口）+ 智联招聘/前程无忧/BOSS直聘 HTTP 适配器（配置第三方招聘数据服务 endpoint 即启用，字段宽容映射）
+2. **数据整合与更新模块**：(platform, external_id) 幂等 upsert；AI 智能分类补全行业/职位类型/标签（规则分类兜底）；每 6 小时定时刷新 + 手动刷新；过期自动下架 + 陈旧数据清理
+3. **展示与筛选模块**：/api/jobs 多条件筛选（关键词/行业/职位类型/地点/招聘类型/来源）+ 前端「招聘广场」页面（秋招精选 Tab、截止日期倒计时、岗位详情弹窗、官方申请入口直达）
+
+### 8.3 验证记录
+
+- 后端 mvn compile 通过；Spring 上下文 local profile 启动成功
+- 实测：POST /api/jobs/refresh 入库 18 条；GET /api/jobs、/api/jobs/meta、行业+地点组合筛选均返回正确
+- 前端 ue-tsc + vite build 通过（JobsView 8.21 kB chunk）；Vitest 213 个测试全部通过
+- 新增表 job_posting 已同步 SchemaInitializer 与 schema.sql
+
+### 8.4 部署注意
+
+- Render 环境变量需新增 AI_BAI_API_KEY（render.yaml 已声明，sync:false 需在 Dashboard 填入）
+- 前端版本号 changelog 1.22.0 与后端 APP_INFO_VERSION 已同步
