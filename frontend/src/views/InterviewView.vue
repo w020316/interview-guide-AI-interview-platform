@@ -719,6 +719,7 @@ function stopStream() {
 }
 
 async function submitAnswer() {
+  if (evalLoading.value) return // 防并发：Ctrl+Enter 可绕过按钮 disabled，此处兜底
   if (!userAnswer.value.trim()) return ElMessage.warning('请输入回答')
   evalLoading.value = true
   evalResult.value = null
@@ -768,6 +769,9 @@ function nextQuestion() {
     qIndex.value++
     userAnswer.value = ''
     evalResult.value = null
+    // 切题时终止上一题的提示流，避免旧题 token 继续写入新题的 streamContent
+    abortController?.abort()
+    streaming.value = false
     streamContent.value = ''
   }
 }

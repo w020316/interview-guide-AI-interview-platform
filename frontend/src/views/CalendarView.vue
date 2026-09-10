@@ -236,7 +236,7 @@ function selectDate(date: string) {
 
 async function load() {
   try {
-    itemsReload()
+    await itemsReload() // 必须等待，否则异常逃逸为 unhandled rejection，页面静默空数据
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载日程失败'))
   }

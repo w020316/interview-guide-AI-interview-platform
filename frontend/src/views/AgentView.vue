@@ -63,7 +63,7 @@
             :rows="2"
             placeholder="输入你的问题，如：帮我找深圳的 Java 秋招岗位..."
             :disabled="streaming"
-            @keydown.enter.exact.prevent="send()"
+            @keydown.enter.exact="onEnterKey"
           ></textarea>
           <BaseButton variant="gradient" :loading="streaming" :disabled="streaming || !input.trim()" @click="send()">
             发送
@@ -76,8 +76,8 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
 import renderMarkdown from '../utils/markdown'
@@ -116,6 +116,13 @@ const input = ref('')
 const streaming = ref(false)
 const thinking = ref(false)
 const chatBox = ref<HTMLElement | null>(null)
+let abortController: AbortController | null = null
+
+onBeforeUnmount(() => {
+  // 离开页面时终止进行中的 SSE 流，避免继续更新已卸载组件
+  abortController?.abort()
+  abortController = null
+})
 
 function renderedContent(content: string): string {
   return renderMarkdown(content)
@@ -164,10 +171,17 @@ async function loadConversation(id: number) {
 async function removeConversation(id: number) {
   if (streaming.value) return
   try {
-    await fetch(`${apiBaseUrl}/api/agent/conversations/${id}`, {
+    const confirmed = await ElMessageBox.confirm('确定删除该会话吗？历史消息将一并清除', '删除会话', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    }).then(() => true).catch(() => false)
+    if (!confirmed) return
+    const res = await fetch(`${apiBaseUrl}/api/agent/conversations/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${authState.token}` },
     })
+    if (!res.ok) throw new Error('delete failed')
     if (conversationId.value === id) {
       newConversation()
     }
@@ -181,6 +195,13 @@ function newConversation() {
   conversationId.value = null
   messages.value = []
   input.value = ''
+}
+
+/** Enter 发送；中文输入法组合态（选词）的回车不触发发送 */
+function onEnterKey(e: KeyboardEvent) {
+  if (e.isComposing || e.keyCode === 229) return
+  e.preventDefault()
+  send()
 }
 
 async function send(preset?: string) {
@@ -200,8 +221,10 @@ async function send(preset?: string) {
   scrollToBottom()
 
   try {
+    abortController = new AbortController()
     const resp = await fetch(`${apiBaseUrl}/api/agent/chat/stream`, {
       method: 'POST',
+      signal: abortController.signal,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${authState.token}`,
@@ -277,6 +300,7 @@ async function send(preset?: string) {
   } finally {
     streaming.value = false
     thinking.value = false
+    abortController = null
     fetchConversations()
     scrollToBottom()
   }

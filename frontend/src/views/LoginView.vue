@@ -304,6 +304,7 @@ async function authWithRetry(url: string, payload: unknown): Promise<unknown> {
 }
 
 async function handleLogin() {
+  if (loading.value) return // 防双触发：回车与表单 submit 同时触发时兜底
   if (!loginForm.value.username || !loginForm.value.password)
     return ElMessage.warning('请填写用户名和密码')
   loading.value = true
@@ -341,6 +342,7 @@ async function handleRegister() {
     return ElMessage.warning('密码至少 6 位')
   if (regForm.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regForm.value.email))
     return ElMessage.warning('邮箱格式不正确')
+  if (loading.value) return // 防双触发：回车与表单 submit 同时触发时兜底
   loading.value = true
   coldStartHint.value = false
   lastError.value = ''
