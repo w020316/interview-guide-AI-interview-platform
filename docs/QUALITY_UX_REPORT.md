@@ -110,3 +110,45 @@
   修复后 /api/info 7s 响应，Live = e234c20
 - 375/768 真机视口复核、Safari/Edge 实机回归（浏览器自动化无法调整视口尺寸，需人工）
 - SUS 57.5 → 80：v1.23.2/v1.24.0/v1.25.0 改进均已上线，待真机走查复测
+
+---
+
+## 二轮评估（v1.26.0 扫码增量 + 生产核验，2026-09-10）
+
+> 范围：针对 v1.26.0 招聘广场扩容后的增量代码审查 + 生产端到端验证。切入点=阶段0基线重测 + 阶段一增量聚焦审查。
+
+### 阶段0 · 基线重测（实测）
+| 项 | 结果 | 门槛 |
+|---|---|---|
+| 后端单测 | 283/283 通过（较上轮 +2） | 全过 |
+| 前端单测 | 234/234 通过（22 文件） | 全过 |
+| 前端 vue-tsc | 0 错误 | 通过 |
+| 前端覆盖率 | 88.06%（Stmts/Lines） | ≥80% |
+| 生产版本 | v1.26.0（changelog.ts CURRENT_VERSION） | — |
+
+### 阶段一 · 增量代码审查
+已排除：无密钥明文泄露（channels=[] + env 注入 apiKey）；无越权（JWT 隔离，岗位公共）；无 N+1（Specification+单条聚合）；degree/experience 前后端精确匹配一致。
+发现问题：**无 P0**；P1×1（见下，生产验证阶段暴露）、P2×1、P3×5 + 数据UX注记×1。
+
+### 阶段二 · 问题修复（4 独立 commit + 1 卫生清理）
+| # | 级别 | 问题 | 方案 | commit | 状态 |
+|---|---|---|---|---|---|
+| 1 | P1 | 前端「全部」Tab 传空 recruitType，服务端 `defaultValue=AUTUMN` 导致「全部」仅显示 18 条，隐藏 SPRING/SOCIAL/INTERN/TARGETED 共 38 条 | 移除 controller 的 AUTUMN 默认值（前端各 Tab 显式传值，AgentTools 内部显式默认） | 743b97e | ✅ 生产验证 全部=56 |
+| 2 | P2 | 第三方渠道 HTTP 拉取无超时，挂死 endpoint 永久占用刷新互斥锁 | SimpleClientHttpRequestFactory 注入连接3s/读取10s 超时 | 269d215 | ✅ |
+| 3 | P3 | 关键字 LIKE 通配符未转义 | escapeLike 转义 `\ % _`，LIKE 显式转义符 | 8709126 | ✅ 单测2例 |
+| 4 | P3 | 死代码 blankToNull | 删除 | 8709126 | ✅ |
+| 5 | P3 | 版本号脱节（pom 1.19.0/package 1.21.0） | 同步 1.26.0 | 9894a87 | ✅ |
+| 6 | P3 | InterviewService.java CRLF 行尾漂移致 git 恒脏 | 还原 LF（内容一致） | — | ✅ |
+
+### 阶段三 · 生产端到端核验（后端修复真实生效）
+- `keyword=100%`（含通配符）→ 无 500、不多匹配（转义生效）；`keyword=快手+SPRING`=1（正确区分类型）
+- `degree=硕士在读+INTERN`=2（美团算法/讯飞NLP，学历筛选取真）
+- 岗位 56 条活跃（AUTUMN 18/SPRING 10/SOCIAL 12/INTERN 10/TARGETED 6）
+- **P1 修复后**：`/api/jobs`（无 recruitType）= **56**，`?recruitType=AUTUMN`=18 →「全部」不再误过滤
+- 前端 pages.dev 200 + SPA 壳正常；CI `743b97e` success；Render 已部署
+
+### 遗留与 Backlog
+- P3：关键字三列前导通配 LIKE，数据量增长后加全文/覆盖索引（当前 56 行无碍）
+- 注记：degree/experience 值粒度不一（`本科及以上/硕士在读/硕士优先`），精确筛选结果偏少，建议后续归并标准化
+- 375/768 真机视口、Safari/Edge 实机回归（浏览器自动化无法调视口，需人工）
+- SUS 复测：仍待用户 10 题主观打分（目标 80，此前 57.5）
