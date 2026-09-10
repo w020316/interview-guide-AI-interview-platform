@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -36,15 +35,22 @@ public class JobAgentService {
     private final List<JobPlatformAdapter> adapters;
     private final HttpJobPlatformAdapter httpAdapter;
     private final JobClassifyService classifyService;
+    private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
+    /** 刷新互斥锁：手动刷新与定时任务并发时后到者跳过（单实例部署，实例内互斥已足够） */
+    private final java.util.concurrent.atomic.AtomicBoolean refreshRunning =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
 
     public JobAgentService(JobPostingRepository repository,
                            List<JobPlatformAdapter> adapters,
                            HttpJobPlatformAdapter httpAdapter,
-                           JobClassifyService classifyService) {
+                           JobClassifyService classifyService,
+                           org.springframework.transaction.PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.adapters = adapters;
         this.httpAdapter = httpAdapter;
         this.classifyService = classifyService;
+        this.transactionTemplate = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
     }
 
     /** 刷新结果统计 */
@@ -55,9 +61,29 @@ public class JobAgentService {
      * 全量刷新：拉取所有启用平台数据并入库
      * - 内置精选等适配器：走 fetch()，platform = adapter.platform()
      * - 第三方平台（智联招聘/前程无忧/BOSS直聘）：走 fetchAllByPlatform()，按平台展示名分组入库
+     *
+     * v1.23.1 修复（BE-02/03）：
+     * - 移除 refresh() 上的 @Transactional：事务不再包裹外部 HTTP 拉取与 AI 分类（此前会长时间
+     *   占用连接，生产 Hikari 池仅 2 连接，导致全站接口排队超时）。单条 save 自带短事务，
+     *   清理类 @Modifying 查询用 TransactionTemplate 包裹
+     * - 新增互斥锁：手动刷新与定时任务并发时后到者返回 null（Controller 转为友好提示），
+     *   避免并发 upsert 撞 UNIQUE(platform, external_id) 约束
+     *
+     * @return 刷新统计；已有刷新任务在执行时返回 null
      */
-    @Transactional
     public RefreshResult refresh() {
+        if (!refreshRunning.compareAndSet(false, true)) {
+            log.info("已有岗位刷新任务在执行，本次触发跳过");
+            return null;
+        }
+        try {
+            return doRefresh();
+        } finally {
+            refreshRunning.set(false);
+        }
+    }
+
+    private RefreshResult doRefresh() {
         int upserted = 0;
         int inserted = 0;
         int updated = 0;
@@ -113,11 +139,15 @@ public class JobAgentService {
         }
 
         // 数据更新机制：截止日期已过 30 天的下架；非内置数据 60 天未更新则清理
-        int expired = repository.deactivateExpired(LocalDate.now().minusDays(30));
-        int removed = repository.deleteStaleThirdParty("内置精选", LocalDateTime.now().minusDays(60));
+        // @Modifying 查询需要事务：用 TransactionTemplate 短事务包裹，不再依赖外部长事务
+        Integer expired = transactionTemplate.execute(status ->
+                repository.deactivateExpired(LocalDate.now().minusDays(30)));
+        Integer removed = transactionTemplate.execute(status ->
+                repository.deleteStaleThirdParty("内置精选", LocalDateTime.now().minusDays(60)));
 
         log.info("招聘信息刷新完成：新增 {} / 更新 {} / 下架 {} / 清理 {}", inserted, updated, expired, removed);
-        return new RefreshResult(upserted, inserted, updated, expired, removed);
+        return new RefreshResult(upserted, inserted, updated,
+                expired == null ? 0 : expired, removed == null ? 0 : removed);
     }
 
     /** 幂等 upsert，返回是否为新增 */

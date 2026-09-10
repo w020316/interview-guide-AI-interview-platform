@@ -86,10 +86,15 @@ public class JobAgentController {
     /**
      * 手动刷新（也可由定时任务自动执行）
      * POST /api/jobs/refresh
+     * 已有刷新任务执行中时返回 429，避免并发刷新撞库
      */
     @Operation(summary = "手动刷新岗位数据")
     @PostMapping("/refresh")
     public Result<JobAgentService.RefreshResult> refresh() {
-        return Result.success(jobAgentService.refresh());
+        JobAgentService.RefreshResult result = jobAgentService.refresh();
+        if (result == null) {
+            return Result.error(429, "岗位数据正在刷新中，请稍后再试");
+        }
+        return Result.success(result);
     }
 }
