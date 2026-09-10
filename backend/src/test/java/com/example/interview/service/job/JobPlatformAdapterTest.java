@@ -32,6 +32,7 @@ class JobPlatformAdapterTest {
 
     private final SeedCampusJobProvider campusProvider = new SeedCampusJobProvider();
     private final SeedMultiChannelJobProvider multiProvider = new SeedMultiChannelJobProvider();
+    private final SeedLiveHotJobsProvider liveProvider = new SeedLiveHotJobsProvider();
 
     @Test
     @DisplayName("parseJobs: TARGETED 定向/专项类映射")
@@ -102,6 +103,21 @@ class JobPlatformAdapterTest {
         // 行业覆盖广度：不少于 8 个不同行业
         long industries = jobs.stream().map(JobDto::industry).distinct().count();
         assertThat(industries).isGreaterThanOrEqualTo(8);
+    }
+
+    @Test
+    @DisplayName("热招速递种子数据：externalId 唯一、广州Java实习非空、无海外单城市岗位")
+    void liveSeed_dataIntegrityAndGzJavaCoverage() {
+        List<JobDto> jobs = liveProvider.fetch();
+        assertSeedIntegrity(jobs);
+        assertThat(jobs).hasSizeGreaterThanOrEqualTo(20);
+        // 广州 + Java/后端 + 实习 组合必须非空（此前零覆盖，重点补齐目标）
+        long gzJavaIntern = jobs.stream().filter(j ->
+                j.location().contains("广州") && (j.title().contains("Java") || j.title().contains("后端"))
+                        && "INTERN".equals(j.recruitType())).count();
+        assertThat(gzJavaIntern).as("广州Java/后端实习组合应有数据").isGreaterThanOrEqualTo(3);
+        // 不得出现海外单城市岗位（如新加坡）
+        assertThat(jobs).noneMatch(j -> j.location().contains("新加坡"));
     }
 
     private void assertSeedIntegrity(List<JobDto> jobs) {
