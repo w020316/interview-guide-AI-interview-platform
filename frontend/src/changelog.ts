@@ -10,9 +10,21 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.26.0'
+export const CURRENT_VERSION = '1.27.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.27.0',
+    date: '2026-09-10',
+    title: '版本 1.27.0 · 招聘广场热招速递扩充',
+    items: [
+      '新增功能：新增「热招速递」数据源，收录 20+ 条真实在招岗位（含来源链接）',
+      '新增功能：重点补齐「广州 + Java/后端 + 实习」等此前零覆盖的高频查询组合',
+      '新增功能：扩充广深大厂后台/算法/AI 实习与 2027 届秋招，覆盖字节/腾讯/美团/阿里/百度/网易等',
+      '新增功能：新增社招技术岗（Java/运维/SRE），覆盖金融、物流科技、网络安全等行业',
+      '修复：修复「全部」Tab 被默认过滤为秋招的问题，现可查看全部岗位'
+    ]
+  },
   {
     version: '1.26.0',
     date: '2026-09-10',
