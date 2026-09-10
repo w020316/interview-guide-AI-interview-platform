@@ -1,25 +1,35 @@
 package com.example.interview.controller;
 
 import com.example.interview.common.Result;
+import com.example.interview.entity.JobFavoriteEntity;
 import com.example.interview.entity.JobPostingEntity;
+import com.example.interview.service.JobFavoriteService;
 import com.example.interview.service.job.JobAgentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 招聘信息智能体接口
  * - 岗位列表：关键词搜索 + 行业/职位类型/地点/招聘类型/来源多条件筛选
  * - 岗位详情 / 筛选元数据 / 手动刷新
+ * - 岗位收藏（快照式）+ 截止日期临近提醒数据
  *
  * 遵循全局 JWT 认证（SecurityConfig anyRequest().authenticated()），userId 不入库（岗位为公共数据）。
  */
@@ -29,9 +39,20 @@ import java.util.Map;
 public class JobAgentController {
 
     private final JobAgentService jobAgentService;
+    private final JobFavoriteService jobFavoriteService;
 
-    public JobAgentController(JobAgentService jobAgentService) {
+    public JobAgentController(JobAgentService jobAgentService, JobFavoriteService jobFavoriteService) {
         this.jobAgentService = jobAgentService;
+        this.jobFavoriteService = jobFavoriteService;
+    }
+
+    /** 从 SecurityContext 获取当前登录用户 ID（JWT subject） */
+    private String currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+            throw new IllegalStateException("未认证用户");
+        }
+        return auth.getPrincipal().toString();
     }
 
     /**
@@ -95,6 +116,82 @@ public class JobAgentController {
         if (result == null) {
             return Result.error(429, "岗位数据正在刷新中，请稍后再试");
         }
+        return Result.success(result);
+    }
+
+    // ── 岗位收藏（v1.23.3）──
+
+    /**
+     * 查询我的岗位收藏列表（快照式，含截止日倒计时与提醒标记）
+     * GET /api/jobs/favorite
+     *
+     * 提醒规则：deadline 7 天内 favorited 项附 remind=true，过期附 expired=true（前端据此渲染提醒横幅）
+     */
+    @Operation(summary = "我的岗位收藏列表（含截止日提醒）")
+    @GetMapping("/favorite")
+    public Result<Map<String, Object>> favoriteList() {
+        List<JobFavoriteEntity> items = jobFavoriteService.listByUser(currentUserId());
+        LocalDate today = LocalDate.now();
+        List<Map<String, Object>> rows = items.stream().map(f -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", f.getId());
+            row.put("jobId", f.getJobId());
+            row.put("title", f.getTitle());
+            row.put("companyName", f.getCompanyName());
+            row.put("platform", f.getPlatform());
+            row.put("location", f.getLocation());
+            row.put("salary", f.getSalary());
+            row.put("deadline", f.getDeadline());
+            row.put("applyUrl", f.getApplyUrl());
+            row.put("createdAt", f.getCreatedAt());
+            if (f.getDeadline() != null) {
+                long daysLeft = ChronoUnit.DAYS.between(today, f.getDeadline());
+                row.put("daysLeft", daysLeft);
+                row.put("expired", daysLeft < 0);
+                row.put("remind", daysLeft >= 0 && daysLeft <= 7);
+            }
+            return row;
+        }).toList();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", rows.size());
+        result.put("items", rows);
+        return Result.success(result);
+    }
+
+    /**
+     * 已收藏岗位 ID 集合（用于前端高亮收藏状态）
+     * GET /api/jobs/favorite/ids
+     */
+    @Operation(summary = "已收藏岗位 ID 集合")
+    @GetMapping("/favorite/ids")
+    public Result<Set<Long>> favoriteIds() {
+        return Result.success(jobFavoriteService.listFavoriteJobIds(currentUserId()));
+    }
+
+    /**
+     * 切换岗位收藏
+     * POST /api/jobs/favorite/toggle  Body {"jobId": 1}
+     */
+    @Operation(summary = "切换（新增/取消）岗位收藏")
+    @PostMapping("/favorite/toggle")
+    public Result<Map<String, Object>> favoriteToggle(@RequestBody Map<String, Object> req) {
+        if (req.get("jobId") == null) {
+            return Result.error(400, "jobId 不能为空");
+        }
+        Long jobId;
+        try {
+            jobId = Long.valueOf(req.get("jobId").toString());
+        } catch (NumberFormatException e) {
+            return Result.error(400, "jobId 格式不正确");
+        }
+        JobPostingEntity job = jobAgentService.findById(jobId);
+        if (job == null) {
+            return Result.error(404, "岗位不存在或已下架");
+        }
+        boolean favorited = jobFavoriteService.toggle(currentUserId(), job);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("favorited", favorited);
+        result.put("count", jobFavoriteService.countByUser(currentUserId()));
         return Result.success(result);
     }
 }

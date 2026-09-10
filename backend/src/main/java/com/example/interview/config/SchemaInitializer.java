@@ -89,6 +89,20 @@ public class SchemaInitializer implements CommandLineRunner {
             "CREATE INDEX IF NOT EXISTS idx_job_posting_deadline ON job_posting(deadline)",
             "CREATE INDEX IF NOT EXISTS idx_job_posting_recruit_type ON job_posting(recruit_type)",
             "CREATE INDEX IF NOT EXISTS idx_job_posting_active ON job_posting(active)",
+            "CREATE TABLE IF NOT EXISTS job_favorite ("
+                    + "id BIGSERIAL PRIMARY KEY, "
+                    + "user_id VARCHAR(64) NOT NULL, "
+                    + "job_id BIGINT NOT NULL, "
+                    + "title VARCHAR(200) NOT NULL, "
+                    + "company_name VARCHAR(200) NOT NULL, "
+                    + "platform VARCHAR(50), "
+                    + "location VARCHAR(100), "
+                    + "salary VARCHAR(100), "
+                    + "deadline DATE, "
+                    + "apply_url VARCHAR(500), "
+                    + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "CONSTRAINT uk_job_favorite_user_job UNIQUE (user_id, job_id))",
+            "CREATE INDEX IF NOT EXISTS idx_job_favorite_user ON job_favorite(user_id)",
             "CREATE TABLE IF NOT EXISTS agent_conversation ("
                     + "id BIGSERIAL PRIMARY KEY, "
                     + "user_id VARCHAR(64) NOT NULL, "
