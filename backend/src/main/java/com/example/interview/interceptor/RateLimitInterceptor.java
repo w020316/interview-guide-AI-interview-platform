@@ -93,36 +93,9 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     /**
      * 解析客户端 IP
-     * 仅在直连 IP 为受信代理时才读 X-Forwarded-For，防止 IP 伪造
+     * v1.23.1 安全修复：从 XFF 右端向左取第一个非受信代理 IP（此前取最左值可被伪造绕过限流）
      */
     private String resolveClientIp(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
-        String forwarded = request.getHeader("X-Forwarded-For");
-        // 仅当直连是内网/代理时才信任 X-Forwarded-For
-        if (forwarded != null && !forwarded.isBlank() && isTrustedProxy(remoteAddr)) {
-            return forwarded.split(",")[0].trim();
-        }
-        return remoteAddr;
-    }
-
-    /** 判断是否为受信代理（精确校验内网地址，避免 172.* 误判） */
-    private boolean isTrustedProxy(String ip) {
-        if (ip == null) return false;
-        if (ip.startsWith("10.")
-                || ip.startsWith("192.168.")
-                || ip.equals("127.0.0.1")
-                || ip.startsWith("::1")) {
-            return true;
-        }
-        // 精确校验 172.16.0.0/12
-        if (ip.startsWith("172.")) {
-            try {
-                int second = Integer.parseInt(ip.split("\\.")[1]);
-                return second >= 16 && second <= 31;
-            } catch (NumberFormatException ignored) {
-                return false;
-            }
-        }
-        return false;
+        return com.example.interview.util.ClientIpUtil.resolve(request);
     }
 }

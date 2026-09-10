@@ -59,7 +59,7 @@ class AuthControllerTest {
         void register_validInput_returnsToken() throws Exception {
             when(userRepository.existsByUsername("alice")).thenReturn(false);
             when(userRepository.existsByEmail(anyString())).thenReturn(false);
-            when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
+            when(userRepository.saveAndFlush(any(UserEntity.class))).thenAnswer(inv -> {
                 UserEntity u = inv.getArgument(0);
                 u.setId(1L);
                 return u;
@@ -137,7 +137,7 @@ class AuthControllerTest {
         @DisplayName("用户名支持中文（合法）")
         void register_chineseUsername_valid() throws Exception {
             when(userRepository.existsByUsername("张三")).thenReturn(false);
-            when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
+            when(userRepository.saveAndFlush(any(UserEntity.class))).thenAnswer(inv -> {
                 UserEntity u = inv.getArgument(0);
                 u.setId(2L);
                 return u;

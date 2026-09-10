@@ -106,7 +106,12 @@ public class AuthController {
                 .passwordHash(passwordEncoder.encode(password))
                 .email(email == null || email.isBlank() ? null : email)
                 .build();
-        userRepository.save(user);
+        try {
+            userRepository.saveAndFlush(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // 并发注册同名用户时唯一约束兜底（check-then-save 存在竞态窗口）
+            return Result.error(400, "用户名已存在");
+        }
 
         // subject 使用数据库自增 id（唯一且不可变），避免用户名变更导致 token 失效
         return Result.success(jwtUtil.generateToken(user.getId().toString()));
@@ -184,34 +189,10 @@ public class AuthController {
     }
 
     /**
-     * 解析客户端 IP（仅信任内网代理）
+     * 解析客户端 IP
+     * v1.23.1 安全修复：从 XFF 右端向左取第一个非受信代理 IP（此前取最左值可被伪造绕过登录锁定）
      */
     private String resolveClientIp(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank() && isTrustedProxy(remoteAddr)) {
-            return forwarded.split(",")[0].trim();
-        }
-        return remoteAddr;
-    }
-
-    private boolean isTrustedProxy(String ip) {
-        if (ip == null) return false;
-        if (ip.startsWith("10.")
-                || ip.startsWith("192.168.")
-                || ip.equals("127.0.0.1")
-                || ip.startsWith("::1")) {
-            return true;
-        }
-        // 精确校验 172.16.0.0/12（172.16.0.0 - 172.31.255.255），避免 172.* 误判
-        if (ip.startsWith("172.")) {
-            try {
-                int second = Integer.parseInt(ip.split("\\.")[1]);
-                return second >= 16 && second <= 31;
-            } catch (NumberFormatException ignored) {
-                return false;
-            }
-        }
-        return false;
+        return com.example.interview.util.ClientIpUtil.resolve(request);
     }
 }
