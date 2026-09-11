@@ -29,7 +29,7 @@ services:
       - key: AI_BASE_URL
         value: https://apihub.agnes-ai.com
       - key: AI_CHAT_MODEL
-        value: agnes-2.0-flash
+        value: agnes-2.5-flash
       - key: AI_EMBEDDING_MODEL
         value: text-embedding-3-small
       # ── Supabase PostgreSQL（用户名密码直接写进 DATABASE_URL，避免环境变量注入问题）──

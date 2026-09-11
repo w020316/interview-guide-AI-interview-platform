@@ -10,9 +10,28 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.28.0'
+export const CURRENT_VERSION = '1.30.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.30.0',
+    date: '2026-09-11',
+    title: '版本 1.30.0 · 多模态附图',
+    items: [
+      '新增功能：「上传附图」——回答时可附带代码截图/白板草图/证书，AI 结合图片综合评估（面试猫图片识别优势落地）',
+      '新增功能：作答聊聊可携带附图进行多模态评估，切换题目自动清除上一题附图',
+      '升级基础：兜底模型升级 agnes-2.5-flash（视觉理解），AI 评估支持结合图片内容点评'
+    ]
+  },
+  {
+    version: '1.29.0',
+    date: '2026-09-11',
+    title: '版本 1.29.0 · 简历岗位匹配',
+    items: [
+      '新增功能：「简历匹配推荐」——粘贴简历核心内容即自动为岗位匹配打分（技能/学历命中），直通高吻合岗位',
+      '优势落地：借鉴 offer毕「基于真实经历检索」能力，打通简历内容与招聘广场，实现双向匹配'
+    ]
+  },
   {
     version: '1.28.0',
     date: '2026-09-11',

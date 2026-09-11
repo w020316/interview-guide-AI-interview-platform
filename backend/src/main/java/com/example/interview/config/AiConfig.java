@@ -20,7 +20,7 @@ import java.util.List;
  * v1.22.0：聊天模型切换为多厂商降级链（app.ai.chain）：
  * 1. B.AI · GLM-5.3-Flash（主模型，免费额度，0 Credits）
  * 2. B.AI · Qwen3.8-Flash（次模型，免费额度，0 Credits）
- * 3. Agnes AI · agnes-2.0-flash（兜底，原主模型自动降为末位）
+ * 3. Agnes AI · agnes-2.5-flash（兜底，原主模型自动降为末位）
  *
  * 不设置硬编码的岗位默认 system prompt，由各业务 Service 根据岗位动态生成，
  * 避免默认 "Java 后端" 与实际岗位冲突（支持全行业岗位）。

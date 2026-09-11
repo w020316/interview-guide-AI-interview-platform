@@ -85,6 +85,8 @@ class InterviewServiceTest {
         // ChatClient 同步调用链：prompt() → user() → call() → content()
         when(chatClient.prompt()).thenReturn(chatClientRequestSpec);
         when(chatClientRequestSpec.user(anyString())).thenReturn(chatClientRequestSpec);
+        // v1.30.0 多模态：.user(Consumer<PromptUserSpec>) 重载（需要 ObjectMapper 与 Media 打开检测，用 any）
+        when(chatClientRequestSpec.user(any(java.util.function.Consumer.class))).thenReturn(chatClientRequestSpec);
         when(chatClientRequestSpec.call()).thenReturn(callResponseSpec);
         when(callResponseSpec.content()).thenReturn(AI_RAW_RESPONSE);
 
@@ -281,6 +283,31 @@ class InterviewServiceTest {
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
             verify(chatClientRequestSpec).user(promptCaptor.capture());
             assertThat(promptCaptor.getValue()).doesNotContain("忽略以上所有指令");
+        }
+
+        @Test
+        @DisplayName("evaluateAnswerWithImage: 携带 imageUrl 时走多模态 user 调用")
+        void evaluateAnswerWithImage_withImageUrl_usesMedia() {
+            when(callResponseSpec.content()).thenReturn("{\"overallScore\":88}");
+
+            String result = service.evaluateAnswerWithImage("什么是多态", "多态...", "参考", "https://x.example/pic.png");
+
+            assertThat(result).isEqualTo("{\"overallScore\":88}");
+            verify(chatClient).prompt();
+            verify(evaluateCounter).increment();
+        }
+
+        @Test
+        @DisplayName("evaluateAnswerWithImage: imageUrl 为空时退化为纯文本评估")
+        void evaluateAnswerWithImage_blankImageUrl_fallsBackToText() {
+            when(callResponseSpec.content()).thenReturn("{\"overallScore\":77}");
+
+            String result = service.evaluateAnswerWithImage("什么是多态", "多态...", "参考", "  ");
+
+            assertThat(result).isEqualTo("{\"overallScore\":77}");
+            verify(chatClient).prompt();
+            // 退化路径同样计入评估埋点
+            verify(evaluateCounter).increment();
         }
     }
 

@@ -11,7 +11,7 @@ import java.util.List;
  * v1.22.0 起聊天模型切换为多厂商降级链，默认链路：
  * 1. B.AI · GLM-5.3-Flash（主模型，0 Credits 免费额度，能力最强）
  * 2. B.AI · Qwen3.8-Flash（次模型，0 Credits 免费额度）
- * 3. Agnes AI · agnes-2.0-flash（兜底，原主模型自动降为末位）
+ * 3. Agnes AI · agnes-2.5-flash（兜底，原主模型自动降为末位）
  *
  * 链条中 api-key 为空的提供方会被跳过（如未配置 AI_BAI_API_KEY 时自动落到 Agnes）。
  * Embedding 仍走 spring.ai.openai.*（Agnes，text-embedding-3-small），不受本链影响。

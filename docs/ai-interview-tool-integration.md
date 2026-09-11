@@ -70,6 +70,14 @@ export function correctTechTerms(text: string): string {
 ### ★3. 数据治理（字段归一化/去重/自动分类 —— 覆盖工具"基于真实经历检索+题库丰富"的准确性基础）
 **已落地 v1.27.0**：`JobFieldNormalizer`（degree/experience 归一化）、`doRefresh` 跨数据源去重、`JobClassifyService` 用免费模型自动分类补全。
 
+### ★7. 简历→岗位双向匹配（offer毕"基于真实经历检索"延伸落地 v1.29.0）
+**优势**：以真实简历为底，推荐高吻合岗位，减少海投。
+**集成（v1.29.0）**：`JobMatchService` 技能/学历命中打分；`POST /api/jobs/match`；前端「简历匹配推荐」按钮粘贴简历即出分、命中标签、一键进入岗位详情。
+```ts
+const res = await api.post('/api/jobs/match', { resumeText })
+// items[].matchScore / matchedSkills 驱动岗位卡片「匹配 xx 分」+技能标签
+```
+
 ### 4. 简历 RAG 强化出题 + 针对性追问链（offer毕/面星/面试猫/牛客"智能追问链"）
 **已落地 v1.28.0**：
 - `InterviewService.generateFollowUp(question, userAnswer, resumeText)`：用免费模型链基于回答+简历生成一道深挖盲区/细节的追问
@@ -91,10 +99,21 @@ const q = await api.post('/api/interview/followup', { question, userAnswer, resu
 // 期望：贴近简历、不重复原题、下钻薄弱点的下一道题
 ```
 
-### 5. 多模态输入（面试猫"图片识别"）
-**backlog**：答题/自我介绍支持上传图片（白板草图/证书），AI 结合图片评估（待实现）。
+### ★8. 多模态图片输入（面试猫"图片识别"落地 v1.30.0）
+**优势**：回答时可上传代码截图/白板草图/证书，AI 结合图片综合评估。
+**集成（v1.30.0）**：后端 `POST /api/interview/upload-image` 上传至 Supabase 返回公开 URL，`POST /api/interview/evaluate` 支持可选 `imageUrl` 走 `Media` 多模态；前端答题区「上传附图」+ 缩略图/移除，切题自动清除。
+```ts
+// 上传 → 拿 URL → 携带进评估
+const up = await api.post('/api/interview/upload-image', formData)  // {url}
+await api.post('/api/interview/evaluate', { question, userAnswer, imageUrl: up.url })
+```
+```java
+// 后端：PromptUserSpec.media 组装图片 visual 输入（agnes-2.5-flash 支持 image_url）
+chatClient.prompt().user(u -> u.text(prompt).media(new Media(detectMimeType(url), URI.create(url))))
+```
+**注意**：多模态仅对具备视觉理解的模型生效（agnes-2.5-flash）；走纯文本降级链的 GLM/Qwen 若不支持图片，评估退化为纯文本（`evaluateAnswerWithImage` 对空 imageUrl 自动退化）。
 
-### 6. 开源底座对齐（interview help）
+### 5. 开源底座对齐（interview help）
 **参考**：本项目已 Spring Boot + Vue，模块齐备；可按需对照其功能清单补齐缺口。
 
 ---
@@ -107,8 +126,8 @@ const q = await api.post('/api/interview/followup', { question, userAnswer, resu
 | 语音作答与表达提升 → | ASR + 语速/停顿 + 术语纠正（★） |
 | 题目沉淀与错题重练 → | 收藏夹 + 错题本 + 从题库组面（★） |
 | 筛选真实在招岗位 → | 招聘广场 + 热招速递 + 每小时扩充（★） |
-| 面对题目深度追问 → | 追问链加深（待实现） |
-| 图片/白板多模态 → | 多模态输入（待实现） |
+| 简历快速锁定高吻合岗位 → | 简历岗位匹配推荐（★） |
+| 图片/白板/证书多模态 → | 多模态附图评估（★） |
 
 ## 四、不做项（明确边界）
 - NPC human/面试狗/interview help 的「隐蔽耳麦/实时偷听对面给答案」属面试作弊，**不实现**；以合规的面试前中自练、结束后复盘替代（本项目已具备三维评分复盘）。
@@ -116,6 +135,8 @@ const q = await api.post('/api/interview/followup', { question, userAnswer, resu
 ---
 
 ## 五、验证记录（真实）
-- 后端单测 **291/291** 全过；前端 vue-tsc 0 错误；
+- 后端单测 **299/299** 全过；前端 vue-tsc 0 错误；
 - 定制题库生产端到端：`/add`→200 id=1 → `/favorite/list` total=1 → `/favorite/bank/start`→sessionId + 1 题(MEDIUM) 全部通过。
 - 语音术语纠正单测 3/3；招聘广场归一化 meta 已收敛为干净枚举。
+- 简历岗位匹配（v1.29.0）：`JobMatchServiceTest` 3/3（技能/学历命中 + 排序）；`JobFieldNormalizerTest` 2/2；`JobPlatformAdapterTest` 6/6（含热招速递广州 Java 实习覆盖）全过。
+- 多模态附图（v1.30.0）：`evaluateAnswerWithImage` 单测 2/2（带图走 media、空图退化纯文本）；`InterviewControllerTest` 新增 imageUrl 用例 1/1；模型升级 agnes-2.5-flash。

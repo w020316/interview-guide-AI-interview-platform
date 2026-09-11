@@ -71,6 +71,10 @@ class InterviewControllerSseTest {
     @MockBean
     private ChatClient chatClient;
 
+    /** v1.30.0 多模态上传：Controller 新增依赖 SupabaseStorageService，需 mock */
+    @MockBean
+    private com.example.interview.service.SupabaseStorageService supabaseStorageService;
+
     /** Mock ChatClient 链式调用：prompt() 和 .user() 都返回 ChatClientRequestSpec */
     @MockBean
     private ChatClient.ChatClientRequestSpec chatClientRequestSpec;

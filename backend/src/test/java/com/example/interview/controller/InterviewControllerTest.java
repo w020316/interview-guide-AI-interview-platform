@@ -64,6 +64,10 @@ class InterviewControllerTest {
     @MockBean
     private org.springframework.ai.chat.client.ChatClient chatClient;
 
+    /** v1.30.0 多模态上传：Controller 新增依赖 SupabaseStorageService，需 mock */
+    @MockBean
+    private com.example.interview.service.SupabaseStorageService supabaseStorageService;
+
     /** 绕过限流：12 个用例会超过 10 次/分钟的默认阈值 */
     @MockBean
     private RateLimitInterceptor rateLimitInterceptor;
@@ -240,7 +244,7 @@ class InterviewControllerTest {
         @Test
         @DisplayName("合法入参（含参考答案）返回 200 + 评估结果")
         void evaluate_validInputWithReference_returns200() throws Exception {
-            when(interviewService.evaluateAnswer("什么是多态？", "多态是...", "参考答案"))
+            when(interviewService.evaluateAnswerWithImage("什么是多态？", "多态是...", "参考答案", null))
                     .thenReturn("{\"score\":85}");
 
             String body = objectMapper.writeValueAsString(Map.of(
@@ -259,11 +263,28 @@ class InterviewControllerTest {
         @Test
         @DisplayName("合法入参（无参考答案）返回 200 + 评估结果")
         void evaluate_validInputWithoutReference_returns200() throws Exception {
-            when(interviewService.evaluateAnswer("什么是多态？", "多态是...", ""))
+            when(interviewService.evaluateAnswerWithImage("什么是多态？", "多态是...", "", null))
                     .thenReturn("{\"score\":80}");
 
             String body = objectMapper.writeValueAsString(Map.of(
                     "question", "什么是多态？", "userAnswer", "多态是..."));
+
+            mockMvc.perform(post("/api/interview/evaluate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data").exists());
+        }
+
+        @Test
+        @DisplayName("携带 imageUrl 时调用多模态评估")
+        void evaluate_withImageUrl_returns200() throws Exception {
+            when(interviewService.evaluateAnswerWithImage("什么是多态？", "多态是...", "", "https://x.com/a.png"))
+                    .thenReturn("{\"score\":88}");
+
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "question", "什么是多态？", "userAnswer", "多态是...", "imageUrl", "https://x.com/a.png"));
 
             mockMvc.perform(post("/api/interview/evaluate")
                             .contentType(MediaType.APPLICATION_JSON)

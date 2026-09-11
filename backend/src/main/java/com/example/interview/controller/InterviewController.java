@@ -43,6 +43,9 @@ public class InterviewController {
     @Autowired
     private ChatClient chatClient;
 
+    @Autowired
+    private com.example.interview.service.SupabaseStorageService supabaseStorageService;
+
     /**
      * v1.11 起：注入 MeterRegistry，将 SSE 限流指标暴露到 actuator metrics
      * - sse.max.concurrent：限流上限（容量）
@@ -131,22 +134,63 @@ public class InterviewController {
     }
 
     /**
-     * 评估用户回答
+     * 评估用户回答（v1.30.0 起支持可选 imageUrl 多模态）
      * POST /api/interview/evaluate
-     * Body: {"question": "...", "userAnswer": "...", "referenceAnswer": "..."}
+     * Body: {"question": "...", "userAnswer": "...", "referenceAnswer": "...", "imageUrl": "..."（可选）}
      */
     @PostMapping("/evaluate")
     public Result<String> evaluateAnswer(@RequestBody Map<String, String> request) {
         String question = request.get("question");
         String userAnswer = request.get("userAnswer");
         String referenceAnswer = request.getOrDefault("referenceAnswer", "");
+        String imageUrl = request.get("imageUrl"); // 可选：用户作答附图（代码截图/草图/证书）
 
         if (question == null || userAnswer == null) {
             return Result.error(400, "问题和回答不能为空");
         }
 
-        String result = interviewService.evaluateAnswer(question, userAnswer, referenceAnswer);
+        String result = interviewService.evaluateAnswerWithImage(question, userAnswer, referenceAnswer, imageUrl);
         return Result.success(result);
+    }
+
+    /**
+     * 上传作答附图（v1.30.0 多模态：代码截图/白板草图/证书）
+     * POST /api/interview/upload-image
+     * Form-data: file=<图片>
+     * 返回：{"url": "https://.../public/.../xxx.png"}
+     */
+    @PostMapping("/upload-image")
+    public Result<java.util.Map<String, String>> uploadImage(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "userId", required = false) String userId) {
+        if (file == null || file.isEmpty()) {
+            return Result.error(400, "请上传图片");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            return Result.error(400, "图片大小不能超过 5MB");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            return Result.error(400, "仅支持图片文件（jpg/png/webp/gif）");
+        }
+        try {
+            String suffix = switch (contentType) {
+                case "image/jpeg" -> ".jpg";
+                case "image/gif" -> ".gif";
+                case "image/webp" -> ".webp";
+                default -> ".png";
+            };
+            String uid = (userId == null || userId.isBlank()) ? "anon" :
+                    com.example.interview.util.HashUtil.sha256Short(userId);
+            String fileName = "interview/" + uid + "/" + System.currentTimeMillis() + suffix;
+            String publicUrl = supabaseStorageService.upload(file, fileName);
+            java.util.Map<String, String> result = new java.util.LinkedHashMap<>();
+            result.put("url", publicUrl);
+            return Result.success(result);
+        } catch (Exception e) {
+            log.error("作答附图上传失败", e);
+            return Result.error(500, "图片上传失败，请稍后重试");
+        }
     }
 
     /**

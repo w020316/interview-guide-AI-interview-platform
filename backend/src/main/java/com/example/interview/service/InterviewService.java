@@ -9,6 +9,7 @@ import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.content.Media;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -16,7 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MimeType;
 
+import java.net.URI;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -247,6 +250,71 @@ public class InterviewService {
             evaluateCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
+    }
+
+    /**
+     * 考虑图片输入的回答评估（v1.30.0：多模态）：
+     * 用户附带一张图片（如代码截图/白板草图/证书），AI 结合图片评估回答。
+     * imageUrl 为空时退化为纯文本评估（等价 evaluateAnswer）。
+     */
+    public String evaluateAnswerWithImage(String question, String userAnswer, String referenceAnswer, String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return evaluateAnswer(question, userAnswer, referenceAnswer);
+        }
+        long start = System.nanoTime();
+        try {
+            String prompt = new StringBuilder()
+                    .append("你是一位面试官，请结合用户随回答附带的图片评估以下回答。\n\n")
+                    .append("【面试题】\n").append(PromptSanitizer.sanitize(question)).append("\n\n")
+                    .append("【参考答案】\n").append(PromptSanitizer.sanitize(referenceAnswer == null ? "" : referenceAnswer)).append("\n\n")
+                    .append("【用户回答】\n").append(PromptSanitizer.sanitize(userAnswer)).append("\n\n")
+                    .append("【图片说明】\n图片为用户作答时的附图（如代码截图/草图/证书），请结合图片内容与文字作答综合评估。\n\n")
+                    .append("请从完整性（30%）、准确性（40%）、表达能力（30%）三个维度评分，并给出改进建议。\n\n")
+                    .append("【评分注意事项】\n")
+                    .append("1. 若图片与回答无关或无法解读，需在 improvements 中如实指出\n")
+                    .append("2. 评分须结合【参考答案】要点逐项核对，杜绝凭印象给分；分数与评语必须一致\n")
+                    .append("3. 若附图是代码，请检查代码正确性并针对性点评\n\n")
+                    .append("【输出要求（务必严格遵守）】\n")
+                    .append("1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记\n")
+                    .append("2. 所有字符串必须使用 ASCII 双引号 \"，禁止使用单引号 ' 或中文引号\n")
+                    .append("3. 不要在字符串值中使用引号，如需引用请用书名号《》\n")
+                    .append("4. 不要输出任何注释、解释、前后缀文字\n")
+                    .append("5. 输出格式：\n")
+                    .append("{\"overallScore\":75,\"completeness\":70,\"accuracy\":80,\"expression\":75,\"strengths\":[\"优点1\"],\"weaknesses\":[\"不足1\"],\"improvements\":[\"建议1\"]}")
+                    .toString();
+
+            // 组装图片 Media：AGNES-2.5-flash 支持 image_url 视觉理解
+            Media media = new Media(detectMimeType(imageUrl), URI.create(imageUrl));
+            String response = com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                    chatClient.prompt()
+                            .user((userSpec) -> userSpec.text(prompt).media(media))
+                            .call()
+                            .content());
+
+            if (response == null || response.isBlank()) {
+                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+            }
+
+            return JsonRepairUtil.repairAndLog(response, "interview-evaluate-image");
+        } finally {
+            evaluateCounter.increment();
+            aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+        }
+    }
+
+    /** 依据图片 URL 后缀推断 MIME 类型，未知默认 image/png */
+    private MimeType detectMimeType(String imageUrl) {
+        String lower = imageUrl.toLowerCase();
+        if (lower.endsWith(".jpeg") || lower.endsWith(".jpg")) {
+            return MimeType.valueOf("image/jpeg");
+        }
+        if (lower.endsWith(".gif")) {
+            return MimeType.valueOf("image/gif");
+        }
+        if (lower.endsWith(".webp")) {
+            return MimeType.valueOf("image/webp");
+        }
+        return MimeType.valueOf("image/png");
     }
 
     /**

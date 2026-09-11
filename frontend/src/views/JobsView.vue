@@ -62,6 +62,9 @@
         <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="applyFilters">
           搜索
         </BaseButton>
+        <BaseButton variant="ghost" @click="matchOpen = !matchOpen">
+          {{ matchOpen ? '收起匹配' : '简历匹配推荐' }}
+        </BaseButton>
       </div>
       <div class="filter-row location-row">
         <input
@@ -76,6 +79,18 @@
         <button class="refresh-btn" :disabled="refreshing" @click="refreshData">
           {{ refreshing ? '刷新中...' : '刷新数据' }}
         </button>
+      </div>
+
+      <!-- 简历匹配推荐（v1.29.0） -->
+      <div v-if="matchOpen" class="filter-row match-panel">
+        <textarea v-model="matchResume" rows="3" class="filter-input ta"
+          placeholder="粘贴简历核心内容（技能/项目/技术栈），自动为你推荐最吻合的岗位"></textarea>
+        <div class="match-actions">
+          <BaseButton variant="gradient" :loading="matching" :disabled="matching || !matchResume.trim()" @click="runMatch">
+            {{ matching ? '匹配中...' : '开始匹配' }}
+          </BaseButton>
+          <BaseButton v-if="matchActive" variant="ghost" @click="exitMatch">返回列表</BaseButton>
+        </div>
       </div>
     </div>
 
@@ -114,6 +129,8 @@
             <span v-if="job.experience" class="meta-item">💼 {{ job.experience }}</span>
           </div>
           <div class="job-tags">
+            <span v-if="matchInfo(job)" class="tag tag-match">匹配 {{ matchInfo(job)?.matchScore ?? 0 }} 分</span>
+            <span v-for="(s, si) in matchInfo(job)?.matchedSkills || []" :key="'ms' + si" class="tag tag-skill">+{{ s }}</span>
             <span class="tag tag-source">{{ job.platform }}</span>
             <span v-if="job.industry" class="tag">{{ job.industry }}</span>
             <span v-if="job.jobType" class="tag">{{ job.jobType }}</span>
@@ -297,11 +314,50 @@ const favIds = ref<Set<number>>(new Set())
 const favList = ref<JobFavorite[]>([])
 const favCount = ref(0)
 const favoriteMode = computed(() => recruitType.value === 'FAVORITE')
+
+// ── 简历匹配推荐（v1.29.0）──
+const matchOpen = ref(false)
+const matchActive = ref(false)
+const matching = ref(false)
+const matchResume = ref('')
+interface MatchedResult { job: JobPosting; matchScore: number; matchedSkills: string[] }
+const matched = ref<MatchedResult[]>([])
+try {
+  const pre = sessionStorage.getItem('interview_prefill_resume')
+  if (pre) matchResume.value = pre
+} catch { /* ignore */ }
+
+function matchInfo(job: JobPosting) {
+  return matched.value.find((m) => m.job.id === job.id) ?? null
+}
+async function runMatch() {
+  if (!matchResume.value.trim()) return ElMessage.warning('请粘贴简历内容')
+  matching.value = true
+  try {
+    const res = (await api.post('/api/jobs/match', { resumeText: matchResume.value })) as unknown as { items?: MatchedResult[] }
+    matched.value = (res?.items || []).filter((i) => i.job && i.job.id != null)
+    if (matched.value.length) {
+      matchActive.value = true
+      ElMessage.success(`为你推荐 ${matched.value.length} 个岗位`)
+    } else {
+      ElMessage.info('暂未找到与你简历匹配的岗位，可试试调整')
+    }
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '匹配失败'))
+  } finally {
+    matching.value = false
+  }
+}
+function exitMatch() {
+  matchActive.value = false
+  matched.value = []
+}
 /** 收藏岗位截止 7 天内的提醒列表（横幅数据源） */
 const remindJobs = computed(() => favList.value.filter((f) => f.remind))
 
 /** 收藏模式渲染快照卡片；普通模式渲染搜索结果 */
 const displayJobs = computed<JobPosting[]>(() => {
+  if (matchActive.value && matched.value.length) return matched.value.map((m) => m.job)
   if (!favoriteMode.value) return jobs.value
   return favList.value.map((f) => ({
     id: f.jobId,
@@ -944,4 +1000,9 @@ onMounted(() => {
     justify-content: space-between;
   }
 }
+.match-panel { flex-direction: column; align-items: stretch; gap: 8px; }
+.match-panel .filter-input.ta { resize: vertical; min-height: 68px; line-height: 1.6; font-family: inherit; }
+.match-actions { display: flex; gap: 8px; align-items: center; }
+.tag-match { color: var(--brand-primary, #0d7377); border-color: var(--brand-primary, #0d7377); font-weight: 600; }
+.tag-skill { color: var(--c-info); border-color: var(--c-info); }
 </style>

@@ -137,6 +137,26 @@
           </div>
           <BaseTextarea v-model="userAnswer" :rows="6" placeholder="请输入你的回答，可结合项目经验展开…（Ctrl+Enter 提交，或用上方语音作答）"
             @keydown.ctrl.enter="submitAnswer" @keydown.meta.enter="submitAnswer" />
+
+          <!-- 多模态附图（v1.30.0）：上传代码截图/白板草图/证书，AI 结合图片评估 -->
+          <div class="attach-bar">
+            <BaseButton variant="ghost" size="sm" :loading="imageUploading" :disabled="imageUploading" @click="pickImageFile">
+              <svg v-if="!imageUploading" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                <circle cx="9" cy="10" r="2" stroke="currentColor" stroke-width="2"/>
+                <path d="M21 16l-4-4-7 7M11 19l3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <span v-else class="rec-dot" aria-hidden="true"></span>
+              {{ imageUrl ? '重新上传截图' : (imageUploading ? '上传中…' : '上传附图（截图/草图/证书）') }}
+            </BaseButton>
+            <input ref="imageInputEl" type="file" accept="image/*" hidden @change="onImageSelected" />
+            <span v-if="imageUrl" class="attach-hint">已附加 1 张图片</span>
+            <template v-if="imageUrl">
+              <img :src="imageUrl" class="attach-preview" alt="作答附图" />
+              <button class="attach-remove" aria-label="移除附图" :title="'移除附图'" @click="removeImage">×</button>
+            </template>
+          </div>
+
           <div class="action-row">
             <BaseButton variant="gradient" :loading="evalLoading" :disabled="evalLoading" @click="submitAnswer">
               {{ evalLoading ? '评估中…' : '提交回答' }}
@@ -409,6 +429,38 @@ const evalResult = ref<EvalResult | null>(null)
 const streaming = ref(false)
 const streamContent = ref('')
 const hintOpen = ref(false)
+
+// ── 多模态附图（v1.30.0）──
+const imageInputEl = ref<HTMLInputElement | null>(null)
+const imageUrl = ref('')
+const imageUploading = ref(false)
+function pickImageFile() {
+  imageInputEl.value?.click()
+}
+async function onImageSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // 允许重复选择同一文件
+  if (!file) return
+  if (!file.type.startsWith('image/')) return ElMessage.warning('请选择图片文件')
+  if (file.size > 5 * 1024 * 1024) return ElMessage.warning('图片不能超过 5MB')
+  imageUploading.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await api.post('/api/interview/upload-image', form) as unknown as { url?: string }
+    if (!res?.url) throw new Error('未返回图片地址')
+    imageUrl.value = res.url
+    ElMessage.success('附图已上传，提交后 AI 将结合图片评估')
+  } catch (err: unknown) {
+    ElMessage.error(getErrMessage(err, '图片上传失败'))
+  } finally {
+    imageUploading.value = false
+  }
+}
+function removeImage() {
+  imageUrl.value = ''
+}
 
 // 通过 ?sessionId= 载入指定会话（从收藏题库发起面试等入口进入时直接答题）
 onMounted(() => {
@@ -858,10 +910,11 @@ async function submitAnswer() {
   evalLoading.value = true
   evalResult.value = null
   try {
-    // 1. 评估回答（AI 返回评分 + 改进建议）
+    // 1. 评估回答（AI 返回评分 + 改进建议；可选携带附图 imageUrl 做多模态评估 v1.30.0）
     const data = await api.post('/api/interview/evaluate', {
       question: currentQ.value.question,
-      userAnswer: userAnswer.value
+      userAnswer: userAnswer.value,
+      imageUrl: imageUrl.value || undefined
     }) as unknown as string
     evalResult.value = safeParse<EvalResult>(data, {})
 
@@ -903,6 +956,7 @@ function nextQuestion() {
     qIndex.value++
     userAnswer.value = ''
     evalResult.value = null
+    imageUrl.value = '' // 切题时清除上一题附图
     // 切题时终止上一题的提示流，避免旧题 token 继续写入新题的 streamContent
     abortController?.abort()
     streaming.value = false
@@ -1733,6 +1787,40 @@ onUnmounted(() => {
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 4px;
+}
+
+/* ── 多模态附图（v1.30.0）── */
+.attach-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.attach-hint {
+  font-size: 12px;
+  color: var(--c-text-secondary, #888);
+}
+.attach-preview {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--c-border-light, #e5e5e5);
+}
+.attach-remove {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--c-danger, #e11d48);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── 评估结果卡片 ── */

@@ -43,7 +43,7 @@ spring:
       base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com}
       chat:
         options:
-          model: ${AI_MODEL:agnes-2.0-flash}
+          model: ${AI_MODEL:agnes-2.5-flash}
           temperature: 0.3
   # 排除自动装配以避免启动崩溃：
   # - pgvector：512MB 容器内 Metaspace 不足
