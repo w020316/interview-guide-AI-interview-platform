@@ -5,6 +5,7 @@ import com.example.interview.entity.ResumeEntity;
 import com.example.interview.service.ResumeAnalysisService;
 import com.example.interview.service.ResumeParseService;
 import com.example.interview.service.ResumeService;
+import com.example.interview.util.SsrUrlValidator;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
 import org.slf4j.Logger;
@@ -241,33 +242,12 @@ public class ResumeController {
             return Result.error(400, "URL 不能为空");
         }
 
-        // URL 安全校验：仅允许 http/https
-        String lowerUrl = url.toLowerCase().trim();
-        if (!lowerUrl.startsWith("http://") && !lowerUrl.startsWith("https://")) {
-            return Result.error(400, "请输入有效的 URL（以 http:// 或 https:// 开头）");
+        // URL 安全校验（防 SSRF）：协议/主机端口/内网与元数据网段统一校验（v1.31.4 抽出共享校验器）
+        SsrUrlValidator.Result valid = SsrUrlValidator.validate(url);
+        if (!valid.ok) {
+            return Result.error(400, valid.message);
         }
-
-        // 防止 SSRF：域名解析后校验全部 IP 均为公网地址
-        // v1.23.1 加固：字符串黑名单可被十进制 IP/重定向/DNS 重绑定绕过，
-        // 改为 DNS 解析级校验 + 禁止 Jsoup 跟随重定向
-        try {
-            java.net.URI uri = java.net.URI.create(url.trim());
-            String host = uri.getHost();
-            if (host == null || host.isBlank()) {
-                return Result.error(400, "URL 缺少主机名");
-            }
-            java.net.InetAddress[] addresses = java.net.InetAddress.getAllByName(host);
-            for (java.net.InetAddress addr : addresses) {
-                if (addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress()
-                        || addr.isAnyLocalAddress() || addr.isMulticastAddress()) {
-                    return Result.error(400, "不支持访问内网地址");
-                }
-            }
-        } catch (java.net.UnknownHostException e) {
-            return Result.error(400, "域名无法解析，请检查 URL");
-        } catch (IllegalArgumentException e) {
-            return Result.error(400, "URL 格式不正确");
-        }
+        url = valid.normalizedUrl;
 
         String userId = currentUserId();
         try {

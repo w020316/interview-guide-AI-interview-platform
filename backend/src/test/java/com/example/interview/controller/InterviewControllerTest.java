@@ -278,13 +278,13 @@ class InterviewControllerTest {
         }
 
         @Test
-        @DisplayName("携带 imageUrl 时调用多模态评估")
+        @DisplayName("携带合法 imageUrl 时调用多模态评估（192.0.2.1 为公网 TEST-NET，无需真实网络）")
         void evaluate_withImageUrl_returns200() throws Exception {
-            when(interviewService.evaluateAnswerWithImage("什么是多态？", "多态是...", "", "https://x.com/a.png"))
+            when(interviewService.evaluateAnswerWithImage("什么是多态？", "多态是...", "", "https://192.0.2.1/a.png"))
                     .thenReturn("{\"score\":88}");
 
             String body = objectMapper.writeValueAsString(Map.of(
-                    "question", "什么是多态？", "userAnswer", "多态是...", "imageUrl", "https://x.com/a.png"));
+                    "question", "什么是多态？", "userAnswer", "多态是...", "imageUrl", "https://192.0.2.1/a.png"));
 
             mockMvc.perform(post("/api/interview/evaluate")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -292,6 +292,18 @@ class InterviewControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").exists());
+        }
+
+        @Test
+        @DisplayName("携带内网/元数据 imageUrl 时被 SSRF 拦截（v1.31.4 B-07）")
+        void evaluate_withInternalImageUrl_rejected() throws Exception {
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "question", "什么是多态？", "userAnswer", "多态是...", "imageUrl", "http://169.254.169.254/latest/meta-data/"));
+            mockMvc.perform(post("/api/interview/evaluate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400));
         }
     }
 }

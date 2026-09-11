@@ -2,7 +2,9 @@ package com.example.interview.controller;
 
 import com.example.interview.common.Result;
 import com.example.interview.service.InterviewService;
+import com.example.interview.util.HashUtil;
 import com.example.interview.util.PromptSanitizer;
+import com.example.interview.util.SsrUrlValidator;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -45,6 +47,10 @@ public class InterviewController {
 
     @Autowired
     private com.example.interview.service.SupabaseStorageService supabaseStorageService;
+
+    /** 关键 AI 生成接口按用户限流：防自动化刷额度；30 次/分钟/用户，基本不影响人工使用（v1.31.4 B-10） */
+    private final com.example.interview.util.PerUserRateLimiter aiLimiter =
+            new com.example.interview.util.PerUserRateLimiter(30, 60 * 1000L);
 
     /**
      * v1.11 起：注入 MeterRegistry，将 SSE 限流指标暴露到 actuator metrics
@@ -106,6 +112,11 @@ public class InterviewController {
             return Result.error(400, "简历和岗位描述不能为空");
         }
 
+        // v1.31.4（B-10）：AI 出题接口按用户限流，防自动化刷额度
+        if (!aiLimiter.allow(currentUserId())) {
+            return Result.error(429, "操作过于频繁，请稍后再试");
+        }
+
         // 跨场自适应：难度偏置 + 弱项聚焦（可选，空则走默认）
         String difficulty = request.get("difficulty") == null ? "" : request.get("difficulty").toString();
         String focusCategories = request.get("focusCategories") == null ? "" : request.get("focusCategories").toString();
@@ -149,6 +160,19 @@ public class InterviewController {
             return Result.error(400, "问题和回答不能为空");
         }
 
+        // v1.31.4 安全加固（B-07）：imageUrl 将由 AI 后端服务端抓取，强制 SSRF 校验，防止访问内网/元数据
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            SsrUrlValidator.Result valid = SsrUrlValidator.validate(imageUrl);
+            if (!valid.ok) {
+                return Result.error(400, "图片地址无效：" + valid.message);
+            }
+        }
+
+        // v1.31.4（B-10）：AI 评分接口按用户限流，防自动化刷额度
+        if (!aiLimiter.allow(currentUserId())) {
+            return Result.error(429, "操作过于频繁，请稍后再试");
+        }
+
         String result = interviewService.evaluateAnswerWithImage(question, userAnswer, referenceAnswer, imageUrl);
         return Result.success(result);
     }
@@ -161,8 +185,7 @@ public class InterviewController {
      */
     @PostMapping("/upload-image")
     public Result<java.util.Map<String, String>> uploadImage(
-            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
-            @RequestParam(value = "userId", required = false) String userId) {
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
         if (file == null || file.isEmpty()) {
             return Result.error(400, "请上传图片");
         }
@@ -180,8 +203,9 @@ public class InterviewController {
                 case "image/webp" -> ".webp";
                 default -> ".png";
             };
-            String uid = (userId == null || userId.isBlank()) ? "anon" :
-                    com.example.interview.util.HashUtil.sha256Short(userId);
+            // v1.31.4 安全修复（B-08）：命名空间一律取自 JWT 当前用户，禁止客户端指定 userId，
+            // 杜绝向任意他人命名空间写图的越权/污染
+            String uid = HashUtil.sha256Short(currentUserId());
             String fileName = "interview/" + uid + "/" + System.currentTimeMillis() + suffix;
             String publicUrl = supabaseStorageService.upload(file, fileName);
             java.util.Map<String, String> result = new java.util.LinkedHashMap<>();
@@ -206,6 +230,10 @@ public class InterviewController {
         String resumeText = request.getOrDefault("resumeText", "");
         if (question.isBlank()) {
             return Result.error(400, "question 不能为空");
+        }
+        // v1.31.4（B-10）：AI 追问接口按用户限流，防自动化刷额度
+        if (!aiLimiter.allow(currentUserId())) {
+            return Result.error(429, "操作过于频繁，请稍后再试");
         }
         return Result.success(interviewService.generateFollowUp(question, userAnswer, resumeText));
     }
