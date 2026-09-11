@@ -42,6 +42,35 @@ function countChars(text: string): number {
 }
 
 /**
+ * 技术术语纠正（v1.28.0）：修正 Web Speech API 对英文技术术语的常见误转写/大小写，
+ * 对齐主流 AI 面试工具的语音识别优化。纯函数，可单测。
+ * 如 "transformer"→"Transformer"、"deepseek"→"DeepSeek"、"变换者"→"Transformer"。
+ */
+const TECH_TERM_FIXES: ReadonlyArray<[RegExp, string]> = [
+  [/\btransformer\b/gi, 'Transformer'],
+  [/变换者/g, 'Transformer'],
+  [/\bdeep[ ]?seek\b/gi, 'DeepSeek'],
+  [/深度求索/g, 'DeepSeek'],
+  [/\brag\b/gi, 'RAG'],
+  [/\b(?:kubernetes|k8s)\b/gi, 'Kubernetes'],
+  [/\bjavascript\b/gi, 'JavaScript'],
+  [/\btypescript\b/gi, 'TypeScript'],
+  [/\bspringbo?ot\b/gi, 'Spring Boot'],
+  [/\bredis\b/gi, 'Redis'],
+  [/\bmysql\b/gi, 'MySQL'],
+  [/\bmongodb\b/gi, 'MongoDB'],
+  [/\blinux\b/gi, 'Linux'],
+]
+
+/** 对转写文本应用技术术语纠正 */
+export function correctTechTerms(text: string): string {
+  if (!text) return text
+  let out = text
+  for (const [re, to] of TECH_TERM_FIXES) out = out.replace(re, to)
+  return out
+}
+
+/**
  * 计算语速/卡顿等表达指标。
  * @param chunks 识别分段时间戳序列（未被清理的原始序列）
  * @param finalText 识别完成的最终文本
@@ -169,12 +198,12 @@ export function createSpeechRecorder(opts: SpeechRecorderOptions = {}) {
       }
       chunks.push({ ts, text: (finalAdded || interim).trim() })
       if (finalAdded) finalized += finalAdded
-      opts.onFinalText?.(finalized)
+      opts.onFinalText?.(correctTechTerms(finalized))
     }
     recognition.onend = () => {
       if (!recording) return
       recording = false
-      opts.onMetrics?.(computeSpeechMetrics(chunks, finalized))
+      opts.onMetrics?.(computeSpeechMetrics(chunks, correctTechTerms(finalized)))
     }
     recognition.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
