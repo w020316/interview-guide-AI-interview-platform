@@ -192,6 +192,7 @@
           </ul>
         </div>
         <div class="action-row">
+          <BaseButton variant="ghost" :loading="followingUp" :disabled="followingUp" @click="deepFollowUp">深挖提问</BaseButton>
           <BaseButton v-if="qIndex < questions.length - 1" variant="gradient" @click="nextQuestion">下一题</BaseButton>
           <BaseButton v-else variant="success" @click="finishSession">结束面试</BaseButton>
         </div>
@@ -906,6 +907,42 @@ function nextQuestion() {
     abortController?.abort()
     streaming.value = false
     streamContent.value = ''
+  }
+}
+
+const followingUp = ref(false)
+
+/** 深挖提问（v1.28.0 追问链）：基于本题回答+简历生成针对性追问，追加进会话继续作答 */
+async function deepFollowUp() {
+  if (!currentQ.value || !sessionId.value || followingUp.value) return
+  followingUp.value = true
+  try {
+    const q = (await api.post('/api/interview/followup', {
+      question: currentQ.value.question,
+      userAnswer: userAnswer.value.trim(),
+      resumeText: resumeText.value || '',
+    }, { timeout: AI_TIMEOUT })) as unknown as string
+    if (!q || !q.trim()) {
+      ElMessage.warning('未能生成追问，请稍后重试')
+      return
+    }
+    // 持久化到当前会话（获取带 id 的新题），再追加到题目列表继续作答
+    const saved = (await api.post(`/api/session/${sessionId.value}/questions`,
+      [{ question: q.trim(), category: currentQ.value.category, difficulty: currentQ.value.difficulty }],
+      { timeout: AI_TIMEOUT })) as unknown as Question[]
+    if (Array.isArray(saved) && saved.length) {
+      questions.value.push(saved[0])
+      qIndex.value = questions.value.length - 1
+      userAnswer.value = ''
+      evalResult.value = null
+      ElMessage.success('已生成深挖追问')
+    } else {
+      ElMessage.warning('追问已生成但保存失败')
+    }
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '生成追问失败'))
+  } finally {
+    followingUp.value = false
   }
 }
 
