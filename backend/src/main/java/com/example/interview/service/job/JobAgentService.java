@@ -294,6 +294,11 @@ public class JobAgentService {
         return httpAdapter;
     }
 
+    /** 全部有效岗位（供简历匹配推荐） */
+    public List<JobPostingEntity> activeJobs() {
+        return repository.findByActiveTrue();
+    }
+
     private static boolean isBlank(String s) {
         return s == null || s.isBlank();
     }

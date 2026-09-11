@@ -22,6 +22,9 @@ public interface JobPostingRepository extends JpaRepository<JobPostingEntity, Lo
     /** 幂等 upsert 依据 */
     Optional<JobPostingEntity> findByPlatformAndExternalId(String platform, String externalId);
 
+    /** 全部有效岗位（供简历匹配推荐） */
+    List<JobPostingEntity> findByActiveTrue();
+
     /** 筛选面板元数据：有效岗位的行业去重列表 */
     @Query("SELECT DISTINCT j.industry FROM JobPostingEntity j WHERE j.active = true AND j.industry IS NOT NULL ORDER BY j.industry")
     List<String> findDistinctIndustries();

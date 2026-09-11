@@ -7,6 +7,7 @@ import com.example.interview.repository.ResumeRepository;
 import com.example.interview.security.JwtUtil;
 import com.example.interview.service.JobFavoriteService;
 import com.example.interview.service.job.JobAgentService;
+import com.example.interview.service.job.JobMatchService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +56,9 @@ class JobFavoriteControllerTest {
 
     @MockBean
     private JobFavoriteService jobFavoriteService;
+
+    @MockBean
+    private JobMatchService jobMatchService;
 
     @MockBean
     private ResumeRepository resumeRepository;

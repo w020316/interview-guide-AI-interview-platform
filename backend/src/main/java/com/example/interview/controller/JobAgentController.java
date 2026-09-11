@@ -5,6 +5,7 @@ import com.example.interview.entity.JobFavoriteEntity;
 import com.example.interview.entity.JobPostingEntity;
 import com.example.interview.service.JobFavoriteService;
 import com.example.interview.service.job.JobAgentService;
+import com.example.interview.service.job.JobMatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
@@ -40,10 +41,13 @@ public class JobAgentController {
 
     private final JobAgentService jobAgentService;
     private final JobFavoriteService jobFavoriteService;
+    private final JobMatchService jobMatchService;
 
-    public JobAgentController(JobAgentService jobAgentService, JobFavoriteService jobFavoriteService) {
+    public JobAgentController(JobAgentService jobAgentService, JobFavoriteService jobFavoriteService,
+                              JobMatchService jobMatchService) {
         this.jobAgentService = jobAgentService;
         this.jobFavoriteService = jobFavoriteService;
+        this.jobMatchService = jobMatchService;
     }
 
     /** 从 SecurityContext 获取当前登录用户 ID（JWT subject） */
@@ -104,6 +108,30 @@ public class JobAgentController {
     @GetMapping("/meta")
     public Result<Map<String, Object>> meta() {
         return Result.success(jobAgentService.meta());
+    }
+
+    @Operation(summary = "简历匹配推荐（岗位吻合度打分）")
+    @PostMapping("/match")
+    public Result<Map<String, Object>> resumeMatch(@RequestBody Map<String, Object> req) {
+        String resumeText = req.get("resumeText") != null ? req.get("resumeText").toString() : "";
+        if (resumeText.isBlank()) {
+            return Result.error(400, "请提供简历内容");
+        }
+        int limit = req.get("limit") != null ? Integer.parseInt(req.get("limit").toString()) : 10;
+
+        var matched = jobMatchService.match(resumeText, jobAgentService.activeJobs(), limit);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", matched.size());
+        result.put("topSkills", jobMatchService.extractSkills(resumeText));
+        List<Map<String, Object>> items = matched.stream().map(m -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("job", m.job());
+            row.put("matchScore", m.matchScore());
+            row.put("matchedSkills", m.matchedSkills());
+            return row;
+        }).toList();
+        result.put("items", items);
+        return Result.success(result);
     }
 
     /**
