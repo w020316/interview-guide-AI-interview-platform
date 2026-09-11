@@ -123,8 +123,8 @@ app:
     # 环境变量等价写法（索引从 0 开始）：
     #   APP_JOB_AGENT_CHANNELS_0_NAME / _ENDPOINT / _API_KEY
     channels: []
-    # 定时刷新：每 6 小时拉取一次各平台岗位
-    refresh-fixed-delay-ms: ${JOB_REFRESH_DELAY:21600000}
+    # 定时刷新：每 1 小时拉取一次各平台岗位（v1.27.0 由 6h 收紧，满足“每小时实时更新”）
+    refresh-fixed-delay-ms: ${JOB_REFRESH_DELAY:3600000}
   rag:
     # 知识库导入去重相似度阈值（0.0~1.0），相似度 >= 此值视为重复，跳过导入
     # 0.90 对应 cosine distance <= 0.10，覆盖文本微调后重复的场景
