@@ -292,7 +292,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
@@ -408,6 +408,40 @@ const evalResult = ref<EvalResult | null>(null)
 const streaming = ref(false)
 const streamContent = ref('')
 const hintOpen = ref(false)
+
+// 通过 ?sessionId= 载入指定会话（从收藏题库发起面试等入口进入时直接答题）
+onMounted(() => {
+  const sid = typeof route.query.sessionId === 'string' ? route.query.sessionId : ''
+  if (sid) {
+    resumeSession(sid)
+    // 载入后清理 query 中的 sessionId，避免刷新重复触发
+    const q = { ...route.query }
+    delete q.sessionId
+    router.replace({ path: '/interview', query: q }).catch(() => {})
+  }
+})
+
+/** 载入一个已存在会话的题目集并进入答题（不复用旧回答，从头作答） */
+async function resumeSession(targetId: string) {
+  loading.value = true
+  try {
+    const qs = (await api.get(`/api/session/${targetId}/questions`, { timeout: AI_TIMEOUT })) as unknown as Question[]
+    if (!Array.isArray(qs) || qs.length === 0) {
+      ElMessage.warning('该会话暂无题目')
+      router.replace('/interview')
+      return
+    }
+    sessionId.value = targetId
+    questions.value = qs
+    qIndex.value = 0
+    ElMessage.success(`已载入 ${qs.length} 道题，开始面试！`)
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '载入面试失败'))
+    router.replace('/interview')
+  } finally {
+    loading.value = false
+  }
+}
 
 // ── 语音作答（ASR）──
 const speechSupported = isSpeechSupported()

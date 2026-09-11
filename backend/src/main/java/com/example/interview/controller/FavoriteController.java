@@ -2,7 +2,10 @@ package com.example.interview.controller;
 
 import com.example.interview.common.Result;
 import com.example.interview.entity.FavoriteQuestionEntity;
+import com.example.interview.entity.InterviewQuestionEntity;
+import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.service.FavoriteService;
+import com.example.interview.service.InterviewSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +13,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +34,9 @@ public class FavoriteController {
 
     @Autowired
     private FavoriteService favoriteService;
+
+    @Autowired
+    private InterviewSessionService sessionService;
 
     /** 从 SecurityContext 获取当前登录用户 ID（JWT subject） */
     private String currentUserId() {
@@ -109,6 +117,67 @@ public class FavoriteController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("favorited", favorited);
         result.put("count", favoriteService.countByUser(userId));
+        return Result.success(result);
+    }
+
+    /**
+     * 从收藏题库发起模拟面试
+     * POST /api/favorite/bank/start
+     * Body: {"favoriteIds":[1,2,3],"jobDescription":"Java 后端(可选)"}
+     *
+     * 复用现有会话/答题/评分链路：以所选收藏题目为题目集创建一个新面试会话，
+     * 可直接进入答题（不重新调用 AI 生成题目）。
+     */
+    @Operation(summary = "从收藏题库发起模拟面试")
+    @PostMapping("/bank/start")
+    public Result<Map<String, Object>> startFromBank(@RequestBody Map<String, Object> req) {
+        String userId = currentUserId();
+
+        List<Long> ids = new ArrayList<>();
+        Object idsObj = req.get("favoriteIds");
+        if (idsObj instanceof List<?> list) {
+            for (Object o : list) {
+                try {
+                    ids.add(Long.valueOf(o.toString()));
+                } catch (NumberFormatException ignored) {
+                    // 忽略非法 id
+                }
+            }
+        }
+        if (ids.isEmpty()) {
+            return Result.error(400, "请选择至少一道收藏题目");
+        }
+
+        String jobDesc = req.get("jobDescription") == null
+                || req.get("jobDescription").toString().isBlank()
+                ? "收藏题库" : req.get("jobDescription").toString().trim();
+
+        // 归属校验：只取属于当前用户的收藏，防 IDOR
+        List<FavoriteQuestionEntity> favs = favoriteService.listByUser(userId);
+        Set<Long> idSet = new HashSet<>(ids);
+        List<FavoriteQuestionEntity> chosen = favs.stream()
+                .filter(f -> idSet.contains(f.getId()))
+                .toList();
+        if (chosen.isEmpty()) {
+            return Result.error(404, "未找到有效的收藏题目");
+        }
+
+        // 创建会话并将收藏题目快照转为会话题目（新会话重新作答，不复用旧回答/分数）
+        InterviewSessionEntity session = sessionService.createSession(userId, jobDesc, null);
+        List<InterviewQuestionEntity> questions = chosen.stream()
+                .map(f -> InterviewQuestionEntity.builder()
+                        .sessionId(session.getSessionId())
+                        .question(f.getQuestion())
+                        .category(f.getCategory())
+                        .difficulty(f.getDifficulty())
+                        .referenceAnswer(f.getReferenceAnswer())
+                        .build())
+                .toList();
+        List<InterviewQuestionEntity> saved = sessionService.saveQuestions(session.getSessionId(), questions);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("sessionId", session.getSessionId());
+        result.put("questions", saved);
         return Result.success(result);
     }
 }
