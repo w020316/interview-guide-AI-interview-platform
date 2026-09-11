@@ -45,6 +45,9 @@ services:
         sync: false
       - key: JWT_EXPIRATION_MS
         value: "86400000"
+      # 管理员账号名单（逗号分隔）；命中者享有无限制刷新等管理能力，留空则均为普通用户
+      - key: APP_ADMIN_USERNAMES
+        value: ""
       # ── Supabase Storage ──
       - key: SUPABASE_URL
         sync: false

@@ -27,6 +27,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       '安全：作答附图上传禁止指定他人用户 ID，命名空间一律取自当前登录身份',
       '安全：招聘刷新与 AI 生成接口增加按用户限流，防止自动化刷配额',
       '健壮性：服务器错误不再透出内部细节、AI 返回的 JSON 修复不再误伤正常字符串内容、出题提示编号统一',
+      '新增：管理员身份体系（配置账号名单即可拥有无限制刷新等管理能力，普通用户不受影响）',
       '完成全项目与 AI 模块第二轮全面审查，详见 docs/code-review-report.md、docs/ai-module-check-report.md'
     ]
   },

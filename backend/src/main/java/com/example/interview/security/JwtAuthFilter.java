@@ -12,7 +12,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  * JWT 认证过滤器
@@ -35,9 +34,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(token) && jwtUtil.isValid(token)) {
             String userId = jwtUtil.extractUserId(token);
-            // 无权限列表，仅标记已认证；具体权限控制由 SecurityConfig 配置
+            String role = jwtUtil.extractRole(token);
+            if (role == null || role.isBlank()) {
+                role = "ROLE_USER"; // 兜底：无角色一律视为普通用户
+            }
+            // v1.31.4：按 JWT 中 role claim 赋权（ROLE_ADMIN / ROLE_USER），支持管理员无限制操作；principal 仍为 userId
+            java.util.List<org.springframework.security.core.GrantedAuthority> authorities =
+                    java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority(role));
             UsernamePasswordAuthenticationToken auth =
-                    new UsernamePasswordAuthenticationToken(userId, null, List.of());
+                    new UsernamePasswordAuthenticationToken(userId, null, authorities);
             SecurityContextHolder.getContext().setAuthentication(auth);
         }
 

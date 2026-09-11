@@ -130,7 +130,7 @@ public class AuthController {
         }
 
         // subject 使用数据库自增 id（唯一且不可变），避免用户名变更导致 token 失效
-        return Result.success(jwtUtil.generateToken(user.getId().toString()));
+        return Result.success(jwtUtil.generateToken(user.getId().toString(), user.getUsername()));
     }
 
     /**
@@ -190,7 +190,7 @@ public class AuthController {
         loginFailMap.remove(clientIp);
 
         // subject 使用数据库自增 id（唯一且不可变），避免用户名变更导致 token 失效
-        return Result.success(jwtUtil.generateToken(user.getId().toString()));
+        return Result.success(jwtUtil.generateToken(user.getId().toString(), user.getUsername()));
     }
 
     /**

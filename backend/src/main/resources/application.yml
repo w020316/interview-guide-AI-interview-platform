@@ -93,6 +93,9 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  # 管理员账号名单（逗号分隔，区分大小写）：命中者签发 ROLE_ADMIN，无限制刷新/保留后续管理接口
+  # 默认空=所有人均为普通用户；生产通过环境变量 APP_ADMIN_USERNAMES 注入
+  admin-usernames: ${APP_ADMIN_USERNAMES:}
   info:
     # 应用元数据，暴露到 /actuator/info 端点
     # 版本号与前端 changelog.ts 保持同步，修改时两处一起更新

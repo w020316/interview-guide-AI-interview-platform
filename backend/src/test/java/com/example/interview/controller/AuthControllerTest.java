@@ -64,7 +64,7 @@ class AuthControllerTest {
                 u.setId(1L);
                 return u;
             });
-            when(jwtUtil.generateToken("1")).thenReturn("mock.jwt.token");
+            when(jwtUtil.generateToken("1", "alice")).thenReturn("mock.jwt.token");
 
             String body = objectMapper.writeValueAsString(Map.of(
                     "username", "alice", "password", "123456", "email", "a@b.com"));
@@ -142,7 +142,7 @@ class AuthControllerTest {
                 u.setId(2L);
                 return u;
             });
-            when(jwtUtil.generateToken("2")).thenReturn("mock.jwt.token");
+            when(jwtUtil.generateToken("2", "张三")).thenReturn("mock.jwt.token");
 
             String body = objectMapper.writeValueAsString(Map.of(
                     "username", "张三", "password", "123456"));
@@ -230,7 +230,7 @@ class AuthControllerTest {
                     .build();
             when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
             when(passwordEncoder.matches("123456", "hashed")).thenReturn(true);
-            when(jwtUtil.generateToken("1")).thenReturn("mock.jwt.token");
+            when(jwtUtil.generateToken("1", "alice")).thenReturn("mock.jwt.token");
 
             String body = objectMapper.writeValueAsString(Map.of(
                     "username", "alice", "password", "123456"));

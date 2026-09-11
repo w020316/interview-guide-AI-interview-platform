@@ -80,14 +80,22 @@
 - v1.31.4 新增单测：`SsrUrlValidatorTest`（4）、`PerUserRateLimiterTest`（3）、`InterviewControllerTest.evaluate_withInternalImageUrl_rejected`（SSRF 拦截）、`JsonRepairUtilTest.stringValueLikeKeyNotCorrupted`（B-12）。
 - 剩余建议项 B-09（前端流式渲染节流）与 B-13（PromptSanitizer 黑名单）为改善性质，暂不改以避免影响既有行为或引入新风险。
 
+### 4.4 管理员身份体系（v1.31.4 新增；用户指定"管理员无限制，正常用户不受影响"）
+
+- **机制**：不新增数据库字段（无生产迁移）。管理员账号由配置 `app.admin-usernames`（环境变量 `APP_ADMIN_USERNAMES`，逗号分隔）指定；登录/注册时命中名单则 JWT 下发 `role=ROLE_ADMIN`，据此构建 SecurityContext 权限。
+- **能力**：`RoleUtil.isCurrentUserAdmin()` 统一判权；`/api/jobs/refresh` 管理员绕过按用户限流（无限制），普通用户维持 5 分钟/次限流，其余行为不变。
+- **实现文件**：`JwtUtil.generateToken(subject, username)` 嵌入 role claim + `extractRole`；`JwtAuthFilter` 按 claim 赋权并以 ROLE_USER 兜底；`RoleUtil` 判权工具；`application.yml`/`render.yaml` 增加 `APP_ADMIN_USERNAMES`。
+- **兼容性**：旧 token 无 role claim → 一律按普通用户处理；`currentUserId()` 仍返回 userId，主流程不受影响。
+- **单测**：新增 `JwtUtilTest`（3 例）覆盖名单内→ROLE_ADMIN、普通→ROLE_USER、空白名单兜底。
+
 ---
 
 ## 五、修复后回归
-- 修复后全量单测 **325/325** 全绿，未引入新问题（v1.31.3 基线 316 → v1.31.4 新增 9 个安全/健壮性单测）。
+- 修复后全量单测 **328/328** 全绿，未引入新问题（v1.31.3 基线 316 → v1.31.4 新增 12 个安全/健壮性单测）。
 - 新增 `JobPostingEntityTest`（2/2）固化 A-02 修复：验证 `@Builder.Default` 默认值与显式覆盖，防回归。
-- v1.31.4 新增单测：SSRF 校验器（4）、限流器（3）、附图 imageUrl 内网拦截（1）、JSON 字符串不被误注入（1）。
+- v1.31.4 新增单测：SSRF 校验器（4）、限流器（3）、附图 imageUrl 内网拦截（1）、JSON 字符串不被误注入（1）、JWT 角色签发（3）。
 
 ---
 
 ## 六、总结论
-项目整体安全性与健壮性良好：IDOR 越权防护到位、XSS 全链路消毒、无硬编码密钥、事务边界正确、并发与限流有保护。v1.31.3 修复登录失败计数内存泄漏与 builder 默认值；v1.31.4 落地 AI 并发闸门统一、冷启动重试修复、SSRF 校验（import-url + imageUrl）、附图上传命名空间越权修复、按用户限流、异常信息不透出（BusinessException）、JSON 修复不误伤字符串、出题提示词编号统一、死代码清理，全部通过回归（325/325 + vue-tsc 0 错误）。
+项目整体安全性与健壮性良好：IDOR 越权防护到位、XSS 全链路消毒、无硬编码密钥、事务边界正确、并发与限流有保护。v1.31.3 修复登录失败计数内存泄漏与 builder 默认值；v1.31.4 落地 AI 并发闸门统一、冷启动重试修复、SSRF 校验、附图上传命名空间越权修复、按用户限流、异常信息不透出、JSON 修复不误伤字符串、出题提示编号统一、死代码清理，并新增**管理员身份体系**（配置名单 → JWT 角色 → 管理员无限制，普通用户不受影响，无生产迁移），全部通过回归（328/328 + vue-tsc 0 错误）。

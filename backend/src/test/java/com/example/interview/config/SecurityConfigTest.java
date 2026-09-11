@@ -138,6 +138,7 @@ class SecurityConfigTest {
         void protectedApi_withValidToken_returns200() throws Exception {
             when(jwtUtil.isValid(anyString())).thenReturn(true);
             when(jwtUtil.extractUserId(anyString())).thenReturn("1");
+            when(jwtUtil.extractRole(anyString())).thenReturn("ROLE_USER");
 
             mockMvc.perform(get("/api/test-secure")
                             .header("Authorization", "Bearer valid-token"))

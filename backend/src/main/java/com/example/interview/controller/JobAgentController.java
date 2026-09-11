@@ -146,8 +146,9 @@ public class JobAgentController {
     @Operation(summary = "手动刷新岗位数据")
     @PostMapping("/refresh")
     public Result<JobAgentService.RefreshResult> refresh() {
-        // 按用户限流：同一用户 5 分钟内仅允许手动刷新一次，防刷第三方抓取配额（B-10）
-        if (!refreshLimiter.allow(currentUserId())) {
+        // 按用户限流：同一用户 5 分钟内仅允许手动刷新一次，防刷第三方抓取配额（B-10）；管理员无限制（v1.31.4）
+        if (!com.example.interview.security.RoleUtil.isCurrentUserAdmin()
+                && !refreshLimiter.allow(currentUserId())) {
             return Result.error(429, "刷新过于频繁，请 5 分钟后再试");
         }
         JobAgentService.RefreshResult result = jobAgentService.refresh();
