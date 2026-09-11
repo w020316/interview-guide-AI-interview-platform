@@ -65,7 +65,8 @@
             :disabled="streaming"
             @keydown.enter.exact="onEnterKey"
           ></textarea>
-          <BaseButton variant="gradient" :loading="streaming" :disabled="streaming || !input.trim()" @click="send()">
+          <BaseButton v-if="streaming" variant="ghost" @click="stopStreaming">停止生成</BaseButton>
+          <BaseButton v-else variant="gradient" :disabled="!input.trim()" @click="send()">
             发送
           </BaseButton>
         </div>
@@ -104,6 +105,7 @@ interface ConversationItem {
 
 const suggestions = [
   '帮我找深圳的技术类秋招岗位',
+  '联网帮我找全国的算法岗位',
   '我哪些知识点比较薄弱？',
   'Redis 持久化面试怎么答？',
   '我最近有哪些面试安排？',
@@ -117,6 +119,7 @@ const streaming = ref(false)
 const thinking = ref(false)
 const chatBox = ref<HTMLElement | null>(null)
 let abortController: AbortController | null = null
+let coldRetried = false // 冷启动已重试标记：整个页面生命周期仅唤醒一次
 
 onBeforeUnmount(() => {
   // 离开页面时终止进行中的 SSE 流，避免继续更新已卸载组件
@@ -218,6 +221,14 @@ function onEnterKey(e: KeyboardEvent) {
   send()
 }
 
+/** 停止本次生成（终止 SSE 流） */
+function stopStreaming() {
+  abortController?.abort()
+  abortController = null
+  streaming.value = false
+  thinking.value = false
+}
+
 async function send(preset?: string) {
   const text = (preset || input.value).trim()
   if (!text || streaming.value) return
@@ -308,7 +319,28 @@ async function send(preset?: string) {
       ElMessage.warning('未收到回复，请重试')
     }
   } catch (e) {
-    if (e instanceof Error && e.name !== 'AbortError') {
+    if (e instanceof Error && e.name === 'AbortError') {
+      // 用户主动停止，静默
+    } else if (e instanceof TypeError && !coldRetried) {
+      // 冷启动自动重试：网络层断开（后端休眠），唤醒后再试一次（整个生命周期仅一次）
+      coldRetried = true
+      try {
+        ElMessage.info('后端服务正在冷启动（30-60s），正在唤醒，请稍候...')
+        const wake = new AbortController()
+        const wakeTimer = setTimeout(() => wake.abort(), 100000)
+        await fetch(`${apiBaseUrl}/api/info`, { signal: wake.signal })
+        clearTimeout(wakeTimer)
+        // 移除本次已推入的用户消息与空气泡，交由重试重新发起
+        messages.value = messages.value.filter((m) => !(m.role === 'user' && m.content === text))
+        const last = messages.value[messages.value.length - 1]
+        if (last && last.role === 'assistant' && last.content === '') {
+          messages.value = messages.value.slice(0, -1)
+        }
+        await send(text)
+      } catch {
+        ElMessage.error('后端唤醒失败，请稍后重试')
+      }
+    } else if (e instanceof Error && e.name !== 'AbortError') {
       ElMessage.error('网络异常，请检查网络后重试')
     }
   } finally {

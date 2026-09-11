@@ -87,29 +87,75 @@ public class WebJobSearcherService {
 
     // ---------- 各候选源抓取实现 ----------
 
-    /** 智联招聘搜索页：https://sou.zhaopin.com/?kw=& city= */
+    /** 智联招聘搜索页：https://sou.zhaopin.com/?kw=&jl=（SSR 内嵌 JSON 岗位数据，真实可抓） */
     private void fetchFromZhilian(String kw, String loc, List<WebJob> out) {
-        String url = "https://sou.zhaopin.com/?jl=" + enc(loc) + "&kw=" + enc(kw);
+        String url = "https://sou.zhaopin.com/?kw=" + enc(kw)
+                + (isNational(loc) ? "" : "&jl=" + enc(loc));
         Document doc = fetch(url);
         if (doc == null) return;
-        // 智联结果卡片通常含 class 含 "joblist-box" 或 li 项，因 JS 渲染可能为空，尽力解析
-        Elements cards = doc.select("div.joblist-box__item, div.iteminfo__line1__jobname, li.joblist-box__item");
-        // 智联 SSR 不渲染时 cards 为空 → 跳过该源
-        if (cards.isEmpty()) return;
-        for (Element c : cards) {
+        List<WebJob> parsed = parseZhilianHtml(doc.html(), loc);
+        for (WebJob w : parsed) {
             if (out.size() >= MAX_PER_SOURCE) break;
-            String title = text(c.select(".iteminfo__line1__jobname"));
-            String company = text(c.select(".companyname"));
-            if (title.isBlank() && company.isBlank()) continue;
-            out.add(new WebJob(
-                    title.isBlank() ? kw : title,
-                    company,
-                    loc,
-                    text(c.select(".iteminfo__line2__jobdesc__salary")),
-                    text(c.select(".iteminfo__line2__jobdesc__edu")),
-                    "",
-                    absHref(c.select("a"))));
+            out.add(w);
         }
+    }
+
+    /** 从智联 SSR HTML 提取岗位（包可见，便于测试；不依赖网络） */
+    List<WebJob> parseZhilianHtml(String html, String loc) {
+        List<WebJob> result = new ArrayList<>();
+        if (html == null || html.isBlank()) return result;
+        // 智联 SSR 把岗位数据以 JSON 形式注入脚本，每条岗位在一个 "position":{"base":{...}} 对象内，
+        // positionName 与其相邻的 salary/workingExp 同在 base 块中。用 positionName + 有界窗口提取，避免跨岗位错配。
+        java.util.regex.Pattern pat = java.util.regex.Pattern.compile(
+                "\"positionName\"\\s*:\\s*\"([^\"]{1,80})\"", java.util.regex.Pattern.DOTALL);
+        java.util.regex.Matcher m = pat.matcher(html);
+        while (m.find() && result.size() < MAX_PER_SOURCE) {
+            String title = unescapeJson(m.group(1));
+            if (title.isBlank()) continue;
+            // salary/workingExp/education 在 positionName 之后 800 字符内（同一 base 块）
+            int end = Math.min(html.length(), m.start() + 800);
+            String seg = html.substring(m.start(), end);
+            String salary = fieldAfter(seg, "salary");
+            String workingExp = fieldAfter(seg, "positionWorkingExp");
+            String education = fieldAfter(seg, "education");
+            // 企业名/城市在整页 VM 数据里，就近向前取（粗粒度但稳定）
+            String company = nearField(html, m.start(), "companyName");
+            String city = nearField(html, m.start(), "cityName");
+            result.add(new WebJob(title, company.isBlank() ? "智联招聘" : company,
+                    city.isBlank() ? (isNational(loc) ? "全国" : loc) : city,
+                    salary.isBlank() ? "面议" : salary,
+                    education.isBlank() ? "" : education,
+                    workingExp.isBlank() ? "" : workingExp, "https://sou.zhaopin.com"));
+        }
+        return result;
+    }
+
+    /** 在 segment 内查找某 JSON 字段的字符串值 */
+    private static String fieldAfter(String seg, String field) {
+        int i = seg.indexOf("\"" + field + "\"");
+        if (i < 0) return "";
+        String sub = seg.substring(i, Math.min(seg.length(), i + 90));
+        java.util.regex.Matcher v = java.util.regex.Pattern.compile(":\\s*\"([^\"]{1,60})\"").matcher(sub);
+        return v.find() ? v.group(1).replace("\\u003d", "=").trim() : "";
+    }
+
+    /** 在 html 的 anchor 位置向前就近找某个 JSON 字段的值（粗粒度但稳定） */
+    private static String nearField(String html, int anchor, String field) {
+        int idx = html.lastIndexOf("\"" + field + "\"", anchor);
+        if (idx < 0 || anchor - idx > 5000) return "";
+        String seg = html.substring(idx, Math.min(html.length(), idx + 120));
+        java.util.regex.Matcher f = java.util.regex.Pattern
+                .compile(":(\"[^\"]{1,60}|[0-9A-Za-z_-]{1,40})").matcher(seg);
+        return f.find() ? unescapeJson(f.group(1).replace("\"", "")).trim() : "";
+    }
+
+    private static boolean isNational(String loc) {
+        return loc == null || loc.isBlank() || "全国".equals(loc) || "不限".equals(loc);
+    }
+
+    private static String unescapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\u003d", "=").replace("\"", "").trim();
     }
 
     /** 拉勾网搜索：https://www.lagou.com/jobs/list_java?city=全国 */
