@@ -153,7 +153,7 @@ List<WebJob> jobs = webJobSearcherService.searchWeb(keyword, location);
 ---
 
 ## 五、验证记录（真实）
-- 后端单测 **314/314** 全过；前端 vue-tsc 0 错误；
+- 后端单测 **316/316** 全过；前端 vue-tsc 0 错误；
 - 定制题库生产端到端：`/add`→200 id=1 → `/favorite/list` total=1 → `/favorite/bank/start`→sessionId + 1 题(MEDIUM) 全部通过。
 - 语音术语纠正单测 3/3；招聘广场归一化 meta 已收敛为干净枚举。
 - 简历岗位匹配（v1.29.0）：`JobMatchServiceTest` 3/3（技能/学历命中 + 排序）；`JobFieldNormalizerTest` 2/2；`JobPlatformAdapterTest` 6/6（含热招速递广州 Java 实习覆盖）全过。
