@@ -187,12 +187,10 @@ function toggleTheme() {
   toggle()
 }
 
-async function logout() {
-  try {
-    await api.post('/api/auth/logout')
-  } catch {
-    // 忽略后端失败
-  }
+function logout() {
+  // JWT 无状态登出：只需前端清除 token 并跳转。后端接口失败/挂起（冷启动/网络）都不应阻塞退出，
+  // 因此改为后台静默调用（v1.31.4 修复：此前 await 挂起导致"点击退出无反应"）
+  api.post('/api/auth/logout').catch(() => {})
   clearAuth()
   router.push('/login')
 }
