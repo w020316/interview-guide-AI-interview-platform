@@ -248,5 +248,39 @@ public class InterviewService {
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
     }
+
+    /**
+     * 针对性追问（v1.28.0：追问链加深）：基于候选人对原题的回答 + 简历要点，
+     * 生成一道下钻细节/定位盲区的追问。返回纯文本问题（非 JSON）。
+     */
+    public String generateFollowUp(String question, String userAnswer, String resumeText) {
+        long start = System.nanoTime();
+        try {
+            String prompt = new StringBuilder()
+                    .append("你是一位专业面试官，正在深挖一位候选人的技术积累。请根据其简历与刚才的回答，追问一道能深挖细节的问题。\n\n")
+                    .append("【原题】\n").append(PromptSanitizer.sanitize(question)).append("\n\n")
+                    .append("【候选人的回答】\n").append(PromptSanitizer.sanitize(userAnswer == null ? "" : userAnswer)).append("\n\n")
+                    .append("【候选人的简历要点】\n").append(PromptSanitizer.sanitize(resumeText == null ? "" : resumeText)).append("\n\n")
+                    .append("【追问原则】\n")
+                    .append("1. 针对回答中最薄弱、最含糊或最有价值的一点下钻，绝不重复原题\n")
+                    .append("2. 若回答较空泛，优先围绕简历中的具体项目/技术栈/量化结果展开\n")
+                    .append("3. 只输出一道追问的一句话本身：不加编号、不加解释、不加引号")
+                    .toString();
+
+            // 纳入全局 AI 并发闸门，与 evaluateAnswer 一致
+            String response = com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                    chatClient.prompt()
+                            .user(prompt)
+                            .call()
+                            .content());
+
+            if (response == null || response.isBlank()) {
+                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+            }
+            return response.trim();
+        } finally {
+            aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+        }
+    }
 }
 

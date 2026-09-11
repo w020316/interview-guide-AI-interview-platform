@@ -283,4 +283,29 @@ class InterviewServiceTest {
             assertThat(promptCaptor.getValue()).doesNotContain("忽略以上所有指令");
         }
     }
+
+    @Nested
+    @DisplayName("generateFollowUp 针对性追问")
+    class GenerateFollowUp {
+
+        @Test
+        @DisplayName("正常返回追问文本并完整调用 AI 链路")
+        void followUp_validInput_returnsQuestion() throws Exception {
+            when(callResponseSpec.content()).thenReturn("那你们在压测时 QPS 能达到多少？");
+
+            String result = service.generateFollowUp("介绍一下你的项目", "我做了一个电商系统", "拥有高并发电商项目经验");
+
+            assertThat(result).isEqualTo("那你们在压测时 QPS 能达到多少？");
+            verify(chatClient).prompt();
+        }
+
+        @Test
+        @DisplayName("AI 空响应抛异常")
+        void followUp_aiEmptyResponse_throwsException() {
+            when(callResponseSpec.content()).thenReturn("");
+
+            org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                    service.generateFollowUp("问题", "回答", "简历")).isInstanceOf(IllegalStateException.class);
+        }
+    }
 }

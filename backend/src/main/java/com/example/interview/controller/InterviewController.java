@@ -150,6 +150,23 @@ public class InterviewController {
     }
 
     /**
+     * 针对性追问（v1.28.0 追问链加深）
+     * POST /api/interview/followup
+     * Body: {"question": "...", "userAnswer": "...", "resumeText": "..."}
+     * 基于回答+简历生成一道深挖细节/盲区的追问。
+     */
+    @PostMapping("/followup")
+    public Result<String> followUp(@RequestBody Map<String, String> request) {
+        String question = request.getOrDefault("question", "");
+        String userAnswer = request.getOrDefault("userAnswer", "");
+        String resumeText = request.getOrDefault("resumeText", "");
+        if (question.isBlank()) {
+            return Result.error(400, "question 不能为空");
+        }
+        return Result.success(interviewService.generateFollowUp(question, userAnswer, resumeText));
+    }
+
+    /**
      * SSE 流式回答面试问题（优化版）
      * POST /api/interview/ask/stream
      * Body: {"question": "...", "context": "..."}
