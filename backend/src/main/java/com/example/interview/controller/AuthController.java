@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthController.class);
 
     @Autowired
     private UserRepository userRepository;
@@ -60,6 +63,19 @@ public class AuthController {
                     ? (now - info.lastFailTime) > LOCK_DURATION_MS
                     : (now - info.lastFailTime) > 30 * 60 * 1000L;
         });
+    }
+
+    /**
+     * 定时清理登录失败计数（v1.31.3）：阻止 loginFailMap 无界增长导致内存泄漏。
+     * 此前仅靠 login 请求惰性清理；若大量不同 IP 各失败不达锁定阈值，map 可持续增长。
+     */
+    @Scheduled(fixedDelay = 5 * 60 * 1000L, initialDelay = 5 * 60 * 1000L)
+    public void scheduledCleanupLoginFails() {
+        try {
+            cleanupExpiredLoginFails();
+        } catch (Exception e) {
+            log.warn("登录失败计数定时清理失败：{}", e.getMessage());
+        }
     }
 
     /**

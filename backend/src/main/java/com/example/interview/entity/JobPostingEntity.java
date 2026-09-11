@@ -110,6 +110,7 @@ public class JobPostingEntity {
     private String tags;
 
     /** 是否有效（过期数据标记为 false，前端默认不展示） */
+    @Builder.Default
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 

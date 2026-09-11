@@ -10,9 +10,19 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.31.2'
+export const CURRENT_VERSION = '1.31.3'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.31.3',
+    date: '2026-09-11',
+    title: '版本 1.31.3 · 稳定性与安全加固',
+    items: [
+      '修复：登录失败计数定时清理，防止长期运行内存泄漏',
+      '修复：岗位实体 Builder 默认值，避免 active 字段为空',
+      '完成全项目代码审查 & 功能测试（314 单测全过），详见 docs/code-review-report.md'
+    ]
+  },
   {
     version: '1.31.2',
     date: '2026-09-11',
