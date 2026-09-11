@@ -70,15 +70,29 @@ export function correctTechTerms(text: string): string {
 ### ★3. 数据治理（字段归一化/去重/自动分类 —— 覆盖工具"基于真实经历检索+题库丰富"的准确性基础）
 **已落地 v1.27.0**：`JobFieldNormalizer`（degree/experience 归一化）、`doRefresh` 跨数据源去重、`JobClassifyService` 用免费模型自动分类补全。
 
-### 4. 简历 RAG 强化出题（offer毕/面星"基于真实经历检索"）
-**现状**：`InterviewService.generateQuestions` 已绑定简历+岗位+追问。可强化为「多轮智能追问」（对齐牛客第4类能力）。
+### 4. 简历 RAG 强化出题 + 针对性追问链（offer毕/面星/面试猫/牛客"智能追问链"）
+**已落地 v1.28.0**：
+- `InterviewService.generateFollowUp(question, userAnswer, resumeText)`：用免费模型链基于回答+简历生成一道深挖盲区/细节的追问
+- 新增 `POST /api/interview/followup`，纳入 `AiConcurrencyGuard` 并发闸门 + `PromptSanitizer` 防注入
 ```java
-// 建议：增加追问轮数参数，SSE 逐步追问简历细节
-// InterviewController 已支持 evaluate + ask/stream，可复用 SSE 做追问
+// 后端：针对性追问（追问链加深）
+@PostMapping("/followup")
+public Result<String> followUp(@RequestBody Map<String, String> request) {
+    if (request.getOrDefault("question", "").isBlank()) return Result.error(400, "question 不能为空");
+    return Result.success(interviewService.generateFollowUp(
+        request.getOrDefault("question",""),
+        request.getOrDefault("userAnswer",""),
+        request.getOrDefault("resumeText","")));
+}
+```
+```ts
+// 前端可在答题后调用，把返回的追问追加进当前会话题目继续作答
+const q = await api.post('/api/interview/followup', { question, userAnswer, resumeText })
+// 期望：贴近简历、不重复原题、下钻薄弱点的下一道题
 ```
 
 ### 5. 多模态输入（面试猫"图片识别"）
-**backlog**：答题/自我介绍支持上传图片（白板草图/证书），AI 结合图片评估。
+**backlog**：答题/自我介绍支持上传图片（白板草图/证书），AI 结合图片评估（待实现）。
 
 ### 6. 开源底座对齐（interview help）
 **参考**：本项目已 Spring Boot + Vue，模块齐备；可按需对照其功能清单补齐缺口。
