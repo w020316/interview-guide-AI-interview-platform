@@ -95,7 +95,12 @@ app:
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   # 管理员账号名单（逗号分隔，区分大小写）：命中者签发 ROLE_ADMIN，无限制刷新/保留后续管理接口
   # 默认空=所有人均为普通用户；生产通过环境变量 APP_ADMIN_USERNAMES 注入
-  admin-usernames: ${APP_ADMIN_USERNAMES:小吴同学,xwtx}
+  admin-usernames: ${APP_ADMIN_USERNAMES:小吴同学}
+  # 种子管理员：启动时若该用户名不存在则自动创建（密码明文仅用于初始化，创建后建议尽快修改）
+  # 密码留空则不创建；生产由 SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD 注入
+  seed-admin:
+    username: ${SEED_ADMIN_USERNAME:}
+    password: ${SEED_ADMIN_PASSWORD:}
   info:
     # 应用元数据，暴露到 /actuator/info 端点
     # 版本号与前端 changelog.ts 保持同步，修改时两处一起更新

@@ -47,7 +47,12 @@ services:
         value: "86400000"
       # 管理员账号名单（逗号分隔）；命中者享有无限制刷新等管理能力
       - key: APP_ADMIN_USERNAMES
-        value: "小吴同学,xwtx"
+        value: "小吴同学"
+      # 种子管理员：启动时若账号不存在则自动创建（用户名/密码）
+      - key: SEED_ADMIN_USERNAME
+        value: "小吴同学"
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
       # ── Supabase Storage ──
       - key: SUPABASE_URL
         sync: false
