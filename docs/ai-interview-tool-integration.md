@@ -160,4 +160,4 @@ List<WebJob> jobs = webJobSearcherService.searchWeb(keyword, location);
 - 多模态附图（v1.30.0）：`evaluateAnswerWithImage` 单测 2/2（带图走 media、空图退化纯文本）；`InterviewControllerTest` 新增 imageUrl 用例 1/1；模型升级 agnes-2.5-flash。
 - 智能体联网搜岗（v1.31.0）：后端单测 **305/305** 全过；`AgentToolsTest` 新增 `searchWebJobs` 3/3（联网命中、联网空降级本地库、双空引导文案）；`WebJobSearcherServiceTest` 智联 SSR 解析 3/3；公开招聘站点可达性实测 OK（智联 ssp 岗位 JSON 21 条、拉勾/51job 可达）。
 - 智能体稳定性（v1.31.1）：`AgentService.callModel` 纳入 `AiConcurrencyGuard` 全局并发闸门，修复智能体模型调用不受限流保护导致的偶发"无回复"；前端新增「停止生成」+ 冷启动唤醒重试。
-- 模型能力释放（v1.31.2）：系统提示词放开通用问答边界（知识问答/元问题直接作答，不强行依赖工具）；收尾回答 `maxTokens 1500→2500`、`temperature 0.4→0.5`，避免长回答截断；ReAct 轮次 6→8 支持多步推理；模型调用自动重试一次；流式分块改按行，长回答更顺滑。
+- 模型能力释放（v1.31.2）：系统提示词放开通用问答边界（知识问答/元问题直接作答，不强行依赖工具）；收尾回答 `maxTokens 1500→2500`、`temperature 0.4→0.5`，避免长回答截断；ReAct 轮次 6→8 支持多步推理；模型调用自动重试一次；流式分块改按行；新会话首次回复后用模型自动提炼精炼标题。

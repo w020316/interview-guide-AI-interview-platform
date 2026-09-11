@@ -165,6 +165,10 @@ public class AgentService {
             }
             onComplete.run();
             saveMessages(conversation, session.userMessage(), finalAnswer);
+            // 新建会话（无历史）首次回复后，异步用模型生成精炼标题，替代截断的首条消息
+            if (session.history().isEmpty()) {
+                renameConversationAsync(conversation.getId(), session.userMessage());
+            }
         } catch (Exception e) {
             log.warn("智能体流式生成失败：{}", e.getMessage());
             onError.accept("AI 服务异常，请重试");
@@ -445,6 +449,41 @@ public class AgentService {
         } catch (Exception e) {
             log.warn("智能体对话落库失败（不影响响应）：{}", e.getMessage());
         }
+    }
+
+    /**
+     * 异步生成会话精炼标题（v1.31.2）：用模型把首条用户消息概括为 ≤20 字标题，
+     * 替代"首条消息截断"的默认标题，提升会话列表可读性。
+     * 异步执行、失败静默：用后台线程调模型，不阻塞 SSE 主流程。
+     */
+    private void renameConversationAsync(Long conversationId, String firstMessage) {
+        if (conversationId == null || firstMessage == null || firstMessage.isBlank()) {
+            return;
+        }
+        // 不阻塞主流程：交给 boundedElastic 异步执行
+        reactor.core.scheduler.Schedulers.boundedElastic().schedule(() -> {
+            try {
+                String prompt = "把下面这条用户的求职相关请求概括为一个中文会话标题，≤20字，只输出标题本身，不加引号、标点可有可无：\n" + firstMessage;
+                String title = com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                        chatClient.prompt().user(prompt).call().content());
+                if (title == null) return;
+                String clean = title.replace("\"", "").replace("\n", " ").trim();
+                if (clean.length() > 20) {
+                    clean = clean.substring(0, 20);
+                }
+                if (clean.isBlank() || "null".equalsIgnoreCase(clean)) {
+                    return;
+                }
+                final String finalTitle = clean;
+                conversationRepository.findById(conversationId).ifPresent(conv -> {
+                    conv.setTitle(finalTitle);
+                    conversationRepository.save(conv);
+                });
+                log.info("智能体会话标题已生成：{}", clean);
+            } catch (Exception e) {
+                log.warn("智能体会话标题生成失败（保持默认标题）：{}", e.getMessage());
+            }
+        });
     }
 
     private static String shorten(String s, int max) {
