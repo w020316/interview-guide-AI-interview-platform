@@ -60,34 +60,34 @@
 | B-07 | P1 | ResumeController `/api/resume/import-url` + InterviewController `/api/interview/evaluate` | SSRF：`import-url` 的 DNS rebinding TOCTOU 窗口；`evaluate` 的 imageUrl 此前**完全无 SSRF 校验**即由 AI 后端服务端抓取 | ✅ 新增共享 `SsrUrlValidator`（协议/端口/内网/回环/元数据网段 + DNS 解析级公网校验），落地到 import-url 与 evaluate 的 imageUrl；注明 rebinding 残余风险 |
 | B-08 | P2 | InterviewController `/api/interview/upload-image` | `userId` 自请求参数而非 JWT，攻击者可向任意 userId 命名空间写图（越权/污染） | ✅ 移除 userId 参数，命名空间统一取 JWT `currentUserId()`，仅含 `HashUtil.sha256Short` |
 | B-10 | P2 | JobAgentController `/api/jobs/refresh` + InterviewController AI 生成接口 | 无按用户限流/配额，任意用户可反复触发昂贵的第三方抓取与 AI 生成 | ✅ 新增 `PerUserRateLimiter`（滑动窗口+陈旧键清理防泄漏）：refresh 5 分钟/用户 1 次，evaluate/followup/questions 每分钟/用户 30 次（不影响人工） |
+| B-11 | P3 | GlobalExceptionHandler | 500 级异常透出 `ex.getMessage()`，可能泄露内部细节（路径/SQL/类名） | ✅ 新增 `BusinessException extends IllegalStateException` 承载用户友好文案并由 handler 原样返回；`handleIllegalState` 改为不透出内部信息；7 处"AI 返回内容为空"改抛 BusinessException（测试类型断言仍兼容） |
+| B-12 | P3 | JsonRepairUtil.UNQUOTED_KEY 正则 | 全局替换命中字符串值内部的 `, 某某:` 文本，误注入引号破坏合法字符串 | ✅ 等长遮蔽双引号字符串后再做 key 修复，仅在字符串外命中；新增回归测试 |
+| B-14 | P3 | InterviewService 出题提示词 | 编号混乱：难度`2.`与聚焦`2.`重复、末尾`3.`缺前置 | ✅ 聚焦改为难度子项`2.1`，形成 `1,1.1,1.2,2,2.1,3` 连续编号 |
+| B-15 | P3 | JobMatchService / WebJobSearcherService | `text == null ||` 恒假死代码；`SKILL_KEYWORDS` 重复 `flink`；`CONNECT_TIMEOUT_MS` 定义未用 | ✅ 清理死代码 |
 
 ### 4.2 评估保留/建议（未改，风险已记录）
 
 | ID | 级别 | 位置 | 问题 | 建议 |
 |---|---|---|---|---|
 | B-09 | P2 | 前端 Interview/Agent View 流式渲染 | 每收一个 token 就对全量内容 `renderMarkdown`(markdown-it+DOMPurify)，长回复为 O(n²) | 增量渲染或 rAF/定时器节流合并 token |
-| B-11 | P3 | GlobalExceptionHandler.handleIllegalState | 500 级异常仍透出 `ex.getMessage()`，可能泄露内部细节（与注释"屏蔽内部细节"相悖） | 500 级固定文案，细节仅写日志；用户友好提示改由专门业务异常承载 |
-| B-12 | P3 | JsonRepairUtil.UNQUOTED_KEY 正则 | 全局正则替换未跳过字符串字面量，可能误注入已合法 JSON 字符串值内的 `, b:` 类文本 | 复用转义状态机，仅在字符串字面量外执行 key 修复 |
 | B-13 | P3 | PromptSanitizer | 黑名单关键词替换无法根治提示词注入（大小写/空格变体可绕过）；`MAX_INPUT_LENGTH` 按码元截断同 B-04 | 依赖 system 强约束 + 输出侧校验；长度按码点 |
-| B-14 | P3 | InterviewService 出题提示词 | 编号混乱（主列表 1/1.1/1.2/3，难度/聚焦规则又各输出 2.），存在重复 2.、缺 3. 前置 | 统一编号序列 |
-| B-15 | P3 | JobMatchService / WebJobSearcherService | `text == null ||` 恒假死代码；`SKILL_KEYWORDS` 中 `flink` 重复；`CONNECT_TIMEOUT_MS` 定义未用 | 清理死代码 |
 
-> 补充说明：B-07/B-08/B-10 已在本轮落地修复（见 4.1）。B-07 的 DNS rebinding 彻底阻断需"连接也绑定已校验 IP + 强制 Host 头"，会破坏 HTTPS 证书/SAN 校验，故作为**已记录残余风险**保留最佳努力校验。
+> 补充说明：B-07/B-08/B-10/B-11/B-12/B-14/B-15 已在本轮落地修复（见 4.1）。B-07 的 DNS rebinding 彻底阻断需"连接也绑定已校验 IP + 强制 Host 头"，会破坏 HTTPS 证书/SAN 校验，故作为**已记录残余风险**保留最佳努力校验。
 
 ### 4.3 回归结论
 
-- 修复 B-01..B-10 后，后端全量单测 **324/324** 通过（BUILD SUCCESS，新增 7 个安全相关单测）、前端 `vue-tsc` **0 错误**。
-- 新增单测：`InterviewControllerTest.evaluate_withInternalImageUrl_rejected`（SSRF 拦截）、`SsrUrlValidatorTest`（4 例）、`PerUserRateLimiterTest`（3 例）。
-- B-09、B-11..B-15 为已记录的风险与低优先清理项，暂不修改行为以避免回归，建议在后续版本按建议落实。
+- 修复 B-01..B-15 后（仅 B-09/B-13 保留为建议项），后端全量单测 **325/325** 通过（BUILD SUCCESS，v1.31.3 基线 316 + 新增 9 个单测）、前端 `vue-tsc` **0 错误**。
+- v1.31.4 新增单测：`SsrUrlValidatorTest`（4）、`PerUserRateLimiterTest`（3）、`InterviewControllerTest.evaluate_withInternalImageUrl_rejected`（SSRF 拦截）、`JsonRepairUtilTest.stringValueLikeKeyNotCorrupted`（B-12）。
+- 剩余建议项 B-09（前端流式渲染节流）与 B-13（PromptSanitizer 黑名单）为改善性质，暂不改以避免影响既有行为或引入新风险。
 
 ---
 
 ## 五、修复后回归
-- 修复后全量单测 **324/324** 全绿，未引入新问题（v1.31.3 基线 316 → v1.31.4 新增 8 个安全/并发相关单测）。
+- 修复后全量单测 **325/325** 全绿，未引入新问题（v1.31.3 基线 316 → v1.31.4 新增 9 个安全/健壮性单测）。
 - 新增 `JobPostingEntityTest`（2/2）固化 A-02 修复：验证 `@Builder.Default` 默认值与显式覆盖，防回归。
-- v1.31.4 新增安全单测：SSRF 校验器（4）、限流器（3）、附图 imageUrl 内网拦截（1）。
+- v1.31.4 新增单测：SSRF 校验器（4）、限流器（3）、附图 imageUrl 内网拦截（1）、JSON 字符串不被误注入（1）。
 
 ---
 
 ## 六、总结论
-项目整体安全性与健壮性良好：IDOR 越权防护到位、XSS 全链路消毒、无硬编码密钥、事务边界正确、并发与限流有保护。v1.31.3 修复登录失败计数内存泄漏与 builder 默认值；v1.31.4 落地 AI 并发闸门统一、冷启动重试修复、SSRF 校验（import-url + imageUrl）、附图上传命名空间越权修复、按用户限流（refresh + AI 生成），并补充 TextUtil 代理对、懒加载实体等加固，全部通过回归（324/324 + vue-tsc 0 错误）。
+项目整体安全性与健壮性良好：IDOR 越权防护到位、XSS 全链路消毒、无硬编码密钥、事务边界正确、并发与限流有保护。v1.31.3 修复登录失败计数内存泄漏与 builder 默认值；v1.31.4 落地 AI 并发闸门统一、冷启动重试修复、SSRF 校验（import-url + imageUrl）、附图上传命名空间越权修复、按用户限流、异常信息不透出（BusinessException）、JSON 修复不误伤字符串、出题提示词编号统一、死代码清理，全部通过回归（325/325 + vue-tsc 0 错误）。

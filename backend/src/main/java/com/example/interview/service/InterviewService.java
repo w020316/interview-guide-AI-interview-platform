@@ -142,7 +142,7 @@ public class InterviewService {
 
             // 5. AI 响应空值校验
             if (response == null || response.isBlank()) {
-                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+                throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
 
             // 6. 清理 Markdown + 修复非标准 JSON
@@ -182,7 +182,8 @@ public class InterviewService {
      */
     private String buildFocusRule(String focus) {
         if (focus == null || focus.isBlank()) return "";
-        return "2. 优先考察以下薄弱分类（至少覆盖其中 2/3）：" + focus + "\n";
+        // v1.31.4 B-14：改为难度条目"2."的子项"2.1"，与末尾"3."形成 1,1.1,1.2,2,2.1,3 连续编号，消除重复"2."
+        return "2.1 在遵循上述难度分布的前提下，优先考察以下薄弱分类（至少覆盖其中 2/3）：" + focus + "\n";
     }
 
     /**
@@ -231,7 +232,7 @@ public class InterviewService {
                             .content());
 
             if (response == null || response.isBlank()) {
-                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+                throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
 
             return JsonRepairUtil.repairAndLog(response, "interview-evaluate");
@@ -281,7 +282,7 @@ public class InterviewService {
                             .content());
 
             if (response == null || response.isBlank()) {
-                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+                throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
 
             return JsonRepairUtil.repairAndLog(response, "interview-evaluate-image");
@@ -332,7 +333,7 @@ public class InterviewService {
                             .content());
 
             if (response == null || response.isBlank()) {
-                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+                throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
             return response.trim();
         } finally {

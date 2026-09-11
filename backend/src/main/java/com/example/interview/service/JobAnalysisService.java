@@ -176,7 +176,7 @@ public class JobAnalysisService {
                             .call()
                             .content());
             if (response == null || response.isBlank()) {
-                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+                throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
             return response;
         } finally {

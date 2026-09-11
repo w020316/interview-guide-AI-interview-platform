@@ -72,6 +72,17 @@ public class GlobalExceptionHandler {
         return Result.error(401, "未认证或登录已过期");
     }
 
+    /**
+     * 面向用户的业务异常：message 本身即设计给用户看的可重试文案，原样返回
+     * （v1.31.4 B-11：与内部 IllegalStateException 区分，避免泄露内部细节）
+     */
+    @ExceptionHandler(BusinessException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public Result<Void> handleBusiness(BusinessException ex) {
+        log.warn("业务异常：{}", ex.getMessage());
+        return Result.error(500, ex.getMessage());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public Result<Void> handleAccessDenied(AccessDeniedException ex) {
@@ -95,8 +106,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleIllegalState(IllegalStateException ex) {
+        // v1.31.4 B-11：非 BusinessException 的非法状态视为内部错误，不透出 ex.getMessage()（防暴露路径/SQL等细节）
         log.error("非法状态异常", ex);
-        return Result.error(500, "服务器内部错误：" + ex.getMessage());
+        return Result.error(500, "服务器内部错误，请稍后重试");
     }
 
     @ExceptionHandler(RuntimeException.class)

@@ -84,8 +84,8 @@ public final class JsonRepairUtil {
         // 5. 单引号字符串 -> 双引号字符串
         s = convertSingleQuotedStrings(s);
 
-        // 6. 未加引号的 key -> 加双引号
-        s = UNQUOTED_KEY.matcher(s).replaceAll("$1\"$2\":");
+        // 6. 未加引号的 key -> 加双引号（仅在字符串字面量外进行，避免误伤字符串值内部的 ", 某某:" 文本）
+        s = quoteUnquotedKeys(s);
 
         // 7. 尾随逗号清理
         s = TRAILING_COMMA.matcher(s).replaceAll("$1");
@@ -160,8 +160,67 @@ public final class JsonRepairUtil {
     }
 
     /**
-     * 修复并校验：修复后尝试解析，成功返回 true
+     * 仅在字符串字面量外补齐未加引号的 JSON key（v1.31.4 B-12）
+     *
+     * <p>原 {@code UNQUOTED_KEY.matcher(s).replaceAll(...)} 会命中的字符串值内部的
+     * {@code ", 某某:"} 文本，误注入引号破坏合法字符串。此处先用等长空格遮蔽双引号字符串内部，
+     * 使正则只在字符串外的结构位置命中 key；再按遮蔽坐标把正则改写结果映射回原文（坐标一致，长度不变）。
      */
+    private static String quoteUnquotedKeys(String s) {
+        if (s == null || s.isEmpty()) return s;
+        String masked = maskDoubleQuotedStrings(s);
+        Matcher m = UNQUOTED_KEY.matcher(masked);
+        if (!m.find()) {
+            return s; // 无未加引号 key，按原样返回，避免不必要的重建
+        }
+        StringBuilder out = new StringBuilder(s.length() + 16);
+        int last = 0;
+        // Matcher 基于 masked（与原文同长度、坐标一致）；group1/group2 在字符串外，masked==原文
+        do {
+            out.append(s, last, m.start());
+            out.append(m.group(1)).append('"').append(m.group(2)).append('"').append(':');
+            last = m.end();
+        } while (m.find());
+        out.append(s, last, s.length());
+        return out.toString();
+    }
+
+    /** 把双引号字符串内部字符遮蔽为等长空格，仅保留引号本身，用于隔离字符串字面量 */
+    private static String maskDoubleQuotedStrings(String s) {
+        StringBuilder out = new StringBuilder(s.length());
+        boolean inString = false;
+        boolean escaped = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!inString) {
+                out.append(c);
+                if (c == '"') {
+                    inString = true;
+                    escaped = false;
+                }
+                continue;
+            }
+            if (escaped) {
+                out.append(' ');
+                escaped = false;
+                continue;
+            }
+            if (c == '\\') {
+                out.append(' ');
+                escaped = true;
+                continue;
+            }
+            if (c == '"') {
+                out.append('"');
+                inString = false;
+                continue;
+            }
+            out.append(' ');
+        }
+        return out.toString();
+    }
+
+    /** 修复并校验：修复后尝试解析，成功返回 true */
     public static boolean isValid(String raw) {
         if (raw == null || raw.isBlank()) return false;
         try {

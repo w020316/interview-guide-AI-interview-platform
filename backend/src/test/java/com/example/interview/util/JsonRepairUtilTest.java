@@ -130,6 +130,17 @@ class JsonRepairUtilTest {
         }
 
         @Test
+        @DisplayName("字符串值内部的 ', 某某:' 文本不被误当 key（v1.31.4 B-12）")
+        void stringValueLikeKeyNotCorrupted() throws Exception {
+            // 合法 JSON：value 内含 ", 示例:" 字面，修复前会误注入引号破坏字符串
+            String raw = "{\"advice\":\"请参考, 示例: x\",\"ok\":true}";
+            String repaired = JsonRepairUtil.repair(raw);
+            assertNotNull(parseStrict(repaired));
+            assertEquals("请参考, 示例: x", parseStrict(repaired).get("advice").asText());
+            assertTrue(parseStrict(repaired).get("ok").asBoolean());
+        }
+
+        @Test
         @DisplayName("中文冒号 ：转 ASCII 冒号 :")
         void chineseColon() throws Exception {
             String raw = "{\"name\"：\"赵六\"}";

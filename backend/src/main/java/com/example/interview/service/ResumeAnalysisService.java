@@ -122,7 +122,7 @@ public class ResumeAnalysisService {
 
             // 4. AI 响应空值校验
             if (response == null || response.isBlank()) {
-                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+                throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
 
             // 5. 清理 Markdown + 修复非标准 JSON
@@ -241,7 +241,7 @@ public class ResumeAnalysisService {
 
             // 5. 空值校验
             if (response == null || response.isBlank()) {
-                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
+                throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
 
             String cleaned = JsonRepairUtil.stripMarkdownFence(response).trim();

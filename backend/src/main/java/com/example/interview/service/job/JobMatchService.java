@@ -26,7 +26,7 @@ public class JobMatchService {
             "并发", "多线程", "分布式", "微服务", "缓存", "消息队列", "大数据", "算法", "机器学习", "深度学习",
             "大模型", "nlp", "python", "go", "golang", "c++", "c语言", "javascript", "ts", "typescript",
             "react", "vue", "前端", "flutter", "android", "ios", "测试", "运维", "数据分析", "sql", "hive",
-            "spark", "flink", "flink"
+            "spark", "flink"
     };
 
     /** 匹配结果 */
@@ -63,7 +63,8 @@ public class JobMatchService {
             String text = concat(job);
             List<String> hit = new ArrayList<>();
             for (String s : skills) {
-                if (text == null || text.toLowerCase(Locale.ROOT).contains(s)) {
+                // text 由 concat(job) 生成，永不为 null
+                if (text.toLowerCase(Locale.ROOT).contains(s)) {
                     hit.add(s);
                 }
             }

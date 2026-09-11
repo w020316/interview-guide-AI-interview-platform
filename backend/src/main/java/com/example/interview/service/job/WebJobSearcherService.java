@@ -41,8 +41,7 @@ public class WebJobSearcherService {
     private static final int MAX_PER_SOURCE = 8;
     /** 最大结果总数 */
     private static final int MAX_TOTAL = 12;
-    /** 连接/读取超时（毫秒） */
-    private static final int CONNECT_TIMEOUT_MS = 5000;
+    /** 读取超时（毫秒）；Jsoup.connect().timeout() 同时作用于连接与读取，连接超时无需单独常量 */
     private static final int READ_TIMEOUT_MS = 8000;
 
     private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
