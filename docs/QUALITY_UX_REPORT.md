@@ -186,3 +186,13 @@
 - `JobFieldNormalizerTest` 新增 2 组用例；后端单测 **286/286** 通过。
 - 生产 `/api/jobs/meta`：degrees=大专/本科/硕士；experiences=不限/应届生/在校生/1-3年/3-5年/5年以上（此前为十余种自由文本）；总岗位 85 无净增去重损失。
 - commit e6e791c（归一化+去重）、69591dc（刷新 1h）。
+
+### 追加：定制题库（v1.28.0，2026-09-11）
+**背景**：对标多款主流 AI 面试工具（offer毕/面星/offer压题 等的自定义题库+实战出题），为收藏夹补上「把收藏/自定题目组织成一次可作答的模拟面试」的能力。
+
+**落地**
+- 后端：`POST /api/favorite/bank/start`——以所选收藏题目创建新会话并转为会话题目（归属校验防 IDOR，新会话从头作答）；`POST /api/favorite/add` + `FavoriteService.addManual`——手动添加自定义题（questionId 恒空）。
+- 前端：收藏夹页新增「从收藏发起面试」（全部收藏一键组面）与「手动加题」表单；`InterviewView` 支持 `?sessionId=` 载入已有会话直接答题。
+
+**验证**：`FavoriteControllerTest` 5 例（bank happy/空ids 400/越权404、add happy/空题400）；后端回归 **291/291**；vue-tsc 0 错误。
+- commit ff0be62（功能）、cc4d4a4（/add 修复—toggle 需原题ID限制导致手动加题不可用）。
