@@ -56,8 +56,8 @@ public class AgentService {
     /** 对话记忆窗口：最近 12 条消息（约 6 轮对话） */
     private static final int HISTORY_WINDOW = 12;
 
-    /** ReAct 最大工具调用轮次 */
-    private static final int MAX_TOOL_ROUNDS = 6;
+    /** ReAct 最大工具调用轮次（v1.31.1 由 6 → 8，支持更复杂问题的多步推理） */
+    private static final int MAX_TOOL_ROUNDS = 8;
 
     /** 标题截断长度 */
     private static final int TITLE_MAX_LEN = 30;
@@ -182,15 +182,36 @@ public class AgentService {
                 .user(prompt);
         // v1.31.1 修复（P0）：纳入全局 AI 并发闸门，与 InterviewService 等其它 AI 服务一致，
         // 防止免费模型限流窗口下智能体并发调用被无限放大而静默失败（表现为"无回复"）。
+        // 容错：网关/模型临时抖动时自动重试一次，减少偶发失败导致"没答上来"。
         final ChatClient.ChatClientRequestSpec request;
         if (!allowAction) {
-            // 收尾调用：温度更低、限制长度，确保输出面向用户的最终回答
-            request = base.options(OpenAiChatOptions.builder().temperature(0.4).maxTokens(1500).build());
+            // 收尾调用：温度适中、放宽长度上限，确保完整回答不被截断（v1.31.1 由 1500→2500）
+            request = base.options(OpenAiChatOptions.builder().temperature(0.5).maxTokens(2500).build());
         } else {
             request = base;
         }
-        String content = com.example.interview.ai.AiConcurrencyGuard.call(() -> request.call().content());
+        String content = callWithRetry(request);
         return content == null ? "" : content.trim();
+    }
+
+    /** 在全局闸门内执行模型调用并自动重试一次（仅对非中断类异常重试） */
+    private String callWithRetry(ChatClient.ChatClientRequestSpec request) {
+        try {
+            return com.example.interview.ai.AiConcurrencyGuard.call(() -> request.call().content());
+        } catch (IllegalStateException e) {
+            // 闸门许可中断类异常不再重试，直接抛出走上层兜底
+            throw e;
+        } catch (Exception first) {
+            log.warn("智能体模型调用失败，重试一次：{}", first.getMessage());
+            // 重试前短暂让出，避免撞上限流窗口
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw first;
+            }
+            return com.example.interview.ai.AiConcurrencyGuard.call(() -> request.call().content());
+        }
     }
 
     /** 解析模型输出是否为工具动作 JSON（严格：仅当整段内容是 JSON 且 action 匹配注册表） */
@@ -240,9 +261,11 @@ public class AgentService {
         }
         sb.append("\n【输出规则（严格遵守）】\n");
         sb.append("- 若需要调用工具：仅输出一行 JSON（标准双引号），格式：{\"action\":\"工具名\",\"params\":{\"参数名\":\"值\"}}\n");
-        sb.append("- 若已有足够信息：直接输出面向用户的最终回答（中文、结构化，不要输出 JSON，不要解释你的决策过程）\n");
+        sb.append("- 凡涉及当前用户的数据（其面试安排、练习统计、错题、其收藏/岗位相关），必须先调用对应工具读取，不要臆测；工具名见上（如 getUpcomingInterviews / getMyInterviewStats / listWrongQuestions）\n");
+        sb.append("- 若已有足够信息：直接输出面向用户的完整最终回答（中文、结构化，不要输出 JSON，不要解释你的决策过程）\n");
+        sb.append("- 若用户问题含糊导致无法确定意图：给出最可能的理解并简要追问，而不是编造答案\n");
         if (!steps.isEmpty()) {
-            sb.append("- 已有观察结果时优先基于观察结果回答，不要重复调用相同工具\n");
+            sb.append("- 已有观察结果时优先基于观察结果回答；如需补充信息可调用不同工具，但不要重复调用已完成且有效的相同工具\n");
         }
         return sb.toString();
     }
@@ -260,9 +283,30 @@ public class AgentService {
 
     private List<String> splitChunks(String text) {
         List<String> chunks = new ArrayList<>();
-        int size = 40;
-        for (int i = 0; i < text.length(); i += size) {
-            chunks.add(text.substring(i, Math.min(i + size, text.length())));
+        // v1.31.1：按行优先切分（保留换行/列表结构），行过长再按 60 字符补切，避免长回答碎片化
+        int size = 60;
+        String[] lines = text.split("\n", -1);
+        StringBuilder buf = new StringBuilder();
+        for (String line : lines) {
+            if (line.length() > size) {
+                // 行过长：先冲刷缓冲，再按字符块切该行
+                if (buf.length() > 0) {
+                    chunks.add(buf.toString());
+                    buf.setLength(0);
+                }
+                for (int i = 0; i < line.length(); i += size) {
+                    chunks.add(line.substring(i, Math.min(i + size, line.length())));
+                }
+            } else {
+                buf.append(line).append('\n');
+                if (buf.length() >= size) {
+                    chunks.add(buf.toString());
+                    buf.setLength(0);
+                }
+            }
+        }
+        if (buf.length() > 0) {
+            chunks.add(buf.toString());
         }
         return chunks;
     }
@@ -356,10 +400,12 @@ public class AgentService {
         sb.append("4. 分析用户的面试表现、找出薄弱点并制定复习计划\n");
         sb.append("5. 查看用户的面试日程\n\n");
         sb.append("【工作准则】\n");
-        sb.append("- 需要用户数据（岗位/统计/错题/日程/知识点）时按协议调用工具，不要凭空编造数据\n");
-        sb.append("- 工具返回空结果时如实告知，并给出可操作的建议\n");
-        sb.append("- 回答简洁、结构化，岗位推荐用列表并附申请链接；复习计划给出具体行动项\n");
-        sb.append("- 使用中文回答\n\n");
+        sb.append("- 需要用户数据（岗位/统计/错题/日程/知识点）时按协议调用工具，不要凭空编造数据；但可基于你的知识给出补充建议\n");
+        sb.append("- 工具返回空结果时如实告知，并结合你的知识给出可操作的替代建议，不要简单只说''暂无''\n");
+        sb.append("- 对求职相关的知识问答（面试题、岗位要求、简历优化等），先尝试 searchKnowledge 检索；若库中无，直接用你的知识完整作答并标注\"基于我的知识\"\n");
+        sb.append("- 对用户的普通/元问题（你是谁、平台功能、如何准备面试等），直接完整作答，无需调工具\n");
+        sb.append("- 回答力求完整、结构清晰：岗位推荐用列表并附申请链接；复习计划给出具体行动项；解释类回答分点展开、给出结论与理由\n");
+        sb.append("- 使用中文回答，尽量详尽而不省略关键信息\n\n");
         sb.append("【当前用户画像（真实数据，可直接引用）】\n");
         try {
             Map<String, Object> summary = interviewSessionService.questionSummary(userId);

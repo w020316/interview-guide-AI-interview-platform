@@ -10,9 +10,20 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.31.0'
+export const CURRENT_VERSION = '1.31.2'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.31.2',
+    date: '2026-09-11',
+    title: '版本 1.31.2 · 智能体能力释放',
+    items: [
+      '智能体全面释放模型能力：现在可直接回答知识问答、平台/求职类元问题，不再局限于岗位查询',
+      '回答更完整：放开长回答长度上限（1500→2500 token），复杂问题不截断',
+      '更稳：模型调用自动重试一次 + 支持最多 8 步多工具推理，降低偶发失败导致的"没答上来"',
+      '流式输出更顺滑：按行推送，长回答/列表体验更自然'
+    ]
+  },
   {
     version: '1.31.0',
     date: '2026-09-11',
