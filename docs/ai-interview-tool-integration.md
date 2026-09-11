@@ -108,10 +108,15 @@ const up = await api.post('/api/interview/upload-image', formData)  // {url}
 await api.post('/api/interview/evaluate', { question, userAnswer, imageUrl: up.url })
 ```
 ```java
-// 后端：PromptUserSpec.media 组装图片 visual 输入（agnes-2.5-flash 支持 image_url）
+// 后端：PromptUserSpec.media 组装图片 visual 输入（OpenAI 兼容 image_url）
 chatClient.prompt().user(u -> u.text(prompt).media(new Media(detectMimeType(url), URI.create(url))))
 ```
-**注意**：多模态仅对具备视觉理解的模型生效（agnes-2.5-flash）；走纯文本降级链的 GLM/Qwen 若不支持图片，评估退化为纯文本（`evaluateAnswerWithImage` 对空 imageUrl 自动退化）。
+**多模态模型覆盖**：降级链三档均原生支持图像理解——
+- 主模型 **GLM-5.3-Flash**（B.AI）：GLM-5 系列首个原生多模态，输入支持图像/视频/文件（2026-08-26 上线）
+- 次模型 **Qwen3.x-Flash**（B.AI）：输入支持图像
+- 兜底 **agnes-2.5-flash**：支持图像 URL 视觉理解
+
+三档任一命中均能看图评估；`evaluateAnswerWithImage` 对空 imageUrl 自动退化纯文本。
 
 ### 5. 开源底座对齐（interview help）
 **参考**：本项目已 Spring Boot + Vue，模块齐备；可按需对照其功能清单补齐缺口。
