@@ -176,15 +176,20 @@ public class AgentService {
 
     /** 单轮决策调用：allowAction=false 时禁止输出动作 JSON */
     private String callModel(AgentStreamSession session, String prompt, boolean allowAction) {
-        var spec = chatClient.prompt()
+        ChatClient.ChatClientRequestSpec base = chatClient.prompt()
                 .system(session.systemPrompt())
                 .messages(toMessages(session.history()))
                 .user(prompt);
+        // v1.31.1 修复（P0）：纳入全局 AI 并发闸门，与 InterviewService 等其它 AI 服务一致，
+        // 防止免费模型限流窗口下智能体并发调用被无限放大而静默失败（表现为"无回复"）。
+        final ChatClient.ChatClientRequestSpec request;
         if (!allowAction) {
             // 收尾调用：温度更低、限制长度，确保输出面向用户的最终回答
-            spec = spec.options(OpenAiChatOptions.builder().temperature(0.4).maxTokens(1500).build());
+            request = base.options(OpenAiChatOptions.builder().temperature(0.4).maxTokens(1500).build());
+        } else {
+            request = base;
         }
-        String content = spec.call().content();
+        String content = com.example.interview.ai.AiConcurrencyGuard.call(() -> request.call().content());
         return content == null ? "" : content.trim();
     }
 
