@@ -59,6 +59,11 @@ public class JobAgentService {
     public record RefreshResult(int upserted, int inserted, int updated, int expired, int removed) {
     }
 
+    /** 是否有刷新任务正在执行（管理后台总览展示） */
+    public boolean isRefreshing() {
+        return refreshRunning.get();
+    }
+
     /**
      * 全量刷新：拉取所有启用平台数据并入库
      * - 内置精选等适配器：走 fetch()，platform = adapter.platform()

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { isLoggedIn } from '../auth'
+import { isLoggedIn, isAdmin } from '../auth'
 
 const routes = [
   { path: '/',          component: () => import('../views/HomeView.vue'),      meta: { requiresAuth: false } },
@@ -18,6 +18,7 @@ const routes = [
   { path: '/progress',  component: () => import('../views/ProgressView.vue'),   meta: { requiresAuth: true  } },
   { path: '/profile',   component: () => import('../views/ProfileView.vue'),   meta: { requiresAuth: true  } },
   { path: '/knowledge', component: () => import('../views/KnowledgeView.vue'), meta: { requiresAuth: true  } },
+  { path: '/admin',     component: () => import('../views/AdminView.vue'),    meta: { requiresAuth: true, requiresAdmin: true  } },
   // 404 兜底：未匹配路径显示 404 页
   { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('../views/NotFoundView.vue') },
 ]
@@ -36,6 +37,10 @@ const router = createRouter({
 router.beforeEach((to) => {
   if (to.meta.requiresAuth && !isLoggedIn()) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  // v1.31.4：管理后台仅 ROLE_ADMIN 可访问
+  if (to.meta.requiresAdmin && !isAdmin()) {
+    return { path: '/' }
   }
 })
 

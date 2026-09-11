@@ -10,7 +10,8 @@ import java.util.Optional;
  * 用户 JPA Repository
  */
 @Repository
-public interface UserRepository extends JpaRepository<UserEntity, Long> {
+public interface UserRepository extends JpaRepository<UserEntity, Long>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<UserEntity> {
 
     Optional<UserEntity> findByUsername(String username);
 

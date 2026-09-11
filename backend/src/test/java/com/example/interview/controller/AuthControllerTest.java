@@ -50,6 +50,9 @@ class AuthControllerTest {
     @MockBean
     private JwtUtil jwtUtil;
 
+    @MockBean
+    private com.example.interview.service.UserBanRegistry userBanRegistry;
+
     @Nested
     @DisplayName("POST /api/auth/register 注册")
     class Register {

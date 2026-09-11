@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,6 +38,9 @@ public class AuthController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private com.example.interview.service.UserBanRegistry userBanRegistry;
 
     /** 登录失败计数：IP → 失败次数 */
     private final ConcurrentHashMap<String, LoginFailInfo> loginFailMap = new ConcurrentHashMap<>();
@@ -189,6 +193,11 @@ public class AuthController {
         // 登录成功，清除失败计数
         loginFailMap.remove(clientIp);
 
+        // v1.31.4 管理后台：被禁用的用户不允许登录
+        if (userBanRegistry.isBanned(user.getId())) {
+            return Result.error(403, "账号已被禁用，请联系管理员");
+        }
+
         // subject 使用数据库自增 id（唯一且不可变），避免用户名变更导致 token 失效
         return Result.success(jwtUtil.generateToken(user.getId().toString(), user.getUsername()));
     }
@@ -202,6 +211,44 @@ public class AuthController {
     @PostMapping("/logout")
     public Result<Void> logout() {
         return Result.success(null);
+    }
+
+    /**
+     * 当前登录用户信息（v1.31.4 管理后台：前端据此展示管理员入口）
+     * 返回 id / username / role（ROLE_ADMIN|ROLE_USER）/ banned
+     */
+    @Operation(summary = "当前用户信息")
+    @GetMapping("/me")
+    public Result<Map<String, Object>> me() {
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+            throw new com.example.interview.common.BusinessException("未认证用户");
+        }
+        String userId = auth.getPrincipal().toString();
+        boolean admin = auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        boolean banned = false;
+        try {
+            banned = userBanRegistry.isBanned(Long.valueOf(userId));
+        } catch (NumberFormatException ignored) {
+            // 非数字 userId 视为未禁用
+        }
+        String username = "";
+        try {
+            UserEntity user = userRepository.findById(Long.valueOf(userId)).orElse(null);
+            if (user != null) {
+                username = user.getUsername();
+            }
+        } catch (NumberFormatException ignored) {
+            // 非数字 userId 视为未禁用
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", userId);
+        result.put("username", username);
+        result.put("role", admin ? "ROLE_ADMIN" : "ROLE_USER");
+        result.put("banned", banned);
+        return Result.success(result);
     }
 
     /**

@@ -88,5 +88,12 @@ export function isLoggedIn(): boolean {
   return isTokenValid(authState.token)
 }
 
-export { isValidJwt, isTokenExpired, isTokenValid }
+/** 当前登录用户是否为管理员（解析 JWT role claim；旧 token 无 claim 视为普通用户）v1.31.4 */
+export function isAdmin(): boolean {
+  if (!isTokenValid(authState.token)) return false
+  const payload = parseJwtPayload(authState.token)
+  return payload?.role === 'ROLE_ADMIN'
+}
+
+export { isValidJwt, parseJwtPayload, isTokenExpired, isTokenValid }
 
