@@ -104,8 +104,9 @@ interface ConversationItem {
 }
 
 const suggestions = [
-  '帮我找深圳的技术类秋招岗位',
   '联网帮我找全国的算法岗位',
+  '帮我出5道Java后端面试题，中等难度',
+  '熟悉Java、Spring、Redis，你推荐我投哪些岗位？',
   '我哪些知识点比较薄弱？',
   'Redis 持久化面试怎么答？',
   '我最近有哪些面试安排？',
