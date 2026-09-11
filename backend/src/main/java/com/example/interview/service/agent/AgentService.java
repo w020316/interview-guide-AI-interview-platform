@@ -71,6 +71,7 @@ public class AgentService {
     private final RagSearchService ragSearchService;
     private final com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
     private final com.example.interview.service.job.JobMatchService jobMatchService;
+    private final com.example.interview.service.InterviewService interviewService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** SSE 并发控制（与面试问答相同的令牌机制，信号量保护线程资源） */
@@ -85,7 +86,8 @@ public class AgentService {
                         InterviewEventService interviewEventService,
                         RagSearchService ragSearchService,
                         com.example.interview.service.job.WebJobSearcherService webJobSearcherService,
-                        com.example.interview.service.job.JobMatchService jobMatchService) {
+                        com.example.interview.service.job.JobMatchService jobMatchService,
+                        com.example.interview.service.InterviewService interviewService) {
         this.chatClient = chatClient;
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
@@ -95,6 +97,7 @@ public class AgentService {
         this.ragSearchService = ragSearchService;
         this.webJobSearcherService = webJobSearcherService;
         this.jobMatchService = jobMatchService;
+        this.interviewService = interviewService;
     }
 
     /**
@@ -136,7 +139,7 @@ public class AgentService {
         String safeMessage = PromptSanitizer.sanitize(session.userMessage());
         AgentTools tools = new AgentTools(conversation.getUserId(), jobAgentService,
                 interviewSessionService, interviewEventService, ragSearchService,
-                webJobSearcherService, jobMatchService);
+                webJobSearcherService, jobMatchService, interviewService);
 
         StringBuilder emitted = new StringBuilder();
         List<String> steps = new ArrayList<>();

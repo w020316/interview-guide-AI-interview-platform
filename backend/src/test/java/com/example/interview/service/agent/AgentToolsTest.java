@@ -45,9 +45,13 @@ class AgentToolsTest {
     @Mock
     private com.example.interview.service.job.JobMatchService jobMatchService;
 
+    @Mock
+    private com.example.interview.service.InterviewService interviewService;
+
     private AgentTools newTools() {
         return new AgentTools("user-1", jobAgentService, interviewSessionService,
-                interviewEventService, ragSearchService, webJobSearcherService, jobMatchService);
+                interviewEventService, ragSearchService, webJobSearcherService,
+                jobMatchService, interviewService);
     }
 
     @Test
@@ -212,5 +216,31 @@ class AgentToolsTest {
         when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of());
         String out = newTools().matchResumeJobs("熟悉Java，本科");
         assertThat(out).contains("暂未找到与这份简历吻合的岗位");
+    }
+
+    @Test
+    @DisplayName("generateInterviewQuestions：正常解析并列出题目")
+    void genQuestionsOk() {
+        when(interviewService.generateQuestions(anyString(), anyString(), anyString(), anyInt(), anyString(), anyString()))
+                .thenReturn("[{\"question\":\"介绍项目架构\",\"category\":\"项目深挖\",\"difficulty\":\"MEDIUM\"}]");
+        String out = newTools().generateInterviewQuestions(1, "Java后端", "MEDIUM");
+        assertThat(out).contains("已为你生成").contains("Java后端").contains("介绍项目架构");
+    }
+
+    @Test
+    @DisplayName("generateInterviewQuestions：count 越界收敛到 1-10")
+    void genQuestionsClamp() {
+        when(interviewService.generateQuestions(anyString(), anyString(), anyString(), eq(10), anyString(), anyString()))
+                .thenReturn("[]");
+        newTools().generateInterviewQuestions(99, null, null);
+        org.mockito.Mockito.verify(interviewService).generateQuestions(anyString(), anyString(), anyString(), eq(10), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("generateInterviewQuestions：异常时返回降级文案")
+    void genQuestionsError() {
+        when(interviewService.generateQuestions(anyString(), anyString(), anyString(), anyInt(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("ai down"));
+        assertThat(newTools().generateInterviewQuestions(5, null, null)).contains("出题暂时不可用");
     }
 }

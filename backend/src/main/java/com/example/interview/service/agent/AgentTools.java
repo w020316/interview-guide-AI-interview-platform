@@ -45,6 +45,7 @@ public class AgentTools {
     private final RagSearchService ragSearchService;
     private final com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
     private final com.example.interview.service.job.JobMatchService jobMatchService;
+    private final com.example.interview.service.InterviewService interviewService;
 
     public AgentTools(String userId,
                       JobAgentService jobAgentService,
@@ -52,7 +53,8 @@ public class AgentTools {
                       InterviewEventService interviewEventService,
                       RagSearchService ragSearchService,
                       com.example.interview.service.job.WebJobSearcherService webJobSearcherService,
-                      com.example.interview.service.job.JobMatchService jobMatchService) {
+                      com.example.interview.service.job.JobMatchService jobMatchService,
+                      com.example.interview.service.InterviewService interviewService) {
         this.userId = userId;
         this.jobAgentService = jobAgentService;
         this.interviewSessionService = interviewSessionService;
@@ -60,6 +62,7 @@ public class AgentTools {
         this.ragSearchService = ragSearchService;
         this.webJobSearcherService = webJobSearcherService;
         this.jobMatchService = jobMatchService;
+        this.interviewService = interviewService;
         registerTools();
     }
 
@@ -77,6 +80,11 @@ public class AgentTools {
                 "根据用户粘贴的简历要点（技能/项目/学历）为岗位自动匹配打分，推荐最吻合的岗位列表（含匹配分）。用于用户给出/粘贴了简历内容时推荐适合他的岗位",
                 "resumeText(必填,简历核心内容或技术要点,如:熟悉Java/Spring/Redis,本科)",
                 (raw, params) -> matchResumeJobs(str(params, "resumeText"))));
+        registry.put("generateInterviewQuestions", new ToolSpec("generateInterviewQuestions",
+                "为求职者生成模拟面试练习题（含分类与难度），用于用户要求练习/出题/模拟面试时。会自动结合用户画像与目标岗位方向",
+                "count(可选,题目数量,默认5,1-10), direction(可选,岗位/技术方向如:Java后端/算法/前端), difficulty(可选,EASY/MEDIUM/HARD)",
+                (raw, params) -> generateInterviewQuestions(
+                        intVal(params, "count"), str(params, "direction"), str(params, "difficulty"))));
         registry.put("searchKnowledge", new ToolSpec("searchKnowledge",
                 "检索平台知识库中的面试知识点（Java/Spring/数据库/中间件等），用于回答技术面试题",
                 "query(必填,要检索的知识主题)",
@@ -234,6 +242,50 @@ public class AgentTools {
             return truncate(sb);
         } catch (Exception e) {
             return "简历匹配暂时不可用：" + e.getMessage();
+        }
+    }
+
+    /** 生成模拟面试练习题（v1.31.2）：调 InterviewService.generateQuestions，结合目标方向与难度 */
+    public String generateInterviewQuestions(Integer count, String direction, String difficulty) {
+        try {
+            int n = (count == null || count < 1) ? 5 : Math.min(count, 10);
+            String jobDesc = blankToNull(direction) == null ? "通用技术岗" : direction.trim();
+            String diff = (difficulty == null || difficulty.isBlank()) ? "" : difficulty.trim().toUpperCase();
+            if (!List.of("", "EASY", "MEDIUM", "HARD").contains(diff)) {
+                diff = "";
+            }
+            String json = interviewService.generateQuestions(userId, "", jobDesc, n, diff, "");
+            if (json == null || json.isBlank()) {
+                return "出题失败，请稍后重试或换个岗位方向。";
+            }
+            // 解析题目 JSON，整理为可读列表
+            var node = objectMapper.readTree(json);
+            StringBuilder sb = new StringBuilder("已为你生成 ").append(n).append(" 道模拟面试题");
+            if (!jobDesc.equals("通用技术岗")) {
+                sb.append("（方向：").append(jobDesc).append("）");
+            }
+            sb.append("：\n");
+            if (node.isArray()) {
+                int idx = 1;
+                for (var q : node) {
+                    if (idx > n) break;
+                    String qtext = q.path("question").asText("");
+                    String cat = q.path("category").asText("");
+                    String d = q.path("difficulty").asText("");
+                    if (qtext.isBlank()) continue;
+                    sb.append(idx++).append(". [").append(cat.isBlank() ? "未分类" : cat)
+                            .append("/").append(d.isBlank() ? "MEDIUM" : d).append("] ").append(qtext).append("\n");
+                }
+                if (idx == 1) {
+                    sb.append("（未解析到题目，请尝试减少数量或换方向）\n");
+                }
+            } else {
+                sb.append(json.length() > 300 ? json.substring(0, 300) : json).append("\n");
+            }
+            sb.append("\n提示：需要的话我可以在后续对话中帮你逐题作答并点评，或给出参考答案。");
+            return truncate(sb);
+        } catch (Exception e) {
+            return "出题暂时不可用：" + e.getMessage();
         }
     }
 
