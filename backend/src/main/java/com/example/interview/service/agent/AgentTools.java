@@ -85,6 +85,11 @@ public class AgentTools {
                 "count(可选,题目数量,默认5,1-10), direction(可选,岗位/技术方向如:Java后端/算法/前端), difficulty(可选,EASY/MEDIUM/HARD)",
                 (raw, params) -> generateInterviewQuestions(
                         intVal(params, "count"), str(params, "direction"), str(params, "difficulty"))));
+        registry.put("deepFollowUp", new ToolSpec("deepFollowUp",
+                "基于用户对某道面试题的作答，生成一道深挖细节/定位盲区的针对性追问（下钻回答中最薄弱或最有价值的一点）。用于用户在面试练习中已作答、想进一步深挖时",
+                "question(必填,原始面试题), userAnswer(必填,用户的作答内容), resumeText(可选,简历要点用于结合背景)",
+                (raw, params) -> deepFollowUp(str(params, "question"),
+                        str(params, "userAnswer"), str(params, "resumeText"))));
         registry.put("searchKnowledge", new ToolSpec("searchKnowledge",
                 "检索平台知识库中的面试知识点（Java/Spring/数据库/中间件等），用于回答技术面试题",
                 "query(必填,要检索的知识主题)",
@@ -286,6 +291,28 @@ public class AgentTools {
             return truncate(sb);
         } catch (Exception e) {
             return "出题暂时不可用：" + e.getMessage();
+        }
+    }
+
+    /** 基于作答生成深挖追问（v1.31.2）：复用 InterviewService.generateFollowUp */
+    public String deepFollowUp(String question, String userAnswer, String resumeText) {
+        if (question == null || question.isBlank() || "null".equalsIgnoreCase(question)
+                || userAnswer == null || userAnswer.isBlank() || "null".equalsIgnoreCase(userAnswer)) {
+            return "请提供面试题与你的作答内容，以便我基于此生成针对性追问。";
+        }
+        try {
+            String followUp = interviewService.generateFollowUp(
+                    question.trim(), userAnswer.trim(),
+                    (resumeText == null || "null".equalsIgnoreCase(resumeText)) ? "" : resumeText.trim());
+            if (followUp == null || followUp.isBlank()) {
+                return "追问生成失败，请稍后重试。";
+            }
+            StringBuilder sb = new StringBuilder("基于你的回答，为你生成一道深挖追问：\n");
+            sb.append(followUp.trim());
+            sb.append("\n\n提示：你可以继续作答这道追问，我可以在后续对话中给出参考答案与点评。");
+            return truncate(sb);
+        } catch (Exception e) {
+            return "追问生成暂时不可用：" + e.getMessage();
         }
     }
 

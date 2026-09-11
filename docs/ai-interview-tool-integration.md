@@ -153,7 +153,7 @@ List<WebJob> jobs = webJobSearcherService.searchWeb(keyword, location);
 ---
 
 ## 五、验证记录（真实）
-- 后端单测 **311/311** 全过；前端 vue-tsc 0 错误；
+- 后端单测 **314/314** 全过；前端 vue-tsc 0 错误；
 - 定制题库生产端到端：`/add`→200 id=1 → `/favorite/list` total=1 → `/favorite/bank/start`→sessionId + 1 题(MEDIUM) 全部通过。
 - 语音术语纠正单测 3/3；招聘广场归一化 meta 已收敛为干净枚举。
 - 简历岗位匹配（v1.29.0）：`JobMatchServiceTest` 3/3（技能/学历命中 + 排序）；`JobFieldNormalizerTest` 2/2；`JobPlatformAdapterTest` 6/6（含热招速递广州 Java 实习覆盖）全过。
@@ -163,3 +163,4 @@ List<WebJob> jobs = webJobSearcherService.searchWeb(keyword, location);
 - 模型能力释放（v1.31.2）：系统提示词放开通用问答边界（知识问答/元问题直接作答，不强行依赖工具）；收尾回答 `maxTokens 1500→2500`、`temperature 0.4→0.5`，避免长回答截断；ReAct 轮次 6→8 支持多步推理；模型调用自动重试一次；流式分块改按行；新会话首次回复后用模型自动提炼精炼标题。
 - 智能体简历匹配（v1.31.2）：新增 `matchResumeJobs` 工具——用户可在对话中粘贴简历要点，智能体调用 `JobMatchService`（v1.29 纯规则打分）推荐高吻合岗位（含匹配分与命中技能）。单测 308/308。
 - 智能体模拟出题（v1.31.2）：新增 `generateInterviewQuestions` 工具——用户可让智能体直接出模拟面试题（可指定数量/技术方向/难度），复用 `InterviewService.generateQuestions` 并解析为可读列表。单测 **311/311**。
+- 智能体深挖追问（v1.31.2）：新增 `deepFollowUp` 工具——基于用户的作答复用 `InterviewService.generateFollowUp` 生成针对性追问，形成"出题→作答→追问"练习闭环。单测 **314/314**。

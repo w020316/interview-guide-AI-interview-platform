@@ -243,4 +243,28 @@ class AgentToolsTest {
                 .thenThrow(new RuntimeException("ai down"));
         assertThat(newTools().generateInterviewQuestions(5, null, null)).contains("出题暂时不可用");
     }
+
+    @Test
+    @DisplayName("deepFollowUp：正常生成追问")
+    void deepFollowUpOk() {
+        when(interviewService.generateFollowUp(anyString(), anyString(), anyString()))
+                .thenReturn("这个场景下你是如何保证 Redis 与 DB 一致性的？");
+        String out = newTools().deepFollowUp("讲讲缓存策略", "我用了先更新 DB 再删缓存", "");;
+        assertThat(out).contains("深挖追问").contains("Redis");
+    }
+
+    @Test
+    @DisplayName("deepFollowUp：缺 question 或 userAnswer 时提示")
+    void deepFollowUpMissing() {
+        assertThat(newTools().deepFollowUp("", "我的回答", "")).contains("请提供面试题与你的作答内容");
+        assertThat(newTools().deepFollowUp("问题", "  ", "")).contains("请提供面试题与你的作答内容");
+    }
+
+    @Test
+    @DisplayName("deepFollowUp：异常时返回降级文案")
+    void deepFollowUpError() {
+        when(interviewService.generateFollowUp(anyString(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("ai down"));
+        assertThat(newTools().deepFollowUp("问题", "回答", "")).contains("追问生成暂时不可用");
+    }
 }
