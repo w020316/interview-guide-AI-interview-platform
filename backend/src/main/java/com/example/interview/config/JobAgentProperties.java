@@ -26,8 +26,8 @@ public class JobAgentProperties {
     /** 通用招聘数据渠道列表（v1.26.0）：任意命名渠道，name 即展示名 */
     private List<ChannelConfig> channels = new ArrayList<>();
 
-    /** 定时刷新间隔（毫秒），默认 6 小时 */
-    private long refreshFixedDelayMs = 6 * 3600 * 1000L;
+    /** 定时刷新间隔（毫秒），默认 1 小时（v1.27.0 由 6h 收紧） */
+    private long refreshFixedDelayMs = 3600 * 1000L;
 
     public Map<String, PlatformConfig> getPlatforms() {
         return platforms;
