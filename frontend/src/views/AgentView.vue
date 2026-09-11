@@ -42,7 +42,7 @@
             <div class="msg-avatar">{{ msg.role === 'user' ? '我' : 'AI' }}</div>
             <div class="msg-bubble" :class="{ streaming: msg.role === 'assistant' && streaming && i === messages.length - 1 }">
               <template v-if="msg.role === 'user'">{{ msg.content }}</template>
-              <div v-else class="md-content" v-html="renderedContent(msg.content)"></div>
+              <div v-else class="md-content" v-html="renderedContent(msg.content, msg.role === 'assistant' && streaming && i === messages.length - 1)"></div>
             </div>
           </div>
 
@@ -127,8 +127,20 @@ onBeforeUnmount(() => {
   abortController = null
 })
 
-function renderedContent(content: string): string {
-  return renderMarkdown(content)
+/**
+ * 渲染助手消息。isStreaming=true 时对"未闭合的 markdown 代码块"做保护：
+ * 临时补一个闭合围栏，避免流式中(``` 未闭合)导致整段被当代码渲染、视觉闪烁。
+ * 仅影响展示，不影响实际内容。
+ */
+function renderedContent(content: string, isStreaming: boolean = false): string {
+  let text = content ?? ''
+  if (isStreaming) {
+    const fences = text.split('```').length - 1
+    if (fences % 2 === 1) {
+      text = text + '\n```' // 临时闭合，让已输出的代码块正常渲染
+    }
+  }
+  return renderMarkdown(text)
 }
 
 async function scrollToBottom() {
