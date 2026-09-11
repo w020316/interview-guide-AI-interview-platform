@@ -10,9 +10,19 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.27.0'
+export const CURRENT_VERSION = '1.28.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.28.0',
+    date: '2026-09-11',
+    title: '版本 1.28.0 · 定制题库',
+    items: [
+      '新增功能：「从收藏发起面试」——把收藏夹题目一键组成新面试，直接答题与评分',
+      '新增功能：「手动加题」——可自主添加自定义题目到题库，再发起模拟面试',
+      '新增功能：简历+岗位定制出题坚持绑定真实经历（简历RAG），追问围绕项目细节展开'
+    ]
+  },
   {
     version: '1.27.0',
     date: '2026-09-10',
