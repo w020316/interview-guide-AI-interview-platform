@@ -69,6 +69,7 @@ public class AgentService {
     private final InterviewSessionService interviewSessionService;
     private final InterviewEventService interviewEventService;
     private final RagSearchService ragSearchService;
+    private final com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** SSE 并发控制（与面试问答相同的令牌机制，信号量保护线程资源） */
@@ -81,7 +82,8 @@ public class AgentService {
                         JobAgentService jobAgentService,
                         InterviewSessionService interviewSessionService,
                         InterviewEventService interviewEventService,
-                        RagSearchService ragSearchService) {
+                        RagSearchService ragSearchService,
+                        com.example.interview.service.job.WebJobSearcherService webJobSearcherService) {
         this.chatClient = chatClient;
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
@@ -89,6 +91,7 @@ public class AgentService {
         this.interviewSessionService = interviewSessionService;
         this.interviewEventService = interviewEventService;
         this.ragSearchService = ragSearchService;
+        this.webJobSearcherService = webJobSearcherService;
     }
 
     /**
@@ -129,7 +132,7 @@ public class AgentService {
         AgentConversationEntity conversation = session.conversation();
         String safeMessage = PromptSanitizer.sanitize(session.userMessage());
         AgentTools tools = new AgentTools(conversation.getUserId(), jobAgentService,
-                interviewSessionService, interviewEventService, ragSearchService);
+                interviewSessionService, interviewEventService, ragSearchService, webJobSearcherService);
 
         StringBuilder emitted = new StringBuilder();
         List<String> steps = new ArrayList<>();
@@ -343,9 +346,10 @@ public class AgentService {
         StringBuilder sb = new StringBuilder();
         sb.append("你是「Career Copilot」，AI 智能面试辅助平台的专属求职智能体。你可以：\n");
         sb.append("1. 搜索与推荐岗位（秋招/社招/实习），并给出申请建议与截止日期提醒\n");
-        sb.append("2. 检索知识库解答技术面试题\n");
-        sb.append("3. 分析用户的面试表现、找出薄弱点并制定复习计划\n");
-        sb.append("4. 查看用户的面试日程\n\n");
+        sb.append("2. 【联网实时搜索】当用户要求最新岗位、全网/全国岗位、或本地岗位不足时，调用 searchWebJobs 联网搜索各大招聘平台的全国实时岗位\n");
+        sb.append("3. 检索知识库解答技术面试题\n");
+        sb.append("4. 分析用户的面试表现、找出薄弱点并制定复习计划\n");
+        sb.append("5. 查看用户的面试日程\n\n");
         sb.append("【工作准则】\n");
         sb.append("- 需要用户数据（岗位/统计/错题/日程/知识点）时按协议调用工具，不要凭空编造数据\n");
         sb.append("- 工具返回空结果时如实告知，并给出可操作的建议\n");

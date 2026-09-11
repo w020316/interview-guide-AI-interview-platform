@@ -10,9 +10,19 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.30.0'
+export const CURRENT_VERSION = '1.31.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.31.0',
+    date: '2026-09-11',
+    title: '版本 1.31.0 · 智能体联网搜岗',
+    items: [
+      '新增功能：Career Copilot 智能体支持联网实时搜索招聘岗位——联网抓取 BOSS直聘/智联/拉勾/前程无忧等平台的全国岗位（不局限于地区），返回真实岗位信息',
+      '智能体稳定性：联网抓取失败时自动降级到本地岗位库，保证对话正常回复',
+      '用法示例：问智能体「帮我找全国的算法岗位」或「最新产品岗」即可触发联网搜索'
+    ]
+  },
   {
     version: '1.30.0',
     date: '2026-09-11',

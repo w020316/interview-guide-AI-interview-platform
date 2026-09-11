@@ -43,17 +43,20 @@ public class AgentTools {
     private final InterviewSessionService interviewSessionService;
     private final InterviewEventService interviewEventService;
     private final RagSearchService ragSearchService;
+    private final com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
 
     public AgentTools(String userId,
                       JobAgentService jobAgentService,
                       InterviewSessionService interviewSessionService,
                       InterviewEventService interviewEventService,
-                      RagSearchService ragSearchService) {
+                      RagSearchService ragSearchService,
+                      com.example.interview.service.job.WebJobSearcherService webJobSearcherService) {
         this.userId = userId;
         this.jobAgentService = jobAgentService;
         this.interviewSessionService = interviewSessionService;
         this.interviewEventService = interviewEventService;
         this.ragSearchService = ragSearchService;
+        this.webJobSearcherService = webJobSearcherService;
         registerTools();
     }
 
@@ -63,6 +66,10 @@ public class AgentTools {
                 "keyword(可选,岗位名/企业名/标签), industry(可选,如:互联网/金融/制造/能源), jobType(可选,如:技术/产品/运营), location(可选,如:深圳), recruitType(可选,AUTUMN/SPRING/INTERN/SOCIAL,默认AUTUMN)",
                 (raw, params) -> searchJobs(str(params, "keyword"), str(params, "industry"),
                         str(params, "jobType"), str(params, "location"), str(params, "recruitType"))));
+        registry.put("searchWebJobs", new ToolSpec("searchWebJobs",
+                "【联网实时搜索】通过联网搜索各大招聘平台（BOSS直聘/智联/拉勾/前程无忧等）的全国实时岗位信息，返回真实岗位：标题、企业、地点、薪资。用于用户要求最新/全网岗位，或本地岗位不足时",
+                "keyword(必填,岗位关键词如:Java/产品/算法), location(可选,城市如:深圳,空或全国表示全国范围)",
+                (raw, params) -> searchWebJobs(str(params, "keyword"), str(params, "location"))));
         registry.put("searchKnowledge", new ToolSpec("searchKnowledge",
                 "检索平台知识库中的面试知识点（Java/Spring/数据库/中间件等），用于回答技术面试题",
                 "query(必填,要检索的知识主题)",
@@ -136,7 +143,64 @@ public class AgentTools {
         }
     }
 
-    /** 2. 知识库检索（RAG） */
+    /** 2. 联网实时岗位搜索（v1.31.0：全国范围，真实抓取为主，失败降级本地库） */
+    public String searchWebJobs(String keyword, String location) {
+        String kw = (keyword == null || keyword.isBlank() || "null".equalsIgnoreCase(keyword)) ? "Java" : keyword.trim();
+        String loc = blankToNull(location);
+        List<com.example.interview.service.job.WebJobSearcherService.WebJob> jobs;
+        try {
+            jobs = webJobSearcherService.searchWeb(kw, loc);
+        } catch (Exception e) {
+            jobs = List.of();
+        }
+        // 联网实时抓取无可用源时，降级到本地聚合库，保证智能体"回复正常"
+        if (jobs.isEmpty()) {
+            return fallbackToLocalJobs(kw, loc);
+        }
+        StringBuilder sb = new StringBuilder("联网实时搜索到 ").append(jobs.size()).append(" 个全国岗位（数据来自公开招聘平台）：\n");
+        for (var j : jobs) {
+            sb.append("- ").append(j.title())
+                    .append(" | ").append(j.company() == null || j.company().isBlank() ? "企业待确认" : j.company())
+                    .append(" | ").append(j.location() == null || j.location().isBlank() ? "地点待确认" : j.location())
+                    .append(" | ").append(j.salary() == null || j.salary().isBlank() ? "面议" : j.salary());
+            if (j.degree() != null && !j.degree().isBlank()) {
+                sb.append(" | 学历:").append(j.degree());
+            }
+            if (j.applyUrl() != null && !j.applyUrl().isBlank()) {
+                sb.append(" | 申请:").append(j.applyUrl());
+            }
+            sb.append("\n");
+        }
+        sb.append("\n提示：以上岗位为联网实时抓取，投递前请以招聘平台页面为准。");
+        return truncate(sb);
+    }
+
+    /** 联网搜索无结果时回退本地聚合岗位（两种数据合流，保证回复可用） */
+    private String fallbackToLocalJobs(String kw, String loc) {
+        try {
+            var page = jobAgentService.search(kw, null, null, loc, null, null, null, null, 0, 8);
+            List<com.example.interview.entity.JobPostingEntity> items = page.getContent();
+            if (items.isEmpty()) {
+                return "当前联网搜索与本地岗位库均未找到匹配岗位。可提示用户：换关键词（如 Java/产品/算法）、换城市，或确认网络可访问公开招聘站点；也可在「招聘广场」刷新数据。";
+            }
+            StringBuilder sb = new StringBuilder("联网实时搜索暂未抓取到新岗位，已为你从本地岗位库推荐 ").append(items.size()).append(" 个相近岗位：\n");
+            for (var j : items) {
+                sb.append("- ").append(j.getTitle())
+                        .append(" | ").append(j.getCompanyName())
+                        .append(" | ").append(j.getLocation() == null ? "地点未标注" : j.getLocation())
+                        .append(" | ").append(j.getSalary() == null ? "面议" : j.getSalary());
+                if (j.getApplyUrl() != null && !j.getApplyUrl().isBlank()) {
+                    sb.append(" | 申请:").append(j.getApplyUrl());
+                }
+                sb.append("\n");
+            }
+            return truncate(sb);
+        } catch (Exception e) {
+            return "联网搜索与本地岗位库暂时都不可用，请稍后再试或换一种问法。";
+        }
+    }
+
+    /** 3. 知识库检索（RAG） */
     public String searchKnowledge(String query) {
         if (query == null || query.isBlank() || "null".equalsIgnoreCase(query)) {
             return "检索主题不能为空";

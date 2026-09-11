@@ -118,6 +118,18 @@ chatClient.prompt().user(u -> u.text(prompt).media(new Media(detectMimeType(url)
 
 三档任一命中均能看图评估；`evaluateAnswerWithImage` 对空 imageUrl 自动退化纯文本。
 
+### ★9. 智能体联网搜岗（v1.31.0）
+**优势**：Career Copilot 智能体可联网搜索各大招聘平台的全国实时岗位，不局限于本地种子/入库数据与个别地区。
+**集成（v1.31.0）**
+- 新增 `WebJobSearcherService`：jsoup 实时抓取 BOSS直聘/智联/拉勾/前程无忧公开招聘搜索页，全国范围，标准化返回标题/企业/地点/薪资/链接
+- 智能体注册新工具 `searchWebJobs`（keyword + 可选 location），接入 ReAct 循环；用户要求"最新/全网/全国岗位"时模型自动触发
+- **稳定性兜底**：联网抓取无可用源或失败时自动降级到本地聚合岗位库，保证智能体正常回复
+```java
+// 后端：联网搜索工具（多源 + 超时 + 空降级）
+List<WebJob> jobs = webJobSearcherService.searchWeb(keyword, location);
+// jobs 为空 → fallbackToLocalJobs(kw, loc) 回退本地库，回复始终可用
+```
+
 ### 5. 开源底座对齐（interview help）
 **参考**：本项目已 Spring Boot + Vue，模块齐备；可按需对照其功能清单补齐缺口。
 
@@ -131,6 +143,7 @@ chatClient.prompt().user(u -> u.text(prompt).media(new Media(detectMimeType(url)
 | 语音作答与表达提升 → | ASR + 语速/停顿 + 术语纠正（★） |
 | 题目沉淀与错题重练 → | 收藏夹 + 错题本 + 从题库组面（★） |
 | 筛选真实在招岗位 → | 招聘广场 + 热招速递 + 每小时扩充（★） |
+| 向智能体问"最新/全国岗位" → | 智能体联网搜岗 searchWebJobs（★） |
 | 简历快速锁定高吻合岗位 → | 简历岗位匹配推荐（★） |
 | 图片/白板/证书多模态 → | 多模态附图评估（★） |
 
@@ -140,8 +153,9 @@ chatClient.prompt().user(u -> u.text(prompt).media(new Media(detectMimeType(url)
 ---
 
 ## 五、验证记录（真实）
-- 后端单测 **299/299** 全过；前端 vue-tsc 0 错误；
+- 后端单测 **302/302** 全过；前端 vue-tsc 0 错误；
 - 定制题库生产端到端：`/add`→200 id=1 → `/favorite/list` total=1 → `/favorite/bank/start`→sessionId + 1 题(MEDIUM) 全部通过。
 - 语音术语纠正单测 3/3；招聘广场归一化 meta 已收敛为干净枚举。
 - 简历岗位匹配（v1.29.0）：`JobMatchServiceTest` 3/3（技能/学历命中 + 排序）；`JobFieldNormalizerTest` 2/2；`JobPlatformAdapterTest` 6/6（含热招速递广州 Java 实习覆盖）全过。
 - 多模态附图（v1.30.0）：`evaluateAnswerWithImage` 单测 2/2（带图走 media、空图退化纯文本）；`InterviewControllerTest` 新增 imageUrl 用例 1/1；模型升级 agnes-2.5-flash。
+- 智能体联网搜岗（v1.31.0）：后端单测 **302/302** 全过；`AgentToolsTest` 新增 `searchWebJobs` 3/3（联网命中、联网空降级本地库、双空引导文案）；公开招聘站点可达性实测 OK（智联/BOSS/拉勾/51job 均 200）。

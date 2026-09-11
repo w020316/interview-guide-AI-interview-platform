@@ -39,10 +39,12 @@ class AgentToolsTest {
     private InterviewEventService interviewEventService;
     @Mock
     private RagSearchService ragSearchService;
+    @Mock
+    private com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
 
     private AgentTools newTools() {
         return new AgentTools("user-1", jobAgentService, interviewSessionService,
-                interviewEventService, ragSearchService);
+                interviewEventService, ragSearchService, webJobSearcherService);
     }
 
     @Test
@@ -133,6 +135,39 @@ class AgentToolsTest {
                 .status("UPCOMING").build();
         when(interviewEventService.listByUser(anyString())).thenReturn(List.of(e));
         assertThat(newTools().getUpcomingInterviews()).contains("腾讯一面").contains("UPCOMING");
+    }
+
+    @Test
+    @DisplayName("searchWebJobs：联网抓取到真实岗位时返回联网结果")
+    void searchWebJobsOk() {
+        var web = new com.example.interview.service.job.WebJobSearcherService.WebJob(
+                "Java开发工程师", "某互联网公司", "深圳", "20k-40k", "本科", "", "https://sou.zhaopin.com");
+        when(webJobSearcherService.searchWeb(anyString(), any())).thenReturn(List.of(web));
+        String out = newTools().searchWebJobs("Java", "深圳");
+        assertThat(out).contains("联网实时搜索到").contains("Java开发工程师").contains("深圳");
+    }
+
+    @Test
+    @DisplayName("searchWebJobs：联网无结果时降级到本地岗位库")
+    void searchWebJobsFallback() {
+        when(webJobSearcherService.searchWeb(anyString(), any())).thenReturn(List.of());
+        var job = com.example.interview.entity.JobPostingEntity.builder()
+                .title("Java 后端").companyName("腾讯").location("深圳").salary("25k")
+                .applyUrl("https://join.qq.com").build();
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of(job)));
+        String out = newTools().searchWebJobs("Java", null);
+        assertThat(out).contains("本地岗位库").contains("Java 后端");
+    }
+
+    @Test
+    @DisplayName("searchWebJobs：联网与本地均无数据返回引导文案")
+    void searchWebJobsBothEmpty() {
+        when(webJobSearcherService.searchWeb(anyString(), any())).thenReturn(List.of());
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+        String out = newTools().searchWebJobs("Java", "沈阳");
+        assertThat(out).contains("搜索与本地岗位库均未找到");
     }
 
     @Test
