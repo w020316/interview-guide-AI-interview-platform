@@ -13,9 +13,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 招聘信息智能体服务
@@ -106,6 +108,10 @@ public class JobAgentService {
             log.warn("第三方平台岗位拉取失败：{}", e.getMessage());
         }
 
+        // 跨数据源去重：同一真实岗位可能被多个 provider 收录（不同 externalId 但同公司+同岗位），
+        // 按归一化 公司+岗位 只保留首次出现的记录，避免招聘广场重复堆量。
+        Set<String> dedup = new HashSet<>();
+
         for (var entry : platformJobs.entrySet()) {
             String platform = entry.getKey();
             List<JobDto> jobs = entry.getValue();
@@ -126,6 +132,10 @@ public class JobAgentService {
                 }
 
                 for (JobDto dto : jobs) {
+                    // 去重：同一 refresh 内不同 provider 收录的同公司同岗位，仅保留首次
+                    if (!dedup.add(dedupKey(dto))) {
+                        continue;
+                    }
                     boolean isNew = upsert(platform, dto, clsMap.get(dto.externalId()));
                     upserted++;
                     if (isNew) inserted++;
@@ -172,8 +182,8 @@ public class JobAgentService {
         entity.setDeadline(dto.deadline());
         entity.setLocation(dto.location());
         entity.setSalary(dto.salary());
-        entity.setDegree(dto.degree());
-        entity.setExperience(dto.experience());
+        entity.setDegree(JobFieldNormalizer.normalizeDegree(dto.degree()));
+        entity.setExperience(JobFieldNormalizer.normalizeExperience(dto.experience()));
         entity.setActive(true);
 
         // 行业/职位类型：优先用平台数据，缺失时用 AI/规则分类补全
@@ -291,5 +301,12 @@ public class JobAgentService {
     /** LIKE 通配符转义（防止用户输入 % _ \ 破坏匹配语义） */
     private static String escapeLike(String s) {
         return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
+    /** 去重键：归一化空白后的 公司|岗位 ，用于跨数据源去重 */
+    private static String dedupKey(JobDto dto) {
+        String company = dto.companyName() == null ? "" : dto.companyName().trim().replaceAll("\\s+", " ");
+        String title = dto.title() == null ? "" : dto.title().trim().replaceAll("\\s+", " ");
+        return company + "|" + title;
     }
 }
