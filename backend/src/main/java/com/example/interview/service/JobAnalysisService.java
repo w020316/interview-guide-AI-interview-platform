@@ -37,9 +37,6 @@ public class JobAnalysisService {
     @Autowired
     private Timer aiCallTimer;
 
-    /** AI 并发控制（与其他 Service 共享限流理念） */
-    private static final java.util.concurrent.Semaphore AI_SEMAPHORE = new java.util.concurrent.Semaphore(5);
-
     /** 简历/JD 文本最大长度（截断后送 AI，避免 prompt 过长拖慢推理） */
     private static final int MAX_TEXT_LEN = 1200;
 
@@ -166,26 +163,22 @@ public class JobAnalysisService {
         return cleaned;
     }
 
-    /** 调用 AI 返回原始文本（带并发控制 + v1.14 指标埋点） */
+    /** 调用 AI 返回原始文本（v1.31.3：纳入全局 AI 并发闸门 + v1.14 埋点） */
     private String callAiRaw(String prompt, String logTag) {
         long start = System.nanoTime();
         try {
-            AI_SEMAPHORE.acquire();
-            try {
-                String response = chatClient.prompt()
-                        .user(prompt)
-                        .call()
-                        .content();
-                if (response == null || response.isBlank()) {
-                    throw new IllegalStateException("AI 返回内容为空，请稍后重试");
-                }
-                return response;
-            } finally {
-                AI_SEMAPHORE.release();
+            // v1.31.3：由独立 AI_SEMAPHORE 改为全局 AiConcurrencyGuard，
+            // 与 InterviewService/RagSearchService/ResumeAnalysisService 等统一共享 5 许可，
+            // 避免多套信号量拆分并发预算、免费模型限流下并发被放大。
+            String response = com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                    chatClient.prompt()
+                            .user(prompt)
+                            .call()
+                            .content());
+            if (response == null || response.isBlank()) {
+                throw new IllegalStateException("AI 返回内容为空，请稍后重试");
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("AI 调用被中断", e);
+            return response;
         } finally {
             // v1.14：统一埋点，覆盖 analyze/gap/letter 三个公开方法
             jobAnalysisCounter.increment();
