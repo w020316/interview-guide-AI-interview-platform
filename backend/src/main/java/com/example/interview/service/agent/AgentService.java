@@ -70,6 +70,7 @@ public class AgentService {
     private final InterviewEventService interviewEventService;
     private final RagSearchService ragSearchService;
     private final com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
+    private final com.example.interview.service.job.JobMatchService jobMatchService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** SSE 并发控制（与面试问答相同的令牌机制，信号量保护线程资源） */
@@ -83,7 +84,8 @@ public class AgentService {
                         InterviewSessionService interviewSessionService,
                         InterviewEventService interviewEventService,
                         RagSearchService ragSearchService,
-                        com.example.interview.service.job.WebJobSearcherService webJobSearcherService) {
+                        com.example.interview.service.job.WebJobSearcherService webJobSearcherService,
+                        com.example.interview.service.job.JobMatchService jobMatchService) {
         this.chatClient = chatClient;
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
@@ -92,6 +94,7 @@ public class AgentService {
         this.interviewEventService = interviewEventService;
         this.ragSearchService = ragSearchService;
         this.webJobSearcherService = webJobSearcherService;
+        this.jobMatchService = jobMatchService;
     }
 
     /**
@@ -132,7 +135,8 @@ public class AgentService {
         AgentConversationEntity conversation = session.conversation();
         String safeMessage = PromptSanitizer.sanitize(session.userMessage());
         AgentTools tools = new AgentTools(conversation.getUserId(), jobAgentService,
-                interviewSessionService, interviewEventService, ragSearchService, webJobSearcherService);
+                interviewSessionService, interviewEventService, ragSearchService,
+                webJobSearcherService, jobMatchService);
 
         StringBuilder emitted = new StringBuilder();
         List<String> steps = new ArrayList<>();

@@ -44,19 +44,22 @@ public class AgentTools {
     private final InterviewEventService interviewEventService;
     private final RagSearchService ragSearchService;
     private final com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
+    private final com.example.interview.service.job.JobMatchService jobMatchService;
 
     public AgentTools(String userId,
                       JobAgentService jobAgentService,
                       InterviewSessionService interviewSessionService,
                       InterviewEventService interviewEventService,
                       RagSearchService ragSearchService,
-                      com.example.interview.service.job.WebJobSearcherService webJobSearcherService) {
+                      com.example.interview.service.job.WebJobSearcherService webJobSearcherService,
+                      com.example.interview.service.job.JobMatchService jobMatchService) {
         this.userId = userId;
         this.jobAgentService = jobAgentService;
         this.interviewSessionService = interviewSessionService;
         this.interviewEventService = interviewEventService;
         this.ragSearchService = ragSearchService;
         this.webJobSearcherService = webJobSearcherService;
+        this.jobMatchService = jobMatchService;
         registerTools();
     }
 
@@ -70,6 +73,10 @@ public class AgentTools {
                 "【联网实时搜索】通过联网搜索各大招聘平台（BOSS直聘/智联/拉勾/前程无忧等）的全国实时岗位信息，返回真实岗位：标题、企业、地点、薪资。用于用户要求最新/全网岗位，或本地岗位不足时",
                 "keyword(必填,岗位关键词如:Java/产品/算法), location(可选,城市如:深圳,空或全国表示全国范围)",
                 (raw, params) -> searchWebJobs(str(params, "keyword"), str(params, "location"))));
+        registry.put("matchResumeJobs", new ToolSpec("matchResumeJobs",
+                "根据用户粘贴的简历要点（技能/项目/学历）为岗位自动匹配打分，推荐最吻合的岗位列表（含匹配分）。用于用户给出/粘贴了简历内容时推荐适合他的岗位",
+                "resumeText(必填,简历核心内容或技术要点,如:熟悉Java/Spring/Redis,本科)",
+                (raw, params) -> matchResumeJobs(str(params, "resumeText"))));
         registry.put("searchKnowledge", new ToolSpec("searchKnowledge",
                 "检索平台知识库中的面试知识点（Java/Spring/数据库/中间件等），用于回答技术面试题",
                 "query(必填,要检索的知识主题)",
@@ -197,6 +204,36 @@ public class AgentTools {
             return truncate(sb);
         } catch (Exception e) {
             return "联网搜索与本地岗位库暂时都不可用，请稍后再试或换一种问法。";
+        }
+    }
+
+    /** 简历 × 岗位 匹配推荐（v1.31.2）：用户粘贴简历要点 → 推荐最吻合岗位 */
+    public String matchResumeJobs(String resumeText) {
+        if (resumeText == null || resumeText.isBlank() || "null".equalsIgnoreCase(resumeText)) {
+            return "请提供简历核心内容（如：熟悉Java/Spring/Redis，本科）以便为你匹配岗位";
+        }
+        try {
+            List<com.example.interview.service.job.JobMatchService.MatchResult> matched =
+                    jobMatchService.match(resumeText.trim(), jobAgentService.activeJobs(), 8);
+            if (matched.isEmpty()) {
+                return "暂未找到与这份简历吻合的岗位。可补充更多技术栈/项目关键词（如：并发/微服务/前端/Vue），或让我联网搜索更多岗位。";
+            }
+            StringBuilder sb = new StringBuilder("根据你的简历为你推荐 ").append(matched.size()).append(" 个高吻合岗位：\n");
+            for (var r : matched) {
+                var j = r.job();
+                sb.append("- [匹配 ").append(r.matchScore()).append(" 分] ").append(j.getTitle())
+                        .append(" | ").append(j.getCompanyName())
+                        .append(" | ").append(j.getLocation() == null ? "地点未标注" : j.getLocation())
+                        .append(" | ").append(j.getSalary() == null ? "面议" : j.getSalary())
+                        .append(" | 命中技能:").append(String.join("/", r.matchedSkills()));
+                if (j.getApplyUrl() != null && !j.getApplyUrl().isBlank()) {
+                    sb.append(" | 申请:").append(j.getApplyUrl());
+                }
+                sb.append("\n");
+            }
+            return truncate(sb);
+        } catch (Exception e) {
+            return "简历匹配暂时不可用：" + e.getMessage();
         }
     }
 

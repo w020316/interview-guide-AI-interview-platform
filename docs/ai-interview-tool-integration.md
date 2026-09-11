@@ -153,7 +153,7 @@ List<WebJob> jobs = webJobSearcherService.searchWeb(keyword, location);
 ---
 
 ## 五、验证记录（真实）
-- 后端单测 **305/305** 全过；前端 vue-tsc 0 错误；
+- 后端单测 **308/308** 全过；前端 vue-tsc 0 错误；
 - 定制题库生产端到端：`/add`→200 id=1 → `/favorite/list` total=1 → `/favorite/bank/start`→sessionId + 1 题(MEDIUM) 全部通过。
 - 语音术语纠正单测 3/3；招聘广场归一化 meta 已收敛为干净枚举。
 - 简历岗位匹配（v1.29.0）：`JobMatchServiceTest` 3/3（技能/学历命中 + 排序）；`JobFieldNormalizerTest` 2/2；`JobPlatformAdapterTest` 6/6（含热招速递广州 Java 实习覆盖）全过。
@@ -161,3 +161,4 @@ List<WebJob> jobs = webJobSearcherService.searchWeb(keyword, location);
 - 智能体联网搜岗（v1.31.0）：后端单测 **305/305** 全过；`AgentToolsTest` 新增 `searchWebJobs` 3/3（联网命中、联网空降级本地库、双空引导文案）；`WebJobSearcherServiceTest` 智联 SSR 解析 3/3；公开招聘站点可达性实测 OK（智联 ssp 岗位 JSON 21 条、拉勾/51job 可达）。
 - 智能体稳定性（v1.31.1）：`AgentService.callModel` 纳入 `AiConcurrencyGuard` 全局并发闸门，修复智能体模型调用不受限流保护导致的偶发"无回复"；前端新增「停止生成」+ 冷启动唤醒重试。
 - 模型能力释放（v1.31.2）：系统提示词放开通用问答边界（知识问答/元问题直接作答，不强行依赖工具）；收尾回答 `maxTokens 1500→2500`、`temperature 0.4→0.5`，避免长回答截断；ReAct 轮次 6→8 支持多步推理；模型调用自动重试一次；流式分块改按行；新会话首次回复后用模型自动提炼精炼标题。
+- 智能体简历匹配（v1.31.2）：新增 `matchResumeJobs` 工具——用户可在对话中粘贴简历要点，智能体调用 `JobMatchService`（v1.29 纯规则打分）推荐高吻合岗位（含匹配分与命中技能）。单测 308/308。

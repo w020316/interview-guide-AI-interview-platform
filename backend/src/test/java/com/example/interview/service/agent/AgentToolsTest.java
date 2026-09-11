@@ -42,9 +42,12 @@ class AgentToolsTest {
     @Mock
     private com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
 
+    @Mock
+    private com.example.interview.service.job.JobMatchService jobMatchService;
+
     private AgentTools newTools() {
         return new AgentTools("user-1", jobAgentService, interviewSessionService,
-                interviewEventService, ragSearchService, webJobSearcherService);
+                interviewEventService, ragSearchService, webJobSearcherService, jobMatchService);
     }
 
     @Test
@@ -181,5 +184,33 @@ class AgentToolsTest {
         String out = newTools().searchJobs(null, null, null, null, null);
         assertThat(out.length()).isLessThan(1600);
         assertThat(out).contains("结果已截断");
+    }
+
+    @Test
+    @DisplayName("matchResumeJobs：简历要点命中时推荐高吻合岗位")
+    void matchResumeJobsOk() {
+        var job = com.example.interview.entity.JobPostingEntity.builder()
+                .title("Java 后端").companyName("字节跳动").location("北京")
+                .salary("30k-50k").applyUrl("https://jobs.bytedance.com").build();
+        when(jobAgentService.activeJobs()).thenReturn(List.of(job));
+        when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of(
+                new com.example.interview.service.job.JobMatchService.MatchResult(job, 80, List.of("java", "spring"))));
+        String out = newTools().matchResumeJobs("熟悉Java和Spring，本科");
+        assertThat(out).contains("Java 后端").contains("80 分").contains("命中技能:java/spring");
+    }
+
+    @Test
+    @DisplayName("matchResumeJobs：空简历给出提示")
+    void matchResumeJobsBlank() {
+        assertThat(newTools().matchResumeJobs("  ")).contains("请提供简历核心内容");
+    }
+
+    @Test
+    @DisplayName("matchResumeJobs：无匹配岗位给出引导")
+    void matchResumeJobsNoHit() {
+        when(jobAgentService.activeJobs()).thenReturn(List.of());
+        when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of());
+        String out = newTools().matchResumeJobs("熟悉Java，本科");
+        assertThat(out).contains("暂未找到与这份简历吻合的岗位");
     }
 }
