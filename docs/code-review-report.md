@@ -42,11 +42,48 @@
 
 ---
 
-## 四、修复后回归
+## 四、v1.31.4 全面复核（第二轮审计，AI 专项 + 全项目回归）
+
+> 方法：4 路并行深度审查（后端服务/AI、控制器/安全/配置、实体/仓库/工具、前端 Vue）+ 全量回归。
+> 基线：后端单测 316/316、前端 vue-tsc 0 错误。
+
+### 4.1 本轮新增问题与修复
+
+| ID | 级别 | 位置 | 问题 | 状态 |
+|---|---|---|---|---|
+| B-01 | P1 | InterviewService / ResumeAnalysisService | 二者各保留独立 `AI_SEMAPHORE(5)`，与全局 `AiConcurrencyGuard` 形成 **3 个信号量**，最坏并发 15 而非 5，免费模型限流下并发被放大；本轮修复漏改 | ✅ 统一为 `AiConcurrencyGuard.call()`，删除冗余字段与不可达 `catch(InterruptedException)` |
+| B-02 | P1 | 前端 AgentView.send | 冷启动重试在 `streaming.value=true` 仍置位时递归调 `send()`，被 `if(streaming) return` 拦截，重试**永远不执行**且用户消息已被移除 | ✅ 重试前复位 `streaming`/`abortController` |
+| B-03 | P2 | 前端 InterviewView.streamHint | `hintColdRetried` 每次进入函数都被重置为 false，冷启动失败后递归可**无限重试** | ✅ 改计数配额(≤1)，由 `startHint` 用户入口重置 |
+| B-04 | P2 | TextUtil.truncate | 按 UTF-16 码元截断，落在 emoji/生僻字代理对中间会截出孤立 surrogate 坏字符 | ✅ 截断点落在代理对时回退一位 |
+| B-05 | P2 | AgentMessageEntity | `@Data` 对含 LAZY ManyToOne 的实体生成 equals/hashCode/toString，事务外访问抛 `LazyInitializationException` 或暗生 N+1 | ✅ 改 `@Getter/@Setter` |
+| B-06 | P3 | AgentMessageRepository | `findLatestByConversationId` 未 `JOIN FETCH`，与同文件另一取数方法不一致，存在 N+1 | ✅ 补 `JOIN FETCH m.conversation` |
+
+### 4.2 评估保留/建议（未改，风险已记录）
+
+| ID | 级别 | 位置 | 问题 | 建议 |
+|---|---|---|---|---|
+| B-07 | P1 | ResumeController `/api/resume/import-url` | DNS rebinding SSRF：校验用 `getAllByName` 解析 IP 合格后，`Jsoup.connect(url)` 再次独立解析并连接，存在 TOCTOU 窗口可命中内网/云元数据 | 用已校验的 `InetAddress` 直连同源 IP + 强制 Host 头，屏蔽 169.254.169.254/内网/链路本地；连接复用同一解析结果 |
+| B-08 | P2 | InterviewController `/api/interview/upload-image` | `userId` 自请求参数而非 JWT（违背"userId 一律取 JWT"约定），攻击者可向任意 userId 命名空间写图（含图转链的 SSRF 面） | 改用 `currentUserId()`；对 `imageUrl` 协议/地址做服务端校验 |
+| B-09 | P2 | 前端 Interview/Agent View 流式渲染 | 每收一个 token 就对全量内容 `renderMarkdown`(markdown-it+DOMPurify)，长回复为 O(n²) | 增量渲染或 rAF/定时器节流合并 token |
+| B-10 | P2 | JobAgentController `/api/jobs/refresh` + SecurityConfig | 全系统无角色分级，任意登录用户可触发第三方抓取/全库刷新及同步 AI 接口（无按用户限流/配额），可刷爆第三方配额 | refresh 加 `hasRole('ADMIN')`/独立密钥，AI 接口按用户限流或加配额 |
+| B-11 | P3 | GlobalExceptionHandler.handleIllegalState | 500 级异常仍透出 `ex.getMessage()`，可能泄露内部细节（与注释"屏蔽内部细节"相悖） | 500 级固定文案，细节仅写日志；用户友好提示改由专门业务异常承载 |
+| B-12 | P3 | JsonRepairUtil.UNQUOTED_KEY 正则 | 全局正则替换未跳过字符串字面量，可能误注入已合法 JSON 字符串值内的 `, b:` 类文本 | 复用转义状态机，仅在字符串字面量外执行 key 修复 |
+| B-13 | P3 | PromptSanitizer | 黑名单关键词替换无法根治提示词注入（大小写/空格变体可绕过）；`MAX_INPUT_LENGTH` 按码元截断同 B-04 | 依赖 system 强约束 + 输出侧校验；长度按码点 |
+| B-14 | P3 | InterviewService 出题提示词 | 编号混乱（主列表 1/1.1/1.2/3，难度/聚焦规则又各输出 2.），存在重复 2.、缺 3. 前置 | 统一编号序列 |
+| B-15 | P3 | JobMatchService / WebJobSearcherService | `text == null ||` 恒假死代码；`SKILL_KEYWORDS` 中 `flink` 重复；`CONNECT_TIMEOUT_MS` 定义未用 | 清理死代码 |
+
+### 4.3 回归结论
+
+- 修复 B-01..B-06 后，后端全量单测 **316/316** 通过（BUILD SUCCESS）、前端 `vue-tsc` **0 错误**。
+- B-07..B-15 为已记录的风险与低优先清理项，暂不修改行为以避免回归，建议在后续版本按建议落实。
+
+---
+
+## 五、修复后回归
 - 修复后全量单测 **316/316** 全绿，未引入新问题。
 - 新增 `JobPostingEntityTest`（2/2）固化 A-02 修复：验证 `@Builder.Default` 默认值与显式覆盖，防回归。
 
 ---
 
-## 五、结论
+## 六、总结论
 项目整体安全性与健壮性良好：IDOR 越权防护到位、XSS 全链路消毒、无硬编码密钥、事务边界正确、并发与限流有保护。本轮修复 2 个真实问题（登录失败计数内存泄漏、builder 默认值），全部通过回归。

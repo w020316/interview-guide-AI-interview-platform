@@ -51,6 +51,7 @@
 | ID | 级别 | 问题 | 修复 |
 |---|---|---|---|
 | AI-01 | P2 | `JobAnalysisService` 使用**独立** `AI_SEMAPHORE(5)`，与全局 `AiConcurrencyGuard` 并存，拆分并发预算（总并发上限被放大，免费模型限流下是隐患） | ✅ 改为全局 `AiConcurrencyGuard.call()`，移除独立信号量，与其它 AI Service 统一共享 5 许可 |
+| AI-05 | P1 | **并发闸门未真正统一**（v1.31.4 复核）：`InterviewService.generateQuestions`、`ResumeAnalysisService.generateOptimizedResume` 各保留 `AI_SEMAPHORE(5)`，与全局闸门形成 **3 个独立信号量**，最坏并发 15 而非 5 | ✅ 三处统一为 `AiConcurrencyGuard.call()`，删除两处冗余信号量字段；同步移除不可达的 `catch(InterruptedException)` |
 
 ### 已确认正常（无问题）
 - AI-02 | 模型降级链完整，`FallbackChatModel` 启动时空链会显式抛异常（不会静默瞎跑）。

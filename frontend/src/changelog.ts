@@ -10,9 +10,22 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.31.3'
+export const CURRENT_VERSION = '1.31.4'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.31.4',
+    date: '2026-09-11',
+    title: '版本 1.31.4 · 全面复核与稳定性加固',
+    items: [
+      '修复：AI 并发控制真正全局统一（面试出题/简历优化此前仍用独立信号量，最坏并发可达 15），避免免费模型限流下批量失败',
+      '修复：智能体 30-60s 冷启动唤醒后重试不再失效，唤醒后能正常恢复回答',
+      '修复：AI 提示冷启动重试增加次数上限，杜绝极端情况无限重试',
+      '修复：长文本截断不再截断 emoji/生僻字（避免产生损坏字符）',
+      '修复：智能体消息实体不再因懒加载关系在日志/哈希中触发异常',
+      '完成全项目与 AI 模块第二轮全面审查，详见 docs/code-review-report.md、docs/ai-module-check-report.md'
+    ]
+  },
   {
     version: '1.31.3',
     date: '2026-09-11',

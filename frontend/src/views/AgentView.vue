@@ -337,6 +337,9 @@ async function send(preset?: string) {
     } else if (e instanceof TypeError && !coldRetried) {
       // 冷启动自动重试：网络层断开（后端休眠），唤醒后再试一次（整个生命周期仅一次）
       coldRetried = true
+      // 复位流控标志，否则第245行 send() 的 `streaming` 守卫会直接拦截本次重试，导致重试永远不执行
+      streaming.value = false
+      abortController = null
       try {
         ElMessage.info('后端服务正在冷启动（30-60s），正在唤醒，请稍候...')
         const wake = new AbortController()

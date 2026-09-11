@@ -17,6 +17,6 @@ public interface AgentMessageRepository extends JpaRepository<AgentMessageEntity
     List<AgentMessageEntity> findByConversationIdOrderByIdAsc(@Param("conversationId") Long conversationId);
 
     /** 会话内最近 N 条消息（倒序取数后由调用方反转为正序），用于装配对话记忆窗口 */
-    @Query("SELECT m FROM AgentMessageEntity m WHERE m.conversation.id = :conversationId ORDER BY m.id DESC")
+    @Query("SELECT m FROM AgentMessageEntity m JOIN FETCH m.conversation WHERE m.conversation.id = :conversationId ORDER BY m.id DESC")
     List<AgentMessageEntity> findLatestByConversationId(@Param("conversationId") Long conversationId, org.springframework.data.domain.Pageable pageable);
 }

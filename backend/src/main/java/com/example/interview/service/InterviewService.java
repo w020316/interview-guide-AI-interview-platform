@@ -55,9 +55,6 @@ public class InterviewService {
 
     private static final String QUESTION_CACHE = "interview:question:";
 
-    /** AI 并发控制：避免免费层 API 限流导致批量失败 */
-    private static final java.util.concurrent.Semaphore AI_SEMAPHORE = new java.util.concurrent.Semaphore(5);
-
     /** 简历文本最大长度（截断后送 AI，避免 prompt 过长拖慢推理） */
     private static final int MAX_RESUME_LEN = 800;
 
@@ -136,17 +133,12 @@ public class InterviewService {
                     .append("[{\"question\":\"请介绍你的项目架构\",\"category\":\"项目深挖\",\"difficulty\":\"MEDIUM\",\"keyPoints\":[\"考察点1\"],\"referenceAnswer\":\"参考答案要点\"}]")
                     .toString();
 
-            // 4. 调用 AI（并发控制 + 信号量保护）
-            String response;
-            AI_SEMAPHORE.acquire();
-            try {
-                response = chatClient.prompt()
-                        .user(prompt)
-                        .call()
-                        .content();
-            } finally {
-                AI_SEMAPHORE.release();
-            }
+            // 4. 调用 AI（纳入全局并发闸门，与其它 AI Service 统一共享 5 许可，v1.31.4）
+            String response = com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                    chatClient.prompt()
+                            .user(prompt)
+                            .call()
+                            .content());
 
             // 5. AI 响应空值校验
             if (response == null || response.isBlank()) {
@@ -164,9 +156,6 @@ public class InterviewService {
             }
 
             return cleaned;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("AI 调用被中断", e);
         } finally {
             questionCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);

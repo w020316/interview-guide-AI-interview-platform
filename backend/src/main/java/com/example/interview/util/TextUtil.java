@@ -45,6 +45,14 @@ public final class TextUtil {
         if (maxLen <= 0) return ellipsis == null ? "" : ellipsis;
         if (text.length() <= maxLen) return text;
         String suffix = ellipsis == null ? "" : ellipsis;
-        return text.substring(0, maxLen) + suffix;
+        int end = maxLen;
+        // v1.31.4 修复（P2）：按 UTF-16 码元截断可能落在 emoji/生僻字的代理对中间，
+        // 截出孤立高位 surrogate 产生坏字符。若截断点前是高 surrogate 且后接低 surrogate，则回退一位。
+        if (end > 0 && end < text.length()
+                && Character.isHighSurrogate(text.charAt(end - 1))
+                && Character.isLowSurrogate(text.charAt(end))) {
+            end--;
+        }
+        return text.substring(0, end) + suffix;
     }
 }

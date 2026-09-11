@@ -232,17 +232,12 @@ public class ResumeAnalysisService {
                     .append("5. 输出一份完整可用的简历，不要省略任何原始简历中的关键信息")
                     .toString();
 
-            // 4. 调用 AI
-            String response;
-            AI_SEMAPHORE.acquire();
-            try {
-                response = chatClient.prompt()
-                        .user(prompt)
-                        .call()
-                        .content();
-            } finally {
-                AI_SEMAPHORE.release();
-            }
+            // 4. 调用 AI（纳入全局并发闸门，与其它 AI Service 统一共享 5 许可，v1.31.4）
+            String response = com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                    chatClient.prompt()
+                            .user(prompt)
+                            .call()
+                            .content());
 
             // 5. 空值校验
             if (response == null || response.isBlank()) {
@@ -259,17 +254,11 @@ public class ResumeAnalysisService {
             }
 
             return cleaned;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("AI 调用被中断", e);
         } finally {
             resumeCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
     }
-
-    /** AI 并发控制（与 InterviewService 共享限流） */
-    private static final java.util.concurrent.Semaphore AI_SEMAPHORE = new java.util.concurrent.Semaphore(5);
 
     /** 简历文本最大长度 */
     private static final int MAX_RESUME_LEN = 800;

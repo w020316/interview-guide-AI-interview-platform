@@ -109,7 +109,7 @@
           <div v-if="hintOpen" id="hint-body" class="hint-body">
             <div class="stream-box" v-html="streamHtml"></div>
             <div class="hint-actions">
-              <BaseButton variant="ghost" size="sm" :loading="streaming" :disabled="streaming" @click="streamHint">
+              <BaseButton variant="ghost" size="sm" :loading="streaming" :disabled="streaming" @click="startHint">
                 {{ streaming ? '获取中…' : (streamContent ? '重新获取' : '获取 AI 提示') }}
               </BaseButton>
               <BaseButton v-if="streaming" variant="ghost" size="sm" @click="stopStream">停止</BaseButton>
@@ -538,7 +538,7 @@ const compareStatusLabel = computed(() => {
 // AbortController 用于取消 SSE 流式请求
 let abortController: AbortController | null = null
 // 冷启动重试标记：AI 提示流在 Render 冷启动网络断开时，唤醒后端后自动重试一次
-let hintColdRetried = false
+let hintColdRetryCount = 0
 
 const currentQ = computed(() => questions.value[qIndex.value])
 // 修复进度条：第一题不为 0%，最后一题能到 100%
@@ -794,10 +794,14 @@ async function startInterview() {
   }
 }
 
+// 用户手动触发提示入口：重置冷启动重试配额，避免上一次失败残留导致后续不再重试
+function startHint() {
+  hintColdRetryCount = 0
+  streamHint()
+}
+
 async function streamHint() {
   if (!currentQ.value) return
-  hintColdRetried = false
-  // 防重入：若上一次流仍在，先 abort 并等待退出
   if (streaming.value) {
     abortController?.abort()
     await new Promise(r => setTimeout(r, 50))
@@ -872,9 +876,9 @@ async function streamHint() {
   } catch (e: unknown) {
     if ((e as Error).name === 'AbortError') {
       // 用户主动取消或超时，静默
-    } else if (e instanceof TypeError && !hintColdRetried) {
-      // 冷启动自动重试：网络层断开（后端休眠），唤醒后再试一次
-      hintColdRetried = true
+    } else if (e instanceof TypeError && hintColdRetryCount < 1) {
+      // 冷启动自动重试：网络层断开（后端休眠），唤醒后再试一次（每次用户触发仅允许一次）
+      hintColdRetryCount += 1
       try {
         ElMessage.info('后端服务正在冷启动（30-60s），正在唤醒，请稍候...')
         const wake = new AbortController()
