@@ -167,7 +167,7 @@ async function manualAdd() {
   if (!q) return ElMessage.warning('请填写题目内容')
   manualSaving.value = true
   try {
-    await api.post('/api/favorite/toggle', {
+    await api.post('/api/favorite/add', {
       question: q,
       category: manualForm.category.trim() || null,
       difficulty: manualForm.difficulty || null,

@@ -180,4 +180,26 @@ public class FavoriteController {
         result.put("questions", saved);
         return Result.success(result);
     }
+
+    /**
+     * 手动加题：把自定义题目加入题库（v1.28.0）
+     * POST /api/favorite/add
+     * Body: {"question":"...","category":"...","difficulty":"...","referenceAnswer":"..."}
+     */
+    @Operation(summary = "手动添加自定义题目")
+    @PostMapping("/add")
+    public Result<FavoriteQuestionEntity> add(@RequestBody Map<String, Object> req) {
+        String userId = currentUserId();
+        String question = req.get("question") != null ? req.get("question").toString() : "";
+        if (question.isBlank()) {
+            return Result.error(400, "题目内容不能为空");
+        }
+        String category = req.get("category") != null ? req.get("category").toString() : null;
+        String difficulty = req.get("difficulty") != null ? req.get("difficulty").toString() : null;
+        String referenceAnswer = req.get("referenceAnswer") != null ? req.get("referenceAnswer").toString() : null;
+
+        FavoriteQuestionEntity saved = favoriteService.addManual(
+                userId, question.trim(), category, difficulty, referenceAnswer);
+        return Result.success(saved);
+    }
 }

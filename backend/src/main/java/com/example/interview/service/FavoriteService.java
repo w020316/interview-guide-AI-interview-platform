@@ -76,6 +76,25 @@ public class FavoriteService {
     }
 
     /**
+     * 手动添加自定义题目到题库（v1.28.0）
+     * 与 toggle 不同：不依赖原题目 ID，questionId 恒为空，每次新增一条自定义题。
+     */
+    @Transactional
+    public FavoriteQuestionEntity addManual(String userId, String question,
+                                            String category, String difficulty, String referenceAnswer) {
+        FavoriteQuestionEntity entity = FavoriteQuestionEntity.builder()
+                .userId(userId)
+                .question(question)
+                .category(category)
+                .difficulty(difficulty)
+                .referenceAnswer(referenceAnswer)
+                .build();
+        FavoriteQuestionEntity saved = favoriteRepository.save(entity);
+        favoriteRepository.flush();
+        return saved;
+    }
+
+    /**
      * 统计用户收藏数量
      */
     public long countByUser(String userId) {

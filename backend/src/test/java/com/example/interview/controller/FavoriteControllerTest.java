@@ -128,4 +128,28 @@ class FavoriteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(404));
     }
+
+    @Test
+    void add_happyPath_returnsFavorite() throws Exception {
+        loginAs("user-1");
+        FavoriteQuestionEntity saved = fav(99L, "项目深挖，说说你的难点", "项目", "HARD");
+        when(favoriteService.addManual(eq("user-1"), eq("项目深挖，说说你的难点"),
+                eq("项目"), eq("HARD"), any())).thenReturn(saved);
+        mockMvc.perform(post("/api/favorite/add")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"question\":\"项目深挖，说说你的难点\",\"category\":\"项目\",\"difficulty\":\"HARD\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.question").value("项目深挖，说说你的难点"));
+    }
+
+    @Test
+    void add_blankQuestion_returns400() throws Exception {
+        loginAs("user-1");
+        mockMvc.perform(post("/api/favorite/add")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"question\":\"   \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400));
+    }
 }
