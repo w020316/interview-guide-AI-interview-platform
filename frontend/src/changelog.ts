@@ -20,6 +20,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       '新增：深度健康体检接口 /api/health（数据库/Redis/JVM/运行时长，匿名可访问），供监控与运维巡检',
       '新增：保活监控升级——每 10 分钟不仅唤醒后端，还校验数据库与 Redis 状态，异常即告警',
+      '修复：生产 Redis 指向已删除实例导致 AI 缓存与登出吊销失效——更新为有效 Upstash 实例（improved-rabbit），/api/health redis=UP 验证通过',
+      '修复：健康/信息探活端点从限流拦截器排除，避免监控与压测高频探活被误限流（429）',
       '后端：优雅停机（部署/重启不打断在途请求，减少 5xx）',
       '后端：Tomcat 线程模型与数据库连接池参数适配免费层（连接探测 + 泄漏预警）',
       '前端：补齐 favicon、SEO 元信息、主题色、后端 preconnect，减少首屏 404 与握手延迟',
