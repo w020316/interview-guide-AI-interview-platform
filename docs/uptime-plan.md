@@ -133,3 +133,19 @@ node scripts/loadtest.mjs --url https://interview-guide-backend.onrender.com/api
 - 所有正确的优化/修复必须同步更新本文档与 `frontend/src/changelog.ts`（前端版本弹窗）。
 - 每次发布推送 `main` 触发 CI + Render 自动部署 + Cloudflare Pages 自动部署。
 - 本方案按需迭代：监控阈值、压测规模、应急预案场景随业务演进补充。
+
+---
+
+## 附：生产事故复盘记录
+
+### 2026-09-13 · 生产 Redis 指向已删除实例（P1，已修复）
+- **症状**：`/api/health` `redis=DOWN`；AI 缓存与登出令牌吊销名存实亡（Redis 不可达时黑名单 fail-open）。
+- **根因**：Render 环境变量 `REDIS_URL` 仍指向已删除的 `interview-redis`（`trusty-monarch-113421.upstash.io`，DNS 无法解析）；有效实例为 `lawai-redis`（`improved-rabbit-178109.upstash.io`）。
+- **处置**：Upstash 控制台读取有效实例完整连接串（`rediss://default:<token>@improved-rabbit-178109.upstash.io:6379`）→ Render Environment 更新 `REDIS_URL` → `Save, rebuild, and deploy` → 验证 `/api/health` `redis=UP`。
+- **预防**：深度体检将 Redis 纳入监控告警（本方案第四节第 1 条），后续此类失效会在 10 分钟内触发 Run 失败 + 邮件；Upstash 实例删除前需先更新 Render 配置。
+
+### 2026-09-13 · 探活端点被限流误拦（P2，已修复）
+- **症状**：并发压测 `/api/health` 出现 68 个 429，成功率仅 77%。
+- **根因**：`RateLimitInterceptor`（IP 10/min）覆盖全部 `/api/**`，无状态探活端点也被限流。
+- **处置**：`WebMvcConfig` 将 `/api/auth/**`、`/api/health`、`/api/info` 排除出限流拦截器。
+- **验证**：300 并发请求成功率 100%，P50 1.7s / P95 2.9s / P99 3.5s（免费层新加坡实例）。
