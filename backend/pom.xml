@@ -61,7 +61,7 @@
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
-            <version>3.0.3</version>
+            <version>3.0.8</version>
         </dependency>
 
         <!-- jsoup HTML 解析（从 HTML 简历中提取纯文本） -->
