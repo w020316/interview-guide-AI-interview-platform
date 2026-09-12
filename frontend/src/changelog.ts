@@ -25,6 +25,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       '前端：补齐 favicon、SEO 元信息、主题色、后端 preconnect，减少首屏 404 与握手延迟',
       '前端：安全响应头升级（HSTS、API no-store 防缓存泄漏）',
       '安全：Dependabot 每周依赖漏洞扫描 + CI 增加 npm audit 高危阻断',
+      '安全：依赖升级清除全部漏洞——vite 5→8、vitest 2→5、plugin-vue 5→6、dompurify 3.4.15，audit 0 漏洞；构建引擎切换 rolldown 后构建提速约 20 倍',
       '测试：新增 /api/health 集成测试（含降级场景）、并发压测脚本 scripts/loadtest.mjs',
       '文档：新增 docs/uptime-plan.md（性能/稳定性/监控/安全/应急预案/测试流程/维护清单）'
     ]

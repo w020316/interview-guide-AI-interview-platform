@@ -27,10 +27,13 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vue-vendor': ['vue', 'vue-router'],
-            'element-plus': ['element-plus', '@element-plus/icons-vue'],
-            'markdown': ['markdown-it'],
+          // v1.32.0：vite 8 / rolldown 仅支持函数式 manualChunks（对象形式已废弃）
+          manualChunks(id: string) {
+            if (id.includes('node_modules')) {
+              if (id.includes('element-plus') || id.includes('@element-plus')) return 'element-plus'
+              if (id.includes('markdown-it') || id.includes('linkify-it') || id.includes('uc.micro')) return 'markdown'
+              if (id.includes('vue') || id.includes('@vue') || id.includes('vue-router') || id.includes('pinia')) return 'vue-vendor'
+            }
           }
         }
       }
