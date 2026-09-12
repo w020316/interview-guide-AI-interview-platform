@@ -41,11 +41,16 @@ class AdminSeedInitializerTest {
     }
 
     @Test
-    @DisplayName("账号已存在则跳过创建")
-    void existingUser_skips() {
+    @DisplayName("账号已存在则重置密码为配置值（v1.31.5）")
+    void existingUser_resetsPassword() {
+        UserEntity existing = UserEntity.builder()
+                .username("小吴同学")
+                .passwordHash(encoder.encode("old-password"))
+                .build();
         when(userRepository.existsByUsername("小吴同学")).thenReturn(true);
+        when(userRepository.findByUsername("小吴同学")).thenReturn(java.util.Optional.of(existing));
         newInitializer("小吴同学", "xwtx").run(null);
-        verify(userRepository, never()).saveAndFlush(any());
+        assertTrue(encoder.matches("xwtx", existing.getPasswordHash()));
     }
 
     @Test
