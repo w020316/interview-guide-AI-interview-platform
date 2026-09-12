@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,6 +56,13 @@ class SecurityConfigTest {
 
     @MockBean
     private RateLimitInterceptor rateLimitInterceptor;
+
+    /** HealthController 构造所需（v1.32.0 深度体检依赖） */
+    @MockBean
+    private JdbcTemplate jdbcTemplate;
+
+    @MockBean
+    private RedisTemplate<String, Object> redisTemplate;
 
     /** 测试专用受保护端点（不在 permitAll 列表，需认证） */
     @RestController

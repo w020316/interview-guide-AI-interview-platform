@@ -10,9 +10,25 @@ export interface ChangelogEntry {
   items: string[]
 }
 
-export const CURRENT_VERSION = '1.31.4'
+export const CURRENT_VERSION = '1.32.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.32.0',
+    date: '2026-09-13',
+    title: '版本 1.32.0 · 网站可用性保障方案落地',
+    items: [
+      '新增：深度健康体检接口 /api/health（数据库/Redis/JVM/运行时长，匿名可访问），供监控与运维巡检',
+      '新增：保活监控升级——每 10 分钟不仅唤醒后端，还校验数据库与 Redis 状态，异常即告警',
+      '后端：优雅停机（部署/重启不打断在途请求，减少 5xx）',
+      '后端：Tomcat 线程模型与数据库连接池参数适配免费层（连接探测 + 泄漏预警）',
+      '前端：补齐 favicon、SEO 元信息、主题色、后端 preconnect，减少首屏 404 与握手延迟',
+      '前端：安全响应头升级（HSTS、API no-store 防缓存泄漏）',
+      '安全：Dependabot 每周依赖漏洞扫描 + CI 增加 npm audit 高危阻断',
+      '测试：新增 /api/health 集成测试（含降级场景）、并发压测脚本 scripts/loadtest.mjs',
+      '文档：新增 docs/uptime-plan.md（性能/稳定性/监控/安全/应急预案/测试流程/维护清单）'
+    ]
+  },
   {
     version: '1.31.4',
     date: '2026-09-11',

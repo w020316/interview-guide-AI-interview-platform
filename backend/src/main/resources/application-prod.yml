@@ -1,6 +1,14 @@
 # 生产环境配置（云端部署用）
 server:
   port: ${PORT:8080}
+  shutdown: graceful            # v1.32.0：优雅停机，部署/重启时等待在途请求完成，减少 5xx
+  tomcat:
+    # 免费层 512MB 内存下的线程模型：请求线程不宜过多，避免线程栈挤占堆内存
+    threads:
+      max: 50
+      min-spare: 4
+    accept-count: 100
+    max-connections: 200
 
 spring:
   application:
@@ -10,6 +18,9 @@ spring:
   threads:
     virtual:
       enabled: false
+  lifecycle:
+    # 优雅停机最长等待 20s，超时强制退出（配合 Render 部署窗口）
+    timeout-per-shutdown-phase: 20s
 
   # Supabase PostgreSQL（用户名/密码直接写在 DATABASE_URL 里，避免环境变量未注入问题）
   datasource:
@@ -21,6 +32,10 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
+      # v1.32.0：连接有效性检测 + 泄漏预警（供运维在日志中发现 SQL 长期占用）
+      validation-timeout: 5000
+      connection-test-query: SELECT 1
+      leak-detection-threshold: 30000
 
   jpa:
     hibernate:

@@ -66,7 +66,7 @@ public class SecurityConfig {
                 // 认证接口公开
                 .requestMatchers("/api/auth/**").permitAll()
                 // 系统信息公开
-                .requestMatchers("/api/info").permitAll()
+                .requestMatchers("/api/info", "/api/health").permitAll()
                 // Swagger UI & OpenAPI 公开
                 .requestMatchers(
                     "/swagger-ui.html", "/swagger-ui/**",

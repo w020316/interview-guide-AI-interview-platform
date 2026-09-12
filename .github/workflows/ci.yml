@@ -70,6 +70,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit dependencies (v1.32.0)
+        # 依赖安全审计：高危/严重漏洞阻断构建（自动修复可由 Dependabot PR 承担）
+        run: npm audit --audit-level=high
+
       - name: Type check (vue-tsc)
         # 类型错误在 CI 阶段即可捕获，避免 vite build（esbuild 去类型）静默放行
         run: npx vue-tsc --noEmit

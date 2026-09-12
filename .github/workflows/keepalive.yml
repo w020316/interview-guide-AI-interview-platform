@@ -1,8 +1,11 @@
 name: Keep Render Backend Warm
 
 # Render 免费层 15 分钟无请求会休眠，首次唤醒需 30~50 秒（SUS 评分主要拖累项）
-# 通过 GitHub Actions 每 10 分钟 ping 一次 /api/info，避免冷启动
+# 通过 GitHub Actions 每 10 分钟 ping 一次 /api/info 与 /api/health，避免冷启动
 # 频率受 GitHub Actions 最小粒度限制（不能低于 5 分钟），10 分钟是稳定且不浪费免费额度的选择
+#
+# v1.32.0：健康校验升级——除保活外，解析 /api/health 的 database/redis/jvm 状态，
+# 任一组件 DOWN 即触发告警（Run 失败 + 邮件通知），作为免费层的可用性监控。
 
 on:
   schedule:
@@ -45,3 +48,29 @@ jobs:
             exit 1
           fi
           echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] 保活成功"
+
+      - name: Deep health check (v1.32.0)
+        env:
+          BACKEND_URL: https://interview-guide-backend.onrender.com
+        run: |
+          set -euo pipefail
+          echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] 深度体检 → $BACKEND_URL/api/health"
+          BODY=$(curl --fail --max-time 60 --silent --show-error "$BACKEND_URL/api/health" || echo "HEALTH_FAILED")
+          if [[ "$BODY" == HEALTH_FAILED ]]; then
+            echo "::error::深度体检请求失败，/api/health 不可达"
+            exit 1
+          fi
+          echo "体检响应: ${BODY:0:400}"
+          # 校验核心组件状态：database / redis 必须为 UP
+          DB_STATUS=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['database']['status'])" 2>/dev/null || echo "PARSE_ERR")
+          REDIS_STATUS=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['redis']['status'])" 2>/dev/null || echo "PARSE_ERR")
+          echo "database=$DB_STATUS redis=$REDIS_STATUS"
+          if [[ "$DB_STATUS" != "UP" ]]; then
+            echo "::error::数据库状态异常（$DB_STATUS），请检查 Supabase DATABASE_URL 与连接池"
+            exit 1
+          fi
+          if [[ "$REDIS_STATUS" != "UP" ]]; then
+            echo "::error::Redis 状态异常（$REDIS_STATUS），请检查 Upstash REDIS_URL（仅影响 AI 缓存，不影响鉴权）"
+            exit 1
+          fi
+          echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] 深度体检通过"
