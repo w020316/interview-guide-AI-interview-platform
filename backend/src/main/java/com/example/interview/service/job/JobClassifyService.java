@@ -1,8 +1,8 @@
 package com.example.interview.service.job;
 
-import com.example.interview.ai.FallbackChatModel;
 import com.example.interview.service.job.JobPlatformAdapter.JobDto;
 import com.example.interview.util.JsonRepairUtil;
+import org.springframework.ai.chat.model.ChatModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -28,10 +28,10 @@ public class JobClassifyService {
     private static final List<String> JOB_TYPES = List.of(
             "技术", "产品", "运营", "设计", "市场", "职能", "金融", "综合");
 
-    private final FallbackChatModel chatModel;
+    private final ChatModel chatModel;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public JobClassifyService(FallbackChatModel chatModel) {
+    public JobClassifyService(ChatModel chatModel) {
         this.chatModel = chatModel;
     }
 
