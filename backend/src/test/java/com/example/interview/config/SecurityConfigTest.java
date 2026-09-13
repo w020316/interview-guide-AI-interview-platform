@@ -136,6 +136,32 @@ class SecurityConfigTest {
                         }
                     });
         }
+
+        @Test
+        @DisplayName("P2-07：未认证 GET /api/auth/me 返回 401（不再落入 /api/auth/** permitAll）")
+        void authMe_withoutToken_returns401() throws Exception {
+            mockMvc.perform(get("/api/auth/me"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value(401));
+        }
+
+        @Test
+        @DisplayName("P2-08：未认证 GET /api/health/detail 返回 401（深度体检需认证）")
+        void healthDetail_withoutToken_returns401() throws Exception {
+            mockMvc.perform(get("/api/health/detail"))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("P2-08：未认证 GET /api/health 仍轻量放行")
+        void health_withoutToken_permitAll() throws Exception {
+            mockMvc.perform(get("/api/health"))
+                    .andExpect(result -> {
+                        if (result.getResponse().getStatus() == 401) {
+                            throw new AssertionError("/api/health 轻量探活应 permitAll，不应返回 401");
+                        }
+                    });
+        }
     }
 
     @Nested

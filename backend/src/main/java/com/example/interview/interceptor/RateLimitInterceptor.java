@@ -16,14 +16,19 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * IP 级别请求限流拦截器（Bucket4j 内存模式）
- * - 每个 IP 每分钟最多 10 次请求
+ * - 每个 IP 每分钟最多 app.rate-limit.per-minute 次（P2-10：默认从 10 提至 60——
+ *   校园网/公司 NAT 后多用户共享同一出口 IP，10 次/分钟会使正常浏览互相挤爆触发 429）
  * - 超限返回 429 Too Many Requests
- * - 使用 Caffeine 风格的过期清理，防止内存泄漏
+ * - 使用过期清理，防止内存泄漏
  */
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitInterceptor.class);
+
+    /** 每 IP 每分钟请求上限（可配） */
+    @org.springframework.beans.factory.annotation.Value("${app.rate-limit.per-minute:60}")
+    private int perMinuteLimit;
 
     /** IP → Bucket 映射，附带最后访问时间用于过期清理 */
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
@@ -41,11 +46,12 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private Bucket resolveBucket(String ip) {
         cleanupIfNeeded();
         lastAccess.put(ip, System.currentTimeMillis());
+        int limit = perMinuteLimit > 0 ? perMinuteLimit : 60;
         return buckets.computeIfAbsent(ip, k ->
                 Bucket.builder()
                         .addLimit(Bandwidth.builder()
-                                .capacity(10)
-                                .refillGreedy(10, Duration.ofMinutes(1))
+                                .capacity(limit)
+                                .refillGreedy(limit, Duration.ofMinutes(1))
                                 .build())
                         .build()
         );

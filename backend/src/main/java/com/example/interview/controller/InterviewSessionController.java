@@ -120,6 +120,19 @@ public class InterviewSessionController {
         if (questions == null || questions.isEmpty()) {
             return Result.error(400, "题目列表不能为空");
         }
+        // P2-09：批量与字段长度上限，防单请求灌库与数据库膨胀
+        if (questions.size() > 50) {
+            return Result.error(400, "单次最多保存 50 道题");
+        }
+        for (Map<String, String> q : questions) {
+            if (q.getOrDefault("question", "").length() > 2000) {
+                return Result.error(400, "单题内容不能超过 2000 字");
+            }
+            String ref = q.get("referenceAnswer");
+            if (ref != null && ref.length() > 4000) {
+                return Result.error(400, "参考答案不能超过 4000 字");
+            }
+        }
 
         List<InterviewQuestionEntity> entities = questions.stream().map(q ->
                 InterviewQuestionEntity.builder()

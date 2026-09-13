@@ -63,9 +63,13 @@ public class SecurityConfig {
                 })
             )
             .authorizeHttpRequests(auth -> auth
+                // P2-07：/api/auth/me 必须先于 /api/auth/** 声明为 authenticated——
+                // 此前落在 permitAll 内，匿名请求经 AnonymousAuthenticationToken 也返回 200 假身份，
+                // 被禁用用户则返回 banned:false，与该接口展示禁用状态的目的矛盾
+                .requestMatchers("/api/auth/me").authenticated()
                 // 认证接口公开
                 .requestMatchers("/api/auth/**").permitAll()
-                // 系统信息公开
+                // 系统信息公开（轻量探活；深度体检在 /api/health/detail，走 anyRequest 认证）
                 .requestMatchers("/api/info", "/api/health").permitAll()
                 // Swagger UI & OpenAPI 公开
                 .requestMatchers(

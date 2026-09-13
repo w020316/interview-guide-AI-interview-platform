@@ -50,10 +50,21 @@ public class HealthController {
     }
 
     /**
-     * 深度健康体检（v1.32.0）：数据库 / Redis / JVM / 运行时长
+     * 轻量探活（匿名可访问，供保活任务/外部监控 ping）。
+     * P2-08：不再执行 DB SELECT 1 / Redis PING、不暴露 JVM 细节——此前匿名深度体检
+     * 既是无认证的资源消耗放大点，也向匿名者泄露基础设施信息。
+     * 深度体检移至需认证的 {@code GET /api/health/detail}（走 anyRequest().authenticated()）。
      */
     @GetMapping("/health")
     public Result<Map<String, Object>> health() {
+        return Result.success(java.util.Collections.<String, Object>singletonMap("status", "UP"));
+    }
+
+    /**
+     * 深度健康体检（需登录）：数据库 / Redis / JVM / 运行时长（v1.32.0 引入，P2-08 起需认证）
+     */
+    @GetMapping("/health/detail")
+    public Result<Map<String, Object>> healthDetail() {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", "UP");
         data.put("uptimeSec", ManagementFactory.getRuntimeMXBean().getUptime() / 1000);

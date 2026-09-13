@@ -68,11 +68,23 @@ class HealthControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/health 返回 200 + 各组件状态（数据库/Redis/JVM 均 UP）")
+    @DisplayName("GET /api/health 轻量探活：匿名仅返回 status=UP，不探测 DB/Redis、不暴露 JVM（P2-08）")
+    void health_lightweightOnlyStatus() throws Exception {
+        mockMvc.perform(get("/api/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.status").value("UP"))
+                .andExpect(jsonPath("$.data.database").doesNotExist())
+                .andExpect(jsonPath("$.data.redis").doesNotExist())
+                .andExpect(jsonPath("$.data.jvm").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /api/health/detail 返回 200 + 各组件状态（数据库/Redis/JVM 均 UP）")
     void health_returnsAllComponentsUp() throws Exception {
         when(jdbcTemplate.queryForObject(any(String.class), any(Class.class))).thenReturn(1L);
         when(redisTemplate.execute(any(RedisCallback.class))).thenReturn("PONG");
-        mockMvc.perform(get("/api/health"))
+        mockMvc.perform(get("/api/health/detail"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.status").value("UP"))
@@ -83,24 +95,24 @@ class HealthControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/health 数据库异常时该字段降级为 DOWN，接口仍 200")
+    @DisplayName("GET /api/health/detail 数据库异常时该字段降级为 DOWN，接口仍 200")
     void health_databaseDown_stillReturns200() throws Exception {
         when(jdbcTemplate.queryForObject(any(String.class), any(Class.class)))
                 .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("db down"));
         when(redisTemplate.execute(any(RedisCallback.class))).thenReturn("PONG");
-        mockMvc.perform(get("/api/health"))
+        mockMvc.perform(get("/api/health/detail"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.database.status").value("DOWN"))
                 .andExpect(jsonPath("$.data.redis.status").value("UP"));
     }
 
     @Test
-    @DisplayName("GET /api/health Redis 异常时该字段降级为 DOWN，接口仍 200")
+    @DisplayName("GET /api/health/detail Redis 异常时该字段降级为 DOWN，接口仍 200")
     void health_redisDown_stillReturns200() throws Exception {
         when(jdbcTemplate.queryForObject(any(String.class), any(Class.class))).thenReturn(1L);
         when(redisTemplate.execute(any(RedisCallback.class)))
                 .thenThrow(new org.springframework.data.redis.RedisConnectionFailureException("redis down"));
-        mockMvc.perform(get("/api/health"))
+        mockMvc.perform(get("/api/health/detail"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.database.status").value("UP"))
                 .andExpect(jsonPath("$.data.redis.status").value("DOWN"));
