@@ -9,7 +9,7 @@
   "finalUrl": "/",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1621
+  "loadMs": 1610
  },
  {
   "page": "login",
@@ -21,7 +21,7 @@
   "finalUrl": "/login",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1572
+  "loadMs": 1744
  },
  {
   "page": "resume",
@@ -33,7 +33,7 @@
   "finalUrl": "/resume",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1523
+  "loadMs": 1573
  },
  {
   "page": "job-analysis",
@@ -45,7 +45,7 @@
   "finalUrl": "/job",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1533
+  "loadMs": 1560
  },
  {
   "page": "interview",
@@ -57,7 +57,7 @@
   "finalUrl": "/interview",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1538
+  "loadMs": 1570
  },
  {
   "page": "history",
@@ -69,7 +69,7 @@
   "finalUrl": "/history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1521
+  "loadMs": 1554
  },
  {
   "page": "resume-history",
@@ -81,7 +81,7 @@
   "finalUrl": "/resume-history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1559
+  "loadMs": 1544
  },
  {
   "page": "knowledge",
@@ -93,7 +93,7 @@
   "finalUrl": "/knowledge",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1516
+  "loadMs": 1556
  },
  {
   "page": "wrong-book",
@@ -105,7 +105,7 @@
   "finalUrl": "/wrong-book",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1516
+  "loadMs": 1542
  },
  {
   "page": "favorites",
@@ -117,7 +117,7 @@
   "finalUrl": "/favorites",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1544
+  "loadMs": 1561
  },
  {
   "page": "progress",
@@ -129,7 +129,7 @@
   "finalUrl": "/progress",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1589
+  "loadMs": 1534
  },
  {
   "page": "calendar",
@@ -141,7 +141,7 @@
   "finalUrl": "/calendar",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1564
+  "loadMs": 1534
  },
  {
   "page": "agent",
@@ -153,7 +153,7 @@
   "finalUrl": "/agent",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1560
+  "loadMs": 1542
  },
  {
   "page": "profile",
@@ -165,7 +165,7 @@
   "finalUrl": "/profile",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1529
+  "loadMs": 1552
  },
  {
   "page": "learning",
@@ -177,7 +177,7 @@
   "finalUrl": "/learning",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1556
+  "loadMs": 1538
  },
  {
   "page": "admin",
@@ -189,7 +189,7 @@
   "finalUrl": "/admin",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1541
+  "loadMs": 1560
  },
  {
   "page": "home",
@@ -201,7 +201,7 @@
   "finalUrl": "/",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1575
+  "loadMs": 1543
  },
  {
   "page": "login",
@@ -213,7 +213,7 @@
   "finalUrl": "/login",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1559
+  "loadMs": 1561
  },
  {
   "page": "resume",
@@ -225,7 +225,7 @@
   "finalUrl": "/resume",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1537
+  "loadMs": 1534
  },
  {
   "page": "job-analysis",
@@ -237,7 +237,7 @@
   "finalUrl": "/job",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1554
+  "loadMs": 1542
  },
  {
   "page": "interview",
@@ -249,7 +249,7 @@
   "finalUrl": "/interview",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1530
+  "loadMs": 1546
  },
  {
   "page": "history",
@@ -261,7 +261,7 @@
   "finalUrl": "/history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1539
+  "loadMs": 1509
  },
  {
   "page": "resume-history",
@@ -273,7 +273,7 @@
   "finalUrl": "/resume-history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1529
+  "loadMs": 1533
  },
  {
   "page": "knowledge",
@@ -285,7 +285,7 @@
   "finalUrl": "/knowledge",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1553
+  "loadMs": 1536
  },
  {
   "page": "wrong-book",
@@ -297,7 +297,7 @@
   "finalUrl": "/wrong-book",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1529
+  "loadMs": 1521
  },
  {
   "page": "favorites",
@@ -309,7 +309,7 @@
   "finalUrl": "/favorites",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1536
+  "loadMs": 1543
  },
  {
   "page": "progress",
@@ -321,7 +321,7 @@
   "finalUrl": "/progress",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1538
+  "loadMs": 1557
  },
  {
   "page": "calendar",
@@ -333,7 +333,7 @@
   "finalUrl": "/calendar",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1508
+  "loadMs": 1547
  },
  {
   "page": "agent",
@@ -345,7 +345,7 @@
   "finalUrl": "/agent",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1532
+  "loadMs": 1604
  },
  {
   "page": "profile",
@@ -357,7 +357,7 @@
   "finalUrl": "/profile",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1538
+  "loadMs": 1559
  },
  {
   "page": "learning",
@@ -369,7 +369,7 @@
   "finalUrl": "/learning",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1529
+  "loadMs": 1536
  },
  {
   "page": "home",
@@ -381,7 +381,7 @@
   "finalUrl": "/",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1527
+  "loadMs": 1525
  },
  {
   "page": "login",
@@ -393,7 +393,7 @@
   "finalUrl": "/login",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1525
+  "loadMs": 1538
  },
  {
   "page": "resume",
@@ -405,7 +405,7 @@
   "finalUrl": "/resume",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1501
+  "loadMs": 1513
  },
  {
   "page": "job-analysis",
@@ -417,7 +417,7 @@
   "finalUrl": "/job",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1512
+  "loadMs": 1515
  },
  {
   "page": "interview",
@@ -429,7 +429,7 @@
   "finalUrl": "/interview",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1518
+  "loadMs": 1519
  },
  {
   "page": "history",
@@ -441,7 +441,7 @@
   "finalUrl": "/history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1516
+  "loadMs": 1547
  },
  {
   "page": "resume-history",
@@ -453,7 +453,7 @@
   "finalUrl": "/resume-history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1516
+  "loadMs": 1520
  },
  {
   "page": "knowledge",
@@ -465,7 +465,7 @@
   "finalUrl": "/knowledge",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1521
+  "loadMs": 1516
  },
  {
   "page": "wrong-book",
@@ -477,7 +477,7 @@
   "finalUrl": "/wrong-book",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1570
+  "loadMs": 1497
  },
  {
   "page": "favorites",
@@ -489,7 +489,7 @@
   "finalUrl": "/favorites",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1509
+  "loadMs": 1501
  },
  {
   "page": "progress",
@@ -501,7 +501,7 @@
   "finalUrl": "/progress",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1532
+  "loadMs": 1512
  },
  {
   "page": "calendar",
@@ -513,7 +513,7 @@
   "finalUrl": "/calendar",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1523
+  "loadMs": 1522
  },
  {
   "page": "agent",
@@ -525,7 +525,7 @@
   "finalUrl": "/agent",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1525
+  "loadMs": 1522
  },
  {
   "page": "profile",
@@ -537,7 +537,7 @@
   "finalUrl": "/profile",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1522
+  "loadMs": 1497
  },
  {
   "page": "learning",
@@ -549,7 +549,7 @@
   "finalUrl": "/learning",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1524
+  "loadMs": 1512
  },
  {
   "page": "home",
@@ -561,7 +561,7 @@
   "finalUrl": "/",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1544
+  "loadMs": 1535
  },
  {
   "page": "login",
@@ -573,7 +573,7 @@
   "finalUrl": "/login",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1559
+  "loadMs": 1514
  },
  {
   "page": "resume",
@@ -585,7 +585,7 @@
   "finalUrl": "/resume",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1514
+  "loadMs": 1527
  },
  {
   "page": "job-analysis",
@@ -597,7 +597,7 @@
   "finalUrl": "/job",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1516
+  "loadMs": 1521
  },
  {
   "page": "interview",
@@ -609,7 +609,7 @@
   "finalUrl": "/interview",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1520
+  "loadMs": 1510
  },
  {
   "page": "history",
@@ -621,7 +621,7 @@
   "finalUrl": "/history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1521
+  "loadMs": 1504
  },
  {
   "page": "resume-history",
@@ -633,7 +633,7 @@
   "finalUrl": "/resume-history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1513
+  "loadMs": 1536
  },
  {
   "page": "knowledge",
@@ -645,7 +645,7 @@
   "finalUrl": "/knowledge",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1522
+  "loadMs": 1520
  },
  {
   "page": "wrong-book",
@@ -657,7 +657,7 @@
   "finalUrl": "/wrong-book",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1522
+  "loadMs": 1498
  },
  {
   "page": "favorites",
@@ -669,7 +669,7 @@
   "finalUrl": "/favorites",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1513
+  "loadMs": 1498
  },
  {
   "page": "progress",
@@ -681,7 +681,7 @@
   "finalUrl": "/progress",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1512
+  "loadMs": 1515
  },
  {
   "page": "calendar",
@@ -693,7 +693,7 @@
   "finalUrl": "/calendar",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1535
+  "loadMs": 1495
  },
  {
   "page": "agent",
@@ -705,7 +705,7 @@
   "finalUrl": "/agent",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1536
+  "loadMs": 1526
  },
  {
   "page": "profile",
@@ -717,7 +717,7 @@
   "finalUrl": "/profile",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1495
+  "loadMs": 1517
  },
  {
   "page": "learning",
@@ -729,7 +729,7 @@
   "finalUrl": "/learning",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1541
+  "loadMs": 1510
  },
  {
   "page": "home",
@@ -741,7 +741,7 @@
   "finalUrl": "/",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1511
+  "loadMs": 1500
  },
  {
   "page": "login",
@@ -753,7 +753,7 @@
   "finalUrl": "/login",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1482
+  "loadMs": 1515
  },
  {
   "page": "resume",
@@ -765,7 +765,7 @@
   "finalUrl": "/resume",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1500
+  "loadMs": 1509
  },
  {
   "page": "job-analysis",
@@ -777,7 +777,7 @@
   "finalUrl": "/job",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1518
+  "loadMs": 1508
  },
  {
   "page": "interview",
@@ -789,7 +789,7 @@
   "finalUrl": "/interview",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1511
+  "loadMs": 1486
  },
  {
   "page": "history",
@@ -801,7 +801,7 @@
   "finalUrl": "/history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1489
+  "loadMs": 1502
  },
  {
   "page": "resume-history",
@@ -813,7 +813,7 @@
   "finalUrl": "/resume-history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1526
+  "loadMs": 1489
  },
  {
   "page": "knowledge",
@@ -825,7 +825,7 @@
   "finalUrl": "/knowledge",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1521
+  "loadMs": 1516
  },
  {
   "page": "wrong-book",
@@ -837,7 +837,7 @@
   "finalUrl": "/wrong-book",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1515
+  "loadMs": 1508
  },
  {
   "page": "favorites",
@@ -849,7 +849,7 @@
   "finalUrl": "/favorites",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1509
+  "loadMs": 1493
  },
  {
   "page": "progress",
@@ -861,7 +861,7 @@
   "finalUrl": "/progress",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1504
+  "loadMs": 1495
  },
  {
   "page": "calendar",
@@ -873,7 +873,7 @@
   "finalUrl": "/calendar",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1489
+  "loadMs": 1485
  },
  {
   "page": "agent",
@@ -885,7 +885,7 @@
   "finalUrl": "/agent",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1523
+  "loadMs": 1516
  },
  {
   "page": "profile",
@@ -897,7 +897,7 @@
   "finalUrl": "/profile",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1486
+  "loadMs": 1489
  },
  {
   "page": "learning",
@@ -909,7 +909,7 @@
   "finalUrl": "/learning",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1507
+  "loadMs": 1501
  },
  {
   "page": "home",
@@ -921,7 +921,7 @@
   "finalUrl": "/",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1517
+  "loadMs": 1531
  },
  {
   "page": "login",
@@ -933,7 +933,7 @@
   "finalUrl": "/login",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1499
+  "loadMs": 1493
  },
  {
   "page": "resume",
@@ -945,7 +945,7 @@
   "finalUrl": "/resume",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1515
+  "loadMs": 1509
  },
  {
   "page": "job-analysis",
@@ -957,7 +957,7 @@
   "finalUrl": "/job",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1493
+  "loadMs": 1518
  },
  {
   "page": "interview",
@@ -969,7 +969,7 @@
   "finalUrl": "/interview",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1507
+  "loadMs": 1494
  },
  {
   "page": "history",
@@ -981,7 +981,7 @@
   "finalUrl": "/history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1493
+  "loadMs": 1509
  },
  {
   "page": "resume-history",
@@ -993,7 +993,7 @@
   "finalUrl": "/resume-history",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1518
+  "loadMs": 1508
  },
  {
   "page": "knowledge",
@@ -1005,7 +1005,7 @@
   "finalUrl": "/knowledge",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1497
+  "loadMs": 1512
  },
  {
   "page": "wrong-book",
@@ -1017,7 +1017,7 @@
   "finalUrl": "/wrong-book",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1505
+  "loadMs": 1491
  },
  {
   "page": "favorites",
@@ -1029,7 +1029,7 @@
   "finalUrl": "/favorites",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1503
+  "loadMs": 1508
  },
  {
   "page": "progress",
@@ -1041,7 +1041,7 @@
   "finalUrl": "/progress",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1508
+  "loadMs": 1521
  },
  {
   "page": "calendar",
@@ -1053,7 +1053,7 @@
   "finalUrl": "/calendar",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1535
+  "loadMs": 1484
  },
  {
   "page": "agent",
@@ -1065,7 +1065,7 @@
   "finalUrl": "/agent",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1506
+  "loadMs": 1503
  },
  {
   "page": "profile",
@@ -1077,7 +1077,7 @@
   "finalUrl": "/profile",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1530
+  "loadMs": 1480
  },
  {
   "page": "learning",
@@ -1089,7 +1089,7 @@
   "finalUrl": "/learning",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1568
+  "loadMs": 1498
  },
  {
   "page": "admin",
@@ -1101,6 +1101,6 @@
   "finalUrl": "/admin",
   "consoleErrors": [],
   "failedRequests": [],
-  "loadMs": 1526
+  "loadMs": 1496
  }
 ]

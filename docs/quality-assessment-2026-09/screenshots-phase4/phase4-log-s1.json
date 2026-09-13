@@ -1,22 +1,22 @@
 [
  {
   "step": "未登录点击开始简历分析",
-  "ms": 3258,
+  "ms": 3252,
   "note": "url=http://localhost:5173/login?redirect=/resume"
  },
  {
   "step": "填写并提交注册",
-  "ms": 3357,
+  "ms": 3165,
   "note": "url=http://localhost:5173/resume"
  },
  {
   "step": "粘贴简历并提交分析",
-  "ms": 1362,
+  "ms": 1368,
   "note": ""
  },
  {
   "step": "AI 分析响应",
-  "ms": 1350,
-  "note": "outcome=服务器内部错误，请稍后重试"
+  "ms": 831,
+  "note": "outcome=AI 服务暂时不可用，请稍后重试"
  }
 ]
