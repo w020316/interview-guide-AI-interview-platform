@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 管理员角色签发/解析单元测试（v1.31.4）
@@ -48,5 +50,18 @@ class JwtUtilTest {
         jwtUtil.validateSecret();
         String token = jwtUtil.generateToken("3", "root");
         assertEquals("ROLE_USER", jwtUtil.extractRole(token));
+    }
+
+    @Test
+    @DisplayName("isAdminUsername：名单命中为 true，未命中/空白名单/null 为 false")
+    void isAdminUsername_matchesReservedList() {
+        jwtUtil.validateSecret();
+        assertTrue(jwtUtil.isAdminUsername("root"));
+        assertFalse(jwtUtil.isAdminUsername("alice"));
+
+        ReflectionTestUtils.setField(jwtUtil, "adminUsernames", "");
+        jwtUtil.validateSecret();
+        assertFalse(jwtUtil.isAdminUsername("root"));
+        assertFalse(jwtUtil.isAdminUsername(null));
     }
 }

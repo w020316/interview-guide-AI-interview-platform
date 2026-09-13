@@ -76,7 +76,7 @@ public class JwtUtil {
      * @return 签名后的 JWT 字符串
      */
     public String generateToken(String subject, String username) {
-        boolean admin = username != null && adminUsernameSet.contains(username);
+        boolean admin = isAdminUsername(username);
         return Jwts.builder()
                 .subject(subject)
                 .issuer(ISSUER)
@@ -91,6 +91,14 @@ public class JwtUtil {
     /** 从 token 中解析 subject（用户标识） */
     public String extractUserId(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    /**
+     * 判断用户名是否命中管理员保留名单。
+     * 注册入口必须拒绝保留名，防止先注册名单用户名即可在签发时获得 ROLE_ADMIN（越权）。
+     */
+    public boolean isAdminUsername(String username) {
+        return username != null && adminUsernameSet.contains(username);
     }
 
     /** 从 token 中解析角色（ROLE_ADMIN / ROLE_USER；旧 token 无该 claim 时按普通用户处理） */

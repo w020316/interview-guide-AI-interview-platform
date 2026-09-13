@@ -217,6 +217,23 @@ class AuthControllerTest {
                     .andExpect(jsonPath("$.code").value(400))
                     .andExpect(jsonPath("$.message").value("邮箱已被注册"));
         }
+
+        @Test
+        @DisplayName("命中管理员保留名单的用户名返回 400（防抢注 ROLE_ADMIN）")
+        void register_adminReservedUsername_returns400() throws Exception {
+            when(jwtUtil.isAdminUsername("小吴同学")).thenReturn(true);
+
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "username", "小吴同学", "password", "123456"));
+
+            mockMvc.perform(post("/api/auth/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("用户名不可用"));
+            verify(userRepository, never()).saveAndFlush(any(UserEntity.class));
+        }
     }
 
     @Nested

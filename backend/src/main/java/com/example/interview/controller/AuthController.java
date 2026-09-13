@@ -104,6 +104,10 @@ public class AuthController {
         if (!username.matches("^[A-Za-z0-9_\\u4e00-\\u9fa5]+$")) {
             return Result.error(400, "用户名只能包含中文、字母、数字和下划线");
         }
+        // 管理员保留名单不可注册：防止抢注名单用户名在签发 token 时即获得 ROLE_ADMIN
+        if (jwtUtil.isAdminUsername(username)) {
+            return Result.error(400, "用户名不可用");
+        }
         // 密码强度校验（6-64 字符）
         if (password.length() < 6 || password.length() > 64) {
             return Result.error(400, "密码长度需 6-64 字符");

@@ -94,7 +94,8 @@ app:
     secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   # 管理员账号名单（逗号分隔，区分大小写）：命中者签发 ROLE_ADMIN，无限制刷新/保留后续管理接口
-  # 默认空=所有人均为普通用户；生产通过环境变量 APP_ADMIN_USERNAMES 注入
+  # 注意：默认内置"小吴同学"（历史部署兼容）；注册接口会拒绝保留名，防止抢注名单用户名获得管理员权限。
+  # 新部署建议通过环境变量 APP_ADMIN_USERNAMES 显式注入，并确保该账号先于他人注册存在。
   admin-usernames: ${APP_ADMIN_USERNAMES:小吴同学}
   # 种子管理员：启动时若该用户名不存在则自动创建（密码明文仅用于初始化，创建后建议尽快修改）
   # 密码留空则不创建；生产由 SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD 注入
