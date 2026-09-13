@@ -53,6 +53,9 @@ public class SchemaInitializer implements CommandLineRunner {
                     + "evaluation_score INT, "
                     + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
             "CREATE INDEX IF NOT EXISTS idx_favorite_user_id ON favorite_question(user_id)",
+            // P2-20：面试题目表补乐观锁版本列（存量生产库生效；表不存在时失败仅告警，
+            // 新表由实体 @Version 建列）
+            "ALTER TABLE interview_question ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0",
             // P1-06：收藏唯一约束（存量库也生效；若历史数据已有重复行，此 DDL 失败仅告警不阻断启动，
             // 需人工清理重复数据后重启再生效）
             "CREATE UNIQUE INDEX IF NOT EXISTS uk_favorite_question_user_question "

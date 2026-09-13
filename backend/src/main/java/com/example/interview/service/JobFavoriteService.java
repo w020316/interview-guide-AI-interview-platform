@@ -3,9 +3,14 @@ package com.example.interview.service;
 import com.example.interview.entity.JobFavoriteEntity;
 import com.example.interview.entity.JobPostingEntity;
 import com.example.interview.repository.JobFavoriteRepository;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Set;
@@ -22,6 +27,18 @@ public class JobFavoriteService {
 
     @Autowired
     private JobFavoriteRepository jobFavoriteRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    /** P2-19：插入走独立新事务，撞唯一约束可在方法内捕获并幂等返回，不污染外层事务 */
+    private TransactionTemplate insertTemplate;
+
+    @PostConstruct
+    void initInsertTemplate() {
+        insertTemplate = new TransactionTemplate(transactionManager);
+        insertTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
 
     /**
      * 查询用户全部岗位收藏，按收藏时间倒序
@@ -41,6 +58,17 @@ public class JobFavoriteService {
 
     /**
      * 切换收藏：已收藏则取消，未收藏则按岗位快照新增
+     *
+     * @param userId 当前用户 ID
+     * @param job    岗位实体（新增时取快照；null 视为岗位不存在）
+     * @return 切换后是否处于收藏状态
+     */
+    /**
+     * 切换收藏：已收藏则取消，未收藏则按岗位快照新增
+     *
+     * <p>P2-19：并发双击时后到者插入撞唯一约束 uk_job_favorite_user_job，此前被
+     * DataAccessException 处理器转成 500"数据库操作失败"；改为捕获约束冲突后重查，
+     * 按当前实际状态幂等返回。
      *
      * @param userId 当前用户 ID
      * @param job    岗位实体（新增时取快照；null 视为岗位不存在）
@@ -68,7 +96,12 @@ public class JobFavoriteService {
         if (jobFavoriteRepository.findByUserIdAndJobId(userId, job.getId()).isPresent()) {
             return true;
         }
-        jobFavoriteRepository.save(entity);
+        try {
+            insertTemplate.executeWithoutResult(status -> jobFavoriteRepository.saveAndFlush(entity));
+        } catch (DataIntegrityViolationException e) {
+            // 并发窗口另一请求已插入同岗位收藏：重查确认并按幂等语义返回
+            return jobFavoriteRepository.findByUserIdAndJobId(userId, job.getId()).isPresent();
+        }
         return true;
     }
 

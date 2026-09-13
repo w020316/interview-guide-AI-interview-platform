@@ -96,6 +96,15 @@ public class GlobalExceptionHandler {
         return Result.error(504, "AI 服务响应超时，请稍后重试");
     }
 
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Result<Void> handleOptimisticLocking(org.springframework.dao.OptimisticLockingFailureException ex) {
+        // P2-20：并发提交同一资源（如双端同时提交同一题答案）时乐观锁冲突，
+        // 返回 409 让前端提示刷新重试，而非 last-write-wins 静默覆盖先提交的数据
+        log.warn("乐观锁冲突（并发更新被拒绝）：{}", ex.getMessage());
+        return Result.error(409, "内容已被更新，请刷新后重试");
+    }
+
     @ExceptionHandler(org.springframework.dao.DataAccessException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleDataAccess(org.springframework.dao.DataAccessException ex) {

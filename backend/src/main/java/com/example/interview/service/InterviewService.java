@@ -90,6 +90,10 @@ public class InterviewService {
                             SearchRequest.builder()
                                     .query(jobDescription)
                                     .topK(2)
+                                    // P2-14：限定当前用户文档——此前无过滤条件，一旦切回 pgvector，
+                                    // 会把任意用户的简历/知识文档拼入当前用户 prompt 造成跨用户串扰
+                                    .filterExpression(new org.springframework.ai.vectorstore.filter.FilterExpressionBuilder()
+                                            .eq("userId", userId).build())
                                     .build()
                     );
                     if (docs != null && !docs.isEmpty()) {

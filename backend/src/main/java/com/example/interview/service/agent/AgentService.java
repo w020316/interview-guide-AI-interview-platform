@@ -109,7 +109,8 @@ public class AgentService {
      * @param conversationId 会话 ID，null 则新建会话
      * @param message        用户消息（经 PromptSanitizer 消毒）
      */
-    public AgentStreamSession streamChat(String userId, Long conversationId, String message) {
+    public AgentStreamSession streamChat(String userId, Long conversationId, String message,
+                                         java.util.concurrent.atomic.AtomicBoolean cancelled) {
         // 1. 会话归属校验/创建（防 IDOR：会话必须属于当前用户）
         AgentConversationEntity conversation = resolveConversation(userId, conversationId, message);
 
@@ -118,7 +119,7 @@ public class AgentService {
                 : loadHistoryWindow(conversation.getId());
         String systemPrompt = buildSystemPrompt(userId);
 
-        return new AgentStreamSession(conversation, systemPrompt, history, message);
+        return new AgentStreamSession(conversation, systemPrompt, history, message, cancelled);
     }
 
     /**
@@ -148,7 +149,9 @@ public class AgentService {
         List<String> steps = new ArrayList<>();
         try {
             String finalAnswer = null;
-            for (int round = 0; round < MAX_TOOL_ROUNDS && finalAnswer == null; round++) {
+            // P2-15：每轮开始前检查取消标志——客户端断连/超时后不再消耗后续 AI 调用与工具执行
+            for (int round = 0; round < MAX_TOOL_ROUNDS && finalAnswer == null
+                    && !session.cancelled().get(); round++) {
                 String prompt = buildIterationPrompt(safeMessage, tools, steps);
                 String content = callModel(session, prompt, true);
                 Action action = parseAction(content, tools);
@@ -161,7 +164,7 @@ public class AgentService {
                 }
             }
             // 轮次耗尽仍未得到最终回答：强制收尾
-            if (finalAnswer == null) {
+            if (finalAnswer == null && !session.cancelled().get()) {
                 finalAnswer = callModel(session, buildFinalPrompt(safeMessage, steps), false);
             }
             if (finalAnswer == null || finalAnswer.isBlank()) {
@@ -170,8 +173,18 @@ public class AgentService {
 
             // 分块推送，模拟流式体验
             for (String chunk : splitChunks(finalAnswer)) {
+                if (session.cancelled().get()) {
+                    // P2-15：客户端已断连，停止推送；已生成的部分照常落库供历史回看
+                    break;
+                }
                 emitted.append(chunk);
                 onToken.accept(chunk);
+            }
+            if (session.cancelled().get()) {
+                if (!emitted.isEmpty()) {
+                    saveMessages(conversation, session.userMessage(), emitted.toString());
+                }
+                return;
             }
             onComplete.run();
             saveMessages(conversation, session.userMessage(), finalAnswer);
@@ -335,13 +348,9 @@ public class AgentService {
         sseGuard.release(userId);
     }
 
+    /** 心跳调度器（由 Controller 持有 future 并在 emitter 生命周期内取消，P2-15） */
     public ScheduledExecutorService heartbeatExecutor() {
         return heartbeat;
-    }
-
-    /** 取消当前流（Controller 断连时调用）；ReAct 循环本身在 boundedElastic 上原子执行 */
-    public void cancel(AtomicBoolean cancelled) {
-        cancelled.set(true);
     }
 
     // ---------- 会话管理 ----------
@@ -458,6 +467,10 @@ public class AgentService {
             messageRepository.save(AgentMessageEntity.builder()
                     .conversation(conversation).role("ASSISTANT")
                     .content(assistantReply).build());
+            // P2-16：同步 bump 会话 updated_at——此前仅消息落库，会话实体自身不变更，
+            // @UpdateTimestamp 不触发，会话列表按 updated_at 倒序实际等于创建顺序
+            conversation.setUpdatedAt(java.time.LocalDateTime.now());
+            conversationRepository.save(conversation);
         } catch (Exception e) {
             log.warn("智能体对话落库失败（不影响响应）：{}", e.getMessage());
         }
@@ -503,11 +516,12 @@ public class AgentService {
         return clean.length() <= max ? clean : clean.substring(0, max);
     }
 
-    /** 一次流式对话的载体（会话 + 系统提示 + 历史 + 用户消息） */
+    /** 一次流式对话的载体（会话 + 系统提示 + 历史 + 用户消息 + 取消标志） */
     public record AgentStreamSession(AgentConversationEntity conversation,
                                      String systemPrompt,
                                      List<AgentMessageEntity> history,
-                                     String userMessage) {
+                                     String userMessage,
+                                     java.util.concurrent.atomic.AtomicBoolean cancelled) {
     }
 
     /** 模型决策出的工具动作 */

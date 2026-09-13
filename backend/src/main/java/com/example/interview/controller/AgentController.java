@@ -66,6 +66,13 @@ public class AgentController {
         return auth.getPrincipal().toString();
     }
 
+    /** P2-15：取消仍在调度的心跳任务（holder 可能为空——心跳尚未建立时已超时） */
+    private static void cancelHeartbeat(java.util.concurrent.ScheduledFuture<?>[] holder) {
+        if (holder[0] != null) {
+            holder[0].cancel(false);
+        }
+    }
+
     /**
      * 流式对话
      * Body: { "message": "...", "conversationId": 1（可选，不传则新建会话） }
@@ -81,6 +88,10 @@ public class AgentController {
         SseEmitter emitter = new SseEmitter(180_000L);
         AtomicBoolean heartbeatRunning = new AtomicBoolean(false);
         final Disposable[] disposableHolder = new Disposable[1];
+        // P2-15：取消标志 + 心跳 future 句柄——onTimeout/onError 时置位取消标志，
+        // ReAct 循环在每轮开始/分块推送处检查并中止后续 AI 调用；心跳在 emitter 生命周期内清理
+        AtomicBoolean agentCancelled = new AtomicBoolean(false);
+        final java.util.concurrent.ScheduledFuture<?>[] heartbeatHolder = new java.util.concurrent.ScheduledFuture<?>[1];
 
         if (message.isBlank()) {
             try {
@@ -109,6 +120,7 @@ public class AgentController {
         // 也会触发 onCompletion），避免重复 release 导致并发上限逐渐失效
         emitter.onCompletion(() -> {
             heartbeatRunning.set(false);
+            cancelHeartbeat(heartbeatHolder);
             agentService.release(userId);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
@@ -116,6 +128,8 @@ public class AgentController {
         });
         emitter.onTimeout(() -> {
             heartbeatRunning.set(false);
+            agentCancelled.set(true);
+            cancelHeartbeat(heartbeatHolder);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -123,6 +137,8 @@ public class AgentController {
         });
         emitter.onError(e -> {
             heartbeatRunning.set(false);
+            agentCancelled.set(true);
+            cancelHeartbeat(heartbeatHolder);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -133,7 +149,8 @@ public class AgentController {
                 // 会话解析/创建（校验在 executor 线程做，含 DB 操作）
                 AgentService.AgentStreamSession session;
                 try {
-                    session = agentService.streamChat(userId, conversationId, PromptSanitizer.sanitize(message));
+                    session = agentService.streamChat(userId, conversationId,
+                            PromptSanitizer.sanitize(message), agentCancelled);
                 } catch (Exception e) {
                     log.warn("智能体会话解析失败：{}", e.getMessage());
                     emitter.send(SseEmitter.event().name("error").data("会话创建失败，请重试"));
@@ -151,7 +168,7 @@ public class AgentController {
                 emitter.send(SseEmitter.event().name("start").data(""));
                 heartbeatRunning.set(true);
 
-                // 心跳保活（15s），防代理超时
+                // 心跳保活（15s），防代理超时；future 存入 holder 供 onTimeout/onError 清理（P2-15）
                 var heartbeatFuture = agentService.heartbeatExecutor().scheduleAtFixedRate(() -> {
                     if (!heartbeatRunning.get()) return;
                     try {
@@ -160,6 +177,7 @@ public class AgentController {
                         heartbeatRunning.set(false);
                     }
                 }, 15, 15, TimeUnit.SECONDS);
+                heartbeatHolder[0] = heartbeatFuture;
 
                 disposableHolder[0] = agentService.runStream(
                         session,

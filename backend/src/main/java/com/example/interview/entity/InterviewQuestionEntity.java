@@ -24,6 +24,15 @@ public class InterviewQuestionEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * 乐观锁版本（P2-20）：同一题双端/重试并发提交答案时防 last-write-wins 静默覆盖，
+     * 冲突以 OptimisticLockingFailureException 暴露（GlobalExceptionHandler 映射 409）。
+     * 生产列由 SchemaInitializer 的 ALTER TABLE ... ADD COLUMN IF NOT EXISTS 迁移补齐。
+     */
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     /** 所属会话 ID */
     @Column(name = "session_id", nullable = false, length = 64)
     private String sessionId;

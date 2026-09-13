@@ -94,6 +94,9 @@ public class JobClassifyService {
         if (!arr.isArray()) {
             throw new IllegalStateException("AI 分类返回非 JSON 数组");
         }
+        // P2-13：按 AI 返回的 index 归位到定长槽位数组——此前按数组出现顺序与岗位按位配对，
+        // 模型乱序/跳号返回时分类会错配到其他岗位
+        Classification[] slots = new Classification[batch.size()];
         for (JsonNode node : arr) {
             int idx = node.path("index").asInt(1) - 1;
             String industry = node.path("industry").asText(null);
@@ -106,15 +109,15 @@ public class JobClassifyService {
                 }
             }
             if (idx >= 0 && idx < batch.size()) {
-                list.add(new Classification(
+                slots[idx] = new Classification(
                         normalize(industry, INDUSTRIES),
                         normalize(jobType, JOB_TYPES),
-                        tags.length() == 0 ? null : tags.toString()));
+                        tags.length() == 0 ? null : tags.toString());
             }
         }
-        // 条数不足时对缺失部分走规则兜底
-        while (list.size() < batch.size()) {
-            list.add(classifyByRule(batch.get(list.size())));
+        // 缺失槽位走规则兜底
+        for (int i = 0; i < batch.size(); i++) {
+            list.add(slots[i] != null ? slots[i] : classifyByRule(batch.get(i)));
         }
         return list;
     }

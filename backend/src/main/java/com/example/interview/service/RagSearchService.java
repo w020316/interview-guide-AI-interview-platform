@@ -241,12 +241,16 @@ public class RagSearchService {
             int dedupChecks = 0;
             for (String text : documents) {
                 if (text == null || text.isBlank()) continue;
-                // 去重预检：搜索该用户已有文档中是否存在高度相似的（每批最多 50 次，超出直接导入）
-                if (dedupChecks < DEDUP_CHECK_LIMIT && isDuplicate(text, userId, b)) {
-                    skipped++;
-                    continue;
+                // 去重预检：搜索该用户已有文档中是否存在高度相似的（每批最多 50 次，超出直接导入）。
+                // P2-12：计数移入条件内——重复路径也消耗一次 embedding 调用，必须占用检查配额，
+                // 否则重复率高的批次完全失去限流保护
+                if (dedupChecks < DEDUP_CHECK_LIMIT) {
+                    dedupChecks++;
+                    if (isDuplicate(text, userId, b)) {
+                        skipped++;
+                        continue;
+                    }
                 }
-                dedupChecks++;
                 docs.add(Document.builder()
                         .text(text)
                         .metadata(Map.of("type", "knowledge", META_USER_ID, userId))

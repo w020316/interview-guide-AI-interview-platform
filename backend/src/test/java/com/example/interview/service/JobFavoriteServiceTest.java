@@ -26,7 +26,17 @@ import static org.mockito.Mockito.when;
 class JobFavoriteServiceTest {
 
     @Mock private JobFavoriteRepository repository;
+    @Mock private org.springframework.transaction.PlatformTransactionManager transactionManager;
     @InjectMocks private JobFavoriteService service;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        // 单元测试不经过 Spring 生命周期，手动初始化插入事务模板（P2-19）
+        service.initInsertTemplate();
+        org.mockito.Mockito.lenient()
+                .when(transactionManager.getTransaction(any()))
+                .thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
+    }
 
     private JobPostingEntity job() {
         return JobPostingEntity.builder()
@@ -59,17 +69,17 @@ class JobFavoriteServiceTest {
     }
 
     @Test
-    @DisplayName("toggle: 未收藏时新增并返回 true（快照字段完整）")
+    @DisplayName("toggle: 未收藏时新增并返回 true（快照字段完整，经独立事务 saveAndFlush）")
     void toggle_new_shouldSave() {
         when(repository.findByUserIdAndJobId("u1", 100L))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.empty());
-        when(repository.save(any(JobFavoriteEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any(JobFavoriteEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         boolean favorited = service.toggle("u1", job());
 
         assertThat(favorited).isTrue();
-        verify(repository).save(any(JobFavoriteEntity.class));
+        verify(repository).saveAndFlush(any(JobFavoriteEntity.class));
     }
 
     @Test
@@ -82,7 +92,7 @@ class JobFavoriteServiceTest {
 
         assertThat(favorited).isFalse();
         verify(repository).delete(own);
-        verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -95,7 +105,22 @@ class JobFavoriteServiceTest {
         boolean favorited = service.toggle("u1", job());
 
         assertThat(favorited).isTrue();
-        verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("toggle: 并发双击撞唯一约束时重查并幂等返回 true（P2-19，不再 500）")
+    void toggle_constraintViolation_idempotentTrue() {
+        when(repository.findByUserIdAndJobId("u1", 100L))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(fav()));
+        when(repository.saveAndFlush(any(JobFavoriteEntity.class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uk_job_favorite_user_job"));
+
+        boolean favorited = service.toggle("u1", job());
+
+        assertThat(favorited).isTrue();
     }
 
     @Test
