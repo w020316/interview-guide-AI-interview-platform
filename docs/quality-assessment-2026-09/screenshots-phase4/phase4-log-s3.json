@@ -1,0 +1,27 @@
+[
+ {
+  "step": "登录",
+  "ms": 3704,
+  "note": "url=http://localhost:5173/"
+ },
+ {
+  "step": "提交知识导入",
+  "ms": 1516,
+  "note": ""
+ },
+ {
+  "step": "导入响应",
+  "ms": 835,
+  "note": "outcome=导入失败"
+ },
+ {
+  "step": "提交 RAG 问答",
+  "ms": 589,
+  "note": ""
+ },
+ {
+  "step": "RAG 问答响应（降级）",
+  "ms": 5,
+  "note": "outcome=导入失败"
+ }
+]
