@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api'
 
@@ -161,12 +161,19 @@ function getErr(e: unknown, fallback: string): string {
   return msg && msg !== 'Request failed with status code 500' ? msg : fallback
 }
 
+// P2-21：定时器句柄——组件卸载时清理，此前离开页面仍每 30s 请求，
+// 登出后触发 401 → 全页跳转
+let overviewTimer: ReturnType<typeof setInterval> | undefined
+onUnmounted(() => {
+  if (overviewTimer) clearInterval(overviewTimer)
+})
+
 onMounted(() => {
   fetchOverview()
   fetchJobs()
   fetchUsers()
   fetchMetrics()
-  setInterval(() => { if (activeTab.value === 'overview') fetchOverview() }, 30000)
+  overviewTimer = setInterval(() => { if (activeTab.value === 'overview') fetchOverview() }, 30000)
 })
 </script>
 
@@ -308,38 +315,38 @@ onMounted(() => {
 .admin-header h1 { margin: 0 0 4px; font-size: 22px; }
 .admin-sub { margin: 0 0 16px; color: #888; font-size: 13px; }
 .admin-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-.tab-btn { padding: 8px 18px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; }
-.tab-btn.active { background: #2f6fed; color: #fff; border-color: #2f6fed; }
-.panel { background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 20px; }
+.tab-btn { padding: 8px 18px; border: 1px solid var(--c-border); border-radius: 8px; background: var(--c-surface); cursor: pointer; font-size: 14px; }
+.tab-btn.active { background: var(--brand-primary); color: #fff; border-color: var(--brand-primary); }
+.panel { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 12px; padding: 20px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.stat-card { background: #f6f8fb; border-radius: 10px; padding: 16px; text-align: center; }
-.stat-value { font-size: 26px; font-weight: 700; color: #2f6fed; }
+.stat-card { background: var(--c-bg-alt); border-radius: 10px; padding: 16px; text-align: center; }
+.stat-value { font-size: 26px; font-weight: 700; color: var(--brand-primary); }
 .stat-label { margin-top: 4px; color: #777; font-size: 13px; }
 .overview-meta { display: flex; gap: 16px; color: #777; font-size: 13px; margin-bottom: 12px; align-items: center; }
 .badge-warn { color: #d97706; font-weight: 600; }
 .badge-ok { color: #16a34a; font-weight: 600; }
 .badge-off { color: #dc2626; font-weight: 600; }
 .refresh-box { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
-.primary-btn { padding: 9px 20px; background: #2f6fed; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.primary-btn { padding: 9px 20px; background: var(--brand-primary); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
 .primary-btn:disabled { opacity: .5; cursor: not-allowed; }
 .refresh-result { color: #16a34a; font-size: 13px; }
 .toolbar { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
-.search-input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
-.ghost-btn { padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; }
+.search-input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--c-border); border-radius: 8px; font-size: 14px; }
+.ghost-btn { padding: 8px 16px; border: 1px solid var(--c-border); border-radius: 8px; background: var(--c-surface); cursor: pointer; font-size: 14px; }
 .ghost-btn:disabled { opacity: .5; cursor: not-allowed; }
 .tip { color: #999; font-size: 12px; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table th, .data-table td { padding: 9px 10px; border-bottom: 1px solid #f0f0f0; text-align: left; }
-.data-table th { background: #fafbfc; color: #666; font-weight: 600; }
+.data-table th { background: var(--c-bg-soft); color: var(--c-text-secondary); font-weight: 600; }
 .ellipsis { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ops { display: flex; gap: 6px; }
-.mini-btn { padding: 4px 10px; font-size: 12px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; }
+.mini-btn { padding: 4px 10px; font-size: 12px; border: 1px solid var(--c-border); border-radius: 6px; background: var(--c-surface); cursor: pointer; }
 .mini-btn.danger { color: #dc2626; border-color: #fca5a5; }
 .empty-cell { text-align: center; color: #999; padding: 24px; }
-.pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; font-size: 13px; color: #666; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; font-size: 13px; color: var(--c-text-secondary); }
 .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 16px; }
-.metric-block { background: #f6f8fb; border-radius: 10px; padding: 14px 16px; }
+.metric-block { background: var(--c-bg-alt); border-radius: 10px; padding: 14px 16px; }
 .metric-block h3 { margin: 0 0 10px; font-size: 14px; color: #444; }
 .metric-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; color: #555; }
-.metric-row b { color: #2f6fed; }
+.metric-row b { color: var(--brand-primary); }
 </style>

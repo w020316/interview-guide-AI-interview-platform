@@ -25,12 +25,12 @@ function parseJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-/** 校验 token 是否已过期。无 exp 字段视为永久有效；过期返回 true */
+/** 校验 token 是否已过期。P2-23：无 exp 字段视为无效（不再永久有效），过期返回 true */
 function isTokenExpired(token: string): boolean {
   const payload = parseJwtPayload(token)
   if (!payload) return true
   const exp = payload.exp
-  if (typeof exp !== 'number') return false // 无 exp 字段，不判定过期
+  if (typeof exp !== 'number') return true // 无 exp 字段视为无效，避免伪造 token 永久可用
   return Date.now() / 1000 >= exp
 }
 

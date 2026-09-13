@@ -885,6 +885,9 @@ async function streamHint() {
         const wakeTimer = setTimeout(() => wake.abort(), 100000)
         await fetch(`${apiBaseUrl}/api/info`, { signal: wake.signal })
         clearTimeout(wakeTimer)
+        // P2-22：递归前先清除外层 60s 兜底定时器——唤醒最多耗时 100s 计入外层超时后，
+        // 定时器触发 abort 的是递归内新建的 controller，重试流会被静默掐断
+        clearTimeout(timeoutId)
         await streamHint()
         return
       } catch {

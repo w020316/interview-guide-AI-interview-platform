@@ -538,7 +538,7 @@ onMounted(() => {
 }
 
 .page-header p {
-  color: var(--text-secondary, #888);
+  color: var(--c-text-secondary);
   margin-bottom: 24px;
 }
 
@@ -551,18 +551,18 @@ onMounted(() => {
 
 .tab-switch button {
   padding: 8px 18px;
-  border: 1px solid var(--border-color, #e5e5e5);
+  border: 1px solid var(--c-border);
   border-radius: 999px;
   background: transparent;
   cursor: pointer;
   font-size: 14px;
-  color: var(--text-primary, #333);
+  color: var(--c-text);
   transition: all 0.2s;
 }
 
 .tab-switch button.active {
-  background: var(--primary-color, #4f46e5);
-  border-color: var(--primary-color, #4f46e5);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
   color: #fff;
 }
 
@@ -619,10 +619,10 @@ onMounted(() => {
   justify-content: center;
   width: 30px;
   height: 30px;
-  border: 1px solid var(--border-color, #e5e5e5);
+  border: 1px solid var(--c-border);
   border-radius: 999px;
   background: transparent;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -638,8 +638,8 @@ onMounted(() => {
 }
 
 .filter-card {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #eee);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
   border-radius: 14px;
   padding: 16px;
   margin-bottom: 20px;
@@ -659,16 +659,16 @@ onMounted(() => {
   flex: 1;
   min-width: 130px;
   padding: 9px 12px;
-  border: 1px solid var(--border-color, #e5e5e5);
+  border: 1px solid var(--c-border);
   border-radius: 10px;
   background: var(--input-bg, #fafafa);
-  color: var(--text-primary, #333);
+  color: var(--c-text);
   font-size: 14px;
   outline: none;
 }
 
 .filter-input:focus {
-  border-color: var(--primary-color, #4f46e5);
+  border-color: var(--brand-primary);
 }
 
 .filter-input.search {
@@ -681,23 +681,23 @@ onMounted(() => {
 
 .update-hint {
   font-size: 12px;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
 }
 
 .refresh-btn {
   padding: 8px 14px;
-  border: 1px solid var(--border-color, #e5e5e5);
+  border: 1px solid var(--c-border);
   border-radius: 10px;
   background: transparent;
-  color: var(--text-primary, #333);
+  color: var(--c-text);
   cursor: pointer;
   font-size: 13px;
   white-space: nowrap;
 }
 
 .refresh-btn:hover:not(:disabled) {
-  border-color: var(--primary-color, #4f46e5);
-  color: var(--primary-color, #4f46e5);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .job-list {
@@ -710,8 +710,8 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #eee);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
   border-radius: 14px;
   padding: 18px 20px;
   cursor: pointer;
@@ -738,7 +738,7 @@ onMounted(() => {
 .job-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-primary, #222);
+  color: var(--c-text);
 }
 
 .job-salary {
@@ -774,7 +774,7 @@ onMounted(() => {
   padding: 2px 10px;
   border-radius: 999px;
   font-size: 12px;
-  background: var(--tag-bg, #f1f0fb);
+  background: var(--brand-primary-50);
   color: var(--tag-text, #4f46e5);
 }
 
@@ -793,7 +793,7 @@ onMounted(() => {
 
 .deadline {
   font-size: 12px;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
   white-space: nowrap;
 }
 
@@ -810,8 +810,8 @@ onMounted(() => {
 .apply-btn {
   padding: 7px 16px;
   border-radius: 10px;
-  border: 1px solid var(--primary-color, #4f46e5);
-  color: var(--primary-color, #4f46e5);
+  border: 1px solid var(--brand-primary);
+  color: var(--brand-primary);
   font-size: 13px;
   text-decoration: none;
   white-space: nowrap;
@@ -819,27 +819,27 @@ onMounted(() => {
 }
 
 .apply-btn:hover {
-  background: var(--primary-color, #4f46e5);
+  background: var(--brand-primary);
   color: #fff;
 }
 
 .apply-btn.primary {
-  background: var(--primary-color, #4f46e5);
+  background: var(--brand-primary);
   color: #fff;
 }
 
 .loading-state {
   text-align: center;
   padding: 60px 0;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
 }
 
 .loading-spinner {
   width: 36px;
   height: 36px;
   margin: 0 auto 12px;
-  border: 3px solid var(--border-color, #eee);
-  border-top-color: var(--primary-color, #4f46e5);
+  border: 3px solid var(--c-border);
+  border-top-color: var(--brand-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -853,7 +853,7 @@ onMounted(() => {
 .empty-state {
   text-align: center;
   padding: 60px 0;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
 }
 
 .empty-icon {
@@ -871,10 +871,10 @@ onMounted(() => {
 
 .pagination button {
   padding: 8px 18px;
-  border: 1px solid var(--border-color, #e5e5e5);
+  border: 1px solid var(--c-border);
   border-radius: 10px;
   background: transparent;
-  color: var(--text-primary, #333);
+  color: var(--c-text);
   cursor: pointer;
 }
 
@@ -885,7 +885,7 @@ onMounted(() => {
 
 .page-info {
   font-size: 13px;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
 }
 
 .modal-mask {
@@ -901,7 +901,7 @@ onMounted(() => {
 
 .modal-card {
   position: relative;
-  background: var(--card-bg, #fff);
+  background: var(--c-surface);
   border-radius: 16px;
   max-width: 640px;
   width: 100%;
@@ -918,7 +918,7 @@ onMounted(() => {
   border: none;
   background: none;
   cursor: pointer;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
 }
 
 .detail-title {
@@ -949,7 +949,7 @@ onMounted(() => {
 .detail-block h4 {
   font-size: 15px;
   margin-bottom: 8px;
-  color: var(--text-primary, #333);
+  color: var(--c-text);
 }
 
 .pre-wrap {
@@ -970,7 +970,7 @@ onMounted(() => {
 
 .detail-source {
   font-size: 12px;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
 }
 
 .fade-in-up {

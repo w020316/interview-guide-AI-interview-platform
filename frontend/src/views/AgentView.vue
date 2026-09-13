@@ -387,7 +387,7 @@ onMounted(() => {
 }
 
 .page-header p {
-  color: var(--text-secondary, #888);
+  color: var(--c-text-secondary);
   margin-bottom: 24px;
 }
 
@@ -423,34 +423,34 @@ onMounted(() => {
   justify-content: space-between;
   gap: 6px;
   padding: 10px 12px;
-  border: 1px solid var(--border-color, #eee);
+  border: 1px solid var(--c-border);
   border-radius: 10px;
   cursor: pointer;
   font-size: 13px;
-  background: var(--card-bg, #fff);
+  background: var(--c-surface);
   transition: border-color 0.2s;
 }
 
 .conv-item:hover {
-  border-color: var(--primary-color, #4f46e5);
+  border-color: var(--brand-primary);
 }
 
 .conv-item.active {
-  border-color: var(--primary-color, #4f46e5);
-  background: var(--tag-bg, #f1f0fb);
+  border-color: var(--brand-primary);
+  background: var(--brand-primary-50);
 }
 
 .conv-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text-primary, #333);
+  color: var(--c-text);
 }
 
 .conv-del {
   border: none;
   background: none;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
   cursor: pointer;
   font-size: 16px;
   flex-shrink: 0;
@@ -462,7 +462,7 @@ onMounted(() => {
 
 .conv-empty {
   text-align: center;
-  color: var(--text-secondary, #999);
+  color: var(--c-text-secondary);
   font-size: 13px;
   padding: 20px 0;
 }
@@ -471,9 +471,9 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border-color, #eee);
+  border: 1px solid var(--c-border);
   border-radius: 14px;
-  background: var(--card-bg, #fff);
+  background: var(--c-surface);
   overflow: hidden;
 }
 
@@ -498,11 +498,11 @@ onMounted(() => {
 .welcome h3 {
   font-size: 18px;
   margin-bottom: 8px;
-  color: var(--text-primary, #222);
+  color: var(--c-text);
 }
 
 .welcome p {
-  color: var(--text-secondary, #888);
+  color: var(--c-text-secondary);
   font-size: 14px;
   margin-bottom: 24px;
 }
@@ -517,10 +517,10 @@ onMounted(() => {
 
 .suggest-btn {
   padding: 10px 14px;
-  border: 1px solid var(--border-color, #e5e5e5);
+  border: 1px solid var(--c-border);
   border-radius: 10px;
   background: var(--input-bg, #fafafa);
-  color: var(--text-primary, #333);
+  color: var(--c-text);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
@@ -528,8 +528,8 @@ onMounted(() => {
 }
 
 .suggest-btn:hover {
-  border-color: var(--primary-color, #4f46e5);
-  color: var(--primary-color, #4f46e5);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .msg-row {
@@ -547,8 +547,8 @@ onMounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--tag-bg, #f1f0fb);
-  color: var(--primary-color, #4f46e5);
+  background: var(--brand-primary-50);
+  color: var(--brand-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -558,7 +558,7 @@ onMounted(() => {
 }
 
 .msg-row.user .msg-avatar {
-  background: var(--primary-color, #4f46e5);
+  background: var(--brand-primary);
   color: #fff;
 }
 
@@ -569,19 +569,19 @@ onMounted(() => {
   font-size: 14px;
   line-height: 1.7;
   background: var(--input-bg, #f5f5f5);
-  color: var(--text-primary, #222);
+  color: var(--c-text);
   overflow-wrap: break-word;
 }
 
 .msg-row.user .msg-bubble {
-  background: var(--primary-color, #4f46e5);
+  background: var(--brand-primary);
   color: #fff;
 }
 
 .msg-bubble.streaming::after {
   content: '▍';
   animation: blink 1s infinite;
-  color: var(--primary-color, #4f46e5);
+  color: var(--brand-primary);
 }
 
 @keyframes blink {
@@ -601,7 +601,7 @@ onMounted(() => {
 }
 
 .md-content :deep(a) {
-  color: var(--primary-color, #4f46e5);
+  color: var(--brand-primary);
 }
 
 .md-content :deep(code) {
@@ -640,31 +640,31 @@ onMounted(() => {
   display: flex;
   gap: 10px;
   padding: 14px 16px;
-  border-top: 1px solid var(--border-color, #eee);
+  border-top: 1px solid var(--c-border);
   align-items: flex-end;
 }
 
 .chat-input {
   flex: 1;
   resize: none;
-  border: 1px solid var(--border-color, #e5e5e5);
+  border: 1px solid var(--c-border);
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
   font-family: inherit;
   background: var(--input-bg, #fafafa);
-  color: var(--text-primary, #333);
+  color: var(--c-text);
   outline: none;
 }
 
 .chat-input:focus {
-  border-color: var(--primary-color, #4f46e5);
+  border-color: var(--brand-primary);
 }
 
 .input-hint {
   text-align: center;
   font-size: 12px;
-  color: var(--text-secondary, #aaa);
+  color: var(--c-text-secondary);
   padding: 0 0 10px;
 }
 

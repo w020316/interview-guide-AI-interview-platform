@@ -38,9 +38,9 @@ describe('auth', () => {
   })
 
   describe('isTokenExpired', () => {
-    it('无 exp 字段视为永久有效，返回 false', () => {
+    it('P2-23：无 exp 字段视为无效，返回 true（不再永久有效）', () => {
       const token = makeMockJwt({ sub: '1' })
-      expect(isTokenExpired(token)).toBe(false)
+      expect(isTokenExpired(token)).toBe(true)
     })
 
     it('exp 已过期返回 true', () => {
