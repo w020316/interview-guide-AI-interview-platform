@@ -22,8 +22,8 @@ const api = axios.create({
   timeout: 60000,
 })
 
-// AI 相关接口需要更长超时（冷启动 + AI 推理 30-60s）
-export const AI_TIMEOUT = 120000
+// AI 相关接口需要更长超时（冷启动 + AI 推理；UI 宣称出题通常需要 2-3 分钟）
+export const AI_TIMEOUT = 180000
 
 /**
  * 认证接口超时：Render 免费层冷启动可能需要 30-60s，给 90s 兜底
@@ -149,21 +149,22 @@ api.interceptors.response.use(
     if (contentType.includes('text/html') || (typeof respData === 'string' && respData.includes('<html'))) {
       error.message = '后端服务未响应，Render 免费层可能正在冷启动，请等待 30-60s 后重试'
     }
-    // 冷启动自动重试：网络层失败（无 HTTP 响应）时，先唤醒后端再重放一次原请求
-    // Render 免费层休眠后首次请求会在唤醒完成前被判定为网络错误，重试可避免直接失败
-    if (!error.response && (error.message === 'Network Error' || error.code === 'ECONNABORTED')) {
+    // 冷启动自动重试：仅「网络层失败且请求未到达服务端」的普通请求时，先唤醒后端再重放一次。
+    // P1-11：ECONNABORTED（本地超时）不再重放——AI 接口超过本地超时说明服务端可能仍在推理，
+    // 静默重放会让后端同时跑两份生成（额度翻倍）且用户无感知等待翻倍；
+    // AI 接口对 Network Error 也不重放——连接中断无法区分「请求未达」与「服务端已受理后断连」，
+    // 重放同样存在双份生成风险。超时/断连场景均给出明确提示，由用户决定是否重试。
+    if (!error.response && error.message === 'Network Error') {
       const cfg = error.config as (InternalAxiosRequestConfig & { __retried?: boolean }) | undefined
       const url = cfg?.url || ''
-      // 排除：无法重试、已重试过、唤醒自身、登录/注册（登录页已有冷启动唤醒+重试逻辑）
-      if (cfg && !cfg.__retried && !url.includes('/api/info') && !isAuthRequest(url)) {
+      // 排除：无法重试、已重试过、唤醒自身、登录/注册（登录页已有冷启动唤醒+重试逻辑）、AI 接口（防双份生成）
+      if (cfg && !cfg.__retried && !url.includes('/api/info') && !isAuthRequest(url) && !isAiRequest(url)) {
         cfg.__retried = true
         return wakeBackend()
           .then(() => api.request(cfg))
           .catch(() => {
             // 唤醒失败：将网络错误映射为友好提示后再 reject，避免暴露原始 Network Error
-            const friendly = error.message === 'Network Error'
-              ? '网络连接失败，请检查网络后重试（后端服务可能正在冷启动）'
-              : (error.message || '请求失败')
+            const friendly = '网络连接失败，请检查网络后重试（后端服务可能正在冷启动）'
             return Promise.reject(new Error(friendly))
           })
       }

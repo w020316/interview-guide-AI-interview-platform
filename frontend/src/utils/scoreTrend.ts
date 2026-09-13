@@ -67,7 +67,9 @@ export function computeTrendStats(pointsInput: TrendPoint[] | null | undefined):
   const average = Math.round((sum / count) * 10) / 10
   const max = list[count - 1]
   const min = list[0]
-  const latest = list[count - 1]
+  // v1.33.0（P1-10）：latest 必须取时序末位（最近一次得分），而非排序后数组末位（=最高分）。
+  // 此前与 delta 的时序口径自相矛盾，ProgressView「最新一次」统计卡显示错误。
+  const latest = scores[scores.length - 1]
 
   let delta = 0
   if (count >= 2 && scores.length >= 2) {

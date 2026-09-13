@@ -165,6 +165,27 @@ describe('api/index 响应拦截器（rejected）', () => {
     await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('网络连接失败') })
   })
 
+  it('普通接口 Network Error 触发冷启动重放（P1-11）', async () => {
+    const cfg: any = { url: '/api/favorites/list', __retried: undefined }
+    const err: any = { config: cfg, message: 'Network Error' }
+    await expect(resRejected(err)).rejects.toBeTruthy()
+    expect(cfg.__retried).toBe(true)
+  })
+
+  it('AI 接口 Network Error 不重放，防双份生成（P1-11）', async () => {
+    const cfg: any = { url: '/api/interview/questions', __retried: undefined }
+    const err: any = { config: cfg, message: 'Network Error' }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('网络连接失败') })
+    expect(cfg.__retried).toBeUndefined()
+  })
+
+  it('AI 接口本地超时（ECONNABORTED）不重放，防双份生成（P1-11）', async () => {
+    const cfg: any = { url: '/api/interview/questions', __retried: undefined }
+    const err: any = { code: 'ECONNABORTED', config: cfg, message: '' }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('AI 服务响应超时') })
+    expect(cfg.__retried).toBeUndefined()
+  })
+
   it('普通错误保持原样 reject', async () => {
     const err = new Error('业务错误')
     await expect(resRejected(err)).rejects.toThrow('业务错误')

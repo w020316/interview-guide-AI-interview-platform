@@ -40,6 +40,15 @@ describe('computeTrendStats', () => {
     expect(computeTrendStats([pt(70, 1), pt(85, 2)]).delta).toBe(15)
     expect(computeTrendStats([pt(85, 1), pt(70, 2)]).delta).toBe(-15)
   })
+
+  it('P1-10：latest 取时序末位而非最高分（降序数据用例）', () => {
+    const s = computeTrendStats([pt(90, 1), pt(80, 2), pt(70, 3)])
+    expect(s.latest).toBe(70)
+    expect(s.max).toBe(90)
+    const s2 = computeTrendStats([pt(60, 1), pt(95, 2), pt(75, 3)])
+    expect(s2.latest).toBe(75)
+    expect(s2.max).toBe(95)
+  })
 })
 
 describe('buildLineChart', () => {
