@@ -95,7 +95,14 @@ public class KnowledgeController {
         }
         // P1-04：经统一入库入口，受 maxDocuments 容量计数保护（此前直接 add 绕过保护，
         // 生产内存向量库会被批量导入撑爆）
-        int stored = ragSearchService.addToVectorStore(docs);
+        // U1：向量化依赖 embedding 服务，不可用时以 503 业务语义返回明确文案（替代 500）
+        int stored;
+        try {
+            stored = ragSearchService.addToVectorStore(docs);
+        } catch (Exception e) {
+            throw new com.example.interview.common.BusinessException(
+                    "AI 服务暂时不可用，知识导入失败，请稍后重试");
+        }
         return Result.success(Map.of("imported", stored, "category", category));
     }
 

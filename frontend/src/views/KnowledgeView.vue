@@ -329,11 +329,13 @@ async function importKnowledge() {
     ElMessage.success('导入成功')
     importText.value = ''
   } catch (e: unknown) {
+    const msg = getErrMessage(e, '导入失败')
     importResult.value = {
       success: false,
-      message: getErrMessage(e, '导入失败'),
+      message: msg,
     }
-    ElMessage.error('导入失败')
+    // U4：toast 与内联提示统一文案，不再出现"导入失败/服务器内部错误"两种说法
+    ElMessage.error(msg)
   } finally {
     importing.value = false
   }
