@@ -1,8 +1,18 @@
 package com.example.interview;
 
+import com.example.interview.entity.ResumeEntity;
+import com.example.interview.repository.ResumeRepository;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Spring 上下文启动冒烟测试（v1.31.4）
@@ -13,13 +23,39 @@ import org.springframework.test.context.ActiveProfiles;
  *
  * <p>本测试使用 local profile（H2 内存库 + SimpleVectorStore + Redis 容错，零外部依赖），
  * 加载完整上下文并断言可正常启动，固化所有 @Component/@Service/@Configuration 的装配正确性。
+ *
+ * <p>v1.33.0（P1-05）：新增 resume 表读写断言。此前 ResumeEntity 的
+ * columnDefinition="JSONB" 在 H2 上 DDL 静默失败（仅 WARN），resume 表不会被创建，
+ * 而本冒烟测试仅断言上下文启动、未触碰 resume 仓库，形成假信心；
+ * 该断言确保 JSON 列映射在 H2 与 PostgreSQL 两种方言下均可建表并读写。
  */
 @SpringBootTest
 @ActiveProfiles("local")
 class ApplicationContextSmokeTest {
 
+    @Autowired
+    private ResumeRepository resumeRepository;
+
     @Test
     void contextLoads() {
         // 仅需 Spring 上下文成功装配并启动即可，无需断言具体行为
+    }
+
+    @Test
+    @DisplayName("resume 表在 H2 上可建表并完成 JSON 列读写（P1-05 回归防线）")
+    void resumeRepositoryReadWriteOnH2() {
+        ResumeEntity entity = ResumeEntity.builder()
+                .userId("smoke-user")
+                .content("Java 后端，8 年经验")
+                .targetJob("Java 高级工程师")
+                .analysisResult("{\"scores\":{\"tech\":80}}")
+                .build();
+        ResumeEntity saved = resumeRepository.saveAndFlush(entity);
+        assertNotNull(saved.getId(), "resume 表应已创建并成功写入");
+
+        ResumeEntity loaded = resumeRepository.findById(saved.getId()).orElseThrow();
+        assertEquals("smoke-user", loaded.getUserId());
+        assertTrue(loaded.getAnalysisResult().contains("\"tech\":80"),
+                "JSON 列应可原样读回（H2 json 列映射）");
     }
 }
