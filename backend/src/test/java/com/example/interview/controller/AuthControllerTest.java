@@ -32,7 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 排除 Spring Security 自动配置（AuthController 本就是 permitAll 端点）。
  */
 @WebMvcTest(controllers = AuthController.class,
-        properties = "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration,org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration")
+        properties = {"spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration,org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration",
+                "app.auth.register-limit-per-hour=1000"})
 class AuthControllerTest {
 
     @Autowired

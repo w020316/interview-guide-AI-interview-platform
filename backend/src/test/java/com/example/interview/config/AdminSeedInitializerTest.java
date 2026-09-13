@@ -18,7 +18,7 @@ import static org.mockito.Mockito.when;
 /**
  * 种子管理员初始化单元测试（v1.31.4）
  * - 未配置密码：不创建
- * - 账号已存在：跳过
+ * - 账号已存在：默认跳过（P2-02），显式 RESET 标志时重置
  * - 不存在：创建（BCrypt 加密）
  */
 class AdminSeedInitializerTest {
@@ -41,15 +41,30 @@ class AdminSeedInitializerTest {
     }
 
     @Test
-    @DisplayName("账号已存在则重置密码为配置值（v1.31.5）")
-    void existingUser_resetsPassword() {
+    @DisplayName("P2-02：账号已存在且未开 RESET 标志时跳过，管理员改过的密码不被还原")
+    void existingUser_defaultSkipsReset() {
+        UserEntity existing = UserEntity.builder()
+                .username("小吴同学")
+                .passwordHash(encoder.encode("user-changed-password"))
+                .build();
+        when(userRepository.existsByUsername("小吴同学")).thenReturn(true);
+        newInitializer("小吴同学", "xwtx").run(null);
+        verify(userRepository, never()).saveAndFlush(any());
+        assertTrue(encoder.matches("user-changed-password", existing.getPasswordHash()));
+    }
+
+    @Test
+    @DisplayName("P2-02：账号已存在且 RESET 标志开启时重置密码为配置值")
+    void existingUser_resetsPasswordWhenFlagOn() {
         UserEntity existing = UserEntity.builder()
                 .username("小吴同学")
                 .passwordHash(encoder.encode("old-password"))
                 .build();
         when(userRepository.existsByUsername("小吴同学")).thenReturn(true);
         when(userRepository.findByUsername("小吴同学")).thenReturn(java.util.Optional.of(existing));
-        newInitializer("小吴同学", "xwtx").run(null);
+        AdminSeedInitializer init = newInitializer("小吴同学", "xwtx");
+        ReflectionTestUtils.setField(init, "resetExisting", true);
+        init.run(null);
         assertTrue(encoder.matches("xwtx", existing.getPasswordHash()));
     }
 

@@ -101,6 +101,14 @@ app:
     service-key: ${SUPABASE_SERVICE_KEY}
     bucket: resumes
 
+# P2-01：生产禁用 Swagger/OpenAPI，避免接口结构被侦察
+# （SecurityConfig 对 swagger 路径的放行保留，但端点关闭后返回 404）
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 logging:
   level:
     com.example.interview: WARN

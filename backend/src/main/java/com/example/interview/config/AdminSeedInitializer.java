@@ -14,13 +14,12 @@ import org.springframework.stereotype.Component;
  * 种子管理员初始化（v1.31.4）
  *
  * <p>启动时读取配置 {@code app.seed-admin.username/password}：若该用户名尚不存在则自动创建账号
- * （BCrypt 加密，幂等——已存在则跳过），使配置的管理员账号开箱即用（如"小吴同学"）。
+ * （BCrypt 加密），使配置的管理员账号开箱即用（如"小吴同学"）。密码配置为空则完全不创建。
  *
- * <p>v1.31.5：账号已存在时重置密码为配置值。此前仅"不存在才创建"，若 Render 上曾部署过
- * 空/旧密码配置，种子密码变更后无法生效，表现为"管理员账号密码不对"无法登录；改为
- * 「配置即事实来源」——每次启动以配置的密码为准，保证种子管理员始终可用。
- *
- * <p>安全说明：密码明文仅用于首次初始化；创建后建议在个人中心修改。若密码配置为空则完全不创建。
+ * <p>v1.33.0（P2-02）：「已存在即重置密码」改为显式 opt-in（环境变量 APP_SEED_ADMIN_RESET=true）。
+ * 此前 v1.31.5 的「配置即事实来源」每次启动强制重置，导致管理员在个人中心改掉的密码会在
+ * 每次自动部署重启后被静默还原为（通常较弱的）环境变量密码。默认仅首次创建；
+ * 需要恢复默认密码时显式设置 RESET 标志重启一次即可。
  */
 @Component
 public class AdminSeedInitializer implements ApplicationRunner {
@@ -35,6 +34,9 @@ public class AdminSeedInitializer implements ApplicationRunner {
 
     @Value("${app.seed-admin.password:}")
     private String seedPassword;
+
+    @Value("${app.seed-admin.reset-existing:${APP_SEED_ADMIN_RESET:false}}")
+    private boolean resetExisting;
 
     public AdminSeedInitializer(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
@@ -51,11 +53,15 @@ public class AdminSeedInitializer implements ApplicationRunner {
         String encoded = passwordEncoder.encode(seedPassword);
         try {
             if (userRepository.existsByUsername(username)) {
-                // v1.31.5：已存在则重置密码为配置值，保证种子管理员密码始终可用
+                if (!resetExisting) {
+                    // P2-02：默认不重置，管理员改过的密码不被部署重启静默还原
+                    log.info("种子管理员账号已存在，跳过重置（如需重置密码请设置 APP_SEED_ADMIN_RESET=true 并重启）");
+                    return;
+                }
                 userRepository.findByUsername(username).ifPresent(user -> {
                     user.setPasswordHash(encoded);
                     userRepository.saveAndFlush(user);
-                    log.info("种子管理员账号已存在，已重置密码：{}", username);
+                    log.info("APP_SEED_ADMIN_RESET=true：已重置种子管理员密码：{}", username);
                 });
                 return;
             }

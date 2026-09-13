@@ -45,6 +45,21 @@ public class AuthController {
     /** 登录失败计数：IP → 失败次数 */
     private final ConcurrentHashMap<String, LoginFailInfo> loginFailMap = new ConcurrentHashMap<>();
 
+    /**
+     * 注册限流（P2-04）：按 IP 默认 5 次/小时滑动窗口，防脚本批量注册垃圾账号与
+     * 「用户名/邮箱已存在」回显驱动的批量枚举。
+     * 限流拦截器整体豁免 /api/auth/**，注册需在此处单独限流。
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.auth.register-limit-per-hour:5}")
+    private int registerLimitPerHour;
+
+    private com.example.interview.util.PerUserRateLimiter registerLimiter;
+
+    @jakarta.annotation.PostConstruct
+    void initRegisterLimiter() {
+        registerLimiter = new com.example.interview.util.PerUserRateLimiter(registerLimitPerHour, 60 * 60 * 1000L);
+    }
+
     /** 最大失败次数（超过则锁定） */
     private static final int MAX_FAIL_COUNT = 5;
 
@@ -89,10 +104,15 @@ public class AuthController {
      */
     @Operation(summary = "用户注册")
     @PostMapping("/register")
-    public Result<String> register(@RequestBody Map<String, String> req) {
+    public Result<String> register(@RequestBody Map<String, String> req, HttpServletRequest request) {
         String username = req.get("username");
         String password = req.get("password");
         String email    = req.get("email");
+
+        // P2-04：注册按 IP 限流（默认 5 次/小时），防批量注册与枚举
+        if (!registerLimiter.allow(com.example.interview.util.ClientIpUtil.resolve(request))) {
+            return Result.error(429, "注册过于频繁，请稍后再试");
+        }
 
         if (username == null || password == null) {
             return Result.error(400, "用户名和密码不能为空");
