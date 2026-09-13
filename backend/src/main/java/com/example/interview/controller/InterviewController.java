@@ -169,6 +169,12 @@ public class InterviewController {
             if (!valid.ok) {
                 return Result.error(400, "图片地址无效：" + valid.message);
             }
+            // P1-08：进一步限制为本系统 Supabase 存储域（upload-image 返回的 URL 形态）。
+            // SsrUrlValidator 是一次性校验，存在 DNS 重绑定 TOCTOU 与重定向残余面；
+            // 限本系统存储域后，抓取目标无法被指向攻击者控制的域名/内网地址。
+            if (!supabaseStorageService.isOwnPublicUrl(imageUrl)) {
+                return Result.error(400, "图片地址无效：仅支持系统存储域的图片");
+            }
         }
 
         // v1.31.4（B-10）：AI 评分接口按用户限流，防自动化刷额度

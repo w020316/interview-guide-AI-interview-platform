@@ -198,4 +198,39 @@ class SupabaseStorageServiceTest {
             assertThat(entityCaptor.getValue().getBody()).isInstanceOf(ByteArrayResource.class);
         }
     }
+
+    @Nested
+    @DisplayName("isOwnPublicUrl: 附图存储域白名单（P1-08）")
+    class IsOwnPublicUrl {
+
+        @Test
+        @DisplayName("本系统 Supabase 公共对象 URL 放行")
+        void ownPublicUrl_pass() {
+            assertThat(service.isOwnPublicUrl(
+                    SUPABASE_URL + "/storage/v1/object/public/" + BUCKET + "/img.png")).isTrue();
+        }
+
+        @Test
+        @DisplayName("同域但非 public 对象路径（如上传端点路径）不视为公共附图")
+        void uploadPath_fail() {
+            assertThat(service.isOwnPublicUrl(
+                    SUPABASE_URL + "/storage/v1/object/" + BUCKET + "/img.png")).isFalse();
+        }
+
+        @Test
+        @DisplayName("其他域名/内网元数据地址一律拒绝")
+        void foreignHost_fail() {
+            assertThat(service.isOwnPublicUrl(
+                    "https://evil.example.com/storage/v1/object/public/resumes/a.png")).isFalse();
+            assertThat(service.isOwnPublicUrl(
+                    "http://169.254.169.254/storage/v1/object/public/resumes/a.png")).isFalse();
+        }
+
+        @Test
+        @DisplayName("空值安全返回 false")
+        void nullSafe_fail() {
+            assertThat(service.isOwnPublicUrl(null)).isFalse();
+            assertThat(service.isOwnPublicUrl("")).isFalse();
+        }
+    }
 }

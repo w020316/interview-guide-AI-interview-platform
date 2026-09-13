@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -278,8 +280,11 @@ class InterviewControllerTest {
         }
 
         @Test
-        @DisplayName("携带合法 imageUrl 时调用多模态评估（192.0.2.1 为公网 TEST-NET，无需真实网络）")
+        @DisplayName("携带合法 imageUrl 且命中存储域白名单时调用多模态评估（P1-08）")
         void evaluate_withImageUrl_returns200() throws Exception {
+            // 192.0.2.1 为公网 TEST-NET 字面量，避免测试环境 DNS；
+            // isOwnPublicUrl 本体行为在 SupabaseStorageServiceTest 中验证，此处 mock 放行
+            when(supabaseStorageService.isOwnPublicUrl("https://192.0.2.1/a.png")).thenReturn(true);
             when(interviewService.evaluateAnswerWithImage("什么是多态？", "多态是...", "", "https://192.0.2.1/a.png"))
                     .thenReturn("{\"score\":88}");
 
@@ -292,6 +297,21 @@ class InterviewControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").exists());
+        }
+
+        @Test
+        @DisplayName("携带非本系统存储域 imageUrl 时被拒（P1-08：封堵重定向/重绑定残余面）")
+        void evaluate_withExternalImageUrl_rejected() throws Exception {
+            // 192.0.2.1 为公网 TEST-NET 且通过 SsrUrlValidator，但不在本系统存储域白名单内
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "question", "什么是多态？", "userAnswer", "多态是...", "imageUrl", "https://192.0.2.1/a.png"));
+
+            mockMvc.perform(post("/api/interview/evaluate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400));
+            verify(interviewService, never()).evaluateAnswerWithImage(any(), any(), any(), any());
         }
 
         @Test

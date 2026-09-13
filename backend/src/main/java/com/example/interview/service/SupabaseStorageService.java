@@ -10,6 +10,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 /**
  * Supabase Storage 文件上传服务
@@ -79,5 +81,32 @@ public class SupabaseStorageService {
 
         // 拼接公开访问 URL
         return supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + safeName;
+    }
+
+    /**
+     * 判断给定 URL 是否为本系统 Supabase 公共存储域（P1-08：作答附图 SSRF 白名单）。
+     *
+     * <p>合法的附图 URL 只能来自 {@link #upload} 的返回值（{supabaseUrl}/storage/v1/object/public/...）。
+     * 限制到本系统存储域后，即使 Spring AI 的媒体下载器跟随 302 重定向或存在 DNS 重绑定
+     * TOCTOU 窗口，攻击者也无法把抓取目标指向自己控制的域名/内网地址。
+     */
+    public boolean isOwnPublicUrl(String url) {
+        if (url == null || url.isBlank() || supabaseUrl == null || supabaseUrl.isBlank()) {
+            return false;
+        }
+        try {
+            URI u = new URI(url.trim());
+            URI base = new URI(supabaseUrl.trim());
+            String host = u.getHost();
+            String baseHost = base.getHost();
+            if (host == null || baseHost == null) {
+                return false;
+            }
+            return host.equalsIgnoreCase(baseHost)
+                    && u.getPath() != null
+                    && u.getPath().startsWith("/storage/v1/object/public/");
+        } catch (URISyntaxException e) {
+            return false;
+        }
     }
 }
