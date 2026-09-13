@@ -8,7 +8,6 @@ import com.example.interview.service.RagSearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,7 +27,6 @@ import java.util.stream.Collectors;
 public class KnowledgeController {
 
     @Autowired private RagSearchService ragSearchService;
-    @Autowired private VectorStore vectorStore;
     @Autowired private InterviewSessionService sessionService;
 
     /** 从 SecurityContext 获取当前登录用户 ID（JWT subject） */
@@ -95,8 +93,10 @@ public class KnowledgeController {
                     .metadata(Map.of("category", category, "source", "batch-import", "userId", userId))
                     .build());
         }
-        vectorStore.add(docs);
-        return Result.success(Map.of("imported", docs.size(), "category", category));
+        // P1-04：经统一入库入口，受 maxDocuments 容量计数保护（此前直接 add 绕过保护，
+        // 生产内存向量库会被批量导入撑爆）
+        int stored = ragSearchService.addToVectorStore(docs);
+        return Result.success(Map.of("imported", stored, "category", category));
     }
 
     // ─────────────────────────── 关联模拟面试 ───────────────────────────

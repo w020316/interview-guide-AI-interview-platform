@@ -37,6 +37,10 @@ public class ResumeAnalysisService {
     @Autowired
     private VectorStore vectorStore;
 
+    /** P1-04：简历向量统一经 RAG 服务入库，受 maxDocuments 容量计数保护 */
+    @Autowired
+    private RagSearchService ragSearchService;
+
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
@@ -154,19 +158,29 @@ public class ResumeAnalysisService {
 
     /**
      * 将简历存入向量库，用于后续面试题生成（异步执行，避免 embedding 不可用时阻塞主请求）
-     * v1.23.1：id 改用 UUID（cacheKey 含冒号，切回 pgvector 时非法）；metadata 补 userId 便于隔离
+     * v1.23.1：metadata 补 userId 便于隔离
+     * v1.33.0（P1-04）：id 改为由 resumeId 派生的确定性 id（非法字符替换为 '-'），
+     * 重复分析同一简历时先删后加（upsert 覆盖），不再每次生成新 UUID 无界累积；
+     * 入库统一走 RagSearchService.addToVectorStore 受容量计数保护。
+     * 注：覆盖场景计数按新增累计（偏保守方向，只会提前拒绝不会放开上限）。
      */
     private void storeResumeEmbedding(String resumeId, String userId, String resumeText) {
         // 用虚拟线程异步执行，避免 embedding 不可用时阻塞主请求
         Thread.startVirtualThread(() -> {
             try {
+                String docId = "resume-" + resumeId.replaceAll("[^a-zA-Z0-9-_]", "-");
+                // 覆盖旧版本文档：同 id 先删后加（不存在时 delete 为无害空操作）
+                try {
+                    vectorStore.delete(List.of(docId));
+                } catch (Exception ignored) {
+                }
                 Document doc = Document.builder()
-                        .id(java.util.UUID.randomUUID().toString())
+                        .id(docId)
                         .text(resumeText)
                         .metadata(Map.of("type", "resume", "resumeId", resumeId,
                                 "userId", userId))
                         .build();
-                vectorStore.add(List.of(doc));
+                ragSearchService.addToVectorStore(List.of(doc));
             } catch (Exception e) {
                 // 向量化失败不影响主流程
                 log.warn("简历向量化失败：{}", e.getMessage());

@@ -196,6 +196,31 @@ public class RagSearchService {
     }
 
     /**
+     * 统一的向量入库入口（P1-04）：全部写入路径（知识导入/批量导入/简历向量化）必须经此方法，
+     * 受 maxDocuments 容量计数保护。生产为全内存 SimpleVectorStore（-Xmx220m），
+     * 任何绕过计数的 add 都会造成无界内存增长直至 OOM。
+     *
+     * @return 实际入库条数（容量不足时部分入库；容量耗尽返回 0）
+     */
+    public int addToVectorStore(List<Document> docs) {
+        if (docs == null || docs.isEmpty()) {
+            return 0;
+        }
+        int remaining = maxDocuments - storedDocs.get();
+        if (remaining <= 0) {
+            log.warn("向量入库被拒绝：已达容量上限 {} 条", maxDocuments);
+            return 0;
+        }
+        List<Document> accepted = docs.size() <= remaining ? docs : new ArrayList<>(docs.subList(0, remaining));
+        vectorStore.add(accepted);
+        storedDocs.addAndGet(accepted.size());
+        if (accepted.size() < docs.size()) {
+            log.warn("向量库容量不足：请求 {} 条，仅入库 {} 条（上限 {}）", docs.size(), accepted.size(), maxDocuments);
+        }
+        return accepted.size();
+    }
+
+    /**
      * 导入知识文档到向量库（绑定 userId）
      * - 空列表直接返回，避免无意义调用
      * - 去重预检：对每个文档做相似度搜索，相似度 >= {@link #DEDUP_SIMILARITY_THRESHOLD} 视为重复，跳过
@@ -231,22 +256,12 @@ public class RagSearchService {
                 log.info("知识库导入：{} 条全部重复或为空，跳过", documents.size());
                 return 0;
             }
-            // 容量上限保护：内存向量库无限累积会导致容器 OOM
-            int remaining = maxDocuments - storedDocs.get();
-            if (remaining <= 0) {
-                log.warn("知识库导入被拒绝：已达容量上限 {} 条", maxDocuments);
-                return 0;
+            // 统一入库入口：容量上限保护 + 计数（P1-04）
+            int stored = addToVectorStore(docs);
+            if (stored > 0 && skipped > 0) {
+                log.info("知识库导入：{} 条新增，{} 条重复跳过", stored, skipped);
             }
-            if (docs.size() > remaining) {
-                log.warn("知识库导入裁剪：请求 {} 条，仅剩 {} 条容量", docs.size(), remaining);
-                docs = new ArrayList<>(docs.subList(0, remaining));
-            }
-            vectorStore.add(docs);
-            storedDocs.addAndGet(docs.size());
-            if (skipped > 0) {
-                log.info("知识库导入：{} 条新增，{} 条重复跳过", docs.size(), skipped);
-            }
-            return docs.size();
+            return stored;
         } catch (Exception e) {
             log.error("知识库导入失败：{}", e.getMessage(), e);
             return 0;

@@ -271,7 +271,8 @@ class KnowledgeControllerTest {
         @Test
         @DisplayName("合法入参返回 200 + 导入数量")
         void batchImport_validInput_returns200() throws Exception {
-            // vectorStore.add 返回 void，无需 mock
+            // P1-04 后批量导入经 RagSearchService.addToVectorStore 统一入库，stub 返回入库条数
+            when(ragSearchService.addToVectorStore(any())).thenReturn(2);
             String body = objectMapper.writeValueAsString(Map.of(
                     "category", "Spring", "chunks", List.of("chunk1", "chunk2")));
 
