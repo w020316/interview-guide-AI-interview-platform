@@ -52,6 +52,7 @@
   --c-surface: #ffffff;
   --c-surface-elevated: #ffffff;
   --c-border: #e7e5e4;                /* stone-200 */
+  --c-navbar: rgba(255, 255, 255, 0.95); /* 导航栏背景（v1.33 P2-I1 暗色适配） */
   --c-border-light: #f5f5f4;
   --c-border-strong: #d6d3d1;         /* stone-300 */
   --c-text: #1c1917;                  /* stone-900 */
@@ -370,6 +371,7 @@ h1, h2, h3, .serif {
   --c-surface: #211d1a;
   --c-surface-elevated: #28231f;
   --c-border: #332d27;
+  --c-navbar: rgba(23, 20, 18, 0.95);
   --c-border-light: #28231f;
   --c-border-strong: #3f3832;
   --c-text: #f5f5f4;

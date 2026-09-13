@@ -35,6 +35,10 @@ const router = createRouter({
 
 // 路由守卫：未登录或 token 格式非法时跳转到 /login，并记录 redirect 参数
 router.beforeEach((to) => {
+  // I6：已登录用户访问 /login 直接回首页，避免"已登录仍显示登录表单"的双状态
+  if (to.path === '/login' && isLoggedIn()) {
+    return { path: '/' }
+  }
   if (to.meta.requiresAuth && !isLoggedIn()) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }

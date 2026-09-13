@@ -739,15 +739,9 @@ async function startInterview() {
   if (!jobDesc.value.trim()) return ElMessage.warning('请填写目标岗位')
   if (loading.value) return // 防止重复点击
   loading.value = true
-  let createdSessionId = ''
   startGenProgress()
   try {
-    // 1. 先创建会话（但不立即设置到响应式状态）
-    const sess = await api.post('/api/session/create',
-      { jobDescription: jobDesc.value }, { timeout: AI_TIMEOUT }) as unknown as { sessionId: string }
-    createdSessionId = sess.sessionId
-
-    // 2. 生成面试题（跨场自适应：按历史成绩推断难度 + 聚焦薄弱分类）
+    // 1. 先生成面试题（U2：先出题后建会话——出题失败不再留下"已完成"的空会话）
     genStep.value = 2
     const { difficulty, focusCategories } = await resolveAdaptiveTarget()
     genStep.value = 3
@@ -756,17 +750,18 @@ async function startInterview() {
       { timeout: AI_TIMEOUT }) as unknown as string
     genStep.value = 4
 
-    // 3. 解析题目（失败时清理已创建的会话，防孤儿会话）
+    // 2. 解析题目
     const parsed = safeParse<Question[]>(qs, [])
     if (!parsed.length) {
       ElMessage.error('面试题生成失败，请检查岗位描述后重试')
-      // 清理已创建的会话
-      api.put(`/api/session/${createdSessionId}/finish`).catch(() => {})
       return
     }
 
-    // 4. 持久化题目到后端（关联 sessionId），获取带 id 的题目列表
-    //    失败不阻塞流程，仅记录日志（用户仍可在当前会话答题，仅历史回顾不可用）
+    // 3. 出题成功后再创建会话并持久化题目
+    //    持久化失败不阻塞流程，仅记录日志（用户仍可在当前会话答题，仅历史回顾不可用）
+    const sess = await api.post('/api/session/create',
+      { jobDescription: jobDesc.value }, { timeout: AI_TIMEOUT }) as unknown as { sessionId: string }
+    const createdSessionId = sess.sessionId
     try {
       const saved = await api.post(`/api/session/${createdSessionId}/questions`,
         parsed, { timeout: AI_TIMEOUT }) as unknown as Question[]
@@ -778,16 +773,12 @@ async function startInterview() {
       console.warn('题目持久化失败，历史回顾将不可用：', persistErr)
     }
 
-    // 5. 题目成功后设置状态，切换到面试页
+    // 4. 题目成功后设置状态，切换到面试页
     sessionId.value = createdSessionId
     questions.value = parsed
     ElMessage.success(`已生成 ${questions.value.length} 道题目，开始面试！`)
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '创建面试失败'))
-    // 异常时也清理已创建的会话
-    if (createdSessionId) {
-      api.put(`/api/session/${createdSessionId}/finish`).catch(() => {})
-    }
   } finally {
     loading.value = false
     stopGenProgress()

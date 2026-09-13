@@ -75,12 +75,14 @@ public class GlobalExceptionHandler {
     /**
      * 面向用户的业务异常：message 本身即设计给用户看的可重试文案，原样返回
      * （v1.31.4 B-11：与内部 IllegalStateException 区分，避免泄露内部细节）
+     * v1.33.0（U1）：业务故障语义改为 503（服务暂不可用），替代 500"内部错误"——
+     * 用户可据此理解"是 AI 服务暂时不可用"而非"平台坏了"。
      */
     @ExceptionHandler(BusinessException.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public Result<Void> handleBusiness(BusinessException ex) {
         log.warn("业务异常：{}", ex.getMessage());
-        return Result.error(500, ex.getMessage());
+        return Result.error(503, ex.getMessage());
     }
 
     @ExceptionHandler(AccessDeniedException.class)

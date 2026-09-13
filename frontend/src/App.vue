@@ -210,7 +210,7 @@ function logout() {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--c-navbar);
   border-bottom: 1px solid var(--c-border);
 }
 
@@ -566,12 +566,17 @@ function logout() {
     display: none;
   }
   .nav-link {
-    padding: 10px 8px;
+    padding: 5px 7px;
     font-size: 12px;
     flex-shrink: 0;
+    flex-direction: column;
+    gap: 2px;
   }
+  /* I5：移动端导航不再纯图标——文字标签随图标竖排展示 */
   .nav-link span {
-    display: none;
+    display: block;
+    font-size: 10px;
+    line-height: 1.2;
   }
   .nav-link svg {
     opacity: 1;

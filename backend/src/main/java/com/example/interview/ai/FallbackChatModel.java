@@ -1,5 +1,6 @@
 package com.example.interview.ai;
 
+import com.example.interview.common.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ChatModel;
@@ -49,7 +50,9 @@ public class FallbackChatModel implements ChatModel {
                 last = e;
             }
         }
-        throw new IllegalStateException("所有 AI 模型均调用失败", last);
+        // U1：降级链全失败属于"AI 服务暂不可用"的可重试业务故障，以 BusinessException 承载
+        // 明确文案（全局处理器映射 503），替代此前语义混淆的 IllegalStateException→500"服务器内部错误"
+        throw new BusinessException("AI 服务暂时不可用，请稍后重试", last);
     }
 
     @Override

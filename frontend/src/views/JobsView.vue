@@ -775,12 +775,12 @@ onMounted(() => {
   border-radius: 999px;
   font-size: 12px;
   background: var(--brand-primary-50);
-  color: var(--tag-text, #4f46e5);
+  color: var(--brand-primary); /* I3：标签回归品牌色 */
 }
 
 .tag-source {
-  background: #ecfdf5;
-  color: #059669;
+  background: var(--c-success-light);
+  color: var(--c-success);
 }
 
 .job-card-side {

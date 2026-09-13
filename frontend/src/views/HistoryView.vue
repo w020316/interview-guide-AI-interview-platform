@@ -159,7 +159,8 @@ function fmtDate(dt: string) {
 function statusClass(status: string) {
   if (!status) return ''
   if (status === 'FINISHED' || status === 'COMPLETED') return 'status-success'
-  if (status === 'IN_PROGRESS' || status === 'ACTIVE') return 'status-info'
+  if (status === 'IN_PROGRESS' || status === 'ACTIVE' || status === 'ONGOING') return 'status-info'
+  if (status === 'FAILED' || status === 'GENERATION_FAILED') return 'status-error'
   return 'status-default'
 }
 
@@ -170,6 +171,9 @@ function statusText(status: string) {
     COMPLETED: '已完成',
     IN_PROGRESS: '进行中',
     ACTIVE: '进行中',
+    ONGOING: '进行中', // U3：ONGOING 此前回显英文原文，与全中文界面不一致
+    FAILED: '生成失败',
+    GENERATION_FAILED: '生成失败',
   }
   return map[status] || status
 }
@@ -355,6 +359,11 @@ function statusText(status: string) {
 .status-info {
   background: rgba(59, 130, 246, 0.1);
   color: #2563eb;
+}
+
+.status-error {
+  background: var(--c-danger-light);
+  color: var(--c-danger);
 }
 
 .status-default {

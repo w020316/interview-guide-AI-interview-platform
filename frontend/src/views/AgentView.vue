@@ -519,7 +519,7 @@ onMounted(() => {
   padding: 10px 14px;
   border: 1px solid var(--c-border);
   border-radius: 10px;
-  background: var(--input-bg, #fafafa);
+  background: var(--c-surface-elevated); /* I2：暗色下不再白底白字 */
   color: var(--c-text);
   font-size: 13px;
   cursor: pointer;
@@ -652,7 +652,7 @@ onMounted(() => {
   padding: 10px 12px;
   font-size: 14px;
   font-family: inherit;
-  background: var(--input-bg, #fafafa);
+  background: var(--c-surface-elevated); /* I2：暗色下不再白底白字 */
   color: var(--c-text);
   outline: none;
 }

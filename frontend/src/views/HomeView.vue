@@ -719,6 +719,10 @@ const steps = [
   .features, .steps {
     grid-template-columns: 1fr;
   }
+  /* I4：移动端演示卡浮动小标遮挡标题，改为隐藏（桌面端保留） */
+  .visual-chip {
+    display: none;
+  }
   .hero {
     padding-top: 40px;
   }
