@@ -10,6 +10,7 @@ import com.example.interview.service.RagSearchService;
 import com.example.interview.service.job.JobAgentService;
 import com.example.interview.util.JsonRepairUtil;
 import com.example.interview.util.PromptSanitizer;
+import com.example.interview.util.SseConcurrencyGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -30,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -74,8 +74,11 @@ public class AgentService {
     private final com.example.interview.service.InterviewService interviewService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /** SSE 并发控制（与面试问答相同的令牌机制，信号量保护线程资源） */
-    private final Semaphore sseSemaphore = new Semaphore(20, true);
+    /**
+     * SSE 并发控制：全局上限 + 每用户上限双层保护（P1-02）。
+     * 上限与原实现一致（全局 20）；每用户默认 1，防止单用户占满全部槽位拒绝其他用户服务
+     */
+    private final SseConcurrencyGuard sseGuard = new SseConcurrencyGuard(20, 1);
     private final ScheduledExecutorService heartbeat = new ScheduledThreadPoolExecutor(1);
 
     public AgentService(ChatClient chatClient,
@@ -322,12 +325,14 @@ public class AgentService {
         return chunks;
     }
 
-    public boolean tryAcquire() {
-        return sseSemaphore.tryAcquire();
+    /** 双层获取 SSE 槽位（全局 + 每用户）；失败时不占用任何资源 */
+    public SseConcurrencyGuard.Result tryAcquire(String userId) {
+        return sseGuard.tryAcquire(userId);
     }
 
-    public void release() {
-        sseSemaphore.release();
+    /** 归还 SSE 槽位（与 tryAcquire 成对调用，置于 emitter onCompletion） */
+    public void release(String userId) {
+        sseGuard.release(userId);
     }
 
     public ScheduledExecutorService heartbeatExecutor() {

@@ -4,6 +4,7 @@ import com.example.interview.common.Result;
 import com.example.interview.entity.AgentConversationEntity;
 import com.example.interview.service.agent.AgentService;
 import com.example.interview.util.PromptSanitizer;
+import com.example.interview.util.SseConcurrencyGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
@@ -90,10 +91,14 @@ public class AgentController {
             return emitter;
         }
 
-        // SSE 并发保护
-        if (!agentService.tryAcquire()) {
+        // SSE 双层并发保护（全局上限 + 每用户上限，P1-02）
+        SseConcurrencyGuard.Result acquire = agentService.tryAcquire(userId);
+        if (acquire != SseConcurrencyGuard.Result.ACQUIRED) {
+            String tip = acquire == SseConcurrencyGuard.Result.USER_LIMIT
+                    ? "您已有一个智能体会话正在进行，请稍候"
+                    : "当前在线用户较多，请稍后重试";
             try {
-                emitter.send(SseEmitter.event().name("error").data("当前在线用户较多，请稍后重试"));
+                emitter.send(SseEmitter.event().name("error").data(tip));
             } catch (IOException ignored) {
             }
             emitter.complete();
@@ -104,7 +109,7 @@ public class AgentController {
         // 也会触发 onCompletion），避免重复 release 导致并发上限逐渐失效
         emitter.onCompletion(() -> {
             heartbeatRunning.set(false);
-            agentService.release();
+            agentService.release(userId);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }

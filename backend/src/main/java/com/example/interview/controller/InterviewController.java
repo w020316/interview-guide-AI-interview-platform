@@ -4,6 +4,7 @@ import com.example.interview.common.Result;
 import com.example.interview.service.InterviewService;
 import com.example.interview.util.HashUtil;
 import com.example.interview.util.PromptSanitizer;
+import com.example.interview.util.SseConcurrencyGuard;
 import com.example.interview.util.SsrUrlValidator;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -26,7 +27,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -67,24 +67,27 @@ public class InterviewController {
     private final ScheduledExecutorService heartbeat = new ScheduledThreadPoolExecutor(1);
 
     /**
-     * SSE 并发限流：限制同时进行的流式连接数，防止虚拟线程池无界扩张导致 OOM
-     * - 上限通过 app.sse.max-concurrent 配置，默认 20
-     * - 超出则返回 503，前端提示用户稍后重试
+     * SSE 并发限流：双层保护——全局上限（app.sse.max-concurrent，默认 20）防止虚拟线程池
+     * 无界扩张导致 OOM；每用户上限（app.sse.max-per-user，默认 1）防止单个用户占满全部
+     * 全局槽位拒绝其他用户服务（P1-01）。超出则返回错误事件，前端提示用户稍后重试
      */
     @Value("${app.sse.max-concurrent:20}")
     private int sseMaxConcurrent;
 
-    private Semaphore sseSemaphore;
+    @Value("${app.sse.max-per-user:1}")
+    private int sseMaxPerUser;
+
+    private SseConcurrencyGuard sseGuard;
 
     @PostConstruct
     private void initSemaphore() {
-        this.sseSemaphore = new Semaphore(sseMaxConcurrent, true);
-        log.info("SSE 并发限流初始化: max-concurrent={}", sseMaxConcurrent);
+        this.sseGuard = new SseConcurrencyGuard(sseMaxConcurrent, sseMaxPerUser);
+        log.info("SSE 并发限流初始化: max-concurrent={}, max-per-user={}", sseMaxConcurrent, sseMaxPerUser);
         // v1.11：注册 actuator gauge，便于监控 SSE 并发水位
         // 测试环境（无 actuator）meterRegistry 为 null，@Autowired(required=false) 兜底
         if (meterRegistry != null) {
-            meterRegistry.gauge("sse.max.concurrent", sseSemaphore, s -> sseMaxConcurrent);
-            meterRegistry.gauge("sse.active.count", sseSemaphore, s -> sseMaxConcurrent - s.availablePermits());
+            meterRegistry.gauge("sse.max.concurrent", sseGuard, SseConcurrencyGuard::globalMax);
+            meterRegistry.gauge("sse.active.count", sseGuard, SseConcurrencyGuard::activeCount);
         }
     }
 
@@ -270,11 +273,17 @@ public class InterviewController {
         // 保存 Disposable 以便客户端断开时取消订阅，防止资源泄漏
         final Disposable[] disposableHolder = new Disposable[1];
 
-        // 尝试获取并发令牌，超出 max-concurrent 则返回 503
-        if (!sseSemaphore.tryAcquire()) {
-            // 注意：此处未注册 onCompletion，emitter.complete() 不会触发 release，避免 double release
+        // 双层并发令牌：全局上限 + 每用户上限，超出则返回错误事件
+        String userId = currentUserId();
+        SseConcurrencyGuard.Result acquire = sseGuard.tryAcquire(userId);
+        if (acquire != SseConcurrencyGuard.Result.ACQUIRED) {
+            // 注意：此处未注册 onCompletion，emitter.complete() 不会触发 release；
+            // guard.tryAcquire 失败时不占用任何资源，无需回滚
+            String tip = acquire == SseConcurrencyGuard.Result.USER_LIMIT
+                    ? "您已有一个回答正在进行，请稍候"
+                    : "当前在线用户较多，请稍后重试";
             try {
-                emitter.send(SseEmitter.event().name("error").data("当前在线用户较多，请稍后重试"));
+                emitter.send(SseEmitter.event().name("error").data(tip));
             } catch (IOException ignored) {
             }
             emitter.complete();
@@ -287,7 +296,7 @@ public class InterviewController {
         // 可用许可只增不减，SSE 并发上限逐渐失效
         emitter.onCompletion(() -> {
             heartbeatRunning.set(false);
-            sseSemaphore.release();
+            sseGuard.release(userId);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
