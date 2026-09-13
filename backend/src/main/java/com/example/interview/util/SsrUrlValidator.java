@@ -105,6 +105,7 @@ public final class SsrUrlValidator {
     private static boolean isSensitiveHost(String host) {
         String h = host.toLowerCase();
         return h.equals("169.254.169.254")
+                || h.equals("100.100.100.200") // 阿里云元数据（位于 CGNAT 段，双保险）
                 || h.equals("metadata.google.internal")
                 || h.equals("metadata")
                 || h.startsWith("metadata.")
@@ -123,13 +124,32 @@ public final class SsrUrlValidator {
         return true;
     }
 
-    /** 内网/保留网段检测：单地址 + IPv4/IPv6 */
+    /**
+     * 内网/保留网段检测：单地址 + IPv4/IPv6。
+     * v1.33.0（P1-09）：补充 Java 标准方法未覆盖的两类网段——
+     * <ul>
+     *   <li>CGNAT 100.64.0.0/10：含阿里云元数据 100.100.100.200；</li>
+     *   <li>IPv6 ULA fd00::/8：{@code isSiteLocalAddress} 仅识别 fec0::/10 旧站点本地段。</li>
+     * </ul>
+     */
     private static boolean isBlocked(InetAddress addr) {
         if (addr == null) return false;
-        return addr.isLoopbackAddress()
+        if (addr.isLoopbackAddress()
                 || addr.isSiteLocalAddress()
                 || addr.isLinkLocalAddress()
                 || addr.isAnyLocalAddress()
-                || addr.isMulticastAddress();
+                || addr.isMulticastAddress()) {
+            return true;
+        }
+        byte[] a = addr.getAddress();
+        // IPv4 CGNAT 100.64.0.0/10
+        if (a.length == 4 && (a[0] & 0xFF) == 100 && (a[1] & 0xFF) >= 64 && (a[1] & 0xFF) <= 127) {
+            return true;
+        }
+        // IPv6 ULA fc00::/7（fd00::/8 实际启用段）
+        if (a.length == 16 && (a[0] & 0xFE) == 0xFC) {
+            return true;
+        }
+        return false;
     }
 }

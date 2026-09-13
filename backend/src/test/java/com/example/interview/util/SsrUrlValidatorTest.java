@@ -46,4 +46,26 @@ class SsrUrlValidatorTest {
         assertFalse(SsrUrlValidator.validate("http://192.0.2.1:3306/").ok);
         assertTrue(SsrUrlValidator.validate("http://192.0.2.1:80/").ok);
     }
+
+    @Test
+    @DisplayName("P1-09：CGNAT 100.64.0.0/10（含阿里云元数据）被拒")
+    void validate_cgnat_rejected() {
+        assertFalse(SsrUrlValidator.validate("http://100.100.100.200/latest/meta-data/").ok,
+                "阿里云元数据地址应被拦截");
+        assertFalse(SsrUrlValidator.validate("http://100.64.1.1/x").ok,
+                "CGNAT 段下边界应被拦截");
+        assertFalse(SsrUrlValidator.validate("http://100.127.255.254/x").ok,
+                "CGNAT 段上边界应被拦截");
+        // 段外相邻地址仍放行
+        assertTrue(SsrUrlValidator.validate("http://100.63.0.1/x").ok);
+        assertTrue(SsrUrlValidator.validate("http://100.128.0.1/x").ok);
+    }
+
+    @Test
+    @DisplayName("P1-09：IPv6 ULA fd00::/8 被拒（isSiteLocalAddress 不识别的网段）")
+    void validate_ipv6Ula_rejected() {
+        // IPv6 字面量须加方括号；getAllByName("[...]") 无法解析即被拒，此处验证解析路径
+        assertFalse(SsrUrlValidator.validate("http://[fd00::1]/x").ok);
+        assertFalse(SsrUrlValidator.validate("http://[fe80::1]/x").ok, "链路本地仍被拒");
+    }
 }

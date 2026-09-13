@@ -103,9 +103,19 @@ public class RedisConfig {
                 return factory;
             }
         } catch (Exception e) {
-            log.warn("REDIS_URL 解析失败（{}），回退本机 Redis：{}", e.getMessage(), url);
+            // P1-07：打码后再打印——Upstash 连接串形如 rediss://default:<PASSWORD>@host，
+            // 明文进日志会随日志平台长期留存
+            log.warn("REDIS_URL 解析失败（{}），回退本机 Redis：{}", e.getMessage(), maskCredentials(url));
         }
         log.info("Redis 未配置或解析失败，回退本机 127.0.0.1:6379（服务层会降级兜底）");
         return new LettuceConnectionFactory(new RedisStandaloneConfiguration("127.0.0.1", 6379));
+    }
+
+    /** 日志打码：隐藏 URL 用户信息段（含密码） */
+    private static String maskCredentials(String url) {
+        if (url == null) {
+            return null;
+        }
+        return url.replaceAll("//[^@/]+@", "//***@");
     }
 }
