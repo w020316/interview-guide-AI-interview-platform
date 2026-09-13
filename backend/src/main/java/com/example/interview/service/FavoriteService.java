@@ -2,9 +2,14 @@ package com.example.interview.service;
 
 import com.example.interview.entity.FavoriteQuestionEntity;
 import com.example.interview.repository.FavoriteQuestionRepository;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Set;
@@ -20,6 +25,22 @@ public class FavoriteService {
 
     @Autowired
     private FavoriteQuestionRepository favoriteRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    /**
+     * P1-06：插入收藏使用独立新事务（REQUIRES_NEW）——并发双击撞唯一约束时可在方法内
+     * 捕获并幂等返回"已收藏"，不会把外层事务标记为 rollback-only 导致提交时
+     * UnexpectedRollbackException。
+     */
+    private TransactionTemplate insertTemplate;
+
+    @PostConstruct
+    void initInsertTemplate() {
+        insertTemplate = new TransactionTemplate(transactionManager);
+        insertTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
 
     /**
      * 查询用户全部收藏，按收藏时间倒序
@@ -41,6 +62,14 @@ public class FavoriteService {
     /**
      * 切换收藏：若该题已收藏则取消，否则按提供的快照新增收藏。
      *
+     * <p>P1-06 语义加固：
+     * <ul>
+     *   <li>取消路径改用 {@code deleteByUserIdAndQuestionId}（派生删除），可一并清掉
+     *       历史遗留的重复收藏行，且以删除行数判定"是否原本已收藏"；</li>
+     *   <li>新增路径依赖 (user_id, question_id) 唯一约束兜底并发双击：撞约束在独立事务中
+     *       捕获并按"已收藏"幂等返回 true，而非抛 500。</li>
+     * </ul>
+     *
      * @param favoriteId 已存在的收藏 ID（用于通过收藏 ID 直接取消；可为 null 走题目 ID 判断）
      * @param userId     当前用户 ID
      * @param questionId 原题目 ID
@@ -56,22 +85,19 @@ public class FavoriteService {
                     .ifPresent(favoriteRepository::delete);
             return false;
         }
-        // 其次按原题目 ID 判定是否已收藏
-        if (questionId != null) {
-            var existing = favoriteRepository.findByUserIdAndQuestionId(userId, questionId);
-            if (existing.isPresent()) {
-                favoriteRepository.delete(existing.get());
-                return false;
-            }
+        // 其次按原题目 ID 删除已收藏（删除行数 > 0 视为原本已收藏）
+        if (questionId != null
+                && favoriteRepository.deleteByUserIdAndQuestionId(userId, questionId) > 0) {
+            return false;
         }
-        // 新增收藏
+        // 新增收藏（独立事务 + 唯一约束兜底并发）
         FavoriteQuestionEntity entity = snapshot.toBuilder().userId(userId).id(null).build();
-        // 避免重复收藏同一题（并发/重复点击兜底）
-        if (entity.getQuestionId() != null
-                && favoriteRepository.findByUserIdAndQuestionId(userId, entity.getQuestionId()).isPresent()) {
+        try {
+            insertTemplate.executeWithoutResult(status -> favoriteRepository.saveAndFlush(entity));
+        } catch (DataIntegrityViolationException e) {
+            // 并发窗口另一请求已插入同题收藏：视为已收藏，幂等返回
             return true;
         }
-        favoriteRepository.save(entity);
         return true;
     }
 

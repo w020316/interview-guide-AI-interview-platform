@@ -19,7 +19,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder(toBuilder = true)
 @Entity
-@Table(name = "favorite_question")
+@Table(name = "favorite_question",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_favorite_question_user_question",
+                columnNames = {"user_id", "question_id"}))
 public class FavoriteQuestionEntity {
 
     @Id
