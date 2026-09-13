@@ -42,7 +42,7 @@
 - **Base URL**：`https://apihub.agnes-ai.com/v1`
 - **Chat 模型**：`agnes-base`
 - **Embedding 模型**：`text-embedding-3-small`
-- **API Key**：`sk-Vr4yB5a0DbzPXcB5wQfthyCH28LF5ZoR2t4sxaOWdNZidC`
+- **API Key**：见环境变量 `AI_API_KEY`（切勿将真实 Key 提交进仓库；历史版本曾泄露，需在 Agnes 平台吊销轮换）
 
 ### 部署架构（0 元方案）
 - **前端托管**：Vercel（永久免费，100GB 流量/月）
@@ -246,7 +246,7 @@ interview-guide/
 
 ### 本地开发
 ```bash
-AI_API_KEY=sk-Vr4yB5a0DbzPXcB5wQfthyCH28LF5ZoR2t4sxaOWdNZidC
+AI_API_KEY=sk-你的 Agnes Key（本地 .env，不入库）
 AI_BASE_URL=https://apihub.agnes-ai.com/v1
 AI_MODEL=agnes-base
 DATABASE_URL=jdbc:postgresql://localhost:5432/interview_guide
@@ -258,7 +258,7 @@ REDIS_PORT=6379
 
 ### 生产环境（Render）
 ```bash
-AI_API_KEY=sk-Vr4yB5a0DbzPXcB5wQfthyCH28LF5ZoR2t4sxaOWdNZidC
+AI_API_KEY=<在 Render 环境变量中配置，勿写进任何文件>
 AI_BASE_URL=https://apihub.agnes-ai.com/v1    # 已在 render.yaml 写死
 AI_MODEL=agnes-base                            # 已在 render.yaml 写死
 DATABASE_URL=jdbc:postgresql://db.xxxx.supabase.co:5432/postgres
