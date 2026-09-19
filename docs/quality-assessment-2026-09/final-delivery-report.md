@@ -74,10 +74,10 @@
 |---|---|---|
 | **Agnes Key 吊销轮换未确认** | ~~P0（外部动作）~~ **已闭环（2026-09-19）** | 泄露 Key「ai助手」(sk-Vr4yt…dNZjdC) 已在 Agnes 平台吊销并实测从密钥列表消失；生产已切换新密钥 interview-guide-prod（Render AI_API_KEY），出题链路 E2E 实测 16.2s 返回真实面试题 |
 | 后端覆盖率 43.3% | ~~中~~ **已闭环** | 四批计划已于 2026-09-19 全部执行完毕：54.4%（复测）→ 85.0%，pom 固化 80% BUNDLE 行覆盖门槛（低于即构建失败）；测试 372→606 例 |
-| P2 暂缓 2 条 | 中→低 | ~~pgvector 恢复~~（已闭环，见下）；**P2-06 签名 URL 仍待产品决策**：私读 bucket + 后端 /api/storage/sign/{path} 签发短时效签名 URL（改历史 URL 语义，需产品确认后再实施） |
+| P2 暂缓 2 条 | 中→低 | ~~pgvector 恢复~~（已闭环）；~~P2-06 签名 URL~~ **代码路径已落地（c9fabd7）**：服务端评估前换签 10 分钟签名 URL + 上传返回预览签名 URL + 前端适配，全部回退安全（bucket 公读期间行为不变）。**剩余动作**：Supabase 控制台将 resumes bucket 转私有（所有者一键操作） |
 | Safari/Firefox 未实测 | 低 | Windows 环境客观限制；建议 macOS/装机后补测（矩阵脚本可直接复用） |
 | 生产 pgvector 死配置 | ~~中~~ **已闭环（P2-17，2026-09-19）** | Supabase vector 扩展 0.8.2 已启用；application-prod.yml 移除 pgvector exclude、删除 @Primary 内存实现（dc41a1c）；生产启动正常（健康检查 UP），向量重启不再丢失。剩余：接入 embedding 提供方后写入数据即完成全链验证 |
-| **Embedding 提供方缺失（新发现 P1）** | **高** | Agnes 已下线全部 embedding 模型（/v1/models 实测仅 chat/video/image，/v1/embeddings 503 model_not_found），B.AI 文档确认仅有 chat 协议——知识库导入/RAG 无法向量化。已做缓解：embedding 客户端显式超时+有限重试（95289da），导入从挂起 5 分钟降为 3.5s 返回。**待决策**：注册具备 embedding 的免费提供方（硅基流动 bge-m3=1024 维 / 智谱 embedding-3 / Jina），需相应调整 pgvector dimensions |
+| **Embedding 提供方缺失（新发现 P1）** | ~~高~~ **已闭环（2026-09-19 晚）** | 已接入硅基流动 BAAI/bge-m3（1024 维）：Render 配置 AI_EMBEDDING_BASE_URL/API_KEY/MODEL/DIMENSIONS 四变量（可插拔架构，c9fabd7），并修复 base-url 误带 /v1 的路径拼接问题（2fdf844）；旧 1536 维空表已删除并按 1024 维重建。生产 E2E 实测：知识导入 3/3 条（15.7s）→ RAG 检索正确命中（1.5s）。Agnes 官方文档确认其模型矩阵仅文本/图像/视频/多模态、无 embedding 端点 |
 | **B.AI 主模型节点不可达（新发现）** | 中 | Render（AWS 新加坡）到 api.b.ai 连接挂起（吃满 240s 读超时×2 节点），降级链每次 AI 请求先空等 8 分钟才到 Agnes。已处置：删除 Render 的 AI_BAI_API_KEY，链条直达 Agnes——出题 E2E 从挂起 9 分钟降至 16.2s。B.AI key 本身仍有效，若其网络恢复可重新启用 |
 | 保活工作流 97% 失败 | ~~中~~ **已修复（2026-09-19）** | 双根因：唤醒预算 210s 打不穿免费实例冷启动 + 深度体检解析 P2-08 前旧格式。重写为 8 分钟唤醒循环 + 适配新格式（303296d），部署后定时运行已恢复 success |
 | 多实例部署前提 | 低 | 限流/封禁/闸门均为单实例语义，扩容前需 Redis 化（backlog B-09） |
