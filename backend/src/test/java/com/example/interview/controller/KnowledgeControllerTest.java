@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -25,7 +26,9 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -378,6 +381,179 @@ class KnowledgeControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.total").value(0));
+        }
+
+        @Test
+        @DisplayName("limit 小于 1 时夹紧为 10 仍返回全部题目")
+        void recentQuestions_limitLessThan1_clampedTo10() throws Exception {
+            InterviewQuestionEntity q1 = InterviewQuestionEntity.builder()
+                    .id(1L).sessionId("s1").question("Q1").build();
+            InterviewQuestionEntity q2 = InterviewQuestionEntity.builder()
+                    .id(2L).sessionId("s1").question("Q2").build();
+            when(sessionService.listAllQuestionsByUser(USER_ID))
+                    .thenReturn(List.of(q1, q2));
+
+            mockMvc.perform(get("/api/knowledge/recent-questions")
+                            .param("limit", "0"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.total").value(2));
+        }
+    }
+
+    @Nested
+    @DisplayName("认证边界 currentUserId()")
+    class Authentication {
+
+        private void performSearchAndExpect500() throws Exception {
+            mockMvc.perform(get("/api/knowledge/search").param("query", "q"))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.code").value(500))
+                    .andExpect(jsonPath("$.message").value("服务器内部错误，请稍后重试"));
+        }
+
+        @Test
+        @DisplayName("三种非法认证状态（无认证/未认证 token/principal 为空）均返回 500")
+        void currentUserId_illegalAuthStates_returns500() throws Exception {
+            // 场景 1：SecurityContext 中无认证信息（auth == null）
+            SecurityContextHolder.clearContext();
+            performSearchAndExpect500();
+
+            // 场景 2：token 存在但 isAuthenticated() == false
+            SecurityContextHolder.getContext()
+                    .setAuthentication(new UsernamePasswordAuthenticationToken(USER_ID, null));
+            performSearchAndExpect500();
+
+            // 场景 3：已认证但 principal == null
+            SecurityContextHolder.getContext()
+                    .setAuthentication(UsernamePasswordAuthenticationToken.authenticated(null, null, List.of()));
+            performSearchAndExpect500();
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/knowledge/import/batch 分块处理边界")
+    class BatchImportEdgeCases {
+
+        @Test
+        @DisplayName("空白分块被跳过，超 8KB 分块被截断为 8192 字符")
+        void batchImport_blankSkippedAndOversizeTruncated() throws Exception {
+            when(ragSearchService.addToVectorStore(any())).thenReturn(2);
+            String oversizeChunk = "长".repeat(9000);
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "category", "Spring",
+                    "chunks", List.of("   ", oversizeChunk, "正常分块")));
+
+            mockMvc.perform(post("/api/knowledge/import/batch")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.imported").value(2));
+
+            // 真实分块逻辑：空白块丢弃，超长块截断，正常块保留
+            verify(ragSearchService).addToVectorStore(argThat(docs ->
+                    docs != null && docs.size() == 2
+                            && docs.get(0).getText().length() == 8192
+                            && "正常分块".equals(docs.get(1).getText())));
+        }
+
+        @Test
+        @DisplayName("category 缺省时使用默认值“通用”")
+        void batchImport_missingCategory_defaultsToGeneral() throws Exception {
+            when(ragSearchService.addToVectorStore(any())).thenReturn(1);
+            String body = objectMapper.writeValueAsString(Map.of("chunks", List.of("分块内容")));
+
+            mockMvc.perform(post("/api/knowledge/import/batch")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.category").value("通用"));
+        }
+
+        @Test
+        @DisplayName("入库抛异常时返回 503 业务语义（AI 服务暂不可用）")
+        void batchImport_addToVectorStoreThrows_returns503() throws Exception {
+            when(ragSearchService.addToVectorStore(any()))
+                    .thenThrow(new RuntimeException("embedding 服务不可用"));
+            String body = objectMapper.writeValueAsString(Map.of("chunks", List.of("分块内容")));
+
+            mockMvc.perform(post("/api/knowledge/import/batch")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.code").value(503))
+                    .andExpect(jsonPath("$.message").value("AI 服务暂时不可用，知识导入失败，请稍后重试"));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/knowledge/wrong-questions 岗位关联")
+    class WrongQuestionsJobMapping {
+
+        @Test
+        @DisplayName("会话岗位为 null 时返回“未指定岗位”占位")
+        void wrongQuestions_nullJobDescription_returnsPlaceholder() throws Exception {
+            InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                    .id(1L).sessionId("s1").question("Q").evaluationScore(40).build();
+            InterviewSessionEntity session = InterviewSessionEntity.builder()
+                    .sessionId("s1").userId(USER_ID).jobDescription(null).build();
+            when(sessionService.listWrongQuestionsByUser(USER_ID, 60)).thenReturn(List.of(q));
+            when(sessionService.listByUser(USER_ID)).thenReturn(List.of(session));
+
+            mockMvc.perform(get("/api/knowledge/wrong-questions"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.questions[0].jobDescription").value("未指定岗位"));
+        }
+
+        @Test
+        @DisplayName("题目关联到会话时返回该会话岗位描述")
+        void wrongQuestions_withJobDescription_returnsIt() throws Exception {
+            InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                    .id(1L).sessionId("s1").question("Q").evaluationScore(40).build();
+            InterviewSessionEntity session = InterviewSessionEntity.builder()
+                    .sessionId("s1").userId(USER_ID).jobDescription("Java 后端").build();
+            when(sessionService.listWrongQuestionsByUser(USER_ID, 60)).thenReturn(List.of(q));
+            when(sessionService.listByUser(USER_ID)).thenReturn(List.of(session));
+
+            mockMvc.perform(get("/api/knowledge/wrong-questions"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.questions[0].jobDescription").value("Java 后端"));
+        }
+
+        @Test
+        @DisplayName("题目 sessionId 无匹配会话时返回“未指定岗位”占位")
+        void wrongQuestions_unknownSession_returnsPlaceholder() throws Exception {
+            InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                    .id(1L).sessionId("ghost-session").question("Q").evaluationScore(40).build();
+            when(sessionService.listWrongQuestionsByUser(USER_ID, 60)).thenReturn(List.of(q));
+            when(sessionService.listByUser(USER_ID)).thenReturn(List.of());
+
+            mockMvc.perform(get("/api/knowledge/wrong-questions"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.questions[0].jobDescription").value("未指定岗位"));
+        }
+
+        @Test
+        @DisplayName("重复 sessionId 的会话冲突时保留第一个岗位描述（merge 函数）")
+        void wrongQuestions_duplicateSessionId_mergeKeepsFirst() throws Exception {
+            InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                    .id(1L).sessionId("s1").question("Q").evaluationScore(40).build();
+            InterviewSessionEntity first = InterviewSessionEntity.builder()
+                    .sessionId("s1").userId(USER_ID).jobDescription("Java 后端").build();
+            InterviewSessionEntity duplicate = InterviewSessionEntity.builder()
+                    .sessionId("s1").userId(USER_ID).jobDescription("Go 后端").build();
+            when(sessionService.listWrongQuestionsByUser(USER_ID, 60)).thenReturn(List.of(q));
+            when(sessionService.listByUser(USER_ID)).thenReturn(List.of(first, duplicate));
+
+            mockMvc.perform(get("/api/knowledge/wrong-questions"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.questions[0].jobDescription").value("Java 后端"));
         }
     }
 }

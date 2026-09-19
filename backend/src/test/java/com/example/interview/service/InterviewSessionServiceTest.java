@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.entity.InterviewQuestionEntity;
 import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.repository.InterviewSessionRepository;
 import com.example.interview.repository.InterviewQuestionRepository;
@@ -7,11 +8,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -70,5 +75,222 @@ class InterviewSessionServiceTest {
         when(sessionRepository.save(any())).thenReturn(mockSession);
         InterviewSessionEntity result = service.finishSession("test-uuid");
         assertThat(result.getStatus()).isEqualTo("FINISHED");
+    }
+
+    @Test
+    @DisplayName("getBySessionId: 存在时应返回会话")
+    void getBySessionId_found_shouldReturnSession() {
+        when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
+        InterviewSessionEntity result = service.getBySessionId("test-uuid");
+        assertThat(result.getSessionId()).isEqualTo("test-uuid");
+        assertThat(result.getUserId()).isEqualTo("user1");
+    }
+
+    // ─────────────────────────── 题目管理 ───────────────────────────
+
+    @Test
+    @DisplayName("saveQuestions: 应为每题设置 sessionId 并批量保存")
+    void saveQuestions_shouldSetSessionIdAndSaveAll() {
+        InterviewQuestionEntity q1 = InterviewQuestionEntity.builder().question("什么是 JVM？").build();
+        InterviewQuestionEntity q2 = InterviewQuestionEntity.builder().question("HashMap 线程安全吗？").build();
+        when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
+        when(questionRepository.saveAll(anyList())).thenReturn(List.of(q1, q2));
+
+        List<InterviewQuestionEntity> result =
+                service.saveQuestions("test-uuid", new ArrayList<>(List.of(q1, q2)));
+
+        assertThat(q1.getSessionId()).isEqualTo("test-uuid");
+        assertThat(q2.getSessionId()).isEqualTo("test-uuid");
+        assertThat(result).hasSize(2);
+        verify(questionRepository).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("saveQuestions: 会话不存在时抛 IllegalArgumentException")
+    void saveQuestions_sessionNotFound_shouldThrow() {
+        when(sessionRepository.findBySessionId("bad-id")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.saveQuestions("bad-id", List.of(new InterviewQuestionEntity())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("会话不存在");
+        verify(questionRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("listQuestions: 应按会话查询题目")
+    void listQuestions_shouldReturnQuestions() {
+        InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("test-uuid").question("Q").build();
+        when(questionRepository.findBySessionIdOrderByIdAsc("test-uuid")).thenReturn(List.of(q));
+
+        List<InterviewQuestionEntity> result = service.listQuestions("test-uuid");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getQuestion()).isEqualTo("Q");
+    }
+
+    @Test
+    @DisplayName("saveAnswer: 应保存用户回答与评分")
+    void saveAnswer_shouldSaveAnswerAndScore() {
+        InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("test-uuid").question("Q").build();
+        when(questionRepository.findById(1L)).thenReturn(Optional.of(q));
+        when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
+        when(questionRepository.save(q)).thenReturn(q);
+
+        InterviewQuestionEntity result = service.saveAnswer(1L, "我的回答", 85, "user1");
+
+        assertThat(result.getUserAnswer()).isEqualTo("我的回答");
+        assertThat(result.getEvaluationScore()).isEqualTo(85);
+        verify(questionRepository).save(q);
+    }
+
+    @Test
+    @DisplayName("saveAnswer: 题目不存在时抛 IllegalArgumentException")
+    void saveAnswer_questionNotFound_shouldThrow() {
+        when(questionRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.saveAnswer(99L, "回答", 80, "user1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("题目不存在");
+    }
+
+    @Test
+    @DisplayName("saveAnswer: 题目所属会话不存在时抛 IllegalArgumentException")
+    void saveAnswer_sessionNotFound_shouldThrow() {
+        InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("ghost-session").build();
+        when(questionRepository.findById(1L)).thenReturn(Optional.of(q));
+        when(sessionRepository.findBySessionId("ghost-session")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.saveAnswer(1L, "回答", 80, "user1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("会话不存在");
+    }
+
+    @Test
+    @DisplayName("saveAnswer: 非本人题目时抛越权异常")
+    void saveAnswer_notOwner_shouldThrow() {
+        InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("test-uuid").build();
+        when(questionRepository.findById(1L)).thenReturn(Optional.of(q));
+        when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
+
+        assertThatThrownBy(() -> service.saveAnswer(1L, "回答", 80, "another-user"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("无权操作他人题目");
+        verify(questionRepository, never()).save(any());
+    }
+
+    // ─────────────────────────── 知识库关联 ───────────────────────────
+
+    @Test
+    @DisplayName("listAllQuestionsByUser: 无会话时返回空列表且不查题目")
+    void listAllQuestionsByUser_noSessions_shouldReturnEmpty() {
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of());
+
+        List<InterviewQuestionEntity> result = service.listAllQuestionsByUser("user1");
+
+        assertThat(result).isEmpty();
+        verify(questionRepository, never()).findBySessionIdInOrderByCreatedAtDesc(any());
+    }
+
+    @Test
+    @DisplayName("listAllQuestionsByUser: 跨全部会话查询题目")
+    void listAllQuestionsByUser_shouldQueryAllSessions() {
+        InterviewSessionEntity s1 = InterviewSessionEntity.builder().sessionId("s1").build();
+        InterviewSessionEntity s2 = InterviewSessionEntity.builder().sessionId("s2").build();
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of(s1, s2));
+        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(anyCollection()))
+                .thenReturn(List.of(InterviewQuestionEntity.builder().id(1L).build()));
+
+        List<InterviewQuestionEntity> result = service.listAllQuestionsByUser("user1");
+
+        assertThat(result).hasSize(1);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<String>> captor =
+                (ArgumentCaptor<Collection<String>>) (ArgumentCaptor<?>) ArgumentCaptor.forClass(Collection.class);
+        verify(questionRepository).findBySessionIdInOrderByCreatedAtDesc(captor.capture());
+        assertThat(captor.getValue()).containsExactlyInAnyOrder("s1", "s2");
+    }
+
+    @Test
+    @DisplayName("listWrongQuestionsByUser: 仅保留评分低于阈值且非 null 的题目")
+    void listWrongQuestionsByUser_shouldFilterBelowThreshold() {
+        InterviewQuestionEntity wrong = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("s1").evaluationScore(50).build();
+        InterviewQuestionEntity passed = InterviewQuestionEntity.builder()
+                .id(2L).sessionId("s1").evaluationScore(70).build();
+        InterviewQuestionEntity unScored = InterviewQuestionEntity.builder()
+                .id(3L).sessionId("s1").evaluationScore(null).build();
+        InterviewSessionEntity s1 = InterviewSessionEntity.builder().sessionId("s1").build();
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of(s1));
+        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(anyCollection()))
+                .thenReturn(List.of(wrong, passed, unScored));
+
+        List<InterviewQuestionEntity> result = service.listWrongQuestionsByUser("user1", 60);
+
+        assertThat(result).containsExactly(wrong);
+    }
+
+    @Test
+    @DisplayName("questionSummary: 空用户应返回全零统计")
+    void questionSummary_emptyUser_shouldReturnZeroStats() {
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of());
+
+        Map<String, Object> summary = service.questionSummary("user1");
+
+        assertThat(summary.get("totalQuestions")).isEqualTo(0L);
+        assertThat(summary.get("answeredQuestions")).isEqualTo(0L);
+        assertThat(summary.get("wrongQuestions")).isEqualTo(0L);
+        assertThat(summary.get("averageScore")).isEqualTo(0.0);
+        assertThat((List<?>) summary.get("byCategory")).isEmpty();
+        assertThat((List<?>) summary.get("byDifficulty")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("questionSummary: 按分类/难度聚合统计（含空值过滤与均分计算）")
+    void questionSummary_shouldAggregateByCategoryAndDifficulty() {
+        // q1：已回答且错题（Java基础/EASY）
+        InterviewQuestionEntity q1 = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("s1").category("Java基础").difficulty("EASY")
+                .userAnswer("我的回答").evaluationScore(50).build();
+        // q2：回答为空白 → 不计 answered；80 分 → 非错题（Java基础/HARD）
+        InterviewQuestionEntity q2 = InterviewQuestionEntity.builder()
+                .id(2L).sessionId("s1").category("Java基础").difficulty("HARD")
+                .userAnswer("   ").evaluationScore(80).build();
+        // q3：分类/难度/回答/评分全空 → 不参与任何统计
+        InterviewQuestionEntity q3 = InterviewQuestionEntity.builder()
+                .id(3L).sessionId("s1").build();
+
+        InterviewSessionEntity s1 = InterviewSessionEntity.builder().sessionId("s1").build();
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of(s1));
+        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(anyCollection()))
+                .thenReturn(List.of(q1, q2, q3));
+
+        Map<String, Object> summary = service.questionSummary("user1");
+
+        assertThat(summary.get("totalQuestions")).isEqualTo(3L);
+        assertThat(summary.get("answeredQuestions")).isEqualTo(1L);
+        assertThat(summary.get("wrongQuestions")).isEqualTo(1L);
+        // 仅 q1/q2 有评分：(50+80)/2 = 65.0
+        assertThat(summary.get("averageScore")).isEqualTo(65.0);
+
+        // 按分类聚合：Java基础 total=2 answered=1 wrong=1 avg=65.0
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> byCategory = (List<Map<String, Object>>) summary.get("byCategory");
+        assertThat(byCategory).hasSize(1);
+        Map<String, Object> javaStat = byCategory.get(0);
+        assertThat(javaStat.get("category")).isEqualTo("Java基础");
+        assertThat(javaStat.get("total")).isEqualTo(2L);
+        assertThat(javaStat.get("answered")).isEqualTo(1L);
+        assertThat(javaStat.get("wrong")).isEqualTo(1L);
+        assertThat(javaStat.get("avgScore")).isEqualTo(65.0);
+
+        // 按难度聚合：EASY/HARD 各 1 题
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> byDifficulty = (List<Map<String, Object>>) summary.get("byDifficulty");
+        assertThat(byDifficulty).hasSize(2);
+        assertThat(byDifficulty)
+                .extracting(stat -> stat.get("difficulty"))
+                .containsExactlyInAnyOrder("EASY", "HARD");
     }
 }
