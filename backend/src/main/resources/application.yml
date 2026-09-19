@@ -44,7 +44,9 @@ spring:
         initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
-        dimensions: 1536
+        # 维度必须与 embedding 模型输出一致：text-embedding-3-small=1536，
+        # 切换提供方时同步设置 AI_EMBEDDING_DIMENSIONS（如硅基流动 bge-m3=1024）
+        dimensions: ${AI_EMBEDDING_DIMENSIONS:1536}
 
   servlet:
     multipart:
@@ -74,6 +76,13 @@ app:
   # 3. Agnes AI agnes-2.5-flash 兜底（原主模型自动降为末位）
   # api-key 为空的提供方自动跳过；主模型失败时自动降级到下一个
   ai:
+    # P2-06 后续（2026-09-19）：embedding 提供方可插拔——Agnes 已下线全部 embedding 模型，
+    # 配置 AI_EMBEDDING_BASE_URL + AI_EMBEDDING_API_KEY + AI_EMBEDDING_MODEL 即指向第三方
+    # （如硅基流动 https://api.siliconflow.cn/v1 + BAAI/bge-m3 + AI_EMBEDDING_DIMENSIONS=1024），
+    # 未配置时回退 spring.ai.openai.*（Agnes）
+    embedding:
+      base-url: ${AI_EMBEDDING_BASE_URL:}
+      api-key: ${AI_EMBEDDING_API_KEY:}
     chain:
       - name: bai-primary
         base-url: ${AI_BAI_BASE_URL:https://api.b.ai}

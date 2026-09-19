@@ -182,6 +182,13 @@ public class InterviewController {
             return Result.error(429, "操作过于频繁，请稍后再试");
         }
 
+        // P2-06：bucket 转私有后公开 URL 将 404——服务端换签 10 分钟短时效签名 URL 供 AI 下载。
+        // 签发失败自动回退原公开 URL（bucket 公读期间无缝过渡），URL 形态变化不影响 SSRF 校验
+        //（校验在换签前完成，换签仅在本系统存储域内进行）。
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            imageUrl = supabaseStorageService.createSignedUrl(imageUrl, 600);
+        }
+
         String result = interviewService.evaluateAnswerWithImage(question, userAnswer, referenceAnswer, imageUrl);
         return Result.success(result);
     }
@@ -217,8 +224,12 @@ public class InterviewController {
             String uid = HashUtil.sha256Short(currentUserId());
             String fileName = "interview/" + uid + "/" + System.currentTimeMillis() + suffix;
             String publicUrl = supabaseStorageService.upload(file, fileName);
+            // P2-06：bucket 转私有后公开 URL 无法直接预览——附赠 1 小时签名 URL 供前端预览；
+            // 提交评估时仍传 url（公开 URL 形态），服务端评估前换签短时效签名 URL
+            String previewSignedUrl = supabaseStorageService.createSignedUrl(publicUrl, 3600);
             java.util.Map<String, String> result = new java.util.LinkedHashMap<>();
             result.put("url", publicUrl);
+            result.put("signedUrl", previewSignedUrl);
             return Result.success(result);
         } catch (Exception e) {
             log.error("作答附图上传失败", e);

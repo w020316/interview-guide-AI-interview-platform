@@ -280,16 +280,20 @@ class InterviewControllerTest {
         }
 
         @Test
-        @DisplayName("携带合法 imageUrl 且命中存储域白名单时调用多模态评估（P1-08）")
+        @DisplayName("携带合法 imageUrl 且命中存储域白名单时：服务端换签后调用多模态评估（P1-08 + P2-06）")
         void evaluate_withImageUrl_returns200() throws Exception {
             // 192.0.2.1 为公网 TEST-NET 字面量，避免测试环境 DNS；
             // isOwnPublicUrl 本体行为在 SupabaseStorageServiceTest 中验证，此处 mock 放行
-            when(supabaseStorageService.isOwnPublicUrl("https://192.0.2.1/a.png")).thenReturn(true);
-            when(interviewService.evaluateAnswerWithImage("什么是多态？", "多态是...", "", "https://192.0.2.1/a.png"))
+            String publicUrl = "https://192.0.2.1/a.png";
+            String signedUrl = "https://192.0.2.1/storage/v1/object/sign/resumes/a.png?token=tok";
+            when(supabaseStorageService.isOwnPublicUrl(publicUrl)).thenReturn(true);
+            // P2-06：controller 在评估前须将公开 URL 换签为短时效签名 URL 再交给服务层
+            when(supabaseStorageService.createSignedUrl(publicUrl, 600)).thenReturn(signedUrl);
+            when(interviewService.evaluateAnswerWithImage("什么是多态？", "多态是...", "", signedUrl))
                     .thenReturn("{\"score\":88}");
 
             String body = objectMapper.writeValueAsString(Map.of(
-                    "question", "什么是多态？", "userAnswer", "多态是...", "imageUrl", "https://192.0.2.1/a.png"));
+                    "question", "什么是多态？", "userAnswer", "多态是...", "imageUrl", publicUrl));
 
             mockMvc.perform(post("/api/interview/evaluate")
                             .contentType(MediaType.APPLICATION_JSON)

@@ -109,4 +109,58 @@ public class SupabaseStorageService {
             return false;
         }
     }
+
+    /**
+     * 为本系统存储的公开 URL 签发短时效签名 URL（P2-06）。
+     *
+     * <p>调用 Supabase Storage 签名接口
+     * {@code POST /storage/v1/object/sign/{bucket}/{path}}（service key 鉴权），
+     * 返回带 token 的临时访问 URL，供 AI 媒体下载器在 bucket 转私有后仍可拉取。
+     *
+     * @param publicUrl  {@link #upload} 返回的公开 URL（{supabaseUrl}/storage/v1/object/public/{bucket}/{path}）
+     * @param ttlSeconds 有效期（秒）
+     * @return 签名 URL；任何失败（非本系统 URL、Supabase 异常）时回退返回原始 publicUrl，
+     *         保证 bucket 仍为公读时功能不受影响（平滑切换）
+     */
+    public String createSignedUrl(String publicUrl, long ttlSeconds) {
+        if (!isOwnPublicUrl(publicUrl)) {
+            return publicUrl;
+        }
+        try {
+            String path = new URI(publicUrl.trim()).getPath()
+                    .replaceFirst("^/storage/v1/object/public/", "");
+            // path = {bucket}/{objectPath}，双重防穿越：拒绝路径上跳
+            if (path.contains("..")) {
+                return publicUrl;
+            }
+            String signUrl = supabaseUrl + "/storage/v1/object/sign/" + path;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + serviceKey);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> entity = new HttpEntity<>("{\"expiresIn\":" + ttlSeconds + "}", headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    signUrl, HttpMethod.POST, entity, String.class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.warn("Supabase 签名 URL 签发失败：status={}，回退公开 URL", response.getStatusCode());
+                return publicUrl;
+            }
+            // 响应形如 {"signedURL":"/object/sign/{bucket}/{path}?token=..."}
+            String body = response.getBody();
+            int idx = body.indexOf("\"signedURL\"");
+            if (idx < 0) {
+                log.warn("Supabase 签名响应缺少 signedURL 字段，回退公开 URL");
+                return publicUrl;
+            }
+            int colon = body.indexOf(':', idx);
+            int quote1 = body.indexOf('"', colon);
+            int quote2 = body.indexOf('"', quote1 + 1);
+            String signed = body.substring(quote1 + 1, quote2);
+            return supabaseUrl + "/storage/v1" + signed;
+        } catch (Exception e) {
+            log.warn("Supabase 签名 URL 签发异常：{}，回退公开 URL", e.getMessage());
+            return publicUrl;
+        }
+    }
 }

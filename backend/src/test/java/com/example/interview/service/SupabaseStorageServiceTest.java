@@ -233,4 +233,90 @@ class SupabaseStorageServiceTest {
             assertThat(service.isOwnPublicUrl("")).isFalse();
         }
     }
+
+    @Nested
+    @DisplayName("createSignedUrl: 短时效签名 URL（P2-06）")
+    class CreateSignedUrl {
+
+        private static final String OWN_PUBLIC_URL =
+                SUPABASE_URL + "/storage/v1/object/public/" + BUCKET + "/interview/u1/1.png";
+
+        @Test
+        @DisplayName("本系统公开 URL 换签成功：返回带 token 的签名 URL")
+        void sign_ownUrl_returnsSignedUrl() {
+            when(restTemplate.exchange(
+                    anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(String.class)
+            )).thenReturn(new ResponseEntity<>(
+                    "{\"signedURL\":\"/object/sign/" + BUCKET + "/interview/u1/1.png?token=tok\"}",
+                    HttpStatus.OK));
+
+            String result = service.createSignedUrl(OWN_PUBLIC_URL, 600);
+
+            assertThat(result).isEqualTo(SUPABASE_URL + "/storage/v1/object/sign/"
+                    + BUCKET + "/interview/u1/1.png?token=tok");
+            verify(restTemplate).exchange(
+                    eq(SUPABASE_URL + "/storage/v1/object/sign/" + BUCKET + "/interview/u1/1.png"),
+                    eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class));
+        }
+
+        @Test
+        @DisplayName("签名请求携带 service key 与 expiresIn 请求体")
+        void sign_sendsServiceKeyAndTtl() {
+            service.createSignedUrl(OWN_PUBLIC_URL, 600);
+
+            ArgumentCaptor<HttpEntity<?>> entityCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+            verify(restTemplate).exchange(anyString(), eq(HttpMethod.POST), entityCaptor.capture(), eq(String.class));
+            HttpHeaders headers = entityCaptor.getValue().getHeaders();
+            assertThat(headers.getFirst("Authorization")).isEqualTo("Bearer " + SERVICE_KEY);
+            assertThat(entityCaptor.getValue().getBody()).isEqualTo("{\"expiresIn\":600}");
+        }
+
+        @Test
+        @DisplayName("非本系统 URL 直接原样返回（不发起请求）")
+        void sign_foreignUrl_returnsOriginal() {
+            String foreign = "https://evil.example.com/storage/v1/object/public/resumes/a.png";
+
+            String result = service.createSignedUrl(foreign, 600);
+
+            assertThat(result).isEqualTo(foreign);
+            verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class),
+                    any(HttpEntity.class), eq(String.class));
+        }
+
+        @Test
+        @DisplayName("签名接口失败时回退原公开 URL（bucket 公读期间平滑过渡）")
+        void sign_httpError_fallsBackToPublicUrl() {
+            when(restTemplate.exchange(
+                    anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(String.class)
+            )).thenReturn(new ResponseEntity<>("sign failed", HttpStatus.INTERNAL_SERVER_ERROR));
+
+            String result = service.createSignedUrl(OWN_PUBLIC_URL, 600);
+
+            assertThat(result).isEqualTo(OWN_PUBLIC_URL);
+        }
+
+        @Test
+        @DisplayName("响应缺少 signedURL 字段时回退原公开 URL")
+        void sign_missingField_fallsBackToPublicUrl() {
+            when(restTemplate.exchange(
+                    anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(String.class)
+            )).thenReturn(new ResponseEntity<>("{\"unexpected\":1}", HttpStatus.OK));
+
+            String result = service.createSignedUrl(OWN_PUBLIC_URL, 600);
+
+            assertThat(result).isEqualTo(OWN_PUBLIC_URL);
+        }
+
+        @Test
+        @DisplayName("路径含路径穿越片段时拒绝换签并原样返回")
+        void sign_pathTraversal_fallsBackToPublicUrl() {
+            String traversal = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET + "/../secret.png";
+
+            String result = service.createSignedUrl(traversal, 600);
+
+            assertThat(result).isEqualTo(traversal);
+            verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class),
+                    any(HttpEntity.class), eq(String.class));
+        }
+    }
 }

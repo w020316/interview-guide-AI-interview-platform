@@ -122,14 +122,24 @@ public class AiConfig {
             RestClient.Builder restClientBuilder,
             @Value("${spring.ai.openai.api-key}") String apiKey,
             @Value("${spring.ai.openai.base-url}") String baseUrl,
-            @Value("${spring.ai.openai.embedding.options.model:text-embedding-3-small}") String embeddingModel) {
+            @Value("${spring.ai.openai.embedding.options.model:text-embedding-3-small}") String embeddingModel,
+            @Value("${app.ai.embedding.base-url:}") String embeddingBaseUrlOverride,
+            @Value("${app.ai.embedding.api-key:}") String embeddingApiKeyOverride) {
+        // P2-06 后续（2026-09-19）：embedding 提供方可插拔——Agnes 已下线全部 embedding 模型，
+        // 通过 AI_EMBEDDING_BASE_URL / AI_EMBEDDING_API_KEY 指向第三方（如硅基流动 bge-m3），
+        // 未配置时回退 spring.ai.openai.*（保持向后兼容）
+        boolean override = embeddingBaseUrlOverride != null && !embeddingBaseUrlOverride.isBlank()
+                && embeddingApiKeyOverride != null && !embeddingApiKeyOverride.isBlank();
+        String useBaseUrl = override ? embeddingBaseUrlOverride : baseUrl;
+        String useApiKey = override ? embeddingApiKeyOverride : apiKey;
+
         RestClient.Builder rb = restClientBuilder.clone().requestFactory(ClientHttpRequestFactories.get(
                 ClientHttpRequestFactorySettings.DEFAULTS
                         .withConnectTimeout(Duration.ofSeconds(10))
                         .withReadTimeout(Duration.ofSeconds(60))));
         OpenAiApi api = OpenAiApi.builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
+                .baseUrl(useBaseUrl)
+                .apiKey(useApiKey)
                 .restClientBuilder(rb)
                 .build();
         return new OpenAiEmbeddingModel(

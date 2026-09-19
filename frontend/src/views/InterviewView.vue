@@ -152,7 +152,7 @@
             <input ref="imageInputEl" type="file" accept="image/*" hidden @change="onImageSelected" />
             <span v-if="imageUrl" class="attach-hint">已附加 1 张图片</span>
             <template v-if="imageUrl">
-              <img :src="imageUrl" class="attach-preview" alt="作答附图" />
+              <img :src="imageSignedUrl" class="attach-preview" alt="作答附图" />
               <button class="attach-remove" aria-label="移除附图" :title="'移除附图'" @click="removeImage">×</button>
             </template>
           </div>
@@ -433,6 +433,8 @@ const hintOpen = ref(false)
 // ── 多模态附图（v1.30.0）──
 const imageInputEl = ref<HTMLInputElement | null>(null)
 const imageUrl = ref('')
+// P2-06：预览专用签名 URL（bucket 转私有后公开 URL 无法直接展示）
+const imageSignedUrl = ref('')
 const imageUploading = ref(false)
 function pickImageFile() {
   imageInputEl.value?.click()
@@ -448,9 +450,11 @@ async function onImageSelected(e: Event) {
   try {
     const form = new FormData()
     form.append('file', file)
-    const res = await api.post('/api/interview/upload-image', form) as unknown as { url?: string }
+    const res = await api.post('/api/interview/upload-image', form) as unknown as { url?: string; signedUrl?: string }
     if (!res?.url) throw new Error('未返回图片地址')
     imageUrl.value = res.url
+    // P2-06：bucket 转私有后公开 URL 无法直接预览，优先使用后端签发的短时效签名 URL 展示
+    imageSignedUrl.value = res.signedUrl || res.url
     ElMessage.success('附图已上传，提交后 AI 将结合图片评估')
   } catch (err: unknown) {
     ElMessage.error(getErrMessage(err, '图片上传失败'))
@@ -460,6 +464,7 @@ async function onImageSelected(e: Event) {
 }
 function removeImage() {
   imageUrl.value = ''
+  imageSignedUrl.value = ''
 }
 
 // 通过 ?sessionId= 载入指定会话（从收藏题库发起面试等入口进入时直接答题）
@@ -955,6 +960,7 @@ function nextQuestion() {
     userAnswer.value = ''
     evalResult.value = null
     imageUrl.value = '' // 切题时清除上一题附图
+    imageSignedUrl.value = ''
     // 切题时终止上一题的提示流，避免旧题 token 继续写入新题的 streamContent
     abortController?.abort()
     streaming.value = false
