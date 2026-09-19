@@ -60,6 +60,7 @@ class AgentControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(agentController).build();
         SecurityContextHolder.getContext().setAuthentication(
                 UsernamePasswordAuthenticationToken.authenticated("u1", null, List.of()));
+        emitterInitGate = new java.util.concurrent.CountDownLatch(1);
     }
 
     @AfterEach
@@ -117,6 +118,14 @@ class AgentControllerTest {
 
     private final ScheduledExecutorService heartbeatExecutor = Executors.newScheduledThreadPool(1);
 
+    /**
+     * Emitter 初始化栅门：首次 perform 返回时 SseEmitter 已由消息转换器初始化。
+     * 若虚拟线程任务在初始化前调用 complete()，Spring 不会触发 onCompletion 回调
+     * （ResponseBodyEmitter 对 init 前 complete 不回放完成事件），release 断言将
+     * 不确定性地失败（CI Linux 上必现）。流式桩先 await 此栅门，保证时序确定。
+     */
+    private java.util.concurrent.CountDownLatch emitterInitGate = new java.util.concurrent.CountDownLatch(1);
+
     /** 执行异步请求并返回 SSE 响应全文（UTF-8 解码） */
     private String performStreamAndGetContent(String body) throws Exception {
         org.springframework.test.web.servlet.MvcResult mvcResult = mockMvc.perform(
@@ -126,6 +135,8 @@ class AgentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.request().asyncStarted())
                 .andReturn();
+        // 首次 perform 返回 = emitter 已初始化，放行被栅门阻塞的异步任务
+        emitterInitGate.countDown();
         return mockMvc.perform(
                         org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch(mvcResult))
                 .andExpect(status().isOk())
@@ -162,7 +173,13 @@ class AgentControllerTest {
         when(agentService.tryAcquire("u1"))
                 .thenReturn(com.example.interview.util.SseConcurrencyGuard.Result.ACQUIRED);
         when(agentService.streamChat(eq("u1"), any(), anyString(), any(AtomicBoolean.class)))
-                .thenThrow(new RuntimeException("db down"));
+                .thenAnswer(inv -> {
+                    // 等待 emitter 初始化后再失败，保证 onCompletion→release 时序确定
+                    if (!emitterInitGate.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("emitter init gate timeout");
+                    }
+                    throw new RuntimeException("db down");
+                });
 
         String content = performStreamAndGetContent("{\"message\":\"你好\",\"conversationId\":9}");
 
@@ -190,7 +207,13 @@ class AgentControllerTest {
         var session = new com.example.interview.service.agent.AgentService.AgentStreamSession(
                 conversation, "SYS", List.of(), "你好", new AtomicBoolean(false));
         when(agentService.streamChat(eq("u1"), eq(42L), anyString(), any(AtomicBoolean.class)))
-                .thenReturn(session);
+                .thenAnswer(inv -> {
+                    // 等待 emitter 初始化，保证 complete() 晚于初始化（onCompletion 必触发）
+                    if (!emitterInitGate.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("emitter init gate timeout");
+                    }
+                    return session;
+                });
         doAnswer(inv -> {
             java.util.function.Consumer<String> onToken = inv.getArgument(1);
             Runnable onComplete = inv.getArgument(2);
@@ -224,7 +247,12 @@ class AgentControllerTest {
         var session = new com.example.interview.service.agent.AgentService.AgentStreamSession(
                 conversation, "SYS", List.of(), "你好", new AtomicBoolean(false));
         when(agentService.streamChat(eq("u1"), eq(43L), anyString(), any(AtomicBoolean.class)))
-                .thenReturn(session);
+                .thenAnswer(inv -> {
+                    if (!emitterInitGate.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("emitter init gate timeout");
+                    }
+                    return session;
+                });
         doAnswer(inv -> {
             java.util.function.Consumer<String> onError = inv.getArgument(3);
             onError.accept("AI 服务异常，请重试");
@@ -248,7 +276,12 @@ class AgentControllerTest {
         var session = new com.example.interview.service.agent.AgentService.AgentStreamSession(
                 conversation, "SYS", List.of(), "你好", new AtomicBoolean(false));
         when(agentService.streamChat(eq("u1"), eq(44L), anyString(), any(AtomicBoolean.class)))
-                .thenReturn(session);
+                .thenAnswer(inv -> {
+                    if (!emitterInitGate.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("emitter init gate timeout");
+                    }
+                    return session;
+                });
         Disposable disposable = mock(Disposable.class);
         when(disposable.isDisposed()).thenReturn(false);
         // 回调异步执行：runStream 先返回 Disposable（写入 holder），之后才触发 emitter.complete()
