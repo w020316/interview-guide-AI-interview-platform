@@ -4,6 +4,8 @@ import com.example.interview.ai.FallbackChatModel;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiEmbeddingModel;
+import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +16,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.client.reactive.JdkClientHttpConnector;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -104,5 +107,35 @@ public class AiConfig {
     @Bean
     public ChatClient chatClient(ChatModel fallbackChatModel) {
         return ChatClient.builder(fallbackChatModel).build();
+    }
+
+    /**
+     * P0-02 后续（2026-09-19）：显式装配 Embedding 模型，覆盖 spring.ai 自动装配。
+     * 问题：自动装配的 OpenAiEmbeddingModel 使用默认 RestClient（无超时）+ 默认重试模板
+     * （指数退避 10 次，累计约 5 分钟），embedding 端点不可用时知识导入请求挂起约 5 分钟
+     * 才失败，期间占用请求线程与 AI 闸门许可。
+     * 修复：连接 10s + 读 60s 显式超时，最多重试 1 次（间隔 0.5s），快速失败后由
+     * RagSearchService 转为「AI 服务暂时不可用」业务文案（U1）。
+     */
+    @Bean
+    public OpenAiEmbeddingModel openAiEmbeddingModel(
+            RestClient.Builder restClientBuilder,
+            @Value("${spring.ai.openai.api-key}") String apiKey,
+            @Value("${spring.ai.openai.base-url}") String baseUrl,
+            @Value("${spring.ai.openai.embedding.options.model:text-embedding-3-small}") String embeddingModel) {
+        RestClient.Builder rb = restClientBuilder.clone().requestFactory(ClientHttpRequestFactories.get(
+                ClientHttpRequestFactorySettings.DEFAULTS
+                        .withConnectTimeout(Duration.ofSeconds(10))
+                        .withReadTimeout(Duration.ofSeconds(60))));
+        OpenAiApi api = OpenAiApi.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .restClientBuilder(rb)
+                .build();
+        return new OpenAiEmbeddingModel(
+                api,
+                org.springframework.ai.document.MetadataMode.EMBED,
+                OpenAiEmbeddingOptions.builder().model(embeddingModel).build(),
+                RetryTemplate.builder().maxAttempts(2).fixedBackoff(500).build());
     }
 }
