@@ -61,13 +61,16 @@ spring:
           model: ${AI_MODEL:agnes-2.5-flash}
           temperature: 0.3
   # 排除自动装配以避免启动崩溃：
-  # - pgvector：512MB 容器内 Metaspace 不足
   # - Redis：其自动装配会按 REDIS_URL 急切解析主机，若 Upstash 端点失效则抛 UnknownHostException，
   #   导致整个上下文无法启动（永远冷启动）。Redis 仅用于 AI 响应缓存，改由 RedisConfig 显式
   #   提供回退本机地址的容错工厂，服务层已做降级，登录/鉴权不依赖 Redis。
+  # P2-17（2026-09-19）：恢复 pgvector——Supabase 已启用 vector 扩展（0.8.2），
+  # 移除 exclude 后 PgVectorStore 自动装配生效（1536 维/HNSW/COSINE，建表见 application.yml
+  # spring.ai.vectorstore.pgvector.*），知识库向量重启不再丢失；原 @Primary 内存
+  # ProdVectorStoreConfig 已删除。若 512MB 容器出现 Metaspace 压力，回滚方式：
+  # 重新加回本 exclude 并恢复 ProdVectorStoreConfig。
   autoconfigure:
     exclude:
-      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
 
