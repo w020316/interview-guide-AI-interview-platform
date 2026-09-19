@@ -167,8 +167,8 @@ class AgentControllerTest {
         String content = performStreamAndGetContent("{\"message\":\"你好\",\"conversationId\":9}");
 
         assertThatSseError(content);
-        // onCompletion 释放 SSE 槽位
-        verify(agentService).release("u1");
+        // onCompletion 释放 SSE 槽位（异步回调，需带超时等待）
+        verify(agentService, org.mockito.Mockito.timeout(5000)).release("u1");
     }
 
     @Test
@@ -210,7 +210,7 @@ class AgentControllerTest {
                 .contains("event:token")
                 .contains("event:done").contains("[DONE]");
         verify(heartbeat).scheduleAtFixedRate(any(), anyLong(), anyLong(), any());
-        verify(agentService).release("u1");
+        verify(agentService, org.mockito.Mockito.timeout(5000)).release("u1");
     }
 
     @Test
@@ -234,7 +234,7 @@ class AgentControllerTest {
         String content = performStreamAndGetContent("{\"message\":\"你好\",\"conversationId\":43}");
 
         assertThatSseError(content);
-        verify(agentService).release("u1");
+        verify(agentService, org.mockito.Mockito.timeout(5000)).release("u1");
     }
 
     @Test
@@ -272,7 +272,7 @@ class AgentControllerTest {
 
         // onCompletion 应 dispose 尚未结束的 Disposable
         verify(disposable, org.mockito.Mockito.timeout(5000)).dispose();
-        verify(agentService).release("u1");
+        verify(agentService, org.mockito.Mockito.timeout(5000)).release("u1");
     }
 
     /** 断言 SSE 响应含 error 事件且 data 非空 */
