@@ -132,6 +132,11 @@ public class AiConfig {
                 && embeddingApiKeyOverride != null && !embeddingApiKeyOverride.isBlank();
         String useBaseUrl = override ? embeddingBaseUrlOverride : baseUrl;
         String useApiKey = override ? embeddingApiKeyOverride : apiKey;
+        // 兼容误带 /v1 的 base-url：OpenAiApi 会自行拼接 /v1/embeddings 路径，
+        // 若配置值以 /v1 结尾会产生 /v1/v1/embeddings 404，此处统一剥离
+        if (useBaseUrl.endsWith("/v1")) {
+            useBaseUrl = useBaseUrl.substring(0, useBaseUrl.length() - 3);
+        }
 
         RestClient.Builder rb = restClientBuilder.clone().requestFactory(ClientHttpRequestFactories.get(
                 ClientHttpRequestFactorySettings.DEFAULTS
