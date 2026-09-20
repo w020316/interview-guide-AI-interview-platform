@@ -253,11 +253,12 @@
                     <!-- @{argLine} 为延迟绑定：jacoco:prepare-agent 会把 -javaagent 写进
                          名为 argLine 的属性，surefire 在分叉 JVM 时才展开，二者缺一不可。
                          同时为测试 JVM 显式设内存上限：JaCoCo 真正生效后会对全部类做插桩，
-                         fork JVM 默认无上限，实测在本机原生内存紧张时以
-                         "Native memory allocation (malloc) failed ... Chunk::new" 崩溃
-                         （surefire 报 The forked VM terminated without properly saying goodbye）。
-                         此上限只作用于测试分叉 JVM，不影响生产容器内存参数。 -->
-                    <argLine>@{argLine} -Xmx1536m -XX:MaxMetaspaceSize=512m -XX:ReservedCodeCacheSize=192m</argLine>
+                         fork JVM 默认无上限，实测在本机原生内存紧张时先后出现两种崩溃：
+                         ① malloc failed ... Chunk::new（JIT 编译器原生内存）
+                         ② mmap failed to map ... for G1 virtual space（G1 启动期映射失败）
+                         故改用 SerialGC（与生产 512MB 容器同款，虚拟空间占用小）并设上限。
+                         此配置只作用于测试分叉 JVM，不影响生产容器内存参数。 -->
+                    <argLine>@{argLine} -Xmx1024m -XX:MaxMetaspaceSize=512m -XX:ReservedCodeCacheSize=192m -XX:+UseSerialGC</argLine>
                 </configuration>
             </plugin>
         </plugins>
