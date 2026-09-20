@@ -66,6 +66,18 @@ public class GlobalExceptionHandler {
         return Result.error(404, "接口不存在：" + ex.getRequestURL());
     }
 
+    /**
+     * Spring Boot 3.2+ 未匹配路径由静态资源处理器抛 {@code NoResourceFoundException}
+     * （而非 NoHandlerFoundException），落到兜底 Exception 会返回 500——
+     * 线上实测（2026-09-20，阶段四场景验证）任何不存在的 API 路径均 500，
+     * 既给客户端错误语义，也污染 5xx 告警。归位为 404。
+     */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Result<Void> handleNoResource(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        return Result.error(404, "接口不存在");
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public Result<Void> handleAuth(AuthenticationException ex) {

@@ -100,6 +100,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("NoResourceFoundException → 404（线上 500 回归防线，2026-09-20 阶段四实测发现）")
+    void noResourceFound_returns404() {
+        // Spring Boot 3.2+ 未匹配路径由静态资源处理器抛此异常，此前落到兜底返回 500
+        var ex = new org.springframework.web.servlet.resource.NoResourceFoundException(
+                org.springframework.http.HttpMethod.GET, "stats/overview");
+        Result<Void> result = handler.handleNoResource(ex);
+        assertThat(result.code()).isEqualTo(404);
+    }
+
+    @Test
     @DisplayName("AuthenticationException → 401 未认证提示")
     void authException_returns401() {
         Result<Void> result = handler.handleAuth(
