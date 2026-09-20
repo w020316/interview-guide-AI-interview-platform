@@ -37,7 +37,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 // 用测试数据覆盖用户真实积累的知识库。故显式关闭持久化并指向临时文件。
 @TestPropertySource(properties = {
         "app.rag.persist-enabled=false",
-        "app.rag.snapshot-file=${java.io.tmpdir}/interview-smoke-vectorstore.json"
+        "app.rag.snapshot-file=${java.io.tmpdir}/interview-smoke-vectorstore.json",
+        // P2-11（2026-09-20）：数据源隔离。local profile 默认指向共享文件库
+        // jdbc:h2:file:D:/xm/data/interview，本地 dev server 运行时会持有文件锁（90028），
+        // 导致本测试偶发红；且测试会向真实本地库写入 smoke-user。改指内存库并关闭自动关闭，
+        // 与正在运行的 dev server 完全解耦，dev server 常驻也不影响 672/672 绿灯。
+        "spring.datasource.url=jdbc:h2:mem:smoke;DB_CLOSE_DELAY=-1"
 })
 class ApplicationContextSmokeTest {
 
