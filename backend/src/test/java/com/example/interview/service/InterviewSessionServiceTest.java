@@ -73,8 +73,18 @@ class InterviewSessionServiceTest {
     void finishSession_shouldSetStatusFinished() {
         when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
         when(sessionRepository.save(any())).thenReturn(mockSession);
-        InterviewSessionEntity result = service.finishSession("test-uuid");
+        InterviewSessionEntity result = service.finishSession("test-uuid", "user1");
         assertThat(result.getStatus()).isEqualTo("FINISHED");
+    }
+
+    @Test
+    @DisplayName("finishSession: 非本人会话应拒绝（B-17 service 层归属校验）")
+    void finishSession_otherUsersSession_shouldThrow() {
+        when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
+        assertThatThrownBy(() -> service.finishSession("test-uuid", "someone-else"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("无权操作他人会话");
+        verify(sessionRepository, never()).save(any());
     }
 
     @Test
@@ -97,7 +107,7 @@ class InterviewSessionServiceTest {
         when(questionRepository.saveAll(anyList())).thenReturn(List.of(q1, q2));
 
         List<InterviewQuestionEntity> result =
-                service.saveQuestions("test-uuid", new ArrayList<>(List.of(q1, q2)));
+                service.saveQuestions("test-uuid", new ArrayList<>(List.of(q1, q2)), "user1");
 
         assertThat(q1.getSessionId()).isEqualTo("test-uuid");
         assertThat(q2.getSessionId()).isEqualTo("test-uuid");
@@ -106,10 +116,22 @@ class InterviewSessionServiceTest {
     }
 
     @Test
+    @DisplayName("saveQuestions: 非本人会话应拒绝（B-17 service 层归属校验）")
+    void saveQuestions_otherUsersSession_shouldThrow() {
+        InterviewQuestionEntity q1 = InterviewQuestionEntity.builder().question("什么是 JVM？").build();
+        when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
+
+        assertThatThrownBy(() -> service.saveQuestions("test-uuid", List.of(q1), "someone-else"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("无权向他人会话写入题目");
+        verify(questionRepository, never()).saveAll(anyList());
+    }
+
+    @Test
     @DisplayName("saveQuestions: 会话不存在时抛 IllegalArgumentException")
     void saveQuestions_sessionNotFound_shouldThrow() {
         when(sessionRepository.findBySessionId("bad-id")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.saveQuestions("bad-id", List.of(new InterviewQuestionEntity())))
+        assertThatThrownBy(() -> service.saveQuestions("bad-id", List.of(new InterviewQuestionEntity()), "user1"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("会话不存在");
         verify(questionRepository, never()).saveAll(anyList());

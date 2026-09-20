@@ -229,7 +229,7 @@ class InterviewSessionControllerTest {
                     .id(1L).sessionId("s1").userId(USER_ID)
                     .jobDescription("Java 后端").status("FINISHED").build();
             when(sessionService.getBySessionId("s1")).thenReturn(s);
-            when(sessionService.finishSession("s1")).thenReturn(finished);
+            when(sessionService.finishSession("s1", USER_ID)).thenReturn(finished);
 
             mockMvc.perform(put("/api/session/s1/finish"))
                     .andExpect(status().isOk())
@@ -333,7 +333,7 @@ class InterviewSessionControllerTest {
             when(sessionService.getBySessionId("s1")).thenReturn(s);
             InterviewQuestionEntity saved = InterviewQuestionEntity.builder()
                     .id(1L).sessionId("s1").question("什么是多态？").build();
-            when(sessionService.saveQuestions(any(String.class), any()))
+            when(sessionService.saveQuestions(any(String.class), any(), any()))
                     .thenReturn(List.of(saved));
 
             String body = objectMapper.writeValueAsString(List.of(

@@ -97,7 +97,7 @@ class FavoriteControllerTest {
         InterviewQuestionEntity q1 = InterviewQuestionEntity.builder()
                 .id(10L).sessionId("sess-abc").question("自我介绍").category("项目").difficulty("EASY")
                 .referenceAnswer("参考答案").build();
-        when(sessionService.saveQuestions(eq("sess-abc"), any())).thenReturn(List.of(q1));
+        when(sessionService.saveQuestions(eq("sess-abc"), any(), any())).thenReturn(List.of(q1));
 
         mockMvc.perform(post("/api/favorite/bank/start")
                         .contentType(MediaType.APPLICATION_JSON)

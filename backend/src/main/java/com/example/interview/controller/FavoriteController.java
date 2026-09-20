@@ -173,7 +173,7 @@ public class FavoriteController {
                         .referenceAnswer(f.getReferenceAnswer())
                         .build())
                 .toList();
-        List<InterviewQuestionEntity> saved = sessionService.saveQuestions(session.getSessionId(), questions);
+        List<InterviewQuestionEntity> saved = sessionService.saveQuestions(session.getSessionId(), questions, userId);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("sessionId", session.getSessionId());

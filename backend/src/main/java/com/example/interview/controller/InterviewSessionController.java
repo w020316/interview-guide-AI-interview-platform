@@ -83,11 +83,12 @@ public class InterviewSessionController {
      */
     @PutMapping("/{sessionId}/finish")
     public Result<InterviewSessionEntity> finishSession(@PathVariable String sessionId) {
+        // controller 层校验用于返回友好 403；service 层再做一次归属校验（纵深防御，B-17）
         InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
         if (!currentUserId().equals(session.getUserId())) {
             return Result.error(403, "无权操作该会话");
         }
-        return Result.success(sessionService.finishSession(sessionId));
+        return Result.success(sessionService.finishSession(sessionId, currentUserId()));
     }
 
     /**
@@ -150,7 +151,7 @@ public class InterviewSessionController {
             return Result.error(400, "题目内容不能为空");
         }
 
-        return Result.success(sessionService.saveQuestions(sessionId, entities));
+        return Result.success(sessionService.saveQuestions(sessionId, entities, currentUserId()));
     }
 
     /**

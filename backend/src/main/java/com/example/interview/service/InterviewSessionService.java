@@ -68,10 +68,20 @@ public class InterviewSessionService {
 
     /**
      * 将会话标记为已完成
+     *
+     * <p>P1（B-17，2026-09-20）：service 层补归属校验。此前仅 controller 层补偿 403，
+     * 一旦新增内部调用方即出现越权写。与 {@link #saveAnswer} 的既有模式保持一致，
+     * 形成纵深防御。
+     *
+     * @param sessionId     会话 ID
+     * @param currentUserId 当前登录用户 ID（用于越权校验）
      */
     @Transactional
-    public InterviewSessionEntity finishSession(String sessionId) {
+    public InterviewSessionEntity finishSession(String sessionId, String currentUserId) {
         InterviewSessionEntity session = getBySessionId(sessionId);
+        if (!currentUserId.equals(session.getUserId())) {
+            throw new IllegalArgumentException("无权操作他人会话");
+        }
         session.setStatus("FINISHED");
         return sessionRepository.save(session);
     }
@@ -81,15 +91,21 @@ public class InterviewSessionService {
     /**
      * 批量保存 AI 生成的面试题目
      *
-     * @param sessionId 会话 ID
-     * @param questions 题目列表
+     * <p>P1（B-17，2026-09-20）：service 层补归属校验，见 {@link #finishSession}。
+     *
+     * @param sessionId     会话 ID
+     * @param questions     题目列表
+     * @param currentUserId 当前登录用户 ID（用于越权校验）
      * @return 已持久化的题目列表
      */
     @Transactional
     public List<InterviewQuestionEntity> saveQuestions(String sessionId,
-                                                        List<InterviewQuestionEntity> questions) {
-        // 确保会话存在
-        getBySessionId(sessionId);
+                                                        List<InterviewQuestionEntity> questions,
+                                                        String currentUserId) {
+        InterviewSessionEntity session = getBySessionId(sessionId);
+        if (!currentUserId.equals(session.getUserId())) {
+            throw new IllegalArgumentException("无权向他人会话写入题目");
+        }
         questions.forEach(q -> q.setSessionId(sessionId));
         return questionRepository.saveAll(questions);
     }
