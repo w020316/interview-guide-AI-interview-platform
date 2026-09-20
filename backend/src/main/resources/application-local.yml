@@ -1,13 +1,21 @@
-# 本地联调配置（零外部依赖：H2 内存库 + SimpleVectorStore + Redis 容错）
+# 本地联调配置（H2 文件库 + 持久化 SimpleVectorStore + Redis 容错）
 # 启动方式：mvn spring-boot:run -Dspring-boot.run.profiles=local
+#
+# v1.34.0（2026-09-20）：「电脑关机后 RAG 不可用」修复
+#   - 数据源由 mem:interview 改为**文件库**，用户/面试记录等重启后仍在
+#   - 向量库由纯内存 SimpleVectorStore 改为带文件快照的实现（见 VectorStoreConfig）
+#   两者数据均落在 D:/xm/data/，与代码分离，便于备份与清理
 
 server:
   port: 8080
 
 spring:
-  # H2 内存数据库
+  # H2 文件数据库（原为 mem:interview，重启即清空）
+  # 注意：H2 不允许 AUTO_SERVER=TRUE 与 DB_CLOSE_ON_EXIT=FALSE 组合使用
+  # （实测报 JdbcSQLFeatureNotSupportedException: Feature not supported），
+  # 故仅使用最简的纯文件模式，数据落在 D:/xm/data/interview.mv.db
   datasource:
-    url: jdbc:h2:mem:interview;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:file:D:/xm/data/interview
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -79,3 +87,22 @@ app:
     url: https://your-project.supabase.co
     service-key: local-dev-placeholder
     bucket: resumes
+  # ── 向量库持久化与知识自动补充（v1.34.0）─────────────────────────────
+  rag:
+    # 快照持久化：进程退出后知识不丢，下次启动自动恢复
+    persist-enabled: ${RAG_PERSIST_ENABLED:true}
+    snapshot-file: ${RAG_SNAPSHOT_FILE:D:/xm/data/vectorstore.json}
+    # 变更后多久落盘一次（毫秒）。写入路径不同步 IO，故可设得较小
+    snapshot-flush-interval-ms: ${RAG_FLUSH_INTERVAL_MS:3000}
+    # 本地堆 768MB，比生产（-Xmx220m 时 500 条）放宽；全行业覆盖需要更多条目
+    max-documents: ${RAG_MAX_DOCUMENTS:2000}
+    # 自动补充知识：RAG 检索无命中时，用 LLM 生成该主题知识条目并入库，
+    # 使知识库随使用自动增长、逐步覆盖任意行业
+    auto-supplement-enabled: ${RAG_AUTO_SUPPLEMENT:true}
+    # 自动补充的每小时上限（防止异常流量导致 AI 调用失控）
+    auto-supplement-per-hour: ${RAG_AUTO_SUPPLEMENT_PER_HOUR:30}
+    # 触发自动补充的相似度门槛：检索最高分低于此值视为「知识库没有」。
+    # SimpleVectorStore 返回的是 distance（越小越相似），故用「大于」判断。
+    # 取值依据（真机实测）：在库命中约 0.32，不在库约 0.52 → 取 0.45 分界，两侧留余量。
+    # ⚠️ 更换 embedding 模型后必须重新标定（不同模型的余弦距离尺度不同）
+    auto-supplement-max-distance: ${RAG_AUTO_SUPPLEMENT_MAX_DISTANCE:0.45}

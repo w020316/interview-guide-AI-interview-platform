@@ -1,5 +1,17 @@
-# Render 部署配置
-# 使用方法: Render Dashboard → New → Blueprint → 选择此仓库
+# Render 部署配置（云部署 —— 电脑关机也能用）
+#
+# 使用方法：Render Dashboard → New → Blueprint → 选择本仓库
+#
+# ── 2026-09-20 更新说明 ────────────────────────────────────────────────
+# 本次修正三处已失效配置：
+#   1. AI 降级链：原写 B.AI（glm-5.3-flash）已不可用，改为当前实测链路
+#      Agnes agnes-2.5-flash → 智谱 glm-4.5-flash → 智谱 glm-4-flash
+#   2. Embedding：原指 Agnes text-embedding-3-small，但 Agnes **无该通道**
+#      （503 model_not_found），导致 prod 知识库播种长期失败。改为阿里云百炼。
+#   3. 新增 RAG 自动补充知识相关开关（全行业覆盖依赖此机制）。
+#
+# ⚠️ 本地 ONNX Embedding 服务（D:\xm\embed_server.py）**无法用于云部署** ——
+#    它跑在你电脑上，电脑关机即不可用。云端必须用远程 Embedding API。
 services:
   - type: web
     name: interview-guide-backend
@@ -13,34 +25,81 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
-      # ── AI 模型降级链（v1.22.0）──
-      # 主模型：B.AI GLM-5.3-Flash（免费）；次模型：B.AI Qwen3.8-Flash（免费）；兜底：Agnes AI
-      - key: AI_BAI_API_KEY
-        sync: false
-      - key: AI_BAI_BASE_URL
-        value: https://api.b.ai
-      - key: AI_BAI_CHAT_MODEL
-        value: glm-5.3-flash
-      - key: AI_BAI_CHAT_MODEL_SECONDARY
-        value: qwen3.8-flash
-      # ── Agnes AI（兜底模型 + 知识库 Embedding）──
+
+      # ══ 1. AI 对话降级链（app.ai.chain）════════════════════════════
+      # 主力：Agnes agnes-2.5-flash —— 质量与稳定性双料第一
       - key: AI_API_KEY
         sync: false
       - key: AI_BASE_URL
         value: https://apihub.agnes-ai.com
       - key: AI_CHAT_MODEL
         value: agnes-2.5-flash
+      # 兜底 1：智谱 glm-4.5-flash —— 跨厂商容灾，岗位分析质量最高
+      - key: AI_ZHIPU_API_KEY
+        sync: false
+      - key: AI_ZHIPU_BASE_URL
+        value: https://open.bigmodel.cn/api/paas/v4
+      - key: AI_ZHIPU_CHAT_MODEL
+        value: glm-4.5-flash
+      # 兜底 2：智谱 glm-4-flash —— 末位保险
+      - key: AI_ZHIPU_FALLBACK_MODEL
+        value: glm-4-flash
+
+      # ══ 2. Embedding（云端必须用远程 API）══════════════════════════
+      # 阿里云百炼 text-embedding-v4：
+      #   免费额度 100 万 Token / 开通后 90 天；中文效果第一梯队；OpenAI 兼容
+      #
+      # ⚠️⚠️ 维度必须设 1024，不能设 1536 —— 这是本轮排查发现的隐藏约束：
+      #   AiConfig 构造 embedding 选项时**没有把 dimensions 传给 API**
+      #   （OpenAiEmbeddingOptions.builder().model(...).build()，缺 .dimensions(...)），
+      #   因此 AI_EMBEDDING_DIMENSIONS **只影响 pgvector 建表**，
+      #   实际返回的向量维度由**模型默认值**决定。
+      #   百炼 text-embedding-v4 默认输出 1024 维 → 故此处必须填 1024，
+      #   否则会出现「表是 1536 列、写入 1024 维向量」的维度不匹配错误。
+      #
+      # ⚠️ 首次切换 embedding 供应商后，需清空 pgvector 旧表（向量空间不通用）：
+      #   在 Supabase SQL Editor 执行：DROP TABLE IF EXISTS vector_store;
+      #   重启后 Spring AI 会按 initialize-schema 自动重建。
+      #
+      # ⚠️ Key 与地域强绑定：北京地域的 Key 不能用于新加坡端点。
+      #   开通：https://bailian.console.aliyun.com/ → 实名 → 模型广场取 Key
+      - key: AI_EMBEDDING_BASE_URL
+        value: https://dashscope.aliyuncs.com/compatible-mode/v1
+      - key: AI_EMBEDDING_API_KEY
+        sync: false
       - key: AI_EMBEDDING_MODEL
-        value: text-embedding-3-small
-      # ── Supabase PostgreSQL（用户名密码直接写进 DATABASE_URL，避免环境变量注入问题）──
+        value: text-embedding-v4
+      - key: AI_EMBEDDING_DIMENSIONS
+        value: "1024"
+
+      # ══ 3. RAG 自动补充知识（全行业覆盖的机制）═════════════════════
+      - key: RAG_AUTO_SUPPLEMENT
+        value: "true"
+      - key: RAG_AUTO_SUPPLEMENT_PER_HOUR
+        value: "30"
+      # ⚠️⚠️ 此阈值是「检索是否命中」的判定线，**必须按 embedding 模型重新标定**！
+      #   0.45 是本地 bge-small-zh-v1.5 的实测分界值（在库命中约 0.32、不在库约 0.52）。
+      #   百炼 text-embedding-v4 的余弦距离尺度**不同**，照搬会导致
+      #   「该补充的不补充」或「已覆盖的重复补充」。
+      #   标定方法：登录后问一个知识库已有的问题 + 一个明显没有的问题，
+      #            看后端日志中 `RAG 命中但相似度不足（bestDistance=...）` 的实际数值，
+      #            取二者之间的分界值回填此处。
+      - key: RAG_AUTO_SUPPLEMENT_MAX_DISTANCE
+        value: "0.45"
+
+      # ══ 4. 数据库：Supabase PostgreSQL（已启用 pgvector）══════════════
+      # 向量库直接用 pgvector，**知识重启不丢**，无需本地那套文件快照
+      # 格式：jdbc:postgresql://aws-0-xxx.pooler.supabase.com:5432/postgres?user=postgres.REF&password=PASSWORD
       - key: DATABASE_URL
-        sync: false  # jdbc:postgresql://aws-0-xxx.pooler.supabase.com:5432/postgres?user=postgres.REF&password=PASSWORD
-      # ── Upstash Redis ──
+        sync: false
+
+      # ══ 5. Redis：Upstash（仅用于 AI 响应缓存，失效不影响核心功能）═══
       - key: REDIS_URL
         sync: false
       - key: REDIS_SSL
         value: "true"
-      # ── JWT ──
+
+      # ══ 6. 鉴权 ════════════════════════════════════════════════════
       - key: JWT_SECRET
         sync: false
       - key: JWT_EXPIRATION_MS
@@ -48,18 +107,21 @@ services:
       # 管理员账号名单（逗号分隔）；命中者享有无限制刷新等管理能力
       - key: APP_ADMIN_USERNAMES
         value: "小吴同学"
-      # 种子管理员：启动时若账号不存在则自动创建（用户名/密码）
+      # 种子管理员：启动时若账号不存在则自动创建
       - key: SEED_ADMIN_USERNAME
         value: "小吴同学"
       - key: SEED_ADMIN_PASSWORD
         sync: false
-      # ── Supabase Storage ──
+
+      # ══ 7. Supabase Storage（简历附件存储）════════════════════════
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
       - key: SUPABASE_BUCKET
         value: resumes
-      # ── JVM 内存（适配 Render 免费层 512MB）──
+
+      # ══ 8. JVM 内存（适配 Render 免费层 512MB）══════════════════════
+      # Metaspace 必须 ≥128m，否则 Spring Boot + AI + Security 栈类加载失败
       - key: JAVA_OPTS
         value: "-Xmx220m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0"

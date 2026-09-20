@@ -24,6 +24,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -198,6 +200,42 @@ class SecurityConfigTest {
         void protectedApi_noAuthHeader_returns401() throws Exception {
             mockMvc.perform(get("/api/test-secure"))
                     .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Nested
+    @DisplayName("CORS 预检（2026-09-19 真机回归防线）")
+    class CorsPreflight {
+
+        /**
+         * 事故背景：前端冷启动唤醒器探测时带了 `Cache-Control` 请求头。
+         * 该头不属于 CORS 安全列表头，跨域下浏览器会先发 OPTIONS 预检；
+         * 若白名单未包含它，预检返回 403 且不带 CORS 响应头，浏览器随即拦截真实请求，
+         * 表现为「探测永远失败、唤醒器空转、登录白等满预算」。
+         * 该问题只在真实浏览器的跨域场景暴露——curl 直发不执行预检，故单测必须显式覆盖。
+         */
+        @Test
+        @DisplayName("预检 Access-Control-Request-Headers: cache-control 必须放行")
+        void preflight_withCacheControl_isAllowed() throws Exception {
+            mockMvc.perform(options("/api/info")
+                            .header("Origin", "http://localhost:5173")
+                            .header("Access-Control-Request-Method", "GET")
+                            .header("Access-Control-Request-Headers", "cache-control"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
+                    .andExpect(header().string("Access-Control-Allow-Headers",
+                            org.hamcrest.Matchers.containsStringIgnoringCase("cache-control")));
+        }
+
+        @Test
+        @DisplayName("预检自定义头（Authorization）仍放行，白名单未被收窄")
+        void preflight_withAuthorization_isAllowed() throws Exception {
+            mockMvc.perform(options("/api/info")
+                            .header("Origin", "http://localhost:5173")
+                            .header("Access-Control-Request-Method", "GET")
+                            .header("Access-Control-Request-Headers", "authorization"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
         }
     }
 }

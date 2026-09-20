@@ -118,13 +118,13 @@
             </label>
             <button type="button" class="link-btn" @click="activeTab = 'register'">还没账号？立即注册</button>
           </div>
-          <!-- 冷启动提示 -->
-          <div v-if="coldStartHint" class="cold-start-hint">
+          <!-- 冷启动提示：由共享唤醒器状态驱动，展示实时进度 -->
+          <div v-if="coldStartHint" class="cold-start-hint" role="status" aria-live="polite">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
               <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
-            <span>后端服务正在冷启动（首次访问需 30-60s），请耐心等待...</span>
+            <span>{{ coldStartMessage }}</span>
           </div>
           <button type="submit" class="btn-submit" :disabled="loading">
             <span v-if="loading" class="spinner"></span>
@@ -183,13 +183,13 @@
             </div>
             <span v-if="regForm.email && !isEmailValid" class="field-error">邮箱格式不正确</span>
           </div>
-          <!-- 冷启动提示 -->
-          <div v-if="coldStartHint" class="cold-start-hint">
+          <!-- 冷启动提示：由共享唤醒器状态驱动，展示实时进度 -->
+          <div v-if="coldStartHint" class="cold-start-hint" role="status" aria-live="polite">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
               <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
-            <span>后端服务正在冷启动（首次访问需 30-60s），请耐心等待...</span>
+            <span>{{ coldStartMessage }}</span>
           </div>
           <button type="submit" class="btn-submit" :disabled="loading || !isFormValid">
             <span v-if="loading" class="spinner"></span>
@@ -215,8 +215,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import api, { getErrMessage } from '../api'
+import api, { getErrMessage, isColdStartError } from '../api'
 import { setAuth } from '../auth'
+import { ensureAwake, isBackendKnownReady, prewarmBackend, wakeState } from '../utils/backendWake'
 
 const router = useRouter()
 const route = useRoute()
@@ -229,8 +230,22 @@ const regForm = ref({ username: '', password: '', email: '' })
 const showLoginPwd = ref(false)
 const showRegPwd = ref(false)
 const rememberMe = ref(false)
-const coldStartHint = ref(false)
 const lastError = ref('')
+
+/**
+ * 冷启动提示：由共享唤醒器状态（backendWake）驱动，而非仅在某次请求失败后才出现。
+ * - 应用启动（main.ts）与登录页挂载都会触发预热，用户输入账号密码的时间通常已覆盖冷启动
+ * - 预热进行中或失败时在表单上展示实时进度，避免"点了登录没反应"的观感
+ */
+const coldStartHint = computed(() => wakeState.status === 'probing' || wakeState.status === 'failed')
+const wakeElapsedSec = computed(() => Math.round(wakeState.elapsedMs / 1000))
+const coldStartMessage = computed(() =>
+  wakeState.status === 'failed'
+    ? '后端服务唤醒失败，请检查网络后点击「重试」'
+    : `后端服务正在冷启动（免费实例约需 1-2 分钟）${
+        wakeElapsedSec.value > 0 ? `，已等待 ${wakeElapsedSec.value}s` : ''
+      }...`
+)
 
 // 表单校验
 const isUsernameValid = computed(() => /^[A-Za-z0-9_\u4e00-\u9fa5]{2,32}$/.test(regForm.value.username))
@@ -241,12 +256,16 @@ const isFormValid = computed(() =>
   isEmailValid.value
 )
 
-// 加载记住的用户名
+// 加载记住的用户名 + 触发冷启动预热
 onMounted(() => {
   const saved = localStorage.getItem('rememberedUsername')
   if (saved) {
     loginForm.value.username = saved
     rememberMe.value = true
+  }
+  // 挂载即预热：让后端在用户输入账号密码期间开始启动（main.ts 已先发起，此处为幂等补充）
+  if (wakeState.status !== 'ready') {
+    prewarmBackend()
   }
 })
 
@@ -257,47 +276,27 @@ function redirectAfterAuth() {
   router.push(safe)
 }
 
-/** 检测错误是否为冷启动/网络错误，显示提示 */
-function isColdStartError(e: unknown): boolean {
-  const msg = getErrMessage(e, '')
-  return msg.includes('冷启动') || msg.includes('Network Error') || msg.includes('网络') || msg.includes('超时')
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-/** 后端唤醒总预算与轮询间隔 */
-const MAX_WAKE_MS = 120000
-const WAKE_INTERVAL_MS = 4000
-
 /**
- * 唤醒并等待后端就绪：轮询无鉴权接口 /api/info。
- * 后端休眠时 Render 会返回启动页(HTML)或连接超时，均被统一拦截为错误，视为未就绪继续重试。
+ * 认证请求：先确认后端已就绪再发送；仍失败且判定为冷启动时，唤醒后重试一次。
+ *
+ * 为什么登录不走 api 拦截器的通用重放：登录/注册是 POST，通用重放会带来重复提交风险，
+ * 因此这里显式控制——只在「后端明显未就绪（冷启动）」这一确定未送达的场景下重试一次。
  */
-async function waitBackendReady(): Promise<boolean> {
-  const start = Date.now()
-  while (Date.now() - start < MAX_WAKE_MS) {
-    try {
-      await api.get('/api/info', { timeout: 15000 })
-      return true
-    } catch {
-      await sleep(WAKE_INTERVAL_MS)
+async function authWithRetry(url: string, payload: unknown): Promise<unknown> {
+  // 预热未完成时先等就绪，避免白白耗尽 AUTH_TIMEOUT 后才提示失败
+  if (!isBackendKnownReady()) {
+    const awake = await ensureAwake()
+    if (!awake) {
+      throw new Error('后端服务唤醒超时（超过 150s），请稍后重试或刷新页面')
     }
   }
-  return false
-}
-
-/** 认证请求：先直接发送；遇冷启动/网络错误则唤醒后端后自动重试一次 */
-async function authWithRetry(url: string, payload: unknown): Promise<unknown> {
   try {
     return await api.post(url, payload)
   } catch (e: unknown) {
     if (!isColdStartError(e)) throw e
-    coldStartHint.value = true
-    const ready = await waitBackendReady()
-    if (!ready) {
-      throw new Error('后端服务唤醒超时（超过 120s），请刷新页面后重试')
+    const awake = await ensureAwake()
+    if (!awake) {
+      throw new Error('后端服务唤醒超时（超过 150s），请稍后重试或刷新页面')
     }
     return await api.post(url, payload)
   }
@@ -308,7 +307,6 @@ async function handleLogin() {
   if (!loginForm.value.username || !loginForm.value.password)
     return ElMessage.warning('请填写用户名和密码')
   loading.value = true
-  coldStartHint.value = false
   lastError.value = ''
   try {
     const token = await authWithRetry('/api/auth/login', loginForm.value) as unknown as string
@@ -325,7 +323,6 @@ async function handleLogin() {
     const msg = getErrMessage(e, '登录失败')
     lastError.value = msg
     if (isColdStartError(e)) {
-      coldStartHint.value = true
       ElMessage.warning(msg)
     } else {
       ElMessage.error(msg)
@@ -344,7 +341,6 @@ async function handleRegister() {
     return ElMessage.warning('邮箱格式不正确')
   if (loading.value) return // 防双触发：回车与表单 submit 同时触发时兜底
   loading.value = true
-  coldStartHint.value = false
   lastError.value = ''
   try {
     const token = await authWithRetry('/api/auth/register', regForm.value) as unknown as string
@@ -355,7 +351,6 @@ async function handleRegister() {
     const msg = getErrMessage(e, '注册失败')
     lastError.value = msg
     if (isColdStartError(e)) {
-      coldStartHint.value = true
       ElMessage.warning(msg)
     } else {
       ElMessage.error(msg)

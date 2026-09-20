@@ -1,5 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import api, { getErrMessage, AUTH_TIMEOUT, AI_TIMEOUT, apiBaseUrl } from './index'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+/**
+ * 屏蔽真实唤醒探测：backendWake 走裸 axios，不 mock 会在 jsdom 里发出真实 XHR
+ * （用例变慢并刷出大量 AggregateError 噪声）。唤醒逻辑本身由
+ * utils/backendWake.test.ts 专项覆盖，此处只关心拦截器如何消费它的返回值。
+ *
+ * 使用 vi.hoisted：vi.mock 的工厂会被提升到文件顶部执行，普通 const 此时尚未初始化。
+ */
+const { ensureAwakeMock } = vi.hoisted(() => ({
+  ensureAwakeMock: vi.fn(() => Promise.resolve(false)),
+}))
+vi.mock('../utils/backendWake', () => ({
+  ensureAwake: () => ensureAwakeMock(),
+}))
+
+import api, { getErrMessage, AUTH_TIMEOUT, AI_TIMEOUT, DEFAULT_TIMEOUT, apiBaseUrl, isColdStartError } from './index'
 
 /** 构造一个未过期的合法 JWT（3 段式，payload 含未来 exp） */
 function validToken(): string {
@@ -25,7 +40,13 @@ describe('api/index 常量', () => {
   })
   it('AI 超时与认证超时已配置', () => {
     expect(AI_TIMEOUT).toBeGreaterThan(AUTH_TIMEOUT)
-    expect(AUTH_TIMEOUT).toBe(90000)
+    expect(AUTH_TIMEOUT).toBe(150000)
+  })
+  it('认证超时必须大于实测冷启动耗时（98s），否则首次登录必然先超时', () => {
+    expect(AUTH_TIMEOUT).toBeGreaterThan(98000)
+  })
+  it('普通请求超时就绪于冷启动（默认值不低于 60s）', () => {
+    expect(DEFAULT_TIMEOUT).toBeGreaterThanOrEqual(60000)
   })
 })
 
@@ -112,8 +133,13 @@ describe('api/index 响应拦截器（fulfilled）', () => {
 })
 
 describe('api/index 响应拦截器（rejected）', () => {
+  beforeEach(() => {
+    ensureAwakeMock.mockReset()
+    ensureAwakeMock.mockResolvedValue(false)
+  })
   afterEach(() => {
     Object.defineProperty(window, 'location', { value: realLocation, writable: true, configurable: true })
+    vi.restoreAllMocks()
   })
 
   it('401 时清除认证并跳转登录', async () => {
@@ -141,8 +167,22 @@ describe('api/index 响应拦截器（rejected）', () => {
   })
 
   it('AI 接口超时给出特定提示', async () => {
-    const err: any = { code: 'ECONNABORTED', config: { url: '/api/interview/generate' }, message: '' }
+    // /api/resume/optimize 是此前遗漏在清单之外的 AI 端点，挑选它作为回归样本
+    const err: any = {
+      code: 'ECONNABORTED',
+      config: { url: '/api/resume/optimize', method: 'post' },
+      message: '',
+    }
     await expect(resRejected(err)).rejects.toMatchObject({ message: 'AI 服务响应超时，可能正在冷启动或推理中，请稍后重试' })
+  })
+
+  it('显式 AI_TIMEOUT 的请求同样按 AI 口径提示（不依赖路径清单）', async () => {
+    const err: any = {
+      code: 'ECONNABORTED',
+      config: { url: '/api/whatever/new-ai-endpoint', timeout: AI_TIMEOUT },
+      message: '',
+    }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('AI 服务响应超时') })
   })
 
   it('认证接口超时给出冷启动提示', async () => {
@@ -150,45 +190,111 @@ describe('api/index 响应拦截器（rejected）', () => {
     await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('冷启动') })
   })
 
-  it('通用超时给出默认提示', async () => {
-    const err: any = { code: 'ECONNABORTED', config: { url: '/api/other' }, message: '' }
+  it('通用超时给出默认提示（非幂等请求不进入唤醒重放）', async () => {
+    const err: any = { code: 'ECONNABORTED', config: { url: '/api/favorite/toggle', method: 'post' }, message: '' }
     await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('请求超时') })
   })
 
   it('HTML 内容响应提示后端未响应', async () => {
-    const err: any = { config: { url: '/api/x' }, response: { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, data: '<html>404</html>' } }
+    const err: any = { config: { url: '/api/x', method: 'post' }, response: { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, data: '<html>404</html>' } }
     await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('后端服务未响应') })
   })
 
-  it('纯 Network Error 提示网络连接失败', async () => {
-    const err: any = { config: { url: '/api/y' }, message: 'Network Error' }
+  it('纯 Network Error 提示网络连接失败（非幂等请求不重放）', async () => {
+    const err: any = { config: { url: '/api/y', method: 'post' }, message: 'Network Error' }
     await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('网络连接失败') })
   })
 
-  it('普通接口 Network Error 触发冷启动重放（P1-11）', async () => {
-    const cfg: any = { url: '/api/favorites/list', __retried: undefined }
-    const err: any = { config: cfg, message: 'Network Error' }
-    await expect(resRejected(err)).rejects.toBeTruthy()
+  it('GET 请求 Network Error 触发唤醒（冷启动恢复路径）', async () => {
+    const cfg: any = { url: '/api/favorites/list', method: 'get', __retried: undefined }
+    const err: any = { config: cfg, response: undefined, message: 'Network Error' }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('唤醒超时') })
+    expect(cfg.__retried).toBe(true)
+    expect(ensureAwakeMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('GET 请求本地超时（ECONNABORTED）同样尝试唤醒重放（幂等，可安全重放）', async () => {
+    const cfg: any = { url: '/api/jobs/list', method: 'get', __retried: undefined }
+    const err: any = { code: 'ECONNABORTED', config: cfg, message: '' }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('唤醒超时') })
     expect(cfg.__retried).toBe(true)
   })
 
-  it('AI 接口 Network Error 不重放，防双份生成（P1-11）', async () => {
-    const cfg: any = { url: '/api/interview/questions', __retried: undefined }
+  it('后端唤醒成功后将原请求重放一次并返回结果', async () => {
+    ensureAwakeMock.mockResolvedValue(true)
+    const replay = vi.spyOn(api, 'request').mockResolvedValue('ok' as never)
+    const cfg: any = { url: '/api/stats/dashboard', method: 'get', __retried: undefined }
+    const err: any = { config: cfg, response: undefined, message: 'Network Error' }
+    await expect(resRejected(err)).resolves.toBe('ok')
+    expect(replay).toHaveBeenCalledTimes(1)
+    expect(cfg.__retried).toBe(true)
+  })
+
+  it('已经重放过一次的请求不再重放，避免无限循环', async () => {
+    const cfg: any = { url: '/api/favorites/list', method: 'get', __retried: true }
+    const err: any = { config: cfg, response: undefined, message: 'Network Error' }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('网络连接失败') })
+    expect(ensureAwakeMock).not.toHaveBeenCalled()
+  })
+
+  it('AI 生成类 POST 永不自动重放（防双份推理与重复入库）', async () => {
+    const cfg: any = { url: '/api/interview/questions', method: 'post', __retried: undefined }
+    const err: any = { config: cfg, message: 'Network Error' }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('AI 服务暂时不可用') })
+    expect(cfg.__retried).toBeUndefined()
+  })
+
+  it('非 AI 的 POST 同样不重放（防重复写入，如收藏切换/提交答案）', async () => {
+    const cfg: any = { url: '/api/favorite/toggle', method: 'post', __retried: undefined }
     const err: any = { config: cfg, message: 'Network Error' }
     await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('网络连接失败') })
     expect(cfg.__retried).toBeUndefined()
   })
 
-  it('AI 接口本地超时（ECONNABORTED）不重放，防双份生成（P1-11）', async () => {
-    const cfg: any = { url: '/api/interview/questions', __retried: undefined }
+  it('清单外的 AI POST（如 /api/job/analyze）也不重放', async () => {
+    const cfg: any = { url: '/api/job/analyze', method: 'post', __retried: undefined }
+    const err: any = { config: cfg, message: 'Network Error' }
+    await expect(resRejected(err)).rejects.toBeTruthy()
+    expect(cfg.__retried).toBeUndefined()
+  })
+
+  it('AI 接口本地超时（ECONNABORTED）不重放，防双份生成', async () => {
+    const cfg: any = { url: '/api/interview/questions', method: 'post', __retried: undefined }
     const err: any = { code: 'ECONNABORTED', config: cfg, message: '' }
     await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('AI 服务响应超时') })
     expect(cfg.__retried).toBeUndefined()
   })
 
+  it('边缘节点 502（非业务 JSON）按冷启动处理并给出可读文案', async () => {
+    const err: any = {
+      config: { url: '/api/auth/login', method: 'post' },
+      response: { status: 502, data: '<html>Bad Gateway</html>', headers: {} },
+      message: 'Request failed with status code 502',
+    }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('冷启动') })
+  })
+
   it('普通错误保持原样 reject', async () => {
     const err = new Error('业务错误')
     await expect(resRejected(err)).rejects.toThrow('业务错误')
+  })
+})
+
+describe('api/index isColdStartError', () => {
+  it('无响应的 Network Error 判定为冷启动信号', () => {
+    expect(isColdStartError({ message: 'Network Error' })).toBe(true)
+  })
+  it('ECONNABORTED 判定为冷启动信号', () => {
+    expect(isColdStartError({ code: 'ECONNABORTED' })).toBe(true)
+  })
+  it('502 且响应体非业务 JSON 判定为冷启动信号', () => {
+    expect(isColdStartError({ response: { status: 502, data: 'Bad Gateway' } })).toBe(true)
+  })
+  it('503 且响应体为后端 Result JSON 时不算冷启动（属业务降级，不应触发唤醒）', () => {
+    expect(isColdStartError({ response: { status: 503, data: { code: 503, message: 'AI 服务暂时不可用' } } })).toBe(false)
+  })
+  it('普通 400 业务错误不算冷启动', () => {
+    expect(isColdStartError({ response: { status: 400, data: { code: 400, message: '用户名已存在' } } })).toBe(false)
   })
 })
 

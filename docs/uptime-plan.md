@@ -46,9 +46,14 @@
 
 ## 四、监控与告警（已实施）
 
-1. **保活 + 健康监控**：GitHub Actions `Keep Render Backend Warm` 每 10 分钟：
-   - ping `/api/info`（唤醒免费实例，双次重试容忍冷启动 100s）；
-   - 深度体检 `/api/health`：解析 `database` / `redis` 状态，任一非 `UP` 即 Run 失败 + 邮件告警。
+1. **保活 + 健康监控**：GitHub Actions `Keep Render Backend Warm` **每 5 分钟**（v1.34.0 由 10 分钟收紧）：
+   - ping `/api/info`（唤醒免费实例，8 分钟耐心重试循环容忍冷启动）；
+   - 存活校验 `/api/health` 返回 `status: UP`，异常即 Run 失败 + 邮件告警。
+   - 收紧到 5 分钟的原因：Render 休眠阈值 15 分钟，而 GitHub 定时任务在高峰期
+     **常有数分钟延迟**（实测可达 5~15 分钟），原 10 分钟间隔叠加延迟后可能越过阈值。
+     本仓库为 public，Actions 分钟数不限量，加密无成本。
+   - ⚠️ 已知限制：GitHub 对「60 天无提交活动」的仓库会自动停用定时工作流；
+     长期停更后需手动在 Actions 页重新启用。
 2. **内置指标**：Spring Boot Actuator `/actuator/health`、`/actuator/info`（公开）；`/actuator/metrics` 与 Prometheus 指标（`MetricsConfig`：AI 调用计数/耗时、缓存命中）需认证。
 3. **管理后台系统指标**：`/admin`（管理员）实时查看 AI 调用、缓存、SSE 并发、JVM 内存。
 4. **告警通道**：
@@ -149,3 +154,65 @@ node scripts/loadtest.mjs --url https://interview-guide-backend.onrender.com/api
 - **根因**：`RateLimitInterceptor`（IP 10/min）覆盖全部 `/api/**`，无状态探活端点也被限流。
 - **处置**：`WebMvcConfig` 将 `/api/auth/**`、`/api/health`、`/api/info` 排除出限流拦截器。
 - **验证**：300 并发请求成功率 100%，P50 1.7s / P95 2.9s / P99 3.5s（免费层新加坡实例）。
+
+### 2026-09-19 · 冷启动导致登录停滞 / 认证无响应（P0，已修复）
+- **实测基线**：线上复测 `GET /actuator/health` 首个请求 **98.1s** 返回 200（冷启动），
+  随后的 `/api/info` 2.7s、`/api/health` 14.1s（已热）。即**冷启动耗时约 1.5 分钟**。
+- **症状**：长时间闲置后首次访问——登录界面点「登录」后长时间无响应；偶发返回
+  `Request failed with status code 502` 这类无法理解的英文报错；进入内页数据全部加载失败。
+- **根因（四处叠加）**：
+  1. 前端 `AUTH_TIMEOUT = 90s` **小于冷启动 98s**，首次登录请求必然先超时；
+  2. 应用启动阶段**没有任何预热请求**，后端只在登录请求失败后才开始被唤醒；
+  3. 边缘节点冷启动期返回的 502/503/504 未被识别为「未就绪」，既不重试也不给可读文案；
+  4. 幂等 GET 请求在本地超时（`ECONNABORTED`）时被排除在自动重试之外，长闲置后打开页面必报错。
+- **处置**：
+  - 新增 `frontend/src/utils/backendWake.ts` 冷启动唤醒器（单飞 + 反应式进度），
+    `main.ts` 应用挂载前即预热、登录页挂载时二次确认，用户输入账号密码的时间覆盖大部分冷启动；
+  - `AUTH_TIMEOUT` 90s → **150s**（> 实测 98s）；默认超时 60s → 90s；
+  - 502/503/504 与 HTML 响应统一识别为冷启动信号，转为「后端服务未响应，可能正在冷启动」；
+  - 幂等 GET 在冷启动/超时后自动唤醒并**重放一次**（唤醒预算 150s）；
+  - 登录页展示「正在冷启动，已等待 Ns」实时进度，不再出现静默等待。
+- **验证**：前端 262 例单测全绿（含 7 例唤醒器专项 + 冷启动分类专项）。
+
+### 2026-09-19 · AI 配置曾可导致整站无法启动（P0，已修复）
+- **症状**：若 AI 提供方环境变量缺失，站点**完全不可用**（登录、注册、健康检查全部失败），
+  Render 表现为健康检查持续失败 → 实例反复重启 → 永久"冷启动"。
+- **根因**：
+  1. `AiConfig.fallbackChatModel` 在 `app.ai.chain` 解析不出可用提供方时**直接抛异常**，
+     使整个 Spring 上下文启动失败——AI 配置与「应用能否启动」被错误地耦合在一起；
+  2. `application-prod.yml` 中 `spring.ai.openai.api-key`、`app.supabase.url/service-key`、
+     `spring.data.redis.url` 均无可解析默认值，任一缺失即启动失败。
+- **处置**：链条为空时回退 `spring.ai.openai.*` 构造单节点模型（应用始终可启动，AI 调用失败
+  统一转为 503 可读文案）；上述三项补默认值 + 启动 WARN；Storage 配置占位时显式告警。
+- **验证**：新增 `AiConfigFallbackTest`（4 例）锁定「降级链为空不阻断启动」契约；
+  后端 620 例全绿（含覆盖率门禁 80%）。
+
+### 2026-09-19 · 预热探测被跨域预检拦截，导致登录白等 150s（P1，已修复，真机发现）
+- **发现方式**：**Microsoft Edge 153 真实浏览器真机验证**（CDP 驱动 + 线上后端）。
+  同一 URL 在页面内手动 `fetch` 返回 200，但唤醒器探测连续 80s 重试 23 次全部失败——
+  这个矛盾只在真实浏览器的跨域场景才出现。
+- **症状**：1.33.1 引入的后端预热器在真实浏览器中**完全失效**；更严重的是
+  `LoginView.authWithRetry()` 会 `await ensureAwake()`（预算 150s），预热永不就绪 ⇒
+  用户点登录要**白等满 150s** 才发出请求，比修复前的 90s 超时**更差**（回归）。
+- **根因（两层）**：
+  1. 探测请求带了 `headers: { 'Cache-Control': 'no-cache' }`。跨域下 `Cache-Control`
+     **不属于 CORS 安全列表请求头**，浏览器强制先发 `OPTIONS` 预检；
+  2. `SecurityConfig.setAllowedHeaders` 白名单不支持它 → 预检返回 **403 且不带任何
+     `access-control-*` 响应头** → 浏览器直接拦截真实请求。
+- **为什么单测/curl 发现不了**：单测中 axios 被 mock（且用例断言了那个错误的请求头，
+  等于把 bug 固化）；curl 直发不执行浏览器预检，故返回 200。
+  **只有真实浏览器跨域环境能暴露此问题**——这是真机验证不可替代的价值。
+- **处置**：
+  1. 前端探测移除全部自定义请求头，缓存失效改用 URL 时间戳 `?_t=`，跨域下退化为「简单请求」；
+  2. 探测改用 `validateStatus: () => true`——**任何 HTTP 响应（含 4xx/5xx）都视为实例已唤醒**，
+     只有网络层错误（连接被拒/超时/CORS 拦截）才判定未就绪；
+  3. 后端 `setAllowedHeaders` 补 `Cache-Control` 作为防御性兜底。
+- **验证**：
+  - 真机复测：修复前 80s 内重试 23 次从未成功；修复后**仅 1 次探测**（89ms 发起 / 184ms 返回）即就绪；
+  - 前端新增 2 例（不得携带自定义请求头、5xx 仍判定已唤醒），263 例全绿；
+  - 后端新增 `SecurityConfigTest$CorsPreflight`（2 例）并做**负向验证**：
+    移除修复后该用例精确复现 `Status expected:<200> but was:<403>`，证明回归防线有效。
+- **注意事项（写代码时务必遵守）**：跨域接口**不要携带非 CORS 安全列表请求头**
+  （`Cache-Control`/`Pragma`/`X-*` 等），否则会引入预检，而后端白名单一旦未覆盖就会静默失败。
+  缓存控制优先用 URL 参数或后端响应头。
+

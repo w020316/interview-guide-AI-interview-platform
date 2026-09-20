@@ -44,17 +44,21 @@ spring:
       ddl-auto: none
 
   # Redis（Upstash，TLS 连接）
+  # P0-02（2026-09-19）：补默认值——REDIS_URL 未注入时占位符无法解析会让整个上下文启动失败；
+  # Redis 仅承担 AI 响应缓存，RedisConfig 已做容错回退，不该成为启动的硬依赖。
   data:
     redis:
-      url: ${REDIS_URL}
+      url: ${REDIS_URL:redis://localhost:6379}
       timeout: 5000
       ssl:
         enabled: true
 
   # Spring AI（Agnes AI，兼容 OpenAI 协议）
+  # P0-02（2026-09-19）：api-key 补默认值。AI 提供方未配置时应只降级 AI 功能，
+  # 而不是因占位符解析失败导致应用（含登录/鉴权）完全无法启动。
   ai:
     openai:
-      api-key: ${AI_API_KEY}
+      api-key: ${AI_API_KEY:sk-placeholder}
       base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com}
       chat:
         options:
@@ -99,9 +103,12 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: 86400000
+  # P0-02（2026-09-19）：Supabase Storage 仅用于简历附件存取，属可选能力。
+  # 补默认值避免其环境变量缺失时占位符解析失败、拖垮整个应用启动。
+  # 使用默认占位值时上传会失败，服务启动时会打印 WARN 提示运维补齐。
   supabase:
-    url: ${SUPABASE_URL}
-    service-key: ${SUPABASE_SERVICE_KEY}
+    url: ${SUPABASE_URL:https://placeholder.supabase.co}
+    service-key: ${SUPABASE_SERVICE_KEY:placeholder-service-key}
     bucket: resumes
 
 # P2-01：生产禁用 Swagger/OpenAPI，避免接口结构被侦察

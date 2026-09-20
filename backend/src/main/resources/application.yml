@@ -84,20 +84,55 @@ app:
       base-url: ${AI_EMBEDDING_BASE_URL:}
       api-key: ${AI_EMBEDDING_API_KEY:}
     chain:
-      - name: bai-primary
-        base-url: ${AI_BAI_BASE_URL:https://api.b.ai}
-        api-key: ${AI_BAI_API_KEY:}
-        model: ${AI_BAI_CHAT_MODEL:glm-5.3-flash}
-        temperature: ${AI_TEMPERATURE:0.7}
-      - name: bai-secondary
-        base-url: ${AI_BAI_BASE_URL:https://api.b.ai}
-        api-key: ${AI_BAI_API_KEY:}
-        model: ${AI_BAI_CHAT_MODEL_SECONDARY:qwen3.8-flash}
-        temperature: ${AI_TEMPERATURE:0.7}
-      - name: agnes-fallback
+      # ══════════════════════════════════════════════════════════════════
+      # 降级链（按顺序尝试，命中即返回）
+      #
+      # 2026-09-20 选型原则修正：**免费模型中选质量最好的，而非最快的**。
+      # 依据：3 平台 × 多模型 × 2 个真实任务（岗位分析 / 简历评估）× 3 次取中位数
+      #       的横向评测（脚本 D:\xm\model_verdict.py，结果 model_verdict.json）。
+      #
+      # ── 评测结果（质量总分 = 岗位分析分 + 简历评估分）─────────────────
+      #   模型                 总分   岗位分析      简历评估      稳定性   结论
+      #   agnes-2.5-flash      168   q96 /  5.6s  q72 /  9.3s   6/6     ★ 主力
+      #   glm-4.5-flash        161   q99 / 13.1s  q62 / 49.2s   6/6     ★ 兜底
+      #   agnes-3.0-flash      158   q96 /  4.3s  q62 /  7.6s   6/6
+      #   glm-4-flash-250414   155   q96 / 14.2s  q59 / 14.2s   6/6
+      #   glm-4-flash          154   q96 / 17.5s  q58 / 18.6s   6/6     ○ 末位保险
+      #   agnes-2.0-flash      101   q101/  5.3s  ✗ 失败        1/6     ✗ 免费档已限流
+      #
+      # ── 关键结论 ────────────────────────────────────────────────────
+      # 1. agnes-2.5-flash 质量与稳定性双料第一（简历评估 q72，比智谱最好的
+      #    q62 高 16%），且响应快 → 定为**主力**。
+      # 2. glm-4.5-flash 岗位分析质量最高（q99）但简历评估慢（49.2s）、
+      #    官方标注即将下线 → 作**跨厂商兜底**，不做主力。
+      # 3. agnes-2.0-flash 虽最快且岗位分析 q101，但触发
+      #    "You've reached the API rate limit for free users" → **必须剔除**，
+      #    放进链里只会让每次调用白撞一次墙。
+      # 4. 硅基流动全部模型（含 embedding）当前 402 余额不足 → 不可用，未入链。
+      # 5. glm-4.7-flash（200K 上下文最强）当前 429 访问量过大，稳定性不足，
+      #    且需 thinking:disabled 才不返回空内容 → 暂不入链。
+      #
+      # ── 链路设计（质量递减，跨厂商容灾）──────────────────────────────
+      #   1) Agnes agnes-2.5-flash   质量最优，日常主力
+      #   2) 智谱 glm-4.5-flash      跨厂商兜底，岗位分析质量之王
+      #   3) 智谱 glm-4-flash        末位保险，最快且长期稳定
+      #
+      # api-key 为空的节点自动跳过；任一节点返回空正文也会被判不可用并继续降级。
+      # ══════════════════════════════════════════════════════════════════
+      - name: agnes-primary
         base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com}
-        api-key: ${AI_API_KEY:sk-placeholder}
+        api-key: ${AI_API_KEY:}
         model: ${AI_CHAT_MODEL:agnes-2.5-flash}
+        temperature: ${AI_TEMPERATURE:0.7}
+      - name: zhipu-quality
+        base-url: ${AI_ZHIPU_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+        api-key: ${AI_ZHIPU_API_KEY:}
+        model: ${AI_ZHIPU_CHAT_MODEL:glm-4.5-flash}
+        temperature: ${AI_TEMPERATURE:0.7}
+      - name: zhipu-lastresort
+        base-url: ${AI_ZHIPU_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+        api-key: ${AI_ZHIPU_API_KEY:}
+        model: ${AI_ZHIPU_FALLBACK_MODEL:glm-4-flash}
         temperature: ${AI_TEMPERATURE:0.7}
   jwt:
     secret: ${JWT_SECRET}
@@ -148,6 +183,9 @@ app:
     # 0.90 对应 cosine distance <= 0.10，覆盖文本微调后重复的场景
     # 调低可更严格去重（如 0.85），调高可放宽（如 0.95）
     dedup-similarity-threshold: ${RAG_DEDUP_THRESHOLD:0.90}
+    # 启动时播种系统预置共享知识（shared=true，全部用户可检索）
+    # 关闭场景：本地联调不想消耗 embedding 调用、单元测试、或运维想手动维护知识库
+    seed-enabled: ${RAG_SEED_ENABLED:true}
   cors:
     # 允许的前端来源（逗号分隔），生产精确域名 + 本地调试
     # 修改部署域名时改环境变量 CORS_ALLOWED_ORIGINS 即可，无需改代码

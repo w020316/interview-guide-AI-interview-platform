@@ -29,22 +29,22 @@
         </div>
       </div>
 
-      <!-- 更新内容列表 -->
-      <div class="update-list">
+      <!-- 更新内容列表（仅展示用户可感知的内容，技术细节对普通用户隐藏） -->
+      <div class="update-list" v-if="latestUserItems.length">
         <div class="list-title">本次更新内容</div>
         <ul>
-          <li v-for="(item, idx) in latest.items" :key="idx">
+          <li v-for="(item, idx) in latestUserItems" :key="idx">
             <span class="item-bullet">·</span>
             <span class="item-text">{{ item }}</span>
           </li>
         </ul>
       </div>
 
-      <!-- 历史版本 -->
-      <details class="history-section" v-if="history.length">
-        <summary>历史版本更新（{{ history.length }} 个）</summary>
+      <!-- 历史版本（同样只保留用户可见条目；全部为技术条目的版本整体不展示） -->
+      <details class="history-section" v-if="historyWithUserItems.length">
+        <summary>历史版本更新（{{ historyWithUserItems.length }} 个）</summary>
         <div class="history-list">
-          <div v-for="entry in history" :key="entry.version" class="history-item">
+          <div v-for="entry in historyWithUserItems" :key="entry.version" class="history-item">
             <div class="history-head">
               <span class="version-badge sm">v{{ entry.version }}</span>
               <span class="version-date">{{ entry.date }}</span>
@@ -71,7 +71,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { CHANGELOG, CURRENT_VERSION } from '../changelog'
+import { CHANGELOG, CURRENT_VERSION, isTechItem, itemText } from '../changelog'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
@@ -81,7 +81,20 @@ const STORAGE_KEY = 'interview_guide_seen_version'
 const dontShowAgain = ref(false)
 
 const latest = computed(() => CHANGELOG[0])
-const history = computed(() => CHANGELOG.slice(1))
+
+/** 过滤出普通用户可见的条目（架构/依赖/测试/内部实现等技术细节一律隐藏） */
+function userItemsOf(entry: { items: Array<string | { text: string; level?: 'user' | 'tech' }> }): string[] {
+  return entry.items.filter((it) => !isTechItem(it)).map(itemText)
+}
+
+const latestUserItems = computed(() => userItemsOf(latest.value))
+
+/** 历史版本：仅保留仍有用户可见条目的版本 */
+const historyWithUserItems = computed(() =>
+  CHANGELOG.slice(1)
+    .map((e) => ({ version: e.version, date: e.date, items: userItemsOf(e) }))
+    .filter((e) => e.items.length > 0)
+)
 
 /** 检查版本：若 localStorage 中记录的版本与当前版本不同，则触发弹窗 */
 function checkVersion() {

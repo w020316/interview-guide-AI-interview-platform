@@ -7,9 +7,15 @@ import 'element-plus/theme-chalk/dark/css-vars.css'
 import './styles/variables.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { initTheme } from './theme'
+import { prewarmBackend } from './utils/backendWake'
 
 // 在任何渲染前应用主题，避免首屏闪烁
 initTheme()
+
+// 冷启动预热：后端部署在 Render 免费层，15 分钟无请求即休眠，实测冷启动约 98s。
+// 这里在应用挂载前就发起一次轻量探测（fire-and-forget，不阻塞首屏），
+// 让实例在用户浏览/输入账号密码期间就开始启动，从源头规避「登录界面加载停滞」。
+prewarmBackend()
 
 const app = createApp(App)
 

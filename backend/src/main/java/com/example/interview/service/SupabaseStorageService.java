@@ -45,6 +45,22 @@ public class SupabaseStorageService {
     }
 
     /**
+     * P0-02（2026-09-19）：Storage 配置为占位值时不阻断启动（仅记录 WARN）。
+     *
+     * <p>此前 application-prod.yml 中 {@code app.supabase.url/service-key} 无默认值，
+     * SUPABASE_URL 未注入会导致占位符解析失败、整个应用无法启动。补齐默认后，
+     * 这里显式告警，避免"上传功能静默失效、没人知道为什么"。
+     */
+    @jakarta.annotation.PostConstruct
+    void warnIfPlaceholder() {
+        if (supabaseUrl == null || supabaseUrl.contains("placeholder.supabase.co")
+                || serviceKey == null || serviceKey.startsWith("placeholder")) {
+            log.warn("Supabase Storage 未正确配置（url={}）：简历文件上传/签名 URL 将不可用，"
+                    + "但登录与其余功能不受影响。请在部署环境注入 SUPABASE_URL / SUPABASE_SERVICE_KEY。", supabaseUrl);
+        }
+    }
+
+    /**
      * 上传文件到 Supabase Storage，返回公开访问 URL
      *
      * @param file     上传的文件

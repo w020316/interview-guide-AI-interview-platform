@@ -2,17 +2,109 @@
  * 版本更新日志
  * 每次发布新增版本条目，前端会与 localStorage 中的版本号对比
  * 若版本不同则弹窗展示本次更新内容
+ *
+ * ── 面向用户的内容筛选（v1.33.3）────────────────────────────────────
+ * 每条更新带 `level` 标记决定是否展示给普通用户：
+ *   - 'user'（默认）：用户能直接感知的功能/体验变化 → 弹窗中展示
+ *   - 'tech'：架构改动、依赖升级、测试数、内部重构、构建配置等 → 弹窗中隐藏
+ *
+ * 历史版本遗留的纯字符串条目会按关键词自动归类（见 TECH_ITEM_PATTERNS），
+ * 避免为了隐藏技术细节而去逐条改写上百条历史数据。
  */
+export type ChangelogLevel = 'user' | 'tech'
+
 export interface ChangelogEntry {
   version: string
   date: string
   title: string
-  items: string[]
+  items: Array<string | { text: string; level?: ChangelogLevel }>
 }
 
-export const CURRENT_VERSION = '1.32.0'
+/** 技术类条目特征词：命中即视为「程序员的更新」，对用户隐藏 */
+const TECH_ITEM_PATTERNS: RegExp[] = [
+  /^\s*(后端|前端|架构|依赖|构建|工程|运维|测试)\s*[:：]/,
+  /单元测试|集成测试|测试用例|全绿|回归用例|用例|覆盖率|jacoco|JaCoCo/,
+  /重构|内部实现|代码审查|代码审查|审查|BeanPostProcessor|AutoConfiguration/,
+  /依赖升级|依赖漏洞|Dependabot|npm audit|CI\b|构建提速|打包|构建配置|构建引擎|rolldown/,
+  /反射|线程模型|连接池|JVM|GC\b|内存|Metaspace|堆内存|OOM/,
+  /幂等|单飞|信号量|并发闸门|线程池|异步|拦截器|过滤器|中间件/,
+  /环境变量|配置项|启动失败|启动崩溃|上下文|占位符|注入|密钥清洗/,
+  /接口|端点|API\b|REST|DTO|实体|实体类|Mapper|Repository|SQL\b|索引优化|建表/,
+  /CORS|预检|跨域|请求头|白名单|HTTP\s*状态|缓存策略/,
+  /SSE\b|流式（?推|输）|超时|重试|降级|限流|熔断/,
+  /日志|埋点|监控|告警|指标|Prometheus|Micrometer|actuator/i,
+  /版本号|版本：|v\d+\.\d+\.\d+/,
+]
+
+/** 判断一条更新是否属于「仅供开发/运维查看」的技术细节 */
+export function isTechItem(raw: string | { text: string; level?: ChangelogLevel }): boolean {
+  if (typeof raw === 'object' && raw !== null) {
+    if (raw.level) return raw.level === 'tech'
+    return isTechItem(raw.text)
+  }
+  return TECH_ITEM_PATTERNS.some((re) => re.test(raw))
+}
+
+/** 取条目文本 */
+export function itemText(raw: string | { text: string; level?: ChangelogLevel }): string {
+  return typeof raw === 'string' ? raw : raw.text
+}
+
+export const CURRENT_VERSION = '1.33.3'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.33.3',
+    date: '2026-09-19',
+    title: '版本 1.33.3 · 登录更稳，知识问答更准',
+    items: [
+      { text: '登录体验：修复长时间未使用后打开网站，登录页会长时间无响应的问题。现在页面会主动唤醒服务，并在输入账号密码期间提前开始准备，登录通常一次成功', level: 'user' },
+      { text: '登录体验：等待期间会显示实时进度（已等待多少秒），不再出现「点了登录没反应」的困惑', level: 'user' },
+      { text: '登录体验：网络恢复或服务刚启动完成时，会自动重试而不是直接报错', level: 'user' },
+      { text: '知识问答：修复「AI 问答」始终提示「参考资料中没有相关内容」的问题——现在内置了覆盖 Java、Spring、数据库、Redis、网络、算法、系统设计的面试知识库，提问会自动引用相关资料作答', level: 'user' },
+      { text: '知识问答：内置题库为所有账号共享，新注册用户无需自行导入即可直接使用', level: 'user' },
+      { text: '稳定性：AI 服务临时不可用时给出更清晰的提示，不再是一句笼统的报错', level: 'user' },
+      { text: 'AI 故障诊断：降级链全失败时日志输出可诊断的一手原因（如「Invalid token」「insufficient balance」「model not found」），替代理先前无信息量的「Error while extracting response」', level: 'tech' },
+      { text: '后端：新增共享知识库播种器（KnowledgeSeedInitializer），启动时把预置知识以 shared=true 写入向量库，受向量库容量上限保护，失败不阻断启动', level: 'tech' },
+      { text: '后端：新增 app.rag.seed-enabled 开关（默认 true），可关闭启动播种', level: 'tech' },
+      { text: '前端：更新弹窗按内容分级展示，技术类条目（架构/依赖/测试/内部实现）不再打扰普通用户', level: 'tech' },
+      { text: '测试：新增共享知识库播种 6 例、AI 失败诊断 5 例回归用例，后端 620 → 631 例全绿', level: 'tech' },
+      { text: '验证：真实 Edge（153.0.4234.32）真机复测登录/会话/多设备/AI 全链路', level: 'tech' },
+    ]
+  },
+  {
+    version: '1.33.2',
+    date: '2026-09-19',
+    title: '版本 1.33.2 · 冷启动预热修复（真机回归）',
+    items: [
+      { text: '登录体验：修复长时间闲置后首次打开网站时，后端预热在真实浏览器中完全失效、导致登录白等的问题', level: 'user' },
+      { text: '登录体验：修复上条带来的「点登录后要等 2 分钟以上才发出请求」，现在会立即或在服务就绪后马上登录', level: 'user' },
+      { text: '修复：预热探测在跨域下触发浏览器预检被拦截，导致实例已就绪却仍判定为未启动', level: 'tech' },
+      { text: '修复：预热探测改走 URL 时间戳参数实现缓存失效，不再携带任何自定义请求头', level: 'tech' },
+      { text: '修复：探测改用「任何 HTTP 响应即视为实例已唤醒」（含 4xx/5xx），仅网络层错误才判定未就绪', level: 'tech' },
+      { text: '后端：CORS 允许请求头白名单补充 Cache-Control 作为防御性兜底', level: 'tech' },
+      { text: '测试：前端 262 → 263 例全绿', level: 'tech' },
+      { text: '验证：真机复测——修复前 80s 内重试 23 次全失败，修复后仅 1 次探测（184ms）即就绪', level: 'tech' },
+    ]
+  },
+  {
+    version: '1.33.1',
+    date: '2026-09-19',
+    title: '版本 1.33.1 · 冷启动韧性提升',
+    items: [
+      { text: '登录体验：修复服务冷启动导致首次登录必失败的问题（此前登录等待上限小于服务启动耗时）', level: 'user' },
+      { text: '登录体验：打开网站即开始准备服务，让你在输入账号密码期间就完成等待', level: 'user' },
+      { text: '登录体验：等待服务就绪时展示实时进度，不再出现「点了登录没反应」', level: 'user' },
+      { text: '登录体验：服务刚启动完成时的临时错误现在可读且会自动重试', level: 'user' },
+      { text: '稳定性：AI 服务未配置时不再导致整个网站（含登录）无法打开', level: 'user' },
+      { text: '修复：幂等 GET 请求在冷启动/超时后自动唤醒并重放一次，长闲置后打开页面不再直接报错', level: 'tech' },
+      { text: '修复：非幂等与 AI 请求不再被静默重放，避免网络抖动造成双份 AI 推理与重复入库', level: 'tech' },
+      { text: '修复：Supabase Storage / Redis 配置缺失不再阻断启动，仅对应能力降级并在启动日志告警', level: 'tech' },
+      { text: '修复：Embedding 密钥与降级链密钥不在空白字符清洗清单内，粘贴带入换行会导致该提供方全部 401', level: 'tech' },
+      { text: '新增：Embedding 提供方与向量维度一致性启动体检，误配时打印可操作的告警', level: 'tech' },
+      { text: '测试：后端 616 → 620 例、前端 262 例全绿', level: 'tech' },
+    ]
+  },
   {
     version: '1.32.0',
     date: '2026-09-13',

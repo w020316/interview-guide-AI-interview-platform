@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.Map;
 
@@ -31,6 +32,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest
 @ActiveProfiles("local")
+// v1.34.0：测试必须与真实数据隔离。local profile 的向量库改为文件快照持久化后，
+// 若不禁用，本测试会加载、并可能在关闭时回写 D:/xm/data/vectorstore.json ——
+// 用测试数据覆盖用户真实积累的知识库。故显式关闭持久化并指向临时文件。
+@TestPropertySource(properties = {
+        "app.rag.persist-enabled=false",
+        "app.rag.snapshot-file=${java.io.tmpdir}/interview-smoke-vectorstore.json"
+})
 class ApplicationContextSmokeTest {
 
     @Autowired

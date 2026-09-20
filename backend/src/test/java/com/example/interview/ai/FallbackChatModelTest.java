@@ -133,4 +133,120 @@ class FallbackChatModelTest {
         assertThat(model.getDefaultOptions()).isSameAs(options);
         assertThat(model.toString()).isEqualTo("FallbackChatModel[gpt-x, glm-y]");
     }
+
+    // ─────────── 失败诊断（2026-09-19 真机验证：上游错误被吞成笼统 503）───────────
+
+    @Test
+    @DisplayName("describeFailure: 从多层包装中挖出上游错误原文（HTTP 200 + error 体的典型形态）")
+    void describeFailure_extractsUpstreamError() {
+        // 真实形态：上游以 200 返回 {"error":{"message":"Invalid token"}}，
+        // Spring AI 反序列化失败，把原文埋成 Jackon 的 cause 消息
+        Throwable root = new RuntimeException(
+                "Cannot deserialize value of type `OpenAiApi$ChatCompletion` "
+                        + "from Object value (token `JsonToken.START_OBJECT`); "
+                        + "content: {\"error\":{\"message\":\"Invalid token (request id: abc)\"}");
+        Throwable mid = new RuntimeException(
+                "Error while extracting response for type [OpenAiApi$ChatCompletion] "
+                        + "and content type [application/json;charset=utf-8]", root);
+
+        String detail = FallbackChatModel.describeFailure(mid);
+
+        // 关键：必须命中含上游错误关键字的那一层，而不是外层的无信息量包装
+        assertThat(detail).contains("Invalid token");
+    }
+
+    @Test
+    @DisplayName("describeFailure: 额度耗尽 / 模型名错误同样可辨认")
+    void describeFailure_recognizesQuotaAndModelErrors() {
+        assertThat(FallbackChatModel.describeFailure(
+                new RuntimeException("wrapped", new IllegalStateException(
+                        "{\"error\":{\"message\":\"insufficient balance\"}} (quota exceeded)"))))
+                .contains("insufficient balance");
+
+        assertThat(FallbackChatModel.describeFailure(
+                new RuntimeException("wrapped", new IllegalStateException(
+                        "The model `glm-9.9-turbo` does not exist"))))
+                .contains("model");
+    }
+
+    @Test
+    @DisplayName("describeFailure: 无 cause 链时回退到自身消息；空消息回退到类名")
+    void describeFailure_fallbacks() {
+        assertThat(FallbackChatModel.describeFailure(new RuntimeException("连接被拒绝")))
+                .isEqualTo("连接被拒绝");
+        assertThat(FallbackChatModel.describeFailure(new RuntimeException())).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("describeFailure: 超长消息被截断，避免日志被大段 JSON 淹没")
+    void describeFailure_truncatesLongMessage() {
+        String huge = "x".repeat(3000);
+        String detail = FallbackChatModel.describeFailure(new RuntimeException(huge));
+        assertThat(detail.length()).isLessThanOrEqualTo(504);
+        assertThat(detail).endsWith("...");
+    }
+
+    @Test
+    @DisplayName("call: 全链失败时抛 BusinessException（503 语义），且不因诊断逻辑改变行为")
+    void call_allFail_throwsBusinessException() {
+        when(primary.call(any(Prompt.class)))
+                .thenThrow(new RuntimeException("Error while extracting response",
+                        new IllegalStateException("{\"error\":{\"message\":\"Invalid token\"}}")));
+        when(secondary.call(any(Prompt.class))).thenThrow(new RuntimeException("备挂"));
+        FallbackChatModel model = new FallbackChatModel(List.of(primary, secondary), List.of("主", "备"));
+
+        assertThatThrownBy(() -> model.call(new Prompt("问")))
+                .isInstanceOf(com.example.interview.common.BusinessException.class)
+                .hasMessageContaining("AI 服务暂时不可用");
+    }
+
+    // ────────────── 空正文防护（2026-09-20 免费模型实测发现）──────────────
+    // 背景：智谱 glm-4.7-flash / glm-4.5-flash 默认开启思考模式，reasoning_content
+    // 吃光 max_tokens 后 content 返回空字符串。HTTP 200 + usage 正常，Spring AI 不抛异常。
+    // 若照原样返回，用户会拿到「成功状态下的空白答案」——比报错更糟。
+
+    @Test
+    @DisplayName("call: 主模型返回空正文时应降级，而不是把空答案当成功返回")
+    void call_emptyContent_degradesToNextModel() {
+        when(primary.call(any(Prompt.class))).thenReturn(response(""));       // 假成功：空正文
+        when(secondary.call(any(Prompt.class))).thenReturn(response("正常答案"));
+        FallbackChatModel model = new FallbackChatModel(List.of(primary, secondary), List.of("主", "备"));
+
+        ChatResponse resp = model.call(new Prompt("问"));
+
+        assertThat(resp.getResult().getOutput().getText()).isEqualTo("正常答案");
+        verify(secondary, times(1)).call(any(Prompt.class));
+    }
+
+    @Test
+    @DisplayName("call: 仅空白字符的正文同样判为不可用")
+    void call_blankContent_degrades() {
+        when(primary.call(any(Prompt.class))).thenReturn(response("   \n\t "));
+        when(secondary.call(any(Prompt.class))).thenReturn(response("兜底答案"));
+        FallbackChatModel model = new FallbackChatModel(List.of(primary, secondary), List.of("主", "备"));
+
+        assertThat(model.call(new Prompt("问")).getResult().getOutput().getText())
+                .isEqualTo("兜底答案");
+    }
+
+    @Test
+    @DisplayName("call: 全链都返回空正文时抛 BusinessException，绝不返回空答案")
+    void call_allEmptyContent_throwsBusinessException() {
+        when(primary.call(any(Prompt.class))).thenReturn(response(""));
+        when(secondary.call(any(Prompt.class))).thenReturn(response(""));
+        FallbackChatModel model = new FallbackChatModel(List.of(primary, secondary), List.of("主", "备"));
+
+        assertThatThrownBy(() -> model.call(new Prompt("问")))
+                .isInstanceOf(com.example.interview.common.BusinessException.class)
+                .hasMessageContaining("AI 服务暂时不可用");
+    }
+
+    @Test
+    @DisplayName("hasUsableContent: null 结构、null 文本、空串、空白一律判不可用")
+    void hasUsableContent_rejectsEmptyStructures() {
+        assertThat(FallbackChatModel.hasUsableContent(null)).isFalse();
+        assertThat(FallbackChatModel.hasUsableContent(response(""))).isFalse();
+        assertThat(FallbackChatModel.hasUsableContent(response("  "))).isFalse();
+        assertThat(FallbackChatModel.hasUsableContent(response("有内容"))).isTrue();
+    }
 }

@@ -101,7 +101,12 @@ public class SecurityConfig {
                 .toList();
         config.setAllowedOriginPatterns(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept"));
+        // 2026-09-19 真机回归修复：补 Cache-Control。
+        // 跨域下 Cache-Control 非 CORS 安全列表头，浏览器会先发 OPTIONS 预检；
+        // 此前白名单未包含它 → 预检 403 → 前端唤醒器探测被浏览器拦截、永远重试失败。
+        // 这里做兜底放行，前端亦已改为不发送该头（用 URL 时间戳做缓存失效）。
+        config.setAllowedHeaders(List.of(
+                "Authorization", "Content-Type", "X-Requested-With", "Accept", "Cache-Control"));
         config.setExposedHeaders(List.of("X-Rate-Limit-Remaining"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);

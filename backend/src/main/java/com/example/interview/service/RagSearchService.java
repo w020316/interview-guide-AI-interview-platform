@@ -67,6 +67,41 @@ public class RagSearchService {
     private double dedupSimilarityThreshold;
 
     /**
+     * 触发知识自动补充的距离阈值（v1.34.0）。
+     *
+     * <p>SimpleVectorStore 返回的 {@code distance} 越小越相似（cosine distance，0 为完全相同）。
+     * 当检索到的最相似文档距离仍大于此值时，视为「知识库实质未覆盖该主题」，
+     * 触发 {@link AutoKnowledgeService} 异步沉淀一条新知识。
+     *
+     * <p><b>阈值取值依据（2026-09-20 真机实测）</b>：SimpleVectorStore 无论相关与否
+     * 都会返回 topK 条结果，因此「有结果」不等于「覆盖」。实测距离分布：
+     * <pre>
+     *   在库命中（护理三查七对 → 命中同名条目）   bestDistance = 0.32
+     *   不在库（医疗器械注册 → 仅命中「门诊诊疗流程」）bestDistance = 0.52
+     *   不在库（航空配载 → 仅命中弱相关条目）        bestDistance = 0.52 左右
+     * </pre>
+     * 取 0.45 作为分界：命中场景（约 0.32）明显低于它，未命中场景（约 0.52）明显高于它，
+     * 两侧各留约 0.07~0.13 的余量。
+     *
+     * <p>⚠️ 此值初始误设为 0.75，导致所有「检索到无关近邻」都被判为「已覆盖」，
+     * 自动补充从未触发。**更换 embedding 模型后必须重新标定本阈值** ——
+     * 不同模型的余弦距离尺度不同。
+     */
+    @Value("${app.rag.auto-supplement-max-distance:0.45}")
+    private double autoSupplementMaxDistance;
+
+    /**
+     * 自动补充服务（延迟解析）。
+     *
+     * <p>用 {@code ObjectProvider} 而非直接 {@code @Autowired}：本服务被
+     * {@code AutoKnowledgeService} 反向依赖（后者要调 {@code addToVectorStore} 入库），
+     * 直接注入会形成构造期循环依赖。{@code ObjectProvider} 把解析推迟到首次使用，
+     * 既打破环又不引入 {@code @Lazy} 代理的额外语义。
+     */
+    @Autowired
+    private org.springframework.beans.factory.ObjectProvider<AutoKnowledgeService> autoKnowledgeProvider;
+
+    /**
      * 向量库最大文档数（生产为内存 SimpleVectorStore，无上限会累积导致 512MB 容器 OOM）
      * 计数器与向量库同生命周期（重启同清零），超限后拒绝新增并提示
      */
@@ -78,6 +113,30 @@ public class RagSearchService {
 
     /** 单批去重检查次数上限：每次检查 = 1 次 embedding 调用，批量大时限流保护（超出部分直接导入） */
     private static final int DEDUP_CHECK_LIMIT = 50;
+
+    /**
+     * 同步「已入库文档数」计数（v1.34.0）。
+     *
+     * <p>背景：{@link #storedDocs} 与内存向量库同生命周期。local profile 改用
+     * 文件快照持久化后，重启会从磁盘恢复 N 条文档，但计数器仍是 0 ——
+     * 这会让 {@link #maxDocuments} 上限失效，知识库被无界追加直至 OOM。
+     * 因此持久化层在 {@code restore()} 之后必须回填真实条数。
+     */
+    public void syncStoredCount(int actualCount) {
+        int safe = Math.max(0, actualCount);
+        storedDocs.set(safe);
+        log.info("向量库容量计数已同步为 {} 条（上限 {}）", safe, maxDocuments);
+    }
+
+    /** 当前已入库文档数（供健康检查/管理接口展示） */
+    public int storedCount() {
+        return storedDocs.get();
+    }
+
+    /** 容量上限（供管理接口展示） */
+    public int maxDocuments() {
+        return maxDocuments;
+    }
 
     /**
      * 检索相关知识点（返回 JSON 数组字符串）
@@ -141,6 +200,8 @@ public class RagSearchService {
         try {
             // 1. 检索相关知识（按 userId 隔离）
             String relatedKnowledge = "";
+            // 默认认为「知识库未覆盖」；只有检索到足够相似的文档才置为 false
+            boolean topicMissing = true;
             try {
                 FilterExpressionBuilder b = new FilterExpressionBuilder();
                 SearchRequest req = SearchRequest.builder()
@@ -154,18 +215,49 @@ public class RagSearchService {
                 List<Document> docs = vectorStore.similaritySearch(req);
                 if (docs != null && !docs.isEmpty()) {
                     StringBuilder sb = new StringBuilder();
+                    double bestDistance = Double.MAX_VALUE;
                     for (Document doc : docs) {
                         sb.append("【参考】").append(doc.getText()).append("\n\n");
+                        Double d = extractDistance(doc);
+                        if (d != null) {
+                            bestDistance = Math.min(bestDistance, d);
+                        }
                     }
                     relatedKnowledge = sb.toString();
+                    // 命中足够相似的文档才算「已覆盖」；否则只是检索到的近邻噪声
+                    topicMissing = bestDistance > autoSupplementMaxDistance;
+                    if (topicMissing) {
+                        log.debug("RAG 命中但相似度不足（bestDistance={} > {}），视为未覆盖该主题",
+                                bestDistance, autoSupplementMaxDistance);
+                    }
                 }
             } catch (Exception e) {
                 log.warn("RAG 检索失败 query='{}'：{}", question, e.getMessage());
             }
 
+            // 1.1 知识库未覆盖该主题 → 异步沉淀一条通用知识，下次同类问题即可命中。
+            // 全行业覆盖无法靠预置知识穷举，这是知识库随使用自动生长的关键机制。
+            // 注意：异步投递，绝不影响本次回答的时延。
+            if (topicMissing) {
+                try {
+                    AutoKnowledgeService svc = autoKnowledgeProvider.getIfAvailable();
+                    if (svc != null) {
+                        svc.supplementAsync(question);
+                    }
+                } catch (Exception e) {
+                    log.debug("触发知识自动补充失败（已忽略）：{}", e.toString());
+                }
+            }
+
             // 2. 构建 RAG Prompt（使用 StringBuilder 避免 String.format 注入风险）
+            // v1.34.0：此前写死「你是一个 Java 后端面试助手」，与平台定位冲突 ——
+            // 本平台是全行业 AI 面试辅助（财会/法律/医疗/教育/销售/制造等），
+            // 写死 IT 语境会让非技术岗问答被强行往编程方向带偏。
             StringBuilder promptBuilder = new StringBuilder()
-                    .append("你是一个 Java 后端面试助手，请根据以下参考资料回答问题。\n\n")
+                    .append("你是一位资深的面试辅导专家，服务范围覆盖**全行业**：")
+                    .append("技术研发、产品与设计、金融与财会、法律、医疗与护理、教育与科研、")
+                    .append("人力资源、销售与市场、运营与电商、制造与工程、行政与公共服务等。\n")
+                    .append("请根据以下参考资料回答问题。\n\n")
                     .append("【参考资料】\n")
                     .append(relatedKnowledge.isEmpty() ? "无" : relatedKnowledge)
                     .append("\n【问题】\n")
@@ -173,7 +265,9 @@ public class RagSearchService {
                     .append("\n\n要求：\n")
                     .append("1. 回答要准确、有条理\n")
                     .append("2. 尽量引用参考资料\n")
-                    .append("3. 如果资料不足，明确说明\n");
+                    .append("3. 如果资料不足，明确说明\n")
+                    .append("4. 先判断提问所属行业与岗位，用该行业的专业术语作答；")
+                    .append("不要假设提问者一定来自互联网/IT 行业\n");
 
             // 3. 调用 AI 并做空值校验（v1.23.1：纳入全局 AI 并发闸门）
             String response = com.example.interview.ai.AiConcurrencyGuard.call(() ->
@@ -291,6 +385,27 @@ public class RagSearchService {
             log.debug("去重检查失败，按非重复处理：{}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 从检索结果中取出距离值。
+     *
+     * <p>不同 VectorStore 实现写入的兼容字段名不一致：SimpleVectorStore 写 {@code distance}，
+     * 部分实现（含 pgvector）在 metadata 中落 {@code score} / {@code similarity}。
+     * 这里按优先级兼容读取，取不到返回 {@code null}（调用方按「无法判断」处理，
+     * 不会误判为「已覆盖」而漏掉自动补充）。
+     */
+    private static Double extractDistance(Document doc) {
+        if (doc == null || doc.getMetadata() == null) {
+            return null;
+        }
+        for (String key : new String[]{"distance", "score", "similarity"}) {
+            Object v = doc.getMetadata().get(key);
+            if (v instanceof Number n) {
+                return n.doubleValue();
+            }
+        }
+        return null;
     }
 
 }
