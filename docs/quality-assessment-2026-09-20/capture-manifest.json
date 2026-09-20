@@ -5,7 +5,7 @@
  "coverage": {
   "light": "8 视图 × 4 分辨率（1920x1080 / 1366x768 / 768x1024 / 375x667）",
   "dark": "4 视图 × 4 分辨率",
-  "total": 48
+  "total": 88
  },
  "entries": [
   {
@@ -726,6 +726,606 @@
     "ovf": false,
     "dlg": false,
     "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q AI 模拟面试 基于岗位与简历生成题目，AI 实时提示，自动评估打分 目标岗位 简历"
+   }
+  },
+  {
+   "page": "resume-history",
+   "route": "/resume/history",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/resume/history",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 简历历史"
+   }
+  },
+  {
+   "page": "resume-history",
+   "route": "/resume/history",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/resume/history",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 简历历史"
+   }
+  },
+  {
+   "page": "resume-history",
+   "route": "/resume/history",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/resume/history",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 简历历史 查看历次简历分析的结果与评分变化 暂无简历分析记录 完成一次简历分析后，记"
+   }
+  },
+  {
+   "page": "resume-history",
+   "route": "/resume/history",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/resume/history",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 简历历史 查看历次简历分析的结果与评分变化 暂无简历分析记录 完成一次简历分析后，记"
+   }
+  },
+  {
+   "page": "job-analysis",
+   "route": "/job",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/job",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 岗位分析"
+   }
+  },
+  {
+   "page": "job-analysis",
+   "route": "/job",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/job",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 岗位分析"
+   }
+  },
+  {
+   "page": "job-analysis",
+   "route": "/job",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/job",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 岗位分析 深度拆解 JD、诊断简历匹配度、一键生成求职信 JD 岗位分析 差距诊断 "
+   }
+  },
+  {
+   "page": "job-analysis",
+   "route": "/job",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/job",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 岗位分析 深度拆解 JD、诊断简历匹配度、一键生成求职信 JD 岗位分析 差距诊断 "
+   }
+  },
+  {
+   "page": "history",
+   "route": "/history",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/history",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 历史面试"
+   }
+  },
+  {
+   "page": "history",
+   "route": "/history",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/history",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 历史面试"
+   }
+  },
+  {
+   "page": "history",
+   "route": "/history",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/history",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 历史面试记录 回顾历次模拟面试的题目、回答与评分 Java 后端（3 年经验，Spr"
+   }
+  },
+  {
+   "page": "history",
+   "route": "/history",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/history",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 历史面试记录 回顾历次模拟面试的题目、回答与评分 Java 后端（3 年经验，Spr"
+   }
+  },
+  {
+   "page": "learning",
+   "route": "/learning",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/learning",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 学习中心"
+   }
+  },
+  {
+   "page": "learning",
+   "route": "/learning",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/learning",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 学习中心"
+   }
+  },
+  {
+   "page": "learning",
+   "route": "/learning",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/learning",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 学习中心 从错题中定位薄弱点，用趋势见证成长，让每一场面试都有规划 面试日历 规划面"
+   }
+  },
+  {
+   "page": "learning",
+   "route": "/learning",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/learning",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 学习中心 从错题中定位薄弱点，用趋势见证成长，让每一场面试都有规划 面试日历 规划面"
+   }
+  },
+  {
+   "page": "favorites",
+   "route": "/favorites",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/favorites",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 收藏夹 "
+   }
+  },
+  {
+   "page": "favorites",
+   "route": "/favorites",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/favorites",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 收藏夹 "
+   }
+  },
+  {
+   "page": "favorites",
+   "route": "/favorites",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/favorites",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 收藏夹 集中回看收藏的重点题目与薄弱点 从收藏发起面试 ＋ 手动加题 还没有收藏 在"
+   }
+  },
+  {
+   "page": "favorites",
+   "route": "/favorites",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/favorites",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 收藏夹 集中回看收藏的重点题目与薄弱点 从收藏发起面试 ＋ 手动加题 还没有收藏 在"
+   }
+  },
+  {
+   "page": "progress",
+   "route": "/progress",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/progress",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 成长趋势"
+   }
+  },
+  {
+   "page": "progress",
+   "route": "/progress",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/progress",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 成长趋势"
+   }
+  },
+  {
+   "page": "progress",
+   "route": "/progress",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/progress",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 成长趋势 用数据看见每一次面试的进步，定位薄弱维度 已完成面试 0 次模拟面试 平均"
+   }
+  },
+  {
+   "page": "progress",
+   "route": "/progress",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/progress",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 成长趋势 用数据看见每一次面试的进步，定位薄弱维度 已完成面试 0 次模拟面试 平均"
+   }
+  },
+  {
+   "page": "wrong-book",
+   "route": "/wrong-book",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/wrong-book",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 错题本 "
+   }
+  },
+  {
+   "page": "wrong-book",
+   "route": "/wrong-book",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/wrong-book",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 错题本 "
+   }
+  },
+  {
+   "page": "wrong-book",
+   "route": "/wrong-book",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/wrong-book",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 错题本 评分低于阈值的题目，重点回顾薄弱题型 错题阈值： 低于 50 分 低于 60"
+   }
+  },
+  {
+   "page": "wrong-book",
+   "route": "/wrong-book",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/wrong-book",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 错题本 评分低于阈值的题目，重点回顾薄弱题型 错题阈值： 低于 50 分 低于 60"
+   }
+  },
+  {
+   "page": "calendar",
+   "route": "/calendar",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/calendar",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 面试日历"
+   }
+  },
+  {
+   "page": "calendar",
+   "route": "/calendar",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/calendar",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 面试日历"
+   }
+  },
+  {
+   "page": "calendar",
+   "route": "/calendar",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/calendar",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 面试日历 规划每一场面试与准备节点，掌控求职节奏 0 总日程 0 待面试 0 已完成"
+   }
+  },
+  {
+   "page": "calendar",
+   "route": "/calendar",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/calendar",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 面试日历 规划每一场面试与准备节点，掌控求职节奏 0 总日程 0 待面试 0 已完成"
+   }
+  },
+  {
+   "page": "admin",
+   "route": "/admin",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 AI 驱"
+   }
+  },
+  {
+   "page": "admin",
+   "route": "/admin",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 AI 驱"
+   }
+  },
+  {
+   "page": "admin",
+   "route": "/admin",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q AI 驱动 · 智能面试准备平台 让每一次面试 都有备而来 上传简历获得 AI 多维"
+   }
+  },
+  {
+   "page": "admin",
+   "route": "/admin",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q AI 驱动 · 智能面试准备平台 让每一次面试 都有备而来 上传简历获得 AI 多维"
+   }
+  },
+  {
+   "page": "notfound",
+   "route": "/nonexistent-xyz-404",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/nonexistent-xyz-404",
+    "th": "light",
+    "ow": 1920,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 404 "
+   }
+  },
+  {
+   "page": "notfound",
+   "route": "/nonexistent-xyz-404",
+   "viewport": "1366x768",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/nonexistent-xyz-404",
+    "th": "light",
+    "ow": 1366,
+    "ovf": false,
+    "dlg": false,
+    "txt": "AI 面试助手 智能面试准备平台 首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q qa_probe_20260920 退出 404 "
+   }
+  },
+  {
+   "page": "notfound",
+   "route": "/nonexistent-xyz-404",
+   "viewport": "768x1024",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/nonexistent-xyz-404",
+    "th": "light",
+    "ow": 768,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 404 页面未找到 你访问的页面不存在或已被移除 返回首页 返回上一页 AI 面试助"
+   }
+  },
+  {
+   "page": "notfound",
+   "route": "/nonexistent-xyz-404",
+   "viewport": "375x667",
+   "theme": "light",
+   "capture": "OK",
+   "measured": {
+    "p": "/nonexistent-xyz-404",
+    "th": "light",
+    "ow": 375,
+    "ovf": false,
+    "dlg": false,
+    "txt": "首页 简历分析 岗位分析 招聘广场 智能体 模拟面试 学习中心 历史记录 知识库 个人中心 Q 404 页面未找到 你访问的页面不存在或已被移除 返回首页 返回上一页 AI 面试助"
    }
   }
  ]
