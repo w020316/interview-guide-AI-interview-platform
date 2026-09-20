@@ -75,6 +75,25 @@
 | 后端覆盖率 30 个低覆盖类（分支覆盖仅 69.04%） | P2 | 已有精确基线，按类逐一补测 |
 | `AutoKnowledgeService` 明文记录用户提问（PII 进日志，A-08） | P3 | 待第二波 |
 
+## 五、推送与部署复验（2026-09-20 13:42–14:03）
+
+| 环节 | 结果 |
+|---|---|
+| `git push origin main` | ✅ **`54effbe..255bde0`（9 个 commit）** |
+| GitHub Actions CI（run `35492376667`） | ✅ **success，1m53s** —— 在被推送的同一提交上：后端 674 测试 + 覆盖率门禁 + 前端 282 测试 + `npm audit` + `vue-tsc` + `vite build` |
+| Render 后端（`autoDeploy: true` 已触发） | ✅ **健康**：部署窗口内 `/actuator/health` **连续 9 次返回 200**（8 分钟，含冷启动） |
+| Vercel 前端 | ⚠️ **本机无法探测**：白名单代理在整段窗口内持续拒绝 `vercel.app`（`502 CONNECT tunnel failed`），直连亦超时 —— 属**本机网络限制**，非部署失败 |
+
+### 部署指纹的客观限制（如实说明）
+
+- `/api/info` 的 `version` **写死为 `1.0.0`**，`/actuator/info` 的 `buildDate` **只有日期没有时间**（且当日已有过一次部署），
+  因此后端**不存在可从外部区分新旧部署的确定性指纹**。
+- 本波后端改动（embedding 维度透传、测试数据源隔离、构建配置）本身**没有可被外部观测的行为变化**，
+  所以「CI 在该提交上全绿 + Render 持续健康」是当前可得的最强证据组合。
+- **顺带发现第 6 个版本源**：`/actuator/info` 返回 `version: "1.23.0"`（`AppInfoContributor`）——
+  版本号不一致比计划书记录的 5 源**更严重**（pom 1.31.3 / package.json 1.28.0 / changelog v1.33.3 /
+  `/api/info` 1.0.0 / local 配置注释 v1.34.0 / **`/actuator/info` 1.23.0**）。
+
 ---
 
-**报告版本**：v1　**编制**：2026-09-20
+**报告版本**：v2　**编制**：2026-09-20
