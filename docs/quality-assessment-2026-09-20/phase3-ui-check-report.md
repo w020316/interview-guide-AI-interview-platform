@@ -2,7 +2,9 @@
 
 > **检查日期**：2026-09-20　**检查环境**：本机真机 Edge 153（CDP 直连，非模拟器）
 > **被检站点**：`https://interview-guide-ai-interview-platform.pages.dev`（说明见 §1）
-> **截图目录**：`screenshots/`（49 张）　**清单**：`capture-manifest.json`
+> **截图目录**：`screenshots/`（**48 张，已做采集归一化**——采集前移除 Vue 过渡类并内联强制
+> `opacity:1`，原因见 §2；不归一化时带入场动画的元素会因 CDP 隐藏页面而全部不可见）
+> **清单**：`capture-manifest.json`（含每页 `measured` 客观指标）
 > **覆盖性质**：**优先级子集**（非计划中的完整矩阵），限制见 §5
 
 ---
@@ -18,20 +20,35 @@
 | **未断功能** | 后端 CORS 白名单同时列了 `vercel.app` 与 `pages.dev`，故线上功能不受影响 |
 | **建议** | ① 统一文档为 pages.dev（或为 vercel 域名重新绑定部署）；② 明确唯一生产入口并写入 README 顶部；③ 若 Vercel 已弃用则删除 `vercel.json` 与相关 CI 步骤，避免误导 |
 
-## 2. 【P1】移动端首屏空白 —— 主视觉与 CTA 在加载后长时间不可见
+## 2. 【已撤回的错误结论】移动端首屏"空白"实为采集环境限制，非产品缺陷
 
-| 项 | 内容 |
-|---|---|
-| **等级** | **P1（影响移动端首屏可用性）** |
-| **复现** | 视口 375×667，打开首页，**不做任何交互** |
-| **实测（CDP 逐秒采样）** | `t=2s → opacity 0` … `t=24s → opacity 0`，全程 **14 个含文字元素**（主标题、副标题、CTA「开始简历分析/模拟面试」、准备度卡片、三张 feature 卡）保持 `opacity: 0` |
-| **触发条件** | 执行一次 `window.scrollTo(0,600)` 后，同批元素 `opacity → 1`（滚动触发揭示） |
-| **根因（计算样式取证）** | ① 容器 `.home` 上**残留 Vue 过渡类 `page-enter-from page-enter-active`** → `.page-enter-from{opacity:0}` 未清除；② 13 个 `fade-in-up` 元素计算样式为 `animation: fadeInUp 0.4s both`，`both` 填充使未开始/未完成时停留在 `from{opacity:0; transform:translateY(12px)}` |
-| **叠加放大** | 375×667 下 `<h1>` 位于 **y=582**（视口高 667），主标题几乎在首屏最底部；配合上面的不可见状态 → **首屏几乎全白**（见 `home_375x667_light.png`） |
-| **桌面端对比** | 1920×1080 首屏可见（元素天然进入可视区，揭示完成）→ 属**移动端特有**问题 |
-| **截图证据** | `screenshots/home_375x667_light.png`、`screenshots/home_375x667_light_12s.png`（12 秒后仍同状态） |
-| **建议** | ① 修正路由过渡类未清除问题（确保 `page-enter-active` 动画结束后移除 `page-enter-from`）；② 揭示动画给**兜底**：初始 `opacity` 不宜为 0 直到滚动才变（可用 `IntersectionObserver` + `rootMargin` 提前触发，或首屏元素不做入场动画）；③ 移动端压缩 hero 上边距，把主标题提到首屏上部；④ 为 `prefers-reduced-motion` 提供直接可见的回退 |
-| **验证建议** | 真机手动确认一次（本次由 CDP 驱动导航，虽已逐秒采样，仍建议人工复核） |
+> **本节为 v1 报告中的 P1 结论，经复核后予以撤回**。保留全过程以示纠错依据。
+
+### 原结论（v1，错误）
+v1 曾记录：「375×667 下主标题/CTA 及 14 个元素加载后 24s 仍 `opacity:0`，需滚动才出现，判 P1」，
+根因归为「容器残留 Vue 过渡类 + `fade-in-up` 动画未到终态」。
+
+### 复核过程与推翻依据
+
+| 步骤 | 证据 | 结论 |
+|---|---|---|
+| ① 检查页面可见性 | `document.visibilityState === "hidden"`（CDP 拉起的 Edge 窗口不可见） | 隐藏页面**不会推进 CSS 动画与过渡**，元素停在 `from` 态是**必然**的 |
+| ② 对照移动/桌面模拟 | `mobile:true` 与 `mobile:false` 结果**完全相同**（均 `hero:0`、14 个零透明度元素） | 与视口/移动模拟**无关**，排除"移动端特有缺陷" |
+| ③ 物证对照 | 另一路径（`agent-browser`，可见窗口）拍到的首页英雄区**正常可见**（深色文字、CTA 清晰） | **可见窗口下动画正常完成** |
+| ④ 机制验证 | 手动移除 `page-enter-from/page-enter-active` 后，容器恢复；但 13 个 `fade-in-up` 元素仍为 0 | 根因是"动画未推进"，而非类残留本身 |
+
+**修正后的结论**：`opacity:0` 是 **CDP 隐藏页面导致的采集假象**。真实用户在可见窗口浏览时，路由过渡与入场动画正常执行，**不存在"首屏空白"缺陷**。
+
+### 仍然成立的相关观察（降级为 P3 建议）
+
+- 375×667 下 `<h1>` 的 `top=582`（视口高 667）→ **首屏上方留白偏多**，主标题几乎贴底；这是一次纯布局测量（不依赖动画），建议移动端压缩 hero 上边距、把主标题提到首屏上部
+- 若后续要做视觉回归，**必须**在截图前注入 `animation:none!important;transition:none!important`（或等页面 `visibilityState=visible`），否则带入场动画的元素一律不可见
+
+### 本次截图的可信边界（重要）
+
+- **仍然可信**：布局位置、横向溢出判定、主题属性、路由落点、DOM 文本/空态文案 —— 均与动画无关
+- **不可信**：带 `.fade-in-up` 入场动画的元素在截图中的"不可见"表现（含 hero 全部内容、卡片），**不代表线上真实表现**
+- 已补拍 `screenshots/home_375x667_light_normalized.png`（移除过渡类后）供对照
 
 ## 3. 【P2】非管理员访问管理后台被静默弹回首页，无任何提示
 
@@ -78,9 +95,11 @@
 ### 工具链限制（导致本次为子集的原因，供后续复用参考）
 
 1. `agent-browser` 这个版本**没有可用的 viewport 命令**（help 里列出但执行报 `Unknown command: viewport`）→ 先期 30 张实际都是同一 1032×758 视口，**已全部废弃不计入**，改用原生 CDP（`Emulation.setDeviceMetricsOverride`）重跑
-2. `agent-browser screenshot` 的路径**必须是 Windows 形式**（`D:/x.png`），且**不支持中文路径** → 先落 ASCII 目录再拷入仓库
-3. 本机 **429 频率限制**导致 UI 检查 worker 两次中断（第二次跑了 108 分钟零产出），额度 2026-09-21 00:07 重置 → 完整矩阵需在额度恢复后由 worker 补齐
-4. `bash script.sh` 会触发沙箱对 `wsl.exe` 的黑名单拦截 → 脚本需内联执行
+2. **【最关键】** CDP 拉起的 Edge 窗口 `document.visibilityState === "hidden"`，而**隐藏页面不推进 CSS 动画与过渡** → 带 `.fade-in-up`（`animation: fadeInUp 0.4s both`）的元素会永远停在 `opacity:0`，`<transition>` 也因 `transitionend` 不触发而残留 `page-enter-from` 类。**这曾导致一次误判（见 §2）**。正确做法：采集前做归一化（移除过渡类 + 内联强制 `opacity:1`），本次 48 张均已归一化
+3. `agent-browser screenshot` 的路径**必须是 Windows 形式**（`D:/x.png`）且**不支持中文路径** → 先落 ASCII 目录再拷入仓库
+4. 本机 **429 频率限制**导致 UI 检查 worker 两次中断（第二次跑了 108 分钟零产出），额度 2026-09-21 00:07 重置 → 完整矩阵需在额度恢复后由 worker 补齐
+5. `bash script.sh` 会触发沙箱对 `wsl.exe` 的黑名单拦截 → 脚本需内联执行
+6. python.exe 是 Windows 程序：脚本路径必须传 `D:/...`，传 `/d/...` 会被解析成 `d:\d\...`
 
 ---
 
