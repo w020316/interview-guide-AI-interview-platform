@@ -204,6 +204,13 @@
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
+                        <configuration>
+                            <!-- P2-10（2026-09-20）：落到纯 ASCII 临时路径，规避中文项目路径下
+                                 surefire 经 cmd.exe 分叉时代码页损坏 -javaagent 目标文件，
+                                 导致 jacoco.exec 落进乱码目录、文件名被截断为 jacoco.exe、
+                                 backend/target/jacoco.exec 缺失而 report/check 被静默跳过。 -->
+                            <destFile>${java.io.tmpdir}/interview-guide-jacoco.exec</destFile>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>report</id>
@@ -211,6 +218,9 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                        <configuration>
+                            <dataFile>${java.io.tmpdir}/interview-guide-jacoco.exec</dataFile>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>check</id>
@@ -219,6 +229,7 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                            <dataFile>${java.io.tmpdir}/interview-guide-jacoco.exec</dataFile>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>
