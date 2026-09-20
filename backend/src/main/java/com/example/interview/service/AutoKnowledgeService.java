@@ -1,6 +1,7 @@
 package com.example.interview.service;
 
 import com.example.interview.ai.AiConcurrencyGuard;
+import com.example.interview.util.HashUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -149,19 +150,19 @@ public class AutoKnowledgeService {
                     .call()
                     .content());
             if (raw == null || raw.isBlank()) {
-                log.debug("自动补充：LLM 返回空内容，跳过。question='{}'", question);
+                log.debug("自动补充：LLM 返回空内容，跳过。questionFp='{}'", questionFingerprint(question));
                 return;
             }
             JsonNode node = parseJson(raw);
             if (node == null) {
-                log.debug("自动补充：响应非合法 JSON，跳过。question='{}'", question);
+                log.debug("自动补充：响应非合法 JSON，跳过。questionFp='{}'", questionFingerprint(question));
                 return;
             }
             String category = text(node, "category");
             String title = text(node, "title");
             String content = text(node, "content");
             if (category.isBlank() || title.isBlank() || content.length() < 50) {
-                log.debug("自动补充：字段不完整或内容过短，跳过。question='{}'", question);
+                log.debug("自动补充：字段不完整或内容过短，跳过。questionFp='{}'", questionFingerprint(question));
                 return;
             }
 
@@ -178,7 +179,10 @@ public class AutoKnowledgeService {
             int stored = ragSearchService.addToVectorStore(List.of(doc));
             if (stored > 0) {
                 totalSupplemented.incrementAndGet();
-                log.info("知识库自动补充：新增 [{}] {}（触发提问：{}）", category, title, question);
+                // P3/A-08（2026-09-20）：日志不落用户提问明文——提问可能粘贴含隐私的简历内容，
+                // 只记短哈希+长度，既能跨日志关联同一次触发，又不泄漏内容
+                log.info("知识库自动补充：新增 [{}] {}（触发提问指纹：{}）",
+                        category, title, questionFingerprint(question));
             } else {
                 log.debug("自动补充：向量库容量已满，未入库。topic='{}'", title);
             }
@@ -186,6 +190,15 @@ public class AutoKnowledgeService {
             // 自动补充是增强能力，任何失败都不应影响主流程
             log.debug("自动补充失败（已忽略）：{}", e.toString());
         }
+    }
+
+    /**
+     * 提问指纹（P3/A-08）：日志不落用户原始提问明文——提问可能粘贴含隐私的简历内容。
+     * 只保留短哈希 + 长度，既能跨日志关联同一次触发，又不泄漏内容。
+     */
+    private String questionFingerprint(String question) {
+        int len = question == null ? 0 : question.length();
+        return HashUtil.sha256Short(question == null ? "" : question) + "/" + len + "字";
     }
 
     /**
