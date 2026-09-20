@@ -21,16 +21,19 @@ export interface WeakSource {
  * @returns 分类名称数组，空列表表示无有效分类
  */
 export function extractWeakCategories<T extends WeakSource>(items: T[], max = 3): string[] {
-  const map = new Map<string, { count: number; sum: number }>()
+  // 仅统计「有得分」的题目：count 改为 scoredCount，避免无分题稀释均值、导致弱项排序失真
+  const map = new Map<string, { scoredCount: number; sum: number }>()
   for (const it of items) {
     if (!it.category) continue
-    const c = map.get(it.category) || { count: 0, sum: 0 }
-    c.count++
-    if (it.evaluationScore != null) c.sum += it.evaluationScore
+    const c = map.get(it.category) || { scoredCount: 0, sum: 0 }
+    if (it.evaluationScore != null) {
+      c.scoredCount++
+      c.sum += it.evaluationScore
+    }
     map.set(it.category, c)
   }
   return [...map.entries()]
-    .map(([cat, st]) => ({ cat, avg: st.count ? st.sum / st.count : 0 }))
+    .map(([cat, st]) => ({ cat, avg: st.scoredCount ? st.sum / st.scoredCount : 0 }))
     .sort((a, b) => a.avg - b.avg)
     .slice(0, max)
     .map((x) => x.cat)

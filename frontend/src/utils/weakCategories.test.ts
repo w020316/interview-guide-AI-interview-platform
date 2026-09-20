@@ -48,6 +48,17 @@ describe('extractWeakCategories', () => {
     expect(extractWeakCategories(items)).toEqual(['基础', '项目深挖'])
   })
 
+  it('无分题不稀释有分题均值：分母只计有分题', () => {
+    const items: Item[] = [
+      makeItem({ id: 1, category: '基础', evaluationScore: 100 }),
+      makeItem({ id: 2, category: '基础', evaluationScore: null }),
+      makeItem({ id: 3, category: '八股', evaluationScore: 50 }),
+    ]
+    // 修复后：基础均分 = 100/1 = 100（无分题不参与分母），八股 = 50 → 八股更弱
+    // 修复前（分母为总题数）：基础 = 100/2 = 50 与八股并列，弱项排序失真
+    expect(extractWeakCategories(items)).toEqual(['八股', '基础'])
+  })
+
   it('空列表或全是无效项时返回空数组', () => {
     expect(extractWeakCategories([])).toEqual([])
     expect(extractWeakCategories([makeItem({ id: 1, category: null }), makeItem({ id: 2, category: '' })])).toEqual([])
