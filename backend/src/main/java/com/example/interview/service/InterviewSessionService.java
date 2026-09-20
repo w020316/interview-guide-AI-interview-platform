@@ -5,6 +5,10 @@ import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.repository.InterviewQuestionRepository;
 import com.example.interview.repository.InterviewSessionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -166,8 +170,41 @@ public class InterviewSessionService {
      * @return 错题列表，按时间倒序
      */
     public List<InterviewQuestionEntity> listWrongQuestionsByUser(String userId, int threshold) {
-        return listAllQuestionsByUser(userId).stream()
-                .filter(q -> q.getEvaluationScore() != null && q.getEvaluationScore() < threshold)
+        // P1/S-02（2026-09-20）：过滤下推数据库。此前先全量加载该用户所有题目再在内存过滤，
+        // 题目数增长后是明显的内存/带宽浪费（错题总结、智能体工具每轮都可能调用）。
+        List<String> sessionIds = listSessionIdsByUser(userId);
+        if (sessionIds.isEmpty()) {
+            return List.of();
+        }
+        return questionRepository.findBySessionIdInAndEvaluationScoreLessThanOrderByCreatedAtDesc(
+                sessionIds, threshold);
+    }
+
+    /**
+     * 分页查询用户最近的题目（知识库"最近题目"）
+     *
+     * <p>P1/S-02（2026-09-20）：分页与计数下推数据库。此前全量加载后在内存
+     * {@code limit(limit)}，且 total 取的是被截断后的条数——分页语义失真。
+     * 现由数据库返回当前页与真实总数。
+     *
+     * @param userId 用户 ID
+     * @param limit  每页条数（1-100）
+     * @return Spring Data 分页对象：getContent() 当前页、getTotalElements() 真实总数
+     */
+    public Page<InterviewQuestionEntity> listRecentQuestionsByUser(String userId, int limit) {
+        List<String> sessionIds = listSessionIdsByUser(userId);
+        if (sessionIds.isEmpty()) {
+            return Page.empty();
+        }
+        Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return questionRepository.findBySessionIdIn(sessionIds, pageable);
+    }
+
+    /** 取用户全部会话 ID（供题目查询收敛用）；无会话返回空列表 */
+    private List<String> listSessionIdsByUser(String userId) {
+        List<InterviewSessionEntity> sessions = sessionRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        return sessions.stream()
+                .map(InterviewSessionEntity::getSessionId)
                 .collect(Collectors.toList());
     }
 

@@ -12,6 +12,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -235,22 +239,79 @@ class InterviewSessionServiceTest {
     }
 
     @Test
-    @DisplayName("listWrongQuestionsByUser: 仅保留评分低于阈值且非 null 的题目")
-    void listWrongQuestionsByUser_shouldFilterBelowThreshold() {
+    @DisplayName("listWrongQuestionsByUser: 阈值过滤下推数据库，按会话收敛查询")
+    void listWrongQuestionsByUser_shouldPushFilterDownToRepository() {
+        // P1/S-02：过滤条件由 SQL 承担（evaluationScore < threshold，NULL 行天然不满足
+        // LessThan 而被排除，与原内存过滤等价），service 只负责收敛会话 ID 与透传阈值
         InterviewQuestionEntity wrong = InterviewQuestionEntity.builder()
                 .id(1L).sessionId("s1").evaluationScore(50).build();
-        InterviewQuestionEntity passed = InterviewQuestionEntity.builder()
-                .id(2L).sessionId("s1").evaluationScore(70).build();
-        InterviewQuestionEntity unScored = InterviewQuestionEntity.builder()
-                .id(3L).sessionId("s1").evaluationScore(null).build();
         InterviewSessionEntity s1 = InterviewSessionEntity.builder().sessionId("s1").build();
-        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of(s1));
-        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(anyCollection()))
-                .thenReturn(List.of(wrong, passed, unScored));
+        InterviewSessionEntity s2 = InterviewSessionEntity.builder().sessionId("s2").build();
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of(s1, s2));
+        when(questionRepository.findBySessionIdInAndEvaluationScoreLessThanOrderByCreatedAtDesc(
+                anyCollection(), eq(60))).thenReturn(List.of(wrong));
 
         List<InterviewQuestionEntity> result = service.listWrongQuestionsByUser("user1", 60);
 
         assertThat(result).containsExactly(wrong);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<String>> captor =
+                (ArgumentCaptor<Collection<String>>) (ArgumentCaptor<?>) ArgumentCaptor.forClass(Collection.class);
+        verify(questionRepository).findBySessionIdInAndEvaluationScoreLessThanOrderByCreatedAtDesc(
+                captor.capture(), eq(60));
+        assertThat(captor.getValue()).containsExactlyInAnyOrder("s1", "s2");
+    }
+
+    @Test
+    @DisplayName("listWrongQuestionsByUser: 无会话时返回空列表且不查题目")
+    void listWrongQuestionsByUser_noSessions_shouldReturnEmpty() {
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of());
+
+        List<InterviewQuestionEntity> result = service.listWrongQuestionsByUser("user1", 60);
+
+        assertThat(result).isEmpty();
+        verify(questionRepository, never())
+                .findBySessionIdInAndEvaluationScoreLessThanOrderByCreatedAtDesc(anyCollection(), eq(60));
+    }
+
+    @Test
+    @DisplayName("listRecentQuestionsByUser: 分页下推数据库，返回真实总数而非截断条数")
+    void listRecentQuestionsByUser_shouldReturnPageWithRealTotal() {
+        // P1/S-02：此前 total 取内存截断后的条数（=min(limit,总数)），语义失真；
+        // 现由 Page.getTotalElements() 提供真实总数
+        InterviewSessionEntity s1 = InterviewSessionEntity.builder().sessionId("s1").build();
+        InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("s1").question("什么是多态？").build();
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of(s1));
+        // 注意：PageImpl 会在 offset+pageSize > total 时用内容条数"纠正"总数，
+        // 故桩数据需满足 offset+pageSize <= total（此处 0+10 <= 17），total 才能保留 17
+        when(questionRepository.findBySessionIdIn(anyCollection(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(q), PageRequest.of(0, 10), 17));
+
+        Page<InterviewQuestionEntity> result = service.listRecentQuestionsByUser("user1", 10);
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getTotalElements()).isEqualTo(17L);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(questionRepository).findBySessionIdIn(anyCollection(), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt"))
+                .isNotNull()
+                .extracting(org.springframework.data.domain.Sort.Order::getDirection)
+                .isEqualTo(org.springframework.data.domain.Sort.Direction.DESC);
+    }
+
+    @Test
+    @DisplayName("listRecentQuestionsByUser: 无会话时返回空分页且不查题目")
+    void listRecentQuestionsByUser_noSessions_shouldReturnEmptyPage() {
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of());
+
+        Page<InterviewQuestionEntity> result = service.listRecentQuestionsByUser("user1", 10);
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isEqualTo(0L);
+        verify(questionRepository, never()).findBySessionIdIn(anyCollection(), any(Pageable.class));
     }
 
     @Test

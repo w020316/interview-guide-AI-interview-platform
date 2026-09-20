@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -179,10 +180,12 @@ public class KnowledgeController {
     public Result<Map<String, Object>> recentQuestions(@RequestParam(defaultValue = "10") int limit) {
         if (limit < 1 || limit > 100) limit = 10;
         String userId = currentUserId();
-        List<InterviewQuestionEntity> all = sessionService.listAllQuestionsByUser(userId);
+        // P1/S-02（2026-09-20）：分页与计数下推数据库。此前全量加载后内存 limit，
+        // 且 total 返回被截断后的条数（=min(limit,总数)），分页语义失真；
+        // 现在 total 为该用户题目真实总数，questions 为当前页。
+        Page<InterviewQuestionEntity> page = sessionService.listRecentQuestionsByUser(userId, limit);
 
-        List<Map<String, Object>> items = all.stream()
-                .limit(limit)
+        List<Map<String, Object>> items = page.getContent().stream()
                 .map(q -> {
                     Map<String, Object> item = new LinkedHashMap<>();
                     item.put("id", q.getId());
@@ -197,7 +200,7 @@ public class KnowledgeController {
                 .collect(Collectors.toList());
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("total", items.size());
+        result.put("total", page.getTotalElements());
         result.put("questions", items);
         return Result.success(result);
     }

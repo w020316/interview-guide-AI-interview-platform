@@ -1,6 +1,8 @@
 package com.example.interview.repository;
 
 import com.example.interview.entity.InterviewQuestionEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +22,20 @@ public interface InterviewQuestionRepository extends JpaRepository<InterviewQues
 
     /** 查询多个会话的所有题目，按创建时间倒序（用于知识库错题汇总） */
     List<InterviewQuestionEntity> findBySessionIdInOrderByCreatedAtDesc(Collection<String> sessionIds);
+
+    /**
+     * 分页查询多个会话的题目，按创建时间倒序（P1/S-02：聚合与计数下推数据库，
+     * 避免全量加载后内存 limit 导致 total 失真）
+     */
+    Page<InterviewQuestionEntity> findBySessionIdIn(Collection<String> sessionIds, Pageable pageable);
+
+    /**
+     * 查询多个会话中评分低于阈值的题目，按创建时间倒序（P1/S-02：过滤下推数据库）。
+     * SQL 语义上 evaluationScore 为 NULL 的行不满足 LessThan，自动排除，
+     * 与原内存过滤 `evaluationScore != null && evaluationScore < threshold` 等价。
+     */
+    List<InterviewQuestionEntity> findBySessionIdInAndEvaluationScoreLessThanOrderByCreatedAtDesc(
+            Collection<String> sessionIds, int threshold);
 
     /** 统计指定会话的题目数量 */
     long countBySessionId(String sessionId);

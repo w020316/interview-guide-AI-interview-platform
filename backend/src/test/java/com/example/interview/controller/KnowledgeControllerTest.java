@@ -17,6 +17,9 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -356,25 +359,28 @@ class KnowledgeControllerTest {
     class RecentQuestions {
 
         @Test
-        @DisplayName("合法入参返回 200 + 最近题目")
+        @DisplayName("合法入参返回 200 + 最近题目（total 为真实总数）")
         void recentQuestions_validInput_returns200() throws Exception {
             InterviewQuestionEntity q = InterviewQuestionEntity.builder()
                     .id(1L).sessionId("s1").question("什么是多态？").build();
-            when(sessionService.listAllQuestionsByUser(USER_ID))
-                    .thenReturn(List.of(q));
+            // P1/S-02：total 现在来自 Page.getTotalElements()（真实总数），
+            // 而非被 limit 截断后的条数
+            when(sessionService.listRecentQuestionsByUser(USER_ID, 5))
+                    .thenReturn(new PageImpl<>(List.of(q), PageRequest.of(0, 5), 7));
 
             mockMvc.perform(get("/api/knowledge/recent-questions")
                             .param("limit", "5"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
-                    .andExpect(jsonPath("$.data.total").value(1));
+                    .andExpect(jsonPath("$.data.total").value(7))
+                    .andExpect(jsonPath("$.data.questions.length()").value(1));
         }
 
         @Test
         @DisplayName("limit 超出 100 时夹紧为 10 仍返回 200")
         void recentQuestions_limitOver100_clampedTo10() throws Exception {
-            when(sessionService.listAllQuestionsByUser(USER_ID))
-                    .thenReturn(List.of());
+            when(sessionService.listRecentQuestionsByUser(USER_ID, 10))
+                    .thenReturn(Page.empty());
 
             mockMvc.perform(get("/api/knowledge/recent-questions")
                             .param("limit", "200"))
@@ -390,8 +396,8 @@ class KnowledgeControllerTest {
                     .id(1L).sessionId("s1").question("Q1").build();
             InterviewQuestionEntity q2 = InterviewQuestionEntity.builder()
                     .id(2L).sessionId("s1").question("Q2").build();
-            when(sessionService.listAllQuestionsByUser(USER_ID))
-                    .thenReturn(List.of(q1, q2));
+            when(sessionService.listRecentQuestionsByUser(USER_ID, 10))
+                    .thenReturn(new PageImpl<>(List.of(q1, q2), PageRequest.of(0, 10), 2));
 
             mockMvc.perform(get("/api/knowledge/recent-questions")
                             .param("limit", "0"))
