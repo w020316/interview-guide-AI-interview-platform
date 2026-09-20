@@ -3,6 +3,7 @@ package com.example.interview.controller;
 import com.example.interview.common.Result;
 import com.example.interview.service.InterviewService;
 import com.example.interview.util.HashUtil;
+import com.example.interview.util.ImageTypeValidator;
 import com.example.interview.util.PromptSanitizer;
 import com.example.interview.util.SseConcurrencyGuard;
 import com.example.interview.util.SsrUrlValidator;
@@ -209,16 +210,24 @@ public class InterviewController {
             return Result.error(400, "图片大小不能超过 5MB");
         }
         String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
+        // P1/B-12（升格，2026-09-20）：改为白名单校验，image/svg+xml 一律拒绝——
+        // SVG 是文本型 XML 可内嵌脚本，落到 bucket 即成存储型 XSS
+        if (!ImageTypeValidator.isAllowed(contentType)) {
             return Result.error(400, "仅支持图片文件（jpg/png/webp/gif）");
         }
+        // magic bytes 校验：内容必须与声明的类型一致，防伪装文件（改 Content-Type 即可绕过初筛）
+        byte[] header;
+        try (var in = file.getInputStream()) {
+            header = in.readNBytes(ImageTypeValidator.HEADER_LENGTH);
+        } catch (IOException e) {
+            log.warn("作答附图读取文件头失败：{}", e.getMessage());
+            return Result.error(400, "图片读取失败，请重试");
+        }
+        String suffix = ImageTypeValidator.resolveExtension(contentType, header);
+        if (suffix == null) {
+            return Result.error(400, "文件内容与图片格式不符，已拒绝");
+        }
         try {
-            String suffix = switch (contentType) {
-                case "image/jpeg" -> ".jpg";
-                case "image/gif" -> ".gif";
-                case "image/webp" -> ".webp";
-                default -> ".png";
-            };
             // v1.31.4 安全修复（B-08）：命名空间一律取自 JWT 当前用户，禁止客户端指定 userId，
             // 杜绝向任意他人命名空间写图的越权/污染
             String uid = HashUtil.sha256Short(currentUserId());
