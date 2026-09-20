@@ -136,16 +136,20 @@ public class JobAgentService {
                     }
                 }
 
+                // P1/S-03：先收集本平台去重后的待写入项，再一次性批量查库与保存，
+                // 消除逐条 findByPlatformAndExternalId + save 的 N+1 写库
+                List<PendingUpsert> pending = new ArrayList<>();
                 for (JobDto dto : jobs) {
                     // 去重：同一 refresh 内不同 provider 收录的同公司同岗位，仅保留首次
                     if (!dedup.add(dedupKey(dto))) {
                         continue;
                     }
-                    boolean isNew = upsert(platform, dto, clsMap.get(dto.externalId()));
-                    upserted++;
-                    if (isNew) inserted++;
-                    else updated++;
+                    pending.add(new PendingUpsert(dto, clsMap.get(dto.externalId())));
                 }
+                UpsertResult r = upsertBatch(platform, pending);
+                upserted += pending.size();
+                inserted += r.inserted();
+                updated += r.updated();
                 log.info("平台 {} 岗位刷新完成：{} 条", platform, jobs.size());
             } catch (Exception e) {
                 // 单平台失败不影响整体刷新
@@ -165,19 +169,61 @@ public class JobAgentService {
                 expired == null ? 0 : expired, removed == null ? 0 : removed);
     }
 
-    /** 幂等 upsert，返回是否为新增 */
-    private boolean upsert(String platform, JobDto dto, JobClassifyService.Classification cls) {
-        var existing = repository.findByPlatformAndExternalId(platform, dto.externalId());
-        JobPostingEntity entity;
-        boolean isNew = existing.isEmpty();
-        if (isNew) {
-            entity = JobPostingEntity.builder()
-                    .platform(platform)
-                    .externalId(dto.externalId())
-                    .build();
-        } else {
-            entity = existing.get();
+    /** 待写入岗位：dto + 其 AI/规则分类补全结果 */
+    private record PendingUpsert(JobDto dto, JobClassifyService.Classification cls) {}
+
+    /** 批量 upsert 结果：inserted 新增数 / updated 更新数 */
+    private record UpsertResult(int inserted, int updated) {}
+
+    /**
+     * 批量幂等 upsert（P1/S-03，2026-09-20）
+     *
+     * <p>原实现逐条 {@code findByPlatformAndExternalId + save}，第三方平台全量刷新时
+     * 每条岗位产生 2 次 DB 往返，数百条即数百次额外查询，Hikari 连接被长时间占用。
+     * 现改为：一次 IN 查询取回存量实体 → 内存完成字段装配 → saveAll 一次性写库。
+     *
+     * <p>整批包在同一个短事务中，获得平台级原子性：任一条失败整批回滚、
+     * 下轮刷新重试，避免「半批成功」的中间状态（原逐条实现失败时已写入的部分会残留）。
+     *
+     * @param platform 平台标识
+     * @param pending  去重后的待写入项
+     * @return 新增 / 更新条数
+     */
+    private UpsertResult upsertBatch(String platform, List<PendingUpsert> pending) {
+        if (pending.isEmpty()) {
+            return new UpsertResult(0, 0);
         }
+        List<String> externalIds = new ArrayList<>(pending.size());
+        for (PendingUpsert p : pending) {
+            externalIds.add(p.dto().externalId());
+        }
+        // 同一 externalId 理论上唯一（uk 约束），putIfAbsent 防御异常数据
+        Map<String, JobPostingEntity> existing = new HashMap<>();
+        for (JobPostingEntity e : repository.findByPlatformAndExternalIdIn(platform, externalIds)) {
+            existing.putIfAbsent(e.getExternalId(), e);
+        }
+
+        List<JobPostingEntity> toSave = new ArrayList<>(pending.size());
+        int inserted = 0;
+        for (PendingUpsert p : pending) {
+            JobDto dto = p.dto();
+            JobPostingEntity entity = existing.get(dto.externalId());
+            if (entity == null) {
+                entity = JobPostingEntity.builder()
+                        .platform(platform)
+                        .externalId(dto.externalId())
+                        .build();
+                inserted++;
+            }
+            applyJobFields(entity, dto, p.cls());
+            toSave.add(entity);
+        }
+        transactionTemplate.execute(status -> repository.saveAll(toSave));
+        return new UpsertResult(inserted, toSave.size() - inserted);
+    }
+
+    /** 字段装配（新增与更新共用，与原逐条 upsert 保持完全一致的赋值与兜底规则） */
+    private void applyJobFields(JobPostingEntity entity, JobDto dto, JobClassifyService.Classification cls) {
         entity.setTitle(dto.title());
         entity.setCompanyName(dto.companyName());
         entity.setApplyUrl(dto.applyUrl());
@@ -198,9 +244,6 @@ public class JobAgentService {
                 : (cls != null && !isBlank(cls.jobType()) ? cls.jobType() : entity.getJobType()));
         entity.setTags(!isBlank(dto.tags()) ? dto.tags()
                 : (cls != null && !isBlank(cls.tags()) ? cls.tags() : entity.getTags()));
-
-        repository.save(entity);
-        return isNew;
     }
 
     /** 岗位详情（仅返回有效岗位） */

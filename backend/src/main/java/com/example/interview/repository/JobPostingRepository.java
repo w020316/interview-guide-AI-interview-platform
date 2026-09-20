@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,6 +22,12 @@ public interface JobPostingRepository extends JpaRepository<JobPostingEntity, Lo
 
     /** 幂等 upsert 依据 */
     Optional<JobPostingEntity> findByPlatformAndExternalId(String platform, String externalId);
+
+    /**
+     * 批量幂等 upsert 依据（P1/S-03）：一次 IN 查询取回存量实体，
+     * 消除逐条 findByPlatformAndExternalId 造成的 N+1 查询
+     */
+    List<JobPostingEntity> findByPlatformAndExternalIdIn(String platform, Collection<String> externalIds);
 
     /** 全部有效岗位（供简历匹配推荐） */
     List<JobPostingEntity> findByActiveTrue();
