@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import api from '../api'
+import api, { getErrMessage } from '../api'
 
 interface Overview {
   totalJobs: number
@@ -66,7 +66,7 @@ async function fetchOverview() {
   try {
     overview.value = await api.get('/api/admin/overview') as unknown as Overview
   } catch (e) {
-    ElMessage.error(getErr(e, '获取总览失败'))
+    ElMessage.error(getErrMessage(e, '获取总览失败'))
   }
 }
 async function doRefresh() {
@@ -79,7 +79,7 @@ async function doRefresh() {
     ElMessage.success(`刷新完成：新增 ${r.inserted} / 更新 ${r.updated} / 下架 ${r.expired}`)
     await fetchOverview()
   } catch (e) {
-    ElMessage.error(getErr(e, '刷新失败'))
+    ElMessage.error(getErrMessage(e, '刷新失败'))
   } finally {
     refreshing.value = false
   }
@@ -94,7 +94,7 @@ async function fetchJobs() {
     jobsTotal.value = data.total
     jobs.value = data.items
   } catch (e) {
-    ElMessage.error(getErr(e, '加载岗位失败'))
+    ElMessage.error(getErrMessage(e, '加载岗位失败'))
   } finally {
     jobsLoading.value = false
   }
@@ -107,7 +107,7 @@ async function toggleJob(job: JobRow) {
     ElMessage.success(job.active ? '已下架' : '已恢复')
     fetchJobs()
   } catch (e) {
-    ElMessage.error(getErr(e, '操作失败'))
+    ElMessage.error(getErrMessage(e, '操作失败'))
   }
 }
 async function deleteJob(job: JobRow) {
@@ -119,7 +119,7 @@ async function deleteJob(job: JobRow) {
     ElMessage.success('已删除')
     fetchJobs()
   } catch (e) {
-    ElMessage.error(getErr(e, '删除失败'))
+    ElMessage.error(getErrMessage(e, '删除失败'))
   }
 }
 
@@ -132,7 +132,7 @@ async function fetchUsers() {
     usersTotal.value = data.total
     users.value = data.items
   } catch (e) {
-    ElMessage.error(getErr(e, '加载用户失败'))
+    ElMessage.error(getErrMessage(e, '加载用户失败'))
   } finally {
     usersLoading.value = false
   }
@@ -144,7 +144,7 @@ async function toggleBan(u: UserRow) {
     ElMessage.success(u.banned ? '已解禁' : '已禁用（进程内生效，重启后恢复）')
     fetchUsers()
   } catch (e) {
-    ElMessage.error(getErr(e, '操作失败'))
+    ElMessage.error(getErrMessage(e, '操作失败'))
   }
 }
 
@@ -152,13 +152,8 @@ async function fetchMetrics() {
   try {
     metrics.value = await api.get('/api/admin/metrics') as unknown as Metrics
   } catch (e) {
-    ElMessage.error(getErr(e, '获取指标失败'))
+    ElMessage.error(getErrMessage(e, '获取指标失败'))
   }
-}
-
-function getErr(e: unknown, fallback: string): string {
-  const msg = (e as Error)?.message
-  return msg && msg !== 'Request failed with status code 500' ? msg : fallback
 }
 
 // P2-21：定时器句柄——组件卸载时清理，此前离开页面仍每 30s 请求，

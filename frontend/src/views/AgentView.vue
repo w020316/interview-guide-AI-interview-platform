@@ -15,7 +15,12 @@
             :key="conv.id"
             class="conv-item"
             :class="{ active: conv.id === conversationId }"
+            role="button"
+            tabindex="0"
+            :aria-label="`打开会话 ${conv.title}`"
             @click="loadConversation(conv.id)"
+            @keydown.enter="loadConversation(conv.id)"
+            @keydown.space.prevent="loadConversation(conv.id)"
           >
             <span class="conv-title">{{ conv.title }}</span>
             <button class="conv-del" title="删除会话" @click.stop="removeConversation(conv.id)">×</button>
