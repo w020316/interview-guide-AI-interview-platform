@@ -1,5 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { isValidJwt, isTokenExpired, isTokenValid } from './auth'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import {
+  isValidJwt,
+  isTokenExpired,
+  isTokenValid,
+  authState,
+  setAuth,
+  clearAuth,
+  isLoggedIn,
+  isAdmin,
+} from './auth'
 
 /**
  * 生成测试用 JWT（三段式，payload 可自定义）
@@ -71,6 +80,91 @@ describe('auth', () => {
 
     it('非法格式返回 false', () => {
       expect(isTokenValid('invalid')).toBe(false)
+    })
+  })
+
+  describe('setAuth / clearAuth / isLoggedIn / isAdmin', () => {
+    const validToken = (role?: string) =>
+      makeMockJwt({
+        sub: '1',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        ...(role ? { role } : {}),
+      })
+
+    beforeEach(() => {
+      // 每个用例前重置响应式状态，避免单例串扰
+      clearAuth()
+      localStorage.clear()
+    })
+
+    it('setAuth 持久化 token 并更新响应式状态', () => {
+      const token = validToken()
+      setAuth(token, 'alice')
+      expect(authState.token).toBe(token)
+      expect(authState.username).toBe('alice')
+      expect(localStorage.getItem('token')).toBe(token)
+      expect(localStorage.getItem('username')).toBe('alice')
+    })
+
+    it('setAuth 拒绝非 JWT 格式 token（不污染状态/存储）', () => {
+      setAuth('not-a-jwt')
+      expect(authState.token).toBe('')
+      expect(localStorage.getItem('token')).toBeNull()
+    })
+
+    it('clearAuth 清空内存与存储', () => {
+      setAuth(validToken(), 'bob')
+      clearAuth()
+      expect(authState.token).toBe('')
+      expect(authState.username).toBe('')
+      expect(localStorage.getItem('token')).toBeNull()
+      expect(localStorage.getItem('username')).toBeNull()
+    })
+
+    it('isLoggedIn 跟随 token 有效性', () => {
+      expect(isLoggedIn()).toBe(false)
+      setAuth(validToken())
+      expect(isLoggedIn()).toBe(true)
+      clearAuth()
+      expect(isLoggedIn()).toBe(false)
+    })
+
+    it('isAdmin 解析 role claim', () => {
+      setAuth(validToken('ROLE_ADMIN'))
+      expect(isAdmin()).toBe(true)
+      clearAuth()
+      setAuth(validToken('ROLE_USER'))
+      expect(isAdmin()).toBe(false)
+    })
+
+    it('持久化失败时仍更新内存状态且不抛错', () => {
+      const spy = vi
+        .spyOn(Storage.prototype, 'setItem')
+        .mockImplementation(() => {
+          throw new Error('quota')
+        })
+      const token = validToken('ROLE_ADMIN')
+      expect(() => setAuth(token, 'carol')).not.toThrow()
+      // 内存状态仍正确更新，仅存储层面失败
+      expect(authState.token).toBe(token)
+      expect(authState.username).toBe('carol')
+      expect(isLoggedIn()).toBe(true)
+      expect(isAdmin()).toBe(true)
+      spy.mockRestore()
+    })
+
+    it('模块初始化时存储读取失败不抛错，状态安全回退为空', async () => {
+      const spy = vi
+        .spyOn(Storage.prototype, 'getItem')
+        .mockImplementation(() => {
+          throw new Error('blocked')
+        })
+      // 重新加载模块：启动期 loadValidToken/loadUsername/清理逻辑均会经历读存储抛错
+      vi.resetModules()
+      const mod = await import('./auth')
+      expect(mod.authState.token).toBe('')
+      expect(mod.authState.username).toBe('')
+      spy.mockRestore()
     })
   })
 })

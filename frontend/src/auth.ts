@@ -1,4 +1,5 @@
 import { reactive } from 'vue'
+import { safeGetItem, safeRemoveItem, safeSetItem } from './utils/storage'
 
 /**
  * 全局认证状态（响应式）
@@ -40,19 +41,19 @@ function isTokenValid(token: string): boolean {
 }
 
 function loadValidToken(): string {
-  const t = localStorage.getItem('token') || ''
+  const t = safeGetItem('token') || ''
   return isTokenValid(t) ? t : ''
 }
 
 function loadUsername(): string {
-  return localStorage.getItem('username') || ''
+  return safeGetItem('username') || ''
 }
 
 // 启动时清理被污染或已过期的 token
-const _startupToken = localStorage.getItem('token') || ''
+const _startupToken = safeGetItem('token') || ''
 if (_startupToken && !isTokenValid(_startupToken)) {
-  localStorage.removeItem('token')
-  localStorage.removeItem('username')
+  safeRemoveItem('token')
+  safeRemoveItem('username')
 }
 
 export const authState = reactive({
@@ -69,18 +70,18 @@ export function setAuth(token: string, username?: string) {
     return
   }
   authState.token = token
-  localStorage.setItem('token', token)
+  safeSetItem('token', token)
   if (username) {
     authState.username = username
-    localStorage.setItem('username', username)
+    safeSetItem('username', username)
   }
 }
 
 export function clearAuth() {
   authState.token = ''
   authState.username = ''
-  localStorage.removeItem('token')
-  localStorage.removeItem('username')
+  safeRemoveItem('token')
+  safeRemoveItem('username')
 }
 
 /** 是否已登录（格式合法 + 未过期） */

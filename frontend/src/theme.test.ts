@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, afterEach, vi } from 'vitest'
 import { applyTheme, theme, toggleTheme } from './theme'
 
 const STORAGE_KEY = 'interview-theme'
@@ -37,4 +37,20 @@ describe('theme util', () => {
     applyTheme('light')
     expect(theme.value).toBe('light')
   })
+
+  it('持久化失败时仍完成切换（无匹配媒体查询配置下不抛错）', () => {
+    const spy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('quota')
+      })
+    applyTheme('light')
+    expect(() => toggleTheme()).not.toThrow()
+    expect(theme.value).toBe('dark')
+    spy.mockRestore()
+  })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })

@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { safeGetItem, safeSetItem } from './utils/storage'
 
 /**
  * 主题切换工具
@@ -18,7 +19,7 @@ function systemPrefersDark(): boolean {
 
 /** 读取初始主题：localStorage > 系统偏好 > 默认 light */
 function initialTheme(): ThemeMode {
-  const saved = localStorage.getItem(STORAGE_KEY)
+  const saved = safeGetItem(STORAGE_KEY)
   if (saved === 'dark' || saved === 'light') return saved
   return systemPrefersDark() ? 'dark' : 'light'
 }
@@ -37,7 +38,7 @@ export function applyTheme(mode: ThemeMode): void {
 /** 切换主题并持久化到 localStorage */
 export function toggleTheme(): ThemeMode {
   const next = theme.value === 'dark' ? 'light' : 'dark'
-  localStorage.setItem(STORAGE_KEY, next)
+  safeSetItem(STORAGE_KEY, next)
   applyTheme(next)
   return next
 }
@@ -48,8 +49,8 @@ export function initTheme(): void {
   if (typeof window === 'undefined' || typeof window.matchMedia === 'undefined') return
   const mq = window.matchMedia(SYSTEM_QUERY)
   const onChange = () => {
-    // 仅当用户未手动选择过时才跟随系统
-    if (!localStorage.getItem(STORAGE_KEY)) {
+    // 仅当用户未手动选择过时才跟随系统（读取失败视为未选择，安全跟随系统）
+    if (!safeGetItem(STORAGE_KEY)) {
       applyTheme(systemPrefersDark() ? 'dark' : 'light')
     }
   }
