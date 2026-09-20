@@ -17,6 +17,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Set;
+import java.util.UUID;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -79,6 +80,9 @@ public class JwtUtil {
         boolean admin = isAdminUsername(username);
         return Jwts.builder()
                 .subject(subject)
+                // jti：token 唯一标识（P1 2026-09-20）——登出黑名单按它精确吊销单个 token，
+                // 不影响同一用户的其他会话
+                .id(UUID.randomUUID().toString())
                 .issuer(ISSUER)
                 .audience().add(AUDIENCE).and()
                 .claim(CLAIM_ROLE, admin ? ROLE_ADMIN : ROLE_USER)
@@ -91,6 +95,20 @@ public class JwtUtil {
     /** 从 token 中解析 subject（用户标识） */
     public String extractUserId(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    /**
+     * 从 token 中解析 jti（P1 2026-09-20：登出黑名单依据）。
+     * 升级前签发的旧 token 无该 claim，返回 null——调用方应视为「不可吊销」放行。
+     */
+    public String extractJti(String token) {
+        String jti = parseClaims(token).getId();
+        return jti == null || jti.isBlank() ? null : jti;
+    }
+
+    /** 从 token 中解析过期时间（epoch 毫秒），供黑名单计算条目存活期 */
+    public long extractExpirationMs(String token) {
+        return parseClaims(token).getExpiration().getTime();
     }
 
     /**

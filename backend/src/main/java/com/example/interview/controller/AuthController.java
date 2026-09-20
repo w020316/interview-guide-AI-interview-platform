@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 认证接口（无需 token 即可访问）
  * POST /api/auth/register  — 注册
  * POST /api/auth/login     — 登录，返回 JWT
- * POST /api/auth/logout    — 登出（前端清 token，服务端无状态）
+ * POST /api/auth/logout    — 登出（清前端 token，并把 jti 写入服务端黑名单即吊销）
  */
 @Tag(name = "认证", description = "用户注册与登录")
 @RestController
@@ -38,6 +38,10 @@ public class AuthController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    /** 登出吊销黑名单（P1 2026-09-20）：required=false 兼容 @WebMvcTest 切片 */
+    @Autowired(required = false)
+    private com.example.interview.security.TokenBlacklistService tokenBlacklist;
 
     @Autowired
     private com.example.interview.service.UserBanRegistry userBanRegistry;
@@ -227,13 +231,26 @@ public class AuthController {
     }
 
     /**
-     * 登出
-     * 当前 JWT 为无状态方案，登出仅由前端清除 token 即可。
-     * 此接口保留供未来扩展 token 黑名单使用，当前返回成功。
+     * 登出（P1 2026-09-20：登出即吊销）
+     * 把当前 Bearer token 的 jti 加入进程内黑名单（存活至 token 自然过期），
+     * 被盗 token 在剩余有效期内也无法再使用。
+     * 无 Authorization 头 / 旧版无 jti 的 token 幂等返回成功（前端清 token 兜底）。
      */
     @Operation(summary = "用户登出")
     @PostMapping("/logout")
-    public Result<Void> logout() {
+    public Result<Void> logout(jakarta.servlet.http.HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ") && tokenBlacklist != null) {
+            String token = header.substring(7);
+            if (jwtUtil.isValid(token)) {
+                String jti = jwtUtil.extractJti(token);
+                if (jti != null) {
+                    long expiresAt = jwtUtil.extractExpirationMs(token);
+                    tokenBlacklist.revoke(jti, expiresAt);
+                    log.info("登出：token 已吊销（jti={}，存活至 token 自然过期）", jti);
+                }
+            }
+        }
         return Result.success(null);
     }
 

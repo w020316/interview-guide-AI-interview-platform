@@ -25,6 +25,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private JwtUtil jwtUtil;
 
     /**
+     * 登出吊销黑名单（P1 2026-09-20）。
+     * required=false 以兼容 @WebMvcTest 切片（不加载 security 包 bean），缺失时跳过吊销检查。
+     */
+    @Autowired(required = false)
+    private TokenBlacklistService tokenBlacklist;
+
+    /**
      * v1.31.4 管理后台：用户禁用注册表。
      * required=false 以兼容 @WebMvcTest 切片（不加载 service bean），无 registry 时跳过禁用检查。
      */
@@ -40,6 +47,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = extractToken(request);
 
         if (StringUtils.hasText(token) && jwtUtil.isValid(token)) {
+            // P1 2026-09-20：已登出吊销的 token 直接不再认证（请求将以未认证身份继续，
+            // 由授权规则返回 401）。旧版无 jti 的 token extractJti 返回 null → 视为未吊销放行
+            if (tokenBlacklist != null && tokenBlacklist.isRevoked(jwtUtil.extractJti(token))) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             String userId = jwtUtil.extractUserId(token);
             // v1.31.4 管理后台：被禁用的用户即使 token 有效也拒绝访问（registry 缺失时跳过）
             if (userBanRegistry != null && userId != null && userBanRegistry.isBanned(parseId(userId))) {

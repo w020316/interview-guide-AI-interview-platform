@@ -18,7 +18,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -53,6 +55,9 @@ class AuthControllerTest {
 
     @MockBean
     private com.example.interview.service.UserBanRegistry userBanRegistry;
+
+    @MockBean
+    private com.example.interview.security.TokenBlacklistService tokenBlacklist;
 
     @Nested
     @DisplayName("POST /api/auth/register 注册")
@@ -337,6 +342,35 @@ class AuthControllerTest {
             mockMvc.perform(post("/api/auth/logout"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
+        }
+
+        @Test
+        @DisplayName("带 Bearer token 登出：jti 被写入黑名单（P1 登出即吊销）")
+        void logout_withBearerToken_revokes() throws Exception {
+            when(jwtUtil.isValid("tok-1")).thenReturn(true);
+            when(jwtUtil.extractJti("tok-1")).thenReturn("jti-1");
+            when(jwtUtil.extractExpirationMs("tok-1")).thenReturn(System.currentTimeMillis() + 60_000L);
+
+            mockMvc.perform(post("/api/auth/logout")
+                            .header("Authorization", "Bearer tok-1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            verify(tokenBlacklist).revoke(eq("jti-1"), anyLong());
+        }
+
+        @Test
+        @DisplayName("旧版无 jti 的 token 登出：幂等成功且不写黑名单")
+        void logout_tokenWithoutJti_idempotent() throws Exception {
+            when(jwtUtil.isValid("tok-old")).thenReturn(true);
+            when(jwtUtil.extractJti("tok-old")).thenReturn(null);
+
+            mockMvc.perform(post("/api/auth/logout")
+                            .header("Authorization", "Bearer tok-old"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            verify(tokenBlacklist, never()).revoke(anyString(), anyLong());
         }
     }
 }
