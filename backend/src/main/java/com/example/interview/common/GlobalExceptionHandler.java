@@ -42,6 +42,33 @@ public class GlobalExceptionHandler {
         return Result.error(400, "参数校验失败：" + msg);
     }
 
+    /**
+     * 路径变量/查询参数类型不匹配（2026-09-20 阶段四线上实测发现）。
+     *
+     * <p>此类异常继承自 RuntimeException，此前落入 handleRuntime 返回 500——
+     * 线上实测三例均 500：{@code /api/jobs/abc}（非数字 id）、
+     * {@code /api/jobs?page=abc}（非数字分页）。属客户端输入错误，应为 400，
+     * 否则既误导用户（显示「服务器内部错误」），又让用户手误/爬虫污染 5xx 告警。
+     */
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleTypeMismatch(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        // 只回显参数名（服务端定义），不回显用户传入的原始值，避免反射型注入面
+        return Result.error(400, "参数类型错误：" + ex.getName());
+    }
+
+    /**
+     * 缺失必填请求参数（同上，2026-09-20 实测 {@code /api/knowledge/search} 无 query 时返回 500）。
+     * 该异常继承 ServletException，此前落 handleGeneral 兜底 500。
+     */
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleMissingParam(
+            org.springframework.web.bind.MissingServletRequestParameterException ex) {
+        return Result.error(400, "缺少必填参数：" + ex.getParameterName());
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMaxUploadSize(MaxUploadSizeExceededException ex) {

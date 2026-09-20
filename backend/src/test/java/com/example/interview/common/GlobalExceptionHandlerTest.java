@@ -110,6 +110,30 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("MethodArgumentTypeMismatchException → 400（线上 500 回归防线）")
+    void typeMismatch_returns400() {
+        // 线上实测：GET /api/jobs/abc、/api/jobs?page=abc 均返回 500，应为 400
+        var ex = new org.springframework.web.method.annotation.MethodArgumentTypeMismatchException(
+                "abc", Long.class, "id", null, null);
+        Result<Void> result = handler.handleTypeMismatch(ex);
+        assertThat(result.code()).isEqualTo(400);
+        assertThat(result.message()).contains("id");
+        // 不回显用户传入的原始值（反射型注入面）
+        assertThat(result.message()).doesNotContain("abc");
+    }
+
+    @Test
+    @DisplayName("MissingServletRequestParameterException → 400（线上 500 回归防线）")
+    void missingParam_returns400() {
+        // 线上实测：GET /api/knowledge/search（无 query）返回 500，应为 400
+        var ex = new org.springframework.web.bind.MissingServletRequestParameterException(
+                "query", "String");
+        Result<Void> result = handler.handleMissingParam(ex);
+        assertThat(result.code()).isEqualTo(400);
+        assertThat(result.message()).contains("query");
+    }
+
+    @Test
     @DisplayName("AuthenticationException → 401 未认证提示")
     void authException_returns401() {
         Result<Void> result = handler.handleAuth(
