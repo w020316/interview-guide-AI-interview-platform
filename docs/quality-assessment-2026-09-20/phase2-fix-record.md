@@ -94,6 +94,40 @@
   版本号不一致比计划书记录的 5 源**更严重**（pom 1.31.3 / package.json 1.28.0 / changelog v1.33.3 /
   `/api/info` 1.0.0 / local 配置注释 v1.34.0 / **`/actuator/info` 1.23.0**）。
 
+## 六、第三/四波修复（2026-09-20 14:05–19:00，主控直接实施）
+
+> 第一波两个实施 worker 因 429 额度限制中断后，剩余项由主控按同样标准接手：
+> 逐项修复 → 本地全量回归 → 独立 commit（body 含问题/思路/验证）→ push → CI 门禁。
+
+| # | commit | 级别 | 问题与修法 |
+|---|---|---|---|
+| 9 | `3926df1` | P2 连带 | **测试 JVM 改用 SerialGC**（-Xmx1024m）：修第二种 fork 崩溃 `mmap failed to map ... G1 virtual space`（本机 commit 配额 19.3/20.3GB，G1 启动期映射 254MB 失败） |
+| 10 | `e4d156a` | **P1** | **S-01** `InterviewSessionService.finishSession/saveQuestions` 补 service 层归属校验（新增 `currentUserId` 参数），3 个调用方同步，+2 越权拒绝用例 |
+| 11 | `ed68819` | **P1** | **S-02** recent/wrong-questions 分页与过滤下推数据库：`total` 从"被截断条数"修正为真实总数（`Page.getTotalElements()`）；错题过滤下推 SQL（NULL 不满足 LessThan 自动排除，与原逻辑等价） |
+| 12 | `e2bd348` | **P1** | **S-03** 岗位刷新批量 upsert：`findByPlatformAndExternalIdIn` 一次 IN 查询 + `saveAll` 单短事务，消除逐条查改存 N+1；平台级原子性，避免半批成功 |
+| 13 | `f5c6841` | **P1** | **B-12** 附图上传白名单+magic bytes 双重校验：新增 `ImageTypeValidator`（明确拒绝 `image/svg+xml`，堵存储型 XSS），只读 12 字节文件头，+22 用例 |
+| 14 | `9f863dd` | P3 | **A-08** 自动补充日志不落提问明文：`questionFingerprint`（短哈希+字数），4 处日志全改 |
+| 15 | `ffe7973` | **P1** | **登出即吊销**（B 方案）：JWT 加 `jti` claim → 新增 `TokenBlacklistService` 进程内有界黑名单（jti→过期时间，惰性清理+5 万条护栏）→ 过滤器命中即 401 → logout 写入。零新依赖、零 Redis 配额消耗 |
+
+### P1 收官状态
+
+阶段一判定的 **9 条 P1 全部闭环**（#1 F-C、#2 A-02 除外——A-02 为 RAG 阈值重标定，
+需线上 embedding 实测，归入阶段四；#5 限流多实例已按约定降级 P2 并标注触发条件）。
+
+| 指标 | 修复前 | 现在 |
+|---|---|---|
+| 后端测试 | 672 例（2 Error 环境性失败） | **711 例全绿**（+39），覆盖率门禁真实生效 |
+| 前端测试 | 270 例 | **282 例** |
+| 已知 P1 未修 | 9 | **1**（A-02，属阶段四标定工作） |
+
+### 本轮新增的可复用结论（详见工作区记忆）
+
+- `PageImpl(content, pageable, total)` 会在 `offset+pageSize > total` 时用内容条数"纠正"总数——
+  桩数据必须自洽，否则 `getTotalElements()` 断言必挂
+- GIF 魔数是 `GIF8`（GIF87a/GIF89a 前 4 字节），不是 GIFF
+- 本机 commit 配额是 Windows 上 JVM fork 类失败的隐性根因（Mockito `self-attach` 报错同理）；
+  页面文件固定 4GB → 8192/16384 后全量测试恢复正常
+
 ---
 
-**报告版本**：v2　**编制**：2026-09-20
+**报告版本**：v3（第三/四波收官，全部 P1 闭环）　**编制**：2026-09-20
