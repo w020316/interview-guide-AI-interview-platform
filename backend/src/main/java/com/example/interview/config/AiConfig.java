@@ -392,10 +392,20 @@ public class AiConfig {
                 .apiKey(useApiKey)
                 .restClientBuilder(rb)
                 .build();
+        // P2-09（2026-09-20）：维度透传修复。此前 OpenAiEmbeddingOptions 只设 model，
+        // 未把 embeddingDimensions 透传进 embedding 请求，实际向量维度完全由模型默认值决定，
+        // 与 pgvector 表维度（AI_EMBEDDING_DIMENSIONS）可能不一致——生产仅因 text-embedding-v4
+        // 原生维度恰好 1024 == 配置值才未暴露。此处链式补 .dimensions()；但 embeddingDimensions<=0
+        // 时不设置（保持原行为），避免个别提供方拒绝该参数导致启动/调用失败。
+        OpenAiEmbeddingOptions.Builder embeddingOptionsBuilder =
+                OpenAiEmbeddingOptions.builder().model(embeddingModel);
+        if (embeddingDimensions > 0) {
+            embeddingOptionsBuilder.dimensions(embeddingDimensions);
+        }
         return new OpenAiEmbeddingModel(
                 api,
                 org.springframework.ai.document.MetadataMode.EMBED,
-                OpenAiEmbeddingOptions.builder().model(embeddingModel).build(),
+                embeddingOptionsBuilder.build(),
                 RetryTemplate.builder().maxAttempts(2).fixedBackoff(500).build());
     }
 }
