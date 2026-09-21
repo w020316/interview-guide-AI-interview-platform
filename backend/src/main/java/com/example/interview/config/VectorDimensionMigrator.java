@@ -42,13 +42,21 @@ public class VectorDimensionMigrator implements CommandLineRunner {
     private final JdbcTemplate jdbcTemplate;
     private final DataSource dataSource;
     private final int configuredDimension;
+    private final boolean force;
 
+    /**
+     * @param force 强制迁移开关（app.rag.dimension-migrate-force，默认 false）。
+     *              表非空且维度不匹配时，若为 true 则 DROP 并重建（⚠️ 会删除表内全部向量，
+     *              仅供「确认数据可弃」的迁移场景使用），false 则只告警。
+     */
     public VectorDimensionMigrator(JdbcTemplate jdbcTemplate,
                                    DataSource dataSource,
-                                   @Value("${spring.ai.vectorstore.pgvector.dimensions:1536}") int configuredDimension) {
+                                   @Value("${spring.ai.vectorstore.pgvector.dimensions:1536}") int configuredDimension,
+                                   @Value("${app.rag.dimension-migrate-force:false}") boolean force) {
         this.jdbcTemplate = jdbcTemplate;
         this.dataSource = dataSource;
         this.configuredDimension = configuredDimension;
+        this.force = force;
     }
 
     @Override
@@ -85,12 +93,19 @@ public class VectorDimensionMigrator implements CommandLineRunner {
         // 2. 表非空则绝不自动动
         Long count = jdbcTemplate.queryForObject("SELECT count(*) FROM vector_store", Long.class);
         if (count != null && count > 0) {
-            if (dim != configuredDimension) {
+            if (dim != configuredDimension && !force) {
                 log.error("向量表维度({})与配置({})不一致，且表内有 {} 条数据——请人工迁移："
-                                + "导出后 DROP TABLE vector_store 再重启应用（本迁移器不自动删除非空表）",
+                                + "导出后 DROP TABLE vector_store 再重启应用（本迁移器不自动删除非空表；"
+                                + "确认数据可弃可临时设置 app.rag.dimension-migrate-force=true）",
                         dim, configuredDimension, count);
+                return;
             }
-            return;
+            if (dim != configuredDimension && force) {
+                log.warn("⚠️ 强制迁移已启用：将删除向量表内 {} 条旧维度({})数据并按新维度({})重建",
+                        count, dim, configuredDimension);
+            } else {
+                return;   // 维度一致，无需处理
+            }
         }
 
         // 3. 空表且维度一致 → 无需处理
