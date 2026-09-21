@@ -9,8 +9,12 @@
 #   因此本文件所有注释一律置于路径行之前。
 
 # 安全响应头（全站）
+# ⚠️ 2026-09-21 实测：本文件中「具体路径」的区块（favicon/assets/*.html）均正常生效，
+# 但 `/*` 通配区块始终未下发（用一次性指纹头 X-Build-Stamp 验证确认，非缓存问题）。
+# 因此以下安全头当前**在 pages.dev 上不生效**，需在 Cloudflare 控制台
+# （Pages 项目 → Settings → Functions/Headers 或 Rules → Response Header Transform）
+# 配置等价规则才能落地——属于需要登录控制台的操作。
 /*
-  X-Build-Stamp: 202609211519
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
