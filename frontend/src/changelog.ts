@@ -50,6 +50,41 @@ export function itemText(raw: string | { text: string; level?: ChangelogLevel })
   return typeof raw === 'string' ? raw : raw.text
 }
 
+/**
+ * 是否自动弹出「版本更新」以及是否显示未读提示（v1.34.1，UX P2-3）。
+ *
+ * 背景：此前只要 localStorage 的已见版本与当前版本不同就**立即**自动弹模态框，
+ * 于是首次访问的用户一进站就被盖住 hero 与主 CTA（实测评审截图确认遮挡）。
+ *
+ * 现按访问类型区分：
+ * - `seen === null`（首次访问）：不打扰，仅标记未读（前端在版本入口显示小红点）；
+ * - `seen !== CURRENT_VERSION`（老用户遇到新版本）：延迟自动弹出，保留更新提醒意图；
+ * - `seen === CURRENT_VERSION`：无动作。
+ *
+ * 独立成纯函数以便单测锁定这一交互决策（组件内含 localStorage 与定时器，不易直测）。
+ */
+export interface ChangelogDecision {
+  /** 是否自动弹出弹窗（组件负责延迟） */
+  open: boolean
+  /** 是否在版本入口显示未读小红点 */
+  unread: boolean
+}
+
+export function decideChangelogAction(seen: string | null): ChangelogDecision {
+  if (seen === CURRENT_VERSION) {
+    return { open: false, unread: false }
+  }
+  if (seen === null) {
+    // 首次访问：不打扰，先让用户看懂产品
+    return { open: false, unread: true }
+  }
+  // 老用户 + 新版本
+  return { open: true, unread: true }
+}
+
+/** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
+export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
+
 export const CURRENT_VERSION = '1.33.3'
 
 export const CHANGELOG: ChangelogEntry[] = [

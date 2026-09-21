@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { isLoggedIn, isAdmin } from '../auth'
 
 const routes = [
@@ -43,7 +44,12 @@ router.beforeEach((to) => {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
   // v1.31.4：管理后台仅 ROLE_ADMIN 可访问
+  //
+  // v1.34.1 修复（UX P2-2）：此前静默 `return { path: '/' }`，非管理员（或角色过期的用户）
+  // 点进 /admin 只会被无声弹回首页 —— 无法判断是「没有权限」「链接失效」还是「系统故障」，
+  // 实测评审即将其误判为产品缺陷。现给出明确提示再返回首页。
   if (to.meta.requiresAdmin && !isAdmin()) {
+    ElMessage.warning('该页面仅管理员可访问，已返回首页')
     return { path: '/' }
   }
 })

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { CHANGELOG, CURRENT_VERSION, isTechItem, itemText } from './changelog'
+import {
+  CHANGELOG,
+  CHANGELOG_AUTO_OPEN_DELAY_MS,
+  CURRENT_VERSION,
+  decideChangelogAction,
+  isTechItem,
+  itemText,
+} from './changelog'
 
 /**
  * 更新弹窗内容分级测试（v1.33.3）
@@ -73,5 +80,29 @@ describe('changelog 内容分级', () => {
         expect(title.includes(bad), `标题不应含技术术语 ${bad}`).toBe(false)
       }
     })
+  })
+})
+
+// ───────────── 版本更新弹窗的自动弹出决策（v1.34.1，UX P2-3）─────────────
+// 背景：此前只要本地版本 ≠ 当前版本就立即自动弹模态框，首次访问的用户一进站
+// 就被盖住 hero 与主 CTA（375px 下主标题几乎贴底）。决策改为区分「首访」与「老用户升级」。
+
+describe('版本更新自动弹出决策 decideChangelogAction', () => {
+  it('首次访问（无本地记录）：不自动弹出，仅显示未读提示', () => {
+    expect(decideChangelogAction(null)).toEqual({ open: false, unread: true })
+  })
+
+  it('已看过当前版本：既不弹出也不提示未读', () => {
+    expect(decideChangelogAction(CURRENT_VERSION)).toEqual({ open: false, unread: false })
+  })
+
+  it('老用户遇到新版本：延迟自动弹出，并提示未读', () => {
+    const d = decideChangelogAction('0.0.1')
+    expect(d.open).toBe(true)
+    expect(d.unread).toBe(true)
+  })
+
+  it('自动弹窗存在延迟，给首屏渲染留出时间', () => {
+    expect(CHANGELOG_AUTO_OPEN_DELAY_MS).toBeGreaterThanOrEqual(1000)
   })
 })

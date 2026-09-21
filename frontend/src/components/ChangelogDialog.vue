@@ -71,12 +71,21 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { CHANGELOG, CURRENT_VERSION, isTechItem, itemText } from '../changelog'
+import {
+  CHANGELOG,
+  CHANGELOG_AUTO_OPEN_DELAY_MS,
+  CURRENT_VERSION,
+  decideChangelogAction,
+  isTechItem,
+  itemText,
+} from '../changelog'
 
 const props = defineProps<{ visible: boolean }>()
-const emit = defineEmits<{ 'update:visible': [boolean] }>()
+const emit = defineEmits<{ 'update:visible': [boolean]; 'unread-change': [boolean] }>()
 
 const STORAGE_KEY = 'interview_guide_seen_version'
+
+// 自动弹窗延迟与决策逻辑均在 changelog.ts 中定义（便于单测锁定交互决策）
 
 const dontShowAgain = ref(false)
 
@@ -96,15 +105,38 @@ const historyWithUserItems = computed(() =>
     .filter((e) => e.items.length > 0)
 )
 
-/** 检查版本：若 localStorage 中记录的版本与当前版本不同，则触发弹窗 */
+/**
+ * 检查版本并按访问类型决定是否自动弹窗。
+ *
+ * v1.34.1 修复（UX P2-3）：此前只要 localStorage 版本与当前版本不同就**立即**自动弹窗，
+ * 于是**首次访问**的用户一进站就被模态框盖住 hero 与主 CTA（实测评审截图确认遮挡），
+ * 且模态遮罩会强制用户先处理弹窗才能看到产品在做什么。
+ *
+ * 现按两种情况区分：
+ * - **首次访问**（localStorage 无记录）：不自动弹窗，只在版本入口标一个「有更新」小红点，
+ *   把「要不要看更新」的决定权交回用户——第一次来的人更需要先看懂产品。
+ * - **老用户遇到新版本**（有记录且与当前不同）：延迟 {@link AUTO_OPEN_DELAY_MS} 后再弹，
+ *   既保留「更新提醒」的产品意图，又让首屏先完成渲染、用户先看到页面再看到弹窗。
+ */
 function checkVersion() {
+  let seen: string | null = null
   try {
-    const seen = localStorage.getItem(STORAGE_KEY)
-    if (seen !== CURRENT_VERSION) {
-      emit('update:visible', true)
-    }
+    seen = localStorage.getItem(STORAGE_KEY)
   } catch {
-    // localStorage 不可用（隐私模式），默认不弹
+    // localStorage 不可用（隐私模式）：不做任何自动行为，仅保留手动入口
+    return
+  }
+
+  // 决策逻辑抽在 changelog.ts 的纯函数中（见 decideChangelogAction 的注释）
+  const { open, unread } = decideChangelogAction(seen)
+  if (unread) {
+    emit('unread-change', true)
+  }
+  if (open) {
+    // 老用户 + 新版本：延迟弹出，避免与首屏渲染抢注意力
+    window.setTimeout(() => {
+      emit('update:visible', true)
+    }, CHANGELOG_AUTO_OPEN_DELAY_MS)
   }
 }
 
@@ -116,6 +148,7 @@ function handleClose() {
   } catch {
     // 忽略写入失败
   }
+  emit('unread-change', false)
   emit('update:visible', false)
 }
 

@@ -5,6 +5,17 @@
       <p>导入面试知识点 / 八股文，AI 将基于知识库增强问答；并关联每次模拟面试的错题与题目汇总</p>
     </header>
 
+    <!-- 知识库状态提示（v1.34.1 UX P3-5）：
+         知识库依赖外部 Embedding 服务，故障时此前完全静默——用户只会觉得"怎么搜都搜不到"。
+         现明确告知「当前不可用 + AI 仍会用通用知识作答」，避免被误判为产品坏了。 -->
+    <div v-if="ragStatus && !ragStatus.available" class="rag-notice fade-in">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 9v4 M12 17h.01 M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>{{ ragStatus.notice || '知识库暂时不可用，AI 将基于通用知识作答。' }}</span>
+    </div>
+
     <!-- Tab 切换 -->
     <div class="tab-switch">
       <button :class="{ active: tab === 'ask' }" @click="tab = 'ask'">
@@ -44,6 +55,11 @@
       <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="ask">
         {{ loading ? '查询中…' : 'AI 知识问答' }}
       </BaseButton>
+
+      <!-- 等待进度（v1.34.1 UX P2-4）：RAG 问答实测约 12s，给出实时秒数与预期区间 -->
+      <div v-if="loading" class="loading-hint">
+        正在检索知识库并生成回答… 已等待 {{ askElapsedSec }}s（通常 5–15 秒，首次调用可能更久）
+      </div>
 
       <div v-if="answer" class="answer-card fade-in-up">
         <div class="answer-head">
@@ -228,7 +244,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import renderMarkdown from '../utils/markdown'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
@@ -292,10 +308,31 @@ const ratePercent = computed(() => {
   return Math.round((summary.value.answeredQuestions / summary.value.totalQuestions) * 100)
 })
 
+/** 已等待秒数（仅用于等待提示，不影响请求） */
+const askElapsedSec = ref(0)
+let askTimer: number | undefined
+
+function startAskTimer() {
+  stopAskTimer()
+  askElapsedSec.value = 0
+  askTimer = window.setInterval(() => { askElapsedSec.value += 1 }, 1000)
+}
+
+function stopAskTimer() {
+  if (askTimer !== undefined) {
+    window.clearInterval(askTimer)
+    askTimer = undefined
+  }
+}
+
 async function ask() {
   if (!question.value.trim()) return ElMessage.warning('请输入问题')
   loading.value = true
   answer.value = ''
+  // v1.34.1（UX P2-4）：RAG 问答实测约 12s（检索 + 生成），此前只有按钮转圈，
+  // 用户无法判断「在正常处理」还是「卡住了」。补充实时已等待秒数与预期区间，
+  // 降低等待焦虑；与其他 AI 视图（简历/岗位分析）的等待文案风格保持一致。
+  startAskTimer()
   try {
     const data = await api.post('/api/knowledge/ask',
       { question: question.value },
@@ -304,6 +341,7 @@ async function ask() {
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '问答失败'))
   } finally {
+    stopAskTimer()
     loading.value = false
   }
 }
@@ -342,6 +380,21 @@ async function importKnowledge() {
 }
 
 /** 切换到错题/汇总 Tab 时自动加载数据 */
+/** 知识库可用状态（v1.34.1 UX P3-5）：让"库不可用"这件事对用户可见 */
+const ragStatus = ref<{ available: boolean; documents: number; notice?: string } | null>(null)
+
+async function loadRagStatus() {
+  try {
+    ragStatus.value = await api.get('/api/knowledge/status') as unknown as
+      { available: boolean; documents: number; notice?: string }
+  } catch {
+    // 状态查询失败不影响主流程：静默即可，用户仍可正常提问
+    ragStatus.value = null
+  }
+}
+
+onMounted(loadRagStatus)
+
 function switchTab(t: Tab) {
   tab.value = t
   if (t === 'wrong' && !wrongList.value.length && !wrongLoading.value) {
@@ -996,6 +1049,25 @@ function formatTime(t?: string) {
   padding: 40px;
   color: var(--c-text-tertiary);
   font-size: 14px;
+}
+
+/* 知识库不可用提示（v1.34.1 UX P3-5）：温和的告警条，说明"为什么搜不到"且不阻断操作 */
+.rag-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md, 10px);
+  background: var(--c-warning-light, #fdf6ec);
+  color: var(--c-warning-text, #b88230);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.rag-notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 /* ── 响应式 ── */

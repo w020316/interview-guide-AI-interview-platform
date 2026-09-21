@@ -158,13 +158,18 @@
           <p class="footer-desc">基于 Spring Boot 3.3 + Spring AI 1.0 + Vue 3 构建，为求职者打造的智能面试准备平台</p>
           <p class="footer-copy">
             © 2026 AI 面试助手 · MIT License
-            <button class="version-link" @click="showChangelog = true">v{{ CURRENT_VERSION }}</button>
+            <button class="version-link" @click="openChangelog">
+              v{{ CURRENT_VERSION }}
+              <!-- v1.34.1（UX P2-3）：存在未读更新时给一个轻量红点提示，
+                   替代「首访直接弹模态框遮挡首屏」的打扰式提醒 -->
+              <span v-if="hasUnreadChangelog" class="version-dot" aria-label="有更新" />
+            </button>
           </p>
         </div>
       </footer>
 
       <!-- 版本更新弹窗 -->
-      <ChangelogDialog v-model:visible="showChangelog" />
+      <ChangelogDialog v-model:visible="showChangelog" @unread-change="hasUnreadChangelog = $event" />
     </div>
   </el-config-provider>
 </template>
@@ -182,6 +187,14 @@ import { theme, toggleTheme as toggle } from './theme'
 const router = useRouter()
 const route = useRoute()
 const showChangelog = ref(false)
+/** 存在未读更新（首访或版本变化）：仅显示小红点，不自动弹窗打断首屏 */
+const hasUnreadChangelog = ref(false)
+
+/** 手动打开版本更新：用户主动查看，视为已读 */
+function openChangelog() {
+  hasUnreadChangelog.value = false
+  showChangelog.value = true
+}
 
 function toggleTheme() {
   toggle()
@@ -511,6 +524,7 @@ function logout() {
 
 .version-link {
   display: inline-block;
+  position: relative;
   margin-left: 8px;
   padding: 2px 8px;
   font-family: var(--font-sans);
@@ -528,6 +542,18 @@ function logout() {
 .version-link:hover {
   background: var(--brand-primary);
   color: #fff;
+}
+
+/* 未读更新小红点（v1.34.1 UX P2-3）：以轻量提示替代首访自动弹窗 */
+.version-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-danger, #f56c6c);
+  box-shadow: 0 0 0 1.5px var(--c-bg, #fff);
 }
 
 /* ── 页面切换动画 ── */
