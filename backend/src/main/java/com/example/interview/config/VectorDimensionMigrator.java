@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -33,6 +34,7 @@ import java.sql.SQLException;
  * 应用其余部分无需感知。
  */
 @Component
+@Order(50)   // 必须先于 KnowledgeSeedInitializer(@Order(100))：先重建表再播种
 public class VectorDimensionMigrator implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(VectorDimensionMigrator.class);
