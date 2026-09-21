@@ -1,5 +1,9 @@
 name: CI
 
+# v1.34.1：actions 升级（checkout@v5 / setup-java@v6 / setup-node@v6 / upload-artifact@v6），
+# 消除「Node.js 20 is deprecated」告警。注意各 action 的主版本并不连续（setup-java 没有 v5），
+# 版本号以 GitHub releases 为准，不要凭猜测升到不存在的 tag。
+
 # 持续集成：提交/合并前自动运行后端 Maven 测试 + 前端 Vitest 测试与构建
 # - 后端：Java 21 + Maven（@WebMvcTest + Mockito 单测，无需真实 DB/Redis）
 # - 前端：Node 24 + Vitest run（含覆盖率阈值）+ vite build 验证可产物
@@ -25,10 +29,10 @@ jobs:
         working-directory: backend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -43,7 +47,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: backend-surefire-reports
           path: backend/target/surefire-reports
@@ -58,10 +62,10 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm

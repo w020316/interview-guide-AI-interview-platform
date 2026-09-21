@@ -242,7 +242,7 @@
 
 - 推送 `main` → CI（后端 Maven 单测 + 前端 vue-tsc/coverage/build/audit）→ Render 自动部署后端 Docker → Cloudflare Pages 自动部署前端。
 - 后端 `render.yaml`（Docker，新加坡免费层）：`SPRING_PROFILES_ACTIVE=prod`，密钥走环境变量（JWT_SECRET、AI API Keys、DATABASE_URL、REDIS_URL=rediss://、SEED_ADMIN_USERNAME/PASSWORD、APP_ADMIN_USERNAMES）。
-- 前端跨域直连：设置 `VITE_API_BASE_URL`；后端 CORS 白名单允许 pages.dev/vercel.app。
+- 前端跨域直连：设置 `VITE_API_BASE_URL`；后端 CORS 白名单仅放行 Cloudflare Pages 域名与本地调试端口（v1.34.1 移除了已停用的 vercel.app）。
 - 编译启动：后端 `mvn spring-boot:run -Dspring-boot.run.profiles=local`（H2 + SimpleVectorStore 零依赖联调）；前端 `npm run dev`。
 
 ---

@@ -90,7 +90,7 @@ interview-guide/
 │   └── tsconfig.json
 ├── docker-compose.yml                         # 本地 PostgreSQL + Redis
 ├── render.yaml                                # Render Blueprint 部署配置
-├── vercel.json                                # Vercel 前端部署配置
+├── .github/workflows/                         # CI 门禁 + Render 保活（前端托管在 Cloudflare Pages）
 ├── .env.example                               # 环境变量模板
 ├── start-dev.ps1                              # Windows 一键启动脚本
 ├── start-dev.sh                               # Linux/macOS 一键启动脚本
@@ -110,7 +110,7 @@ interview-guide/
 | 阶段 2 | 环境准备（JDK 21 + Maven + Node.js） | ✅ 100% |
 | 阶段 3 | 后端代码骨架（编译/打包通过） | ✅ 100% |
 | 阶段 4 | 前端代码骨架 | ✅ 100% |
-| 阶段 5 | 部署配置（Dockerfile/render.yaml/vercel.json） | ✅ 100% |
+| 阶段 5 | 部署配置（Dockerfile / render.yaml / Cloudflare Pages _headers） | ✅ 100% |
 | 阶段 6 | 文档（README + DEPLOY + 启动脚本） | ✅ 100% |
 | 阶段 7 | Git 仓库初始化 + 推送 GitHub | ✅ 100% |
 

@@ -1,4 +1,4 @@
-# 部署指南：0 元上云（Vercel + Render + Supabase + Upstash）
+# 部署指南：0 元上云（Cloudflare Pages + Render + Supabase + Upstash）
 
 > 全程 GitHub 登录，无需信用卡，永久免费
 > 已切换为 Render（Koyeb 需要付费），更适合学生
@@ -7,7 +7,7 @@
 
 ```
 ┌────────────────────────────────────────────────┐
-│  Vercel（前端 Vue3 静态托管，永久免费）         │
+│  Cloudflare Pages（前端 Vue3 静态托管，免费）   │
 └──────────────────┬─────────────────────────────┘
                    │
 ┌──────────────────▼─────────────────────────────┐
@@ -29,7 +29,7 @@
 
 | 服务 | 用途 | 免费额度 | 信用卡 | 休眠 |
 |------|------|---------|--------|------|
-| **Vercel** | 前端托管 | 100GB 流量/月 | ❌ | 不休眠 |
+| **Cloudflare Pages** | 前端托管 | 无限流量/500 次构建/月 | ❌ | 不休眠 |
 | **Render** | 后端 Docker | 512MB + 5GB 流量 | ❌ | 15 分钟无访问休眠 |
 | **Supabase** | PostgreSQL + pgvector | 500MB + 5GB 流量 | ❌ | 7 天不访问暂停 |
 | **Upstash** | Redis | 10K 命令/天 | ❌ | 不休眠 |
@@ -195,22 +195,33 @@ git push -u origin main
 
 ---
 
-### Step 6: 部署前端到 Vercel（3 分钟）
+### Step 6: 部署前端到 Cloudflare Pages（3 分钟）
 
-1. 访问 https://vercel.com/ → 用 GitHub 登录
-2. **New Project** → **Import Git Repository**
+> ⚠️ **2026-09-21 修正**：本节原为 Vercel 步骤。实际线上前端托管在 **Cloudflare Pages**
+> （`interview-guide-ai-interview-platform.pages.dev`），Vercel 域名已停用，
+> 仓库中的 `vercel.json` 已删除；安全响应头改由 `frontend/public/_headers` 承担。
+
+1. 访问 https://dash.cloudflare.com/ → 用 GitHub 登录
+2. **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
 3. 选择 `interview-guide` 仓库
-4. 配置：
-   - **Root Directory**: 点开，选 `frontend` 文件夹
-   - **Framework Preset**: Vue
-   - **Build Command**: `npm install && npm run build`
-   - **Output Directory**: `dist`
-   - **Environment Variables**：
-     - Key: `VITE_API_BASE`
-     - Value: `https://interview-guide-backend.onrender.com`
-5. 点 **Deploy**
-6. 等 1-2 分钟，获取访问地址：
-   - 格式：`https://interview-guide-你的名.vercel.app`
+4. 配置构建：
+   - **Production branch**: `main`
+   - **Framework preset**: `Vue`
+   - **Build command**: `npm run build`
+   - **Build output directory**: `dist`
+   - **Root directory**: `frontend`（**必填**，仓库根不是前端工程）
+5. **Environment Variables**（注意变量名必须与代码一致，写错则前端拿不到后端地址）：
+   - Key: `VITE_API_BASE_URL`
+   - Value: `https://interview-guide-backend.onrender.com`
+6. 点 **Save and Deploy**，等 1-2 分钟，获取访问地址：
+   - 格式：`https://<项目名>.pages.dev`
+7. **确认安全响应头已生效**（`frontend/public/_headers` 会被自动应用）：
+   ```bash
+   curl -sSI https://<项目名>.pages.dev/ | grep -i x-frame-options
+   # 期望输出：x-frame-options: DENY
+   ```
+   > 若缺失，检查 `_headers` 中**注释是否被写在某个路径区块内部**——
+   > Cloudflare 会静默忽略整块（2026-09-21 实测踩坑，注释必须放在路径行之前）。
 
 ---
 
@@ -251,7 +262,7 @@ Render 免费层**15 分钟无请求即休眠**，下次访问要等约 1 分钟
 
 | 项目 | 访问地址 | 预期结果 |
 |------|---------|---------|
-| 前端 | https://interview-guide-你的名.vercel.app | 看到 AI 面试平台界面 |
+| 前端 | https://interview-guide-ai-interview-platform.pages.dev | 看到 AI 面试平台界面 |
 | 后端健康检查 | https://interview-guide-backend.onrender.com/actuator/health | `{"status":"UP"}` |
 | API 信息 | https://interview-guide-backend.onrender.com/api/info | 返回 JSON |
 | 简历分析 | 前端 → 简历分析 Tab → 输入简历 → 点分析 | AI 返回评分 |
@@ -264,7 +275,7 @@ Render 免费层**15 分钟无请求即休眠**，下次访问要等约 1 分钟
 
 | 项目 | 访问地址 |
 |------|---------|
-| 前端 | https://interview-guide-你的名.vercel.app |
+| 前端 | https://interview-guide-ai-interview-platform.pages.dev |
 | 后端 API | https://interview-guide-backend.onrender.com |
 | 健康检查 | https://interview-guide-backend.onrender.com/actuator/health |
 
@@ -333,7 +344,7 @@ Agnes AI 免费且不限量，但需确认：
 ## 各平台官方文档
 
 - Render 文档：https://render.com/docs
-- Vercel 文档：https://vercel.com/docs
+- Cloudflare Pages 文档：https://developers.cloudflare.com/pages/
 - Supabase 文档：https://supabase.com/docs
 - Upstash 文档：https://docs.upstash.com/redis
 - Agnes AI：https://platform.agnes-ai.com/

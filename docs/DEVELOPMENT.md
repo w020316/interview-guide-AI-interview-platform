@@ -200,7 +200,7 @@ interview-guide/
 │           └── schema.sql            # 生产幂等建表脚本
 ├── frontend/                         # Vue3 + Vite 前端
 │   ├── package.json / vite.config.ts # 依赖、代理、手动 chunk、vitest 覆盖率阈值
-│   ├── vercel.json / public/_redirects / public/_headers   # 部署路由与安全头
+│   └── public/_redirects / public/_headers                 # Cloudflare Pages 路由与安全头
 │   └── src/
 │       ├── api/index.ts              # axios 封装（baseURL/VITE_API_BASE_URL 约定）
 │       ├── auth.ts                   # JWT 存取与登出
@@ -217,7 +217,7 @@ interview-guide/
 │   ├── architecture.md               # 架构文档
 │   └── quality-assessment-2026-09/   # 六阶段质量评估报告（基线/修复记录/遗留风险）
 ├── render.yaml                       # Render Blueprint（服务定义 + 环境变量清单）
-├── vercel.json                       # Vercel rewrites（/api → Render）
+# 前端部署文件：frontend/public/_redirects（SPA 回退）、frontend/public/_headers（安全头 + 缓存策略）
 ├── supabase-init.sql                 # Supabase 初始化 SQL（建表 + 启用扩展）
 ├── scripts/loadtest.mjs              # 压测脚本
 ├── start-dev.ps1 / start-dev.sh      # 一键开发启动
@@ -420,7 +420,7 @@ npm run build             # 产物验证（需设置 VITE_API_BASE_URL 占位）
 | `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` / `SUPABASE_BUCKET` | `https://<REF>.supabase.co` / service key / `resumes` | secret |
 | `JAVA_OPTS` | `-Xmx220m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0`（Metaspace 不得低于 128m） | 固定 |
 
-前端托管侧：Vercel 用 rewrites 同源代理（`VITE_API_BASE_URL` 留空）；Cloudflare Pages 需设置 `VITE_API_BASE_URL=https://interview-guide-backend.onrender.com`（后端 CORS 已放行 `*.pages.dev`）。
+前端托管侧：Cloudflare Pages 构建时注入 `VITE_API_BASE_URL=https://interview-guide-backend.onrender.com`（后端 CORS 已放行该 pages.dev 域名）——前端跨域直连后端，不走同源代理。
 
 ### 7.3 改配置的三处同步原则
 
@@ -481,7 +481,7 @@ cd frontend && npm run build && npm run preview   # http://localhost:4173
 1. Supabase：新建项目 → SQL Editor 执行 `supabase-init.sql`（建表 + `CREATE EXTENSION vector`）→ Storage 创建 `resumes` bucket。
 2. Render：Dashboard → New → **Blueprint** → 选本仓库（自动读取 render.yaml）→ 逐个填入 `sync: false` 的 secret 变量（§7.2）→ Deploy。
 3. Upstash：创建 Redis（TLS）→ 把连接串填入 `REDIS_URL`，`REDIS_SSL=true`。
-4. Vercel：导入仓库，框架 Vite，`vercel.json` 已含 rewrites；Cloudflare Pages 备用（构建命令 `npm run build`，输出 `dist`，环境变量 `VITE_API_BASE_URL`）。
+4. Cloudflare Pages：Connect to Git → 根目录 `frontend`，构建命令 `npm run build`，输出目录 `dist`，环境变量 `VITE_API_BASE_URL`（写法见 DEPLOY.md Step 6）。
 5. 验证：`https://interview-guide-backend.onrender.com/api/health` UP；前端登录/出题/RAG 全流程。
 
 **日常发布（标准流程）**
@@ -552,7 +552,7 @@ PowerShell 的引号转义会破坏 JSON。把 JSON 写入文件用 `curl.exe --
 | Render | https://dashboard.render.com ｜ https://status.render.com ｜ support@render.com |
 | Supabase | https://supabase.com/dashboard ｜ https://status.supabase.com ｜ Dashboard 工单 |
 | Upstash | https://console.upstash.com ｜ https://status.upstash.com ｜ 控制台工单 |
-| Vercel / Cloudflare Pages | 各自 Dashboard；状态页 vercel-status.com / cloudflarestatus.com |
+| Cloudflare Pages | https://dash.cloudflare.com ｜ 状态页 cloudflarestatus.com |
 
 **故障上报模板**：环境（本地/测试/生产）→ 现象与时间点 → 请求/响应片段（脱敏）→ Render 日志 Request ID → 已尝试的排查步骤。
 

@@ -1,8 +1,12 @@
 # AI 智能面试辅助平台
 
 > 基于 Spring Boot 3.3 + Spring AI 1.0 + Java 21 的 AI 面试辅助系统
-> 零成本部署到云端（Vercel + Render + Supabase + Upstash，全部免费）
+> 零成本部署到云端（Cloudflare Pages + Render + Supabase + Upstash，全部免费）
 > AI 模型使用 Agnes AI（兼容 OpenAI 协议，免费无限量）
+>
+> **在线入口（唯一）**：前端 <https://interview-guide-ai-interview-platform.pages.dev>　·　后端 API <https://interview-guide-backend.onrender.com>
+> 说明：历史文档中出现的 `vercel.app` 域名已停用，前端实际托管在 **Cloudflare Pages**；
+> Render 免费层 15 分钟无访问会休眠，仓库内置 `.github/workflows/keepalive.yml` 每 5 分钟保活。
 
 ## 核心功能
 
@@ -23,7 +27,7 @@
 | 数据库 | PostgreSQL 16 + pgvector 向量扩展 |
 | 缓存 | Redis 7 |
 | 前端 | Vue 3 + Element Plus + TypeScript + Vite |
-| 部署 | Vercel + Render + Supabase + Upstash（0 元） |
+| 部署 | Cloudflare Pages + Render + Supabase + Upstash（0 元） |
 | AI 模型 | Agnes AI（兼容 OpenAI，免费无限量） |
 
 ## 项目结构
@@ -51,8 +55,8 @@ interview-guide/
 │   ├── vite.config.ts
 │   └── package.json
 ├── docker-compose.yml          # 本地开发环境
-├── render.yaml                 # Render 部署配置
-├── vercel.json                 # Vercel 部署配置
+├── render.yaml                 # Render 后端部署配置（Blueprint）
+├── .github/workflows/          # CI（测试门禁）+ Keepalive（Render 保活）
 └── .env.example                # 环境变量模板
 ```
 
