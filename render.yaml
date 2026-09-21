@@ -125,3 +125,26 @@ services:
       # Metaspace 必须 ≥128m，否则 Spring Boot + AI + Security 栈类加载失败
       - key: JAVA_OPTS
         value: "-Xmx220m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0"
+
+# ══════════════════════════════════════════════════════════════════
+# 自托管 Embedding 服务（免费方案，v1.34.1）
+# 第三方 embedding API 全部收费（硅基流动/智谱/百炼均需余额），
+# 改用 fastembed(ONNX) + bge-small-zh-v1.5 自托管：零成本、无限额度，
+# 且与本地开发环境同一模型，RAG 自动补充阈值 0.45 的标定重新有效。
+# 模型在 Docker 构建期烘焙进镜像，运行期离线加载，512MB 内存实测占用约 300MB。
+  - type: web
+    name: interview-guide-embedding
+    env: docker
+    plan: free
+    dockerfilePath: ./embedding-service/Dockerfile
+    dockerContext: ./embedding-service
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: EMBED_MODEL
+        value: BAAI/bge-small-zh-v1.5
+      - key: EMBED_CACHE
+        value: /app/models
+      # 轻量防滥用令牌（后端 AI_EMBEDDING_API_KEY 需填同名值）
+      - key: EMBED_AUTH_TOKEN
+        value: wb-embed-2026
