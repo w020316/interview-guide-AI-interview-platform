@@ -123,7 +123,7 @@ class VectorDimensionMigratorTest {
         when(connection.getMetaData()).thenReturn(metaData);
         when(metaData.getDatabaseProductName()).thenReturn("H2");
 
-        new VectorDimensionMigrator(jdbcTemplate, dataSource, 512).run(null);
+        new VectorDimensionMigrator(jdbcTemplate, dataSource, 512, false).run(null);
 
         verify(jdbcTemplate, never()).query(anyString(), any(ResultSetExtractor.class));
         verify(jdbcTemplate, never()).execute(anyString());
@@ -134,7 +134,7 @@ class VectorDimensionMigratorTest {
     void exception_swallowed() throws Exception {
         when(dataSource.getConnection()).thenThrow(new SQLException("db down"));
         // 不应抛出
-        new VectorDimensionMigrator(jdbcTemplate, dataSource, 512).run(null);
+        new VectorDimensionMigrator(jdbcTemplate, dataSource, 512, false).run(null);
         assertThat(true).isTrue();
     }
 }
