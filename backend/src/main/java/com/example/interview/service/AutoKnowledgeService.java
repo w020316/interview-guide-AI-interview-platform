@@ -145,7 +145,9 @@ public class AutoKnowledgeService {
 
     private void doSupplement(String question) {
         try {
-            String raw = AiConcurrencyGuard.call(() -> chatClient.prompt()
+            // v1.34.1（P3-6）：改走后台专用许可池。本方法由检索落空时异步触发、无用户在等，
+            // 此前与用户前台请求共用 5 个许可，批量补充会占满许可让用户请求排队超时。
+            String raw = AiConcurrencyGuard.callBackground(() -> chatClient.prompt()
                     .user(buildPrompt(question))
                     .call()
                     .content());

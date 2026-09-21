@@ -139,34 +139,66 @@ public class FallbackChatModel implements ChatModel {
 
     @Override
     public Flux<ChatResponse> stream(Prompt prompt) {
-        return Flux.defer(() -> {
-            // v1.23.1 修复（P2）：仅当尚未向下游发出任何 token 时才允许降级。
-            // 此前 onErrorResume 作用于整条流，流中途失败也会切换模型重发，
-            // 导致前半段旧模型内容与新模型内容拼接错乱
-            AtomicBoolean firstTokenSent = new AtomicBoolean(false);
-            Flux<ChatResponse> flux = delegates.get(0).stream(prompt)
-                    .doOnNext(resp -> firstTokenSent.set(true));
-            for (int i = 1; i < delegates.size(); i++) {
-                final int idx = i;
-                flux = flux.onErrorResume(e -> {
-                    if (firstTokenSent.get()) {
+        return Flux.defer(() -> streamFrom(0, prompt,
+                new AtomicBoolean(false), new java.util.concurrent.atomic.AtomicReference<>()));
+    }
+
+    /**
+     * 从第 {@code idx} 个节点起尝试流式输出，支持两级降级。
+     *
+     * <p><b>降级条件（两者都要求「尚未向下游发出任何可用 token」）</b>：
+     * <ol>
+     *   <li>订阅时抛错（网络/限流/5xx）→ 换下一节点；</li>
+     *   <li><b>流正常结束但没有任何可用正文</b>（HTTP 200 + 空 content 的假成功）→ 换下一节点。</li>
+     * </ol>
+     *
+     * <p>第 2 条是 v1.34.1 修复：此前只有 {@link #call} 路径做了空正文判定，
+     * {@code stream} 路径会把空正文当成功返回，用户拿到「成功状态下的空白回答」且无任何错误提示，
+     * 比直接报错更糟。两条路径的判据现统一为 {@link #hasUsableContent}。
+     *
+     * <p><b>不降级的场景</b>：已向下游发出可用 token 后中途失败——此时切换模型会导致
+     * 新旧模型内容拼接错乱（v1.23.1 修复的既有行为，此处保持）。
+     *
+     * @param tokenSent 是否已向下游发出可用正文（跨节点共享，用于判断能否安全降级）
+     * @param lastError 最近一次真实异常，用于在降级链耗尽时保留原始错误语义
+     */
+    private Flux<ChatResponse> streamFrom(int idx, Prompt prompt, AtomicBoolean tokenSent,
+                                          java.util.concurrent.atomic.AtomicReference<Throwable> lastError) {
+        if (idx >= delegates.size()) {
+            // 降级链耗尽：优先抛出最后一个节点的真实异常（保持既有测试与诊断语义），
+            // 若为「全部节点都返回空正文」则抛出可重试的业务异常
+            Throwable err = lastError.get();
+            return err != null ? Flux.error(err)
+                    : Flux.error(new BusinessException("AI 服务暂时不可用，请稍后重试"));
+        }
+
+        // 过滤空正文 chunk：既避免下游把空白 token 推给用户，也让「全空正文流」自然退化为
+        // empty，从而被 switchIfEmpty 捕获并触发降级
+        Flux<ChatResponse> current = Flux.defer(() -> delegates.get(idx).stream(prompt))
+                .filter(FallbackChatModel::hasUsableContent)
+                .doOnNext(resp -> tokenSent.set(true));
+
+        return current
+                .switchIfEmpty(Flux.defer(() -> {
+                    if (tokenSent.get()) {
+                        // 已发出过正文，后续为空 → 正常结束，不降级
+                        return Flux.empty();
+                    }
+                    log.warn("AI 模型 {} 流式返回空正文（HTTP 200 假成功，疑似思考模式耗尽 max_tokens），尝试降级",
+                            names.get(idx));
+                    return streamFrom(idx + 1, prompt, tokenSent, lastError);
+                }))
+                .onErrorResume(e -> {
+                    if (tokenSent.get()) {
                         log.warn("AI 模型 {} 流式输出中途失败（已发出 token，不降级）：{}",
-                                names.get(idx - 1), describeFailure(e));
+                                names.get(idx), describeFailure(e));
                         return Flux.error(e);
                     }
                     log.warn("AI 模型 {} 流式调用失败（未发出 token），尝试降级：{}",
-                            names.get(idx - 1), describeFailure(e));
-                    Flux<ChatResponse> next = Flux.defer(() -> delegates.get(idx).stream(prompt))
-                            .doOnNext(resp -> firstTokenSent.set(true));
-                    return next.onErrorResume(inner -> {
-                        log.error("AI 模型 {} 流式降级后仍失败：{}",
-                                names.get(idx), describeFailure(inner));
-                        return Flux.error(inner);
-                    });
+                            names.get(idx), describeFailure(e));
+                    lastError.set(e);
+                    return streamFrom(idx + 1, prompt, tokenSent, lastError);
                 });
-            }
-            return flux;
-        });
     }
 
     @Override

@@ -57,20 +57,15 @@ public class AiConfig {
     private static final Logger log = LoggerFactory.getLogger(AiConfig.class);
 
     /**
-     * 响应诊断拦截器是否已加装。
-     *
-     * <p>RestClient.Builder 是原型作用域，同一次启动内本方法只应执行一次；但为防将来
-     * 被多处调用导致拦截器重复堆叠（每次请求记 N 遍日志），用静态标志做幂等保护。
-     * 生产部署为单实例进程，静态字段无跨实例一致性问题。
-     */
-    private static volatile boolean diagnosticInterceptorAttached = false;
-
-    /**
      * 上游 AI 响应诊断拦截器（单例复用）。
      *
      * <p>有状态可复用：拦截器本身无实例字段，且下游 {@code OpenAiApi} 会按需 clone
      * {@code RestClient.Builder}，共用同一拦截器实例不会产生交叉污染，同时避免每次
      * 构造节点都 new 一个新对象。
+     *
+     * <p>v1.34.1 清理（P3-1）：原有一个 {@code diagnosticInterceptorAttached} 静态标志
+     * 声称用于「防拦截器重复堆叠的幂等保护」，但全仓无任何读写点（死代码），且其前提也不成立——
+     * 每个降级链节点都需要各自的 builder 挂载一次，本就该按节点挂载而非全局一次。已删除。
      */
     private static final AiResponseDiagnosticInterceptor DIAGNOSTIC_INTERCEPTOR =
             new AiResponseDiagnosticInterceptor();

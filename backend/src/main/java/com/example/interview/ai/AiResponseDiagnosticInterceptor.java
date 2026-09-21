@@ -88,7 +88,14 @@ public class AiResponseDiagnosticInterceptor implements ClientHttpRequestInterce
         }
 
         try {
-            // 只在「HTTP 层不是成功」或「疑似错误体」时才缓冲，避免正常路径多一次内存拷贝
+            // v1.34.1 修正（P2-12 ③）：此处**对所有响应无条件缓冲响应体**，这是必需的、而非疏漏——
+            // 本拦截器存在的意义正是捕获「HTTP 200 但 body 是 {"error":{...}}」这种假成功
+            // （上游网关的典型形态），而错误特征只存在于 body 中，不读 body 就无法识别。
+            // 由于 body 被消费，必须用 BufferingClientHttpResponseWrapper 重新包装供下游复用，
+            // 因此**正常路径也会多一次内存拷贝**——这是诊断能力换来的已知代价，
+            // 此前注释误述为「只在非成功或疑似错误时才缓冲」，与实现不符。
+            // 若将来需要消除该开销，应改为可配置开关（如 app.ai.diagnostics.body-sniff=false），
+            // 而不是删掉读取逻辑（会同时失去 200-假成功 的检出能力）。
             boolean suspiciousStatus = status < 200 || status >= 300;
             byte[] snapshot;
             try {

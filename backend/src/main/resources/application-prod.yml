@@ -62,7 +62,11 @@ spring:
       base-url: ${AI_BASE_URL:https://apihub.agnes-ai.com}
       chat:
         options:
-          model: ${AI_MODEL:agnes-2.5-flash}
+          # v1.34.1 统一（P3-3）：此前 prod 用 ${AI_MODEL}、base 用 ${AI_CHAT_MODEL}，
+          # 同一语义两个变量名。生产只设 AI_CHAT_MODEL 时本行取不到值、只设 AI_MODEL 时
+          # 主降级链（app.ai.chain[0]）又取不到值，运维极易配错。
+          # 现统一为 AI_CHAT_MODEL，并保留 AI_MODEL 作为兼容回退（老部署不受影响）。
+          model: ${AI_CHAT_MODEL:${AI_MODEL:agnes-2.5-flash}}
           temperature: 0.3
   # 排除自动装配以避免启动崩溃：
   # - Redis：其自动装配会按 REDIS_URL 急切解析主机，若 Upstash 端点失效则抛 UnknownHostException，

@@ -75,6 +75,36 @@ public class GlobalExceptionHandler {
         return Result.error(400, "文件大小超出限制（最大 10MB）");
     }
 
+    /**
+     * 缺少 multipart 文件部件（v1.34.1，P2-1 错误语义修正）
+     *
+     * <p>真机实测（2026-09-20）触发面：{@code POST /api/interview/upload-image} 与
+     * {@code POST /api/resume/upload} 在「multipart 请求未带 file 部件」时返回
+     * 500「服务器内部错误」——用户无法判断是自己传错了文件。
+     * 本异常继承 ServletException（与上方 MissingServletRequestParameterException 同类），
+     * 此前无处理器而落入 RuntimeException 兜底 500，现归位 400 并指明缺失的部件名。
+     */
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleMissingPart(
+            org.springframework.web.multipart.support.MissingServletRequestPartException ex) {
+        log.warn("缺少 multipart 请求部件：{}", ex.getRequestPartName());
+        return Result.error(400, "请上传文件（缺少 " + ex.getRequestPartName() + " 部件）");
+    }
+
+    /**
+     * multipart 请求体解析失败（v1.34.1，P2-1 错误语义修正）
+     *
+     * <p>真机实测触发面：请求声明 multipart 但无 boundary，或直接以 JSON 调用 multipart 接口。
+     * 此前返回 500，现归位 400 并给出可操作的提示。
+     */
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleMultipart(org.springframework.web.multipart.MultipartException ex) {
+        log.warn("multipart 请求解析失败：{}", ex.getMessage());
+        return Result.error(400, "请求格式不正确，请使用 multipart/form-data 上传文件");
+    }
+
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public Result<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
@@ -151,6 +181,24 @@ public class GlobalExceptionHandler {
     public Result<Void> handleDataAccess(org.springframework.dao.DataAccessException ex) {
         log.error("数据库操作失败", ex);
         return Result.error(500, "数据库操作失败，请联系管理员");
+    }
+
+    /**
+     * AI 并发闸门排队超时（v1.34.1，P3-4 异常语义统一）
+     *
+     * <p>本质是「AI 服务暂不可用」的可重试业务故障，语义应与降级链全失败（503）一致；
+     * 此前落入下方 {@link IllegalStateException} 分支返回 500「服务器内部错误」，
+     * 用户无法区分是自己操作有误还是服务繁忙。
+     *
+     * <p>必须声明在 {@code handleIllegalState} 之前由 Spring 按最具体类型匹配——
+     * 本类型继承 IllegalStateException，若无本处理器则会命中后者。
+     * 文案为闸门自述（不含路径/SQL 等内部细节），可安全透出。
+     */
+    @ExceptionHandler(com.example.interview.ai.AiGateTimeoutException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public Result<Void> handleAiGateTimeout(com.example.interview.ai.AiGateTimeoutException ex) {
+        log.warn("AI 并发闸门排队超时：{}", ex.getMessage());
+        return Result.error(503, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)

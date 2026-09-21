@@ -76,6 +76,11 @@ app:
   # 3. Agnes AI agnes-2.5-flash 兜底（原主模型自动降为末位）
   # api-key 为空的提供方自动跳过；主模型失败时自动降级到下一个
   ai:
+    # AI 并发闸门排队超时（秒），v1.34.1 P3-8 新增可配置项。
+    # 前台许可 5 个、后台许可 2 个（后台=知识自动补充/岗位批量分类等无人在等的任务）。
+    # 排队超过该时长即快速失败：前台返回 503「AI 并发闸门排队超时」，后台本次跳过。
+    # 取值须 < 上游读超时（application.yml 的 app.ai.read-timeout-seconds=240），否则许可可能长期被占。
+    guard-acquire-timeout-seconds: ${AI_GUARD_ACQUIRE_TIMEOUT_SECONDS:30}
     # P2-06 后续（2026-09-19）：embedding 提供方可插拔——Agnes 已下线全部 embedding 模型，
     # 配置 AI_EMBEDDING_BASE_URL + AI_EMBEDDING_API_KEY + AI_EMBEDDING_MODEL 即指向第三方
     # （如硅基流动 https://api.siliconflow.cn/v1 + BAAI/bge-m3 + AI_EMBEDDING_DIMENSIONS=1024），

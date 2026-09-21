@@ -249,4 +249,76 @@ class FallbackChatModelTest {
         assertThat(FallbackChatModel.hasUsableContent(response("  "))).isFalse();
         assertThat(FallbackChatModel.hasUsableContent(response("有内容"))).isTrue();
     }
+
+    // ────── 流式路径空正文防护（v1.34.1 P1 修复回归）──────
+    // 背景：空正文判定此前只加在 call 路径，stream 路径漏改——上游「思考模式耗尽 max_tokens」
+    // 返回 HTTP 200 + 空正文时，用户会看到「成功状态下的空白回答」且无任何错误提示。
+    // 两条路径的判据现统一为 hasUsableContent。
+
+    @Test
+    @DisplayName("stream: 主模型流为空正文时应降级，而不是把空白回答当成功返回（P1 回归）")
+    void stream_primaryEmptyContent_degradesToNextModel() {
+        when(primary.stream(any(Prompt.class))).thenReturn(Flux.just(response("")));
+        when(secondary.stream(any(Prompt.class))).thenReturn(Flux.just(response("备流式正文")));
+        FallbackChatModel model = new FallbackChatModel(List.of(primary, secondary), List.of("主", "备"));
+
+        List<ChatResponse> out = model.stream(new Prompt("问")).collectList().block(Duration.ofSeconds(5));
+
+        assertThat(out).hasSize(1);
+        assertThat(out.get(0).getResult().getOutput().getText()).isEqualTo("备流式正文");
+        verify(secondary, times(1)).stream(any(Prompt.class));
+    }
+
+    @Test
+    @DisplayName("stream: 纯空白正文同样触发降级")
+    void stream_blankContent_degrades() {
+        when(primary.stream(any(Prompt.class))).thenReturn(Flux.just(response("   \n\t ")));
+        when(secondary.stream(any(Prompt.class))).thenReturn(Flux.just(response("兜底")));
+        FallbackChatModel model = new FallbackChatModel(List.of(primary, secondary), List.of("主", "备"));
+
+        List<ChatResponse> out = model.stream(new Prompt("问")).collectList().block(Duration.ofSeconds(5));
+
+        assertThat(out).hasSize(1);
+        assertThat(out.get(0).getResult().getOutput().getText()).isEqualTo("兜底");
+    }
+
+    @Test
+    @DisplayName("stream: 全链都返回空正文时抛 BusinessException（503 语义），不返回空白")
+    void stream_allEmptyContent_throwsBusinessException() {
+        when(primary.stream(any(Prompt.class))).thenReturn(Flux.just(response("")));
+        when(secondary.stream(any(Prompt.class))).thenReturn(Flux.just(response("")));
+        FallbackChatModel model = new FallbackChatModel(List.of(primary, secondary), List.of("主", "备"));
+
+        assertThatThrownBy(() -> model.stream(new Prompt("问")).collectList().block(Duration.ofSeconds(5)))
+                .isInstanceOf(com.example.interview.common.BusinessException.class)
+                .hasMessageContaining("AI 服务暂时不可用");
+    }
+
+    @Test
+    @DisplayName("stream: 空正文 chunk 被过滤，下游只收到有内容的 token")
+    void stream_emptyChunksFilteredOut() {
+        when(primary.stream(any(Prompt.class))).thenReturn(Flux.just(
+                response(""), response("  "), response("第一个字"), response("后续内容")));
+        FallbackChatModel model = new FallbackChatModel(List.of(primary, secondary), List.of("主", "备"));
+
+        List<ChatResponse> out = model.stream(new Prompt("问")).collectList().block(Duration.ofSeconds(5));
+
+        assertThat(out).hasSize(2);
+        assertThat(out.get(0).getResult().getOutput().getText()).isEqualTo("第一个字");
+        assertThat(out.get(1).getResult().getOutput().getText()).isEqualTo("后续内容");
+        verify(secondary, times(0)).stream(any(Prompt.class));
+    }
+
+    @Test
+    @DisplayName("stream: 首节点空正文→降级中途失败时仍向上传播错误（不吞异常）")
+    void stream_emptyThenFailure_propagatesError() {
+        when(primary.stream(any(Prompt.class))).thenReturn(Flux.just(response("")));
+        when(secondary.stream(any(Prompt.class)))
+                .thenReturn(Flux.error(new RuntimeException("备节点不可用")));
+        FallbackChatModel model = new FallbackChatModel(List.of(primary, secondary), List.of("主", "备"));
+
+        assertThatThrownBy(() -> model.stream(new Prompt("问")).collectList().block(Duration.ofSeconds(5)))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("备节点不可用");
+    }
 }
