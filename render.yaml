@@ -121,6 +121,12 @@ services:
       - key: SUPABASE_BUCKET
         value: resumes
 
+      # ══ 7.5 向量表维度迁移开关（v1.34.1 临时开启）═══════════════════
+      # 当前表内为失败播种的残留数据（3 条），且维度 1024→512 需重建；
+      # true = 允许迁移器删除旧维度数据并重建。迁移完成后应改回 false。
+      - key: app.rag.dimension-migrate-force
+        value: "true"
+
       # ══ 8. JVM 内存（适配 Render 免费层 512MB）══════════════════════
       # Metaspace 必须 ≥128m，否则 Spring Boot + AI + Security 栈类加载失败
       - key: JAVA_OPTS
