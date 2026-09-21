@@ -45,10 +45,14 @@ class VectorDimensionMigratorTest {
     private DatabaseMetaData metaData;
 
     private VectorDimensionMigrator newMigrator(int dim) throws SQLException {
+        return newMigrator(dim, false);
+    }
+
+    private VectorDimensionMigrator newMigrator(int dim, boolean force) throws SQLException {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.getMetaData()).thenReturn(metaData);
         when(metaData.getDatabaseProductName()).thenReturn("PostgreSQL");
-        return new VectorDimensionMigrator(jdbcTemplate, dataSource, dim);
+        return new VectorDimensionMigrator(jdbcTemplate, dataSource, dim, force);
     }
 
     private void mockTableDimension(Integer dim) {
