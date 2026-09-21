@@ -174,7 +174,20 @@ public class RagSearchService {
                 Map<String, Object> item = new HashMap<>();
                 item.put("id", doc.getId());
                 item.put("content", doc.getText() == null ? "" : doc.getText());
-                item.put("score", doc.getMetadata().getOrDefault("distance", 0.0));
+                // v1.34.1 修复（P2-10）：原字段名为 score 但取值实为向量库的 distance
+                // （余弦距离，**越小越相似**），前端若按「分越高越好」渲染/排序会得到相反语义。
+                // 现补充语义明确的 distance 与 similarity，并保留 score 作为历史契约字段
+                //（语义同 distance，不改变既有前端行为）。
+                Object rawDistance = doc.getMetadata().get("distance");
+                item.put("score", rawDistance == null ? 0.0 : rawDistance);
+                if (rawDistance instanceof Number n) {
+                    double d = n.doubleValue();
+                    item.put("distance", d);                       // 余弦距离：越小越相似
+                    item.put("similarity", Math.max(0.0, 1.0 - d)); // 归一化相似度：越大越相似
+                } else {
+                    item.put("distance", null);
+                    item.put("similarity", null);
+                }
                 result.add(item);
             }
             return objectMapper.writeValueAsString(result);
@@ -315,6 +328,34 @@ public class RagSearchService {
     }
 
     /**
+     * 统一的向量删除入口（v1.34.1，P2-6）：与 {@link #addToVectorStore} 配对，
+     * 删除时同步递减容量计数。
+     *
+     * <p><b>背景</b>：简历向量化走「先删后加」的 upsert 覆盖，此前直接调用
+     * {@code vectorStore.delete}，绕过了 {@link #storedDocs} 计数；而计数只有 {@code set}
+     * （启动恢复）与 {@code addAndGet}（新增）两处写入，**没有任何递减路径** ——
+     * 反复分析同一份简历会让计数单调虚高，容量检查 {@code maxDocuments - storedDocs}
+     * 越来越保守，最终出现「向量库实际未满却拒绝导入知识」。
+     *
+     * @return 实际请求删除的条数（删除失败返回 0 且不改计数）
+     */
+    public int removeFromVectorStore(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        try {
+            vectorStore.delete(ids);
+        } catch (Exception e) {
+            // 删除失败则计数不动，保持与真实库一致（宁可偏保守，不可偏乐观）
+            log.warn("向量删除失败（容量计数保持不变）：{}", e.getMessage());
+            return 0;
+        }
+        // 递减并钳到 0：重复删除或与启动恢复竞争时，计数可能被压到真实值以下
+        storedDocs.updateAndGet(cur -> Math.max(0, cur - ids.size()));
+        return ids.size();
+    }
+
+    /**
      * 导入知识文档到向量库（绑定 userId）
      * - 空列表直接返回，避免无意义调用
      * - 去重预检：对每个文档做相似度搜索，相似度 >= {@link #DEDUP_SIMILARITY_THRESHOLD} 视为重复，跳过
@@ -332,9 +373,20 @@ public class RagSearchService {
             FilterExpressionBuilder b = new FilterExpressionBuilder();
             List<Document> docs = new ArrayList<>();
             int skipped = 0;
+            int skippedExact = 0;
             int dedupChecks = 0;
+            // v1.34.1 改进（P2-11）：先用哈希集合剔除**批次内精确重复**，再做相似度预检。
+            // 此前 DEDUP_CHECK_LIMIT=50 的语义是「每批只对前 50 条做相似度检查，其余直接入库」，
+            // 若前 50 条里有大量完全相同的文本，会白白消耗 50 次 embedding 配额
+            //（每次 isDuplicate = 1 次 embedding），而真正的重复条目却因超出上限被放行入库。
+            // 现精确重复零成本拦截，有限的相似度预算全部用于互不相同的新文本。
+            java.util.Set<String> seenInBatch = new java.util.HashSet<>();
             for (String text : documents) {
                 if (text == null || text.isBlank()) continue;
+                if (!seenInBatch.add(text.trim())) {
+                    skippedExact++;
+                    continue;
+                }
                 // 去重预检：搜索该用户已有文档中是否存在高度相似的（每批最多 50 次，超出直接导入）。
                 // P2-12：计数移入条件内——重复路径也消耗一次 embedding 调用，必须占用检查配额，
                 // 否则重复率高的批次完全失去限流保护
@@ -351,13 +403,15 @@ public class RagSearchService {
                         .build());
             }
             if (docs.isEmpty()) {
-                log.info("知识库导入：{} 条全部重复或为空，跳过", documents.size());
+                log.info("知识库导入：{} 条全部重复或为空，跳过（批次内精确重复 {} 条）",
+                        documents.size(), skippedExact);
                 return 0;
             }
             // 统一入库入口：容量上限保护 + 计数（P1-04）
             int stored = addToVectorStore(docs);
-            if (stored > 0 && skipped > 0) {
-                log.info("知识库导入：{} 条新增，{} 条重复跳过", stored, skipped);
+            if (stored > 0 && (skipped > 0 || skippedExact > 0)) {
+                log.info("知识库导入：{} 条新增，{} 条库内重复跳过，{} 条批次内精确重复跳过",
+                        stored, skipped, skippedExact);
             }
             return stored;
         } catch (Exception e) {

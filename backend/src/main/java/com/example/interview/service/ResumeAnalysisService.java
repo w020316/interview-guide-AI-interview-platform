@@ -64,6 +64,19 @@ public class ResumeAnalysisService {
 
     private static final String CACHE_PREFIX = "resume:analysis:";
 
+    /** 简历分析缓存存活时长（毫秒）：与 Redis 侧 30 分钟保持一致（v1.34.1 P2-5） */
+    private static final long CACHE_TTL_MILLIS = 30 * 60 * 1000L;
+
+    /**
+     * Redis 不可用时的进程内兜底缓存（v1.34.1 P2-5）。
+     *
+     * <p>无 Redis 环境（本地/低配单机）下此前缓存整体旁路——真机实测 {@code cache.hit.count = 0}、
+     * 重复请求耗时 7.12s（与首次 9.24s 同量级），即每次都全额调用 LLM。
+     * 实例级而非静态，避免单测之间通过静态状态互相污染。
+     */
+    private final com.example.interview.util.LocalPromptCache redisFallbackCache =
+            new com.example.interview.util.LocalPromptCache(500);
+
     /**
      * 分析简历并给出评分和建议
      *
@@ -87,7 +100,16 @@ public class ResumeAnalysisService {
                     return JsonRepairUtil.repairAndLog(cached.toString(), "resume-cache");
                 }
             } catch (Exception e) {
-                log.warn("Redis 缓存读取失败，降级直连 AI：{}", e.getMessage());
+                log.warn("Redis 缓存读取失败，降级进程内缓存/直连 AI：{}", e.getMessage());
+                // v1.34.1（P2-5）：Redis 不可用时改用进程内兜底缓存。
+                // 仅在「读取抛异常」时启用（而非 Redis 返回 null 的正常未命中），
+                // 确保 Redis 正常时行为与改造前完全一致。
+                String fallback = redisFallbackCache.get(cacheKey);
+                if (fallback != null) {
+                    cacheHit = true;
+                    cacheHitCounter.increment();
+                    return JsonRepairUtil.repairAndLog(fallback, "resume-cache-local");
+                }
             }
             if (!cacheHit) {
                 cacheMissCounter.increment();
@@ -95,7 +117,10 @@ public class ResumeAnalysisService {
 
             // 2. 构建 Prompt（用 StringBuilder 替代 String.format，用户输入经 PromptSanitizer 消毒）
             String safeTargetJob = PromptSanitizer.sanitize(targetJob);
-            String safeResume = PromptSanitizer.sanitize(resumeText);
+            // v1.34.1 修复（P2-3）：简历文本此前只 sanitize 不截断，与本类 generateOptimizedResume
+            // 的 800 字截断策略不一致——上传接口允许 10MB，长简历会直灌 prompt，
+            // 使 token 成本与延迟不可控。现两处统一走 MAX_RESUME_LEN。
+            String safeResume = PromptSanitizer.sanitize(TextUtil.truncate(resumeText, MAX_RESUME_LEN));
             String prompt = new StringBuilder()
                     .append("你是一位资深的").append(safeTargetJob).append("招聘面试官，请根据以下简历和目标岗位进行多维度分析。\n\n")
                     .append("【目标岗位】\n").append(safeTargetJob).append("\n\n")
@@ -133,17 +158,31 @@ public class ResumeAnalysisService {
             String cleaned = JsonRepairUtil.repairAndLog(response, "resume-analyze");
 
             // 6. 合法性校验：修复后仍非法则用兜底 JSON（保证前端不报错）
+            boolean usedFallback = false;
             if (!JsonRepairUtil.isValid(cleaned)) {
                 log.warn("AI 返回修复后仍非法，使用兜底 JSON。原始返回前 200 字符：{}",
                         response.length() > 200 ? response.substring(0, 200) + "..." : response);
                 cleaned = JsonRepairUtil.FALLBACK_JSON;
+                usedFallback = true;
             }
 
             // 7. 写入缓存（30 分钟，Redis 不可用时静默跳过）
-            try {
-                redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);
-            } catch (Exception e) {
-                log.warn("Redis 缓存写入失败，跳过缓存：{}", e.getMessage());
+            //
+            // v1.34.1 修复（P2-7）：兜底 JSON 此前也被写入 30 分钟缓存。
+            // AI 只是临时抖动（如上游返回被截断）产生的兜底结果会被缓存住，
+            // 之后即便 AI 已恢复，同一简历仍会命中兜底内容，用户体感「一直坏」。
+            // 现兜底结果一律不缓存（等价于下次重试），脏数据不进缓存。
+            if (!usedFallback) {
+                try {
+                    redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);
+                } catch (Exception e) {
+                    // v1.34.1（P2-5）：Redis 写入失败时落进程内兜底缓存，
+                    // 使无 Redis 环境下的重复简历分析也能命中缓存（否则每次都全额调用 LLM）
+                    log.warn("Redis 缓存写入失败，改用进程内缓存：{}", e.getMessage());
+                    redisFallbackCache.put(cacheKey, cleaned, CACHE_TTL_MILLIS);
+                }
+            } else {
+                log.info("本次为兜底结果，跳过写入缓存（避免抖动结果被缓存 30 分钟）");
             }
 
             // 8. 简历文本向量化存入向量库
@@ -162,7 +201,9 @@ public class ResumeAnalysisService {
      * v1.33.0（P1-04）：id 改为由 resumeId 派生的确定性 id（非法字符替换为 '-'），
      * 重复分析同一简历时先删后加（upsert 覆盖），不再每次生成新 UUID 无界累积；
      * 入库统一走 RagSearchService.addToVectorStore 受容量计数保护。
-     * 注：覆盖场景计数按新增累计（偏保守方向，只会提前拒绝不会放开上限）。
+     * v1.34.1（P2-6）：删除改走 {@link RagSearchService#removeFromVectorStore}，
+     * 与 addToVectorStore 配对递减容量计数——此前直接 vectorStore.delete 绕过计数，
+     * 计数只增不减，反复分析同一简历会使计数虚高并最终误拒知识导入。
      */
     private void storeResumeEmbedding(String resumeId, String userId, String resumeText) {
         // 用虚拟线程异步执行，避免 embedding 不可用时阻塞主请求
@@ -171,7 +212,7 @@ public class ResumeAnalysisService {
                 String docId = "resume-" + resumeId.replaceAll("[^a-zA-Z0-9-_]", "-");
                 // 覆盖旧版本文档：同 id 先删后加（不存在时 delete 为无害空操作）
                 try {
-                    vectorStore.delete(List.of(docId));
+                    ragSearchService.removeFromVectorStore(List.of(docId));
                 } catch (Exception ignored) {
                 }
                 Document doc = Document.builder()

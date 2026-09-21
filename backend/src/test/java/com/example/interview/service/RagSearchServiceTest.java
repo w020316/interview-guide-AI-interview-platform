@@ -334,5 +334,62 @@ class RagSearchServiceTest {
 
         assertThat(stored).isZero();
     }
+
+    // ───────── 容量计数成对增减（v1.34.1 P2-6 修复回归）─────────
+    // 背景：删除路径此前直接 vectorStore.delete，绕过 storedDocs 计数；
+    // 计数只有「启动恢复 set」与「新增 addAndGet」两处写入口，无任何递减路径，
+    // 反复分析同一简历会让计数单调虚高，最终「向量库实际未满却拒绝导入知识」。
+
+    @Test
+    @DisplayName("removeFromVectorStore: 删除成功后容量计数成对递减（P2-6 回归）")
+    void removeFromVectorStore_decrementsStoredCount() {
+        ReflectionTestUtils.setField(service, "maxDocuments", 10);
+        service.addToVectorStore(List.of(doc("d1"), doc("d2"), doc("d3")));
+        assertThat(service.storedCount()).isEqualTo(3);
+
+        int removed = service.removeFromVectorStore(List.of("d2"));
+
+        assertThat(removed).isEqualTo(1);
+        assertThat(service.storedCount()).isEqualTo(2);
+        verify(vectorStore).delete(List.of("d2"));
+    }
+
+    @Test
+    @DisplayName("removeFromVectorStore: 删除后容量释放，原本被拒的入库可再次成功")
+    void removeFromVectorStore_freesCapacityForNewImport() {
+        ReflectionTestUtils.setField(service, "maxDocuments", 2);
+        service.addToVectorStore(List.of(doc("d1"), doc("d2")));
+        // 已达上限：新入库被拒
+        assertThat(service.addToVectorStore(List.of(doc("d3")))).isZero();
+
+        service.removeFromVectorStore(List.of("d1"));
+
+        // 删除释放 1 个名额后，入库恢复可用（修复前计数不降，这里会一直是 0）
+        assertThat(service.addToVectorStore(List.of(doc("d3")))).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("removeFromVectorStore: 删除失败时计数不变；计数不会降为负数")
+    void removeFromVectorStore_deleteFailureKeepsCountAndNeverNegative() {
+        ReflectionTestUtils.setField(service, "maxDocuments", 10);
+        service.addToVectorStore(List.of(doc("d1")));
+
+        doThrow(new RuntimeException("delete down")).when(vectorStore).delete(anyList());
+        assertThat(service.removeFromVectorStore(List.of("d1"))).isZero();
+        assertThat(service.storedCount()).as("删除失败不应改计数").isEqualTo(1);
+
+        // 空列表为无害空操作
+        assertThat(service.removeFromVectorStore(List.of())).isZero();
+        assertThat(service.removeFromVectorStore(null)).isZero();
+
+        // 过度删除时钳到 0，不得为负（否则 maxDocuments - storedDocs 会放开上限）
+        doNothing().when(vectorStore).delete(anyList());
+        service.removeFromVectorStore(List.of("x1", "x2", "x3", "x4", "x5"));
+        assertThat(service.storedCount()).isZero();
+    }
+
+    private static org.springframework.ai.document.Document doc(String id) {
+        return org.springframework.ai.document.Document.builder().id(id).text("t-" + id).build();
+    }
 }
 

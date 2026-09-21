@@ -58,6 +58,21 @@ public class InterviewService {
     /** 简历文本最大长度（截断后送 AI，避免 prompt 过长拖慢推理） */
     private static final int MAX_RESUME_LEN = 800;
 
+    /** 岗位描述最大长度（v1.34.1 P2-4：与简历同等截断，此前 JD 未截断） */
+    private static final int MAX_JD_LEN = 800;
+
+    /** 出题缓存存活时长（毫秒）：与 Redis 侧 1 小时保持一致（v1.34.1 P2-5） */
+    private static final long CACHE_TTL_MILLIS = 60 * 60 * 1000L;
+
+    /**
+     * Redis 不可用时的进程内兜底缓存（v1.34.1 P2-5）。
+     *
+     * <p>无 Redis 环境（本地/低配单机）下此前缓存整体旁路，重复出题每次都全额调用 LLM。
+     * 实例级而非静态，避免单测之间通过静态状态互相污染。
+     */
+    private final com.example.interview.util.LocalPromptCache redisFallbackCache =
+            new com.example.interview.util.LocalPromptCache(500);
+
     /**
      * 生成面试题
      * @param userId 用户 ID（用于缓存隔离，防跨用户串扰）
@@ -79,13 +94,30 @@ public class InterviewService {
                     return cached.toString();
                 }
             } catch (Exception e) {
-                log.warn("Redis 缓存读取失败，降级直连 AI：{}", e.getMessage());
+                log.warn("Redis 缓存读取失败，降级进程内缓存/直连 AI：{}", e.getMessage());
+                // v1.34.1（P2-5）：Redis 不可用时改用进程内兜底缓存。
+                // 仅在「读取抛异常」时启用（而非 Redis 返回 null 的正常未命中），
+                // 确保 Redis 正常时行为与改造前完全一致，不引入双写不一致。
+                String fallback = redisFallbackCache.get(cacheKey);
+                if (fallback != null) {
+                    cacheHit = true;
+                    return fallback;
+                }
             }
 
-            // 2. RAG 检索（降 topK=2 + 短路：生产环境 pgvector 被排除时直接跳过，避免 5s 超时浪费）
+            // 2. RAG 检索（降 topK=2 + 短路：向量库不可用时直接跳过，避免无谓超时）
+            //
+            // v1.34.1 修复（P2-2）：此前用「实现类名是否含 SimpleVectorStore」判断可用性，
+            // 本意是排除「生产 pgvector 被排除」的场景，但 local profile 使用的
+            // PersistentSimpleVectorStore **名字里正含该子串**，被误判为不可用 ——
+            // 导致本地环境 AI 出题静默跳过 RAG，与 v1.34「让本地 RAG 可用」的目标矛盾；
+            // 且 AOP 代理包装或实现类改名都会让该判定失效（脆弱判定）。
+            //
+            // 改为「非空即可用」：真正不可用时下文的 try/catch 会捕获并跳过，
+            // 由具体调用失败决定降级，而不是靠猜测类名。
             String relatedKnowledge = "";
             try {
-                if (isVectorStoreAvailable()) {
+                if (vectorStore != null) {
                     List<Document> docs = vectorStore.similaritySearch(
                             SearchRequest.builder()
                                     .query(jobDescription)
@@ -113,7 +145,9 @@ public class InterviewService {
 
             // 3. 精简 Prompt（用 StringBuilder 替代 String.format，避免 % 注入；用户输入经 PromptSanitizer 消毒）
             String truncatedResume = TextUtil.truncate(resumeText, MAX_RESUME_LEN);
-            String safeJobDesc = PromptSanitizer.sanitize(jobDescription);
+            // v1.34.1 修复（P2-4）：JD 与简历同为用户输入，此前只截简历不截 JD。
+            // 岗位描述上传入上限为请求体 1MB，未截断会直灌 prompt，导致 token 成本与延迟不可控。
+            String safeJobDesc = PromptSanitizer.sanitize(TextUtil.truncate(jobDescription, MAX_JD_LEN));
             String safeResume = PromptSanitizer.sanitize(truncatedResume);
             String safeFocus = PromptSanitizer.sanitize(focusCategories == null || focusCategories.isBlank() ? "" : focusCategories);
             String safeDiff = PromptSanitizer.sanitize(difficulty == null ? "" : difficulty.trim().toUpperCase());
@@ -156,7 +190,10 @@ public class InterviewService {
             try {
                 redisTemplate.opsForValue().set(cacheKey, cleaned, 1, TimeUnit.HOURS);
             } catch (Exception e) {
-                log.warn("Redis 缓存写入失败，跳过缓存：{}", e.getMessage());
+                // v1.34.1（P2-5）：Redis 写入失败时落进程内兜底缓存，
+                // 使无 Redis 环境下的重复出题也能命中缓存（否则每次都全额调用 LLM）
+                log.warn("Redis 缓存写入失败，改用进程内缓存：{}", e.getMessage());
+                redisFallbackCache.put(cacheKey, cleaned, CACHE_TTL_MILLIS);
             }
 
             return cleaned;
@@ -188,18 +225,6 @@ public class InterviewService {
         if (focus == null || focus.isBlank()) return "";
         // v1.31.4 B-14：改为难度条目"2."的子项"2.1"，与末尾"3."形成 1,1.1,1.2,2,2.1,3 连续编号，消除重复"2."
         return "2.1 在遵循上述难度分布的前提下，优先考察以下薄弱分类（至少覆盖其中 2/3）：" + focus + "\n";
-    }
-
-    /**
-     * 检测 VectorStore 是否真正可用（生产环境 pgvector 被排除时返回 false）
-     */
-    private boolean isVectorStoreAvailable() {
-        try {
-            return vectorStore != null
-                    && !vectorStore.getClass().getName().contains("SimpleVectorStore");
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     /**

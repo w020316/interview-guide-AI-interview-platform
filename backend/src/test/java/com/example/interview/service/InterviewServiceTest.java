@@ -151,6 +151,22 @@ class InterviewServiceTest {
         }
 
         @Test
+        @DisplayName("Redis 读写均异常时（未部署 Redis）第二次出题命中进程内兜底缓存（P2-5）")
+        void generateQuestions_redisUnavailable_secondCallHitsLocalFallbackCache() {
+            when(valueOperations.get(anyString())).thenThrow(new RuntimeException("Redis 连接失败"));
+            doThrow(new RuntimeException("Redis 写入失败"))
+                    .when(valueOperations).set(anyString(), any(), anyLong(), any());
+
+            String first = service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "");
+            String second = service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "");
+
+            assertThat(first).isEqualTo(AI_RAW_RESPONSE);
+            assertThat(second).isEqualTo(AI_RAW_RESPONSE);
+            // 关键断言：第二次命中进程内缓存，AI 只被调用一次（修复前每次出题都打模型）
+            verify(chatClient, times(1)).prompt();
+        }
+
+        @Test
         @DisplayName("RAG 检索异常时跳过 RAG 继续调用 AI")
         void generateQuestions_ragError_skipsRagAndCallsAi() {
             when(vectorStore.similaritySearch(any(SearchRequest.class)))

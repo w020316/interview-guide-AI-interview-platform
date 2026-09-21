@@ -103,8 +103,10 @@ class ResumeAnalysisServiceTest {
         verify(cacheMissCounter).increment();
         // 合法 JSON 原样写入缓存（30 分钟）
         verify(valueOps).set(anyString(), eq(VALID_JSON), eq(30L), eq(TimeUnit.MINUTES));
-        // 异步向量化：先删旧版本（upsert），再经 RagSearchService 统一入库
-        verify(vectorStore, timeout(3000)).delete(anyList());
+        // 异步向量化：先删旧版本（upsert），再经 RagSearchService 统一入库。
+        // v1.34.1（P2-6）：删除也统一走 RagSearchService，使容量计数能成对递减，
+        // 不再直接 vectorStore.delete 绕过计数（否则计数只增不减、误拒后续导入）。
+        verify(ragSearchService, timeout(3000)).removeFromVectorStore(anyList());
         verify(ragSearchService, timeout(3000)).addToVectorStore(anyList());
         verify(resumeCounter).increment();
         verify(aiCallTimer).record(anyLong(), any(TimeUnit.class));
@@ -124,7 +126,7 @@ class ResumeAnalysisServiceTest {
     }
 
     @Test
-    @DisplayName("analyze: AI 返回超长非法文本时回退兜底 JSON（覆盖日志截断分支）")
+    @DisplayName("analyze: AI 返回超长非法文本时回退兜底 JSON，且**不写入缓存**（P2-7）")
     void analyze_invalidLongJson_usesFallbackJson() {
         stubCacheMiss();
         // >200 字符且不含任何 JSON 结构的纯文本
@@ -133,7 +135,10 @@ class ResumeAnalysisServiceTest {
         String result = service.analyze(USER_ID, RESUME, JOB);
 
         assertThat(result).isEqualTo(JsonRepairUtil.FALLBACK_JSON);
-        verify(valueOps).set(anyString(), eq(JsonRepairUtil.FALLBACK_JSON), eq(30L), eq(TimeUnit.MINUTES));
+        // v1.34.1（P2-7）：兜底 JSON 不再写入 30 分钟缓存。
+        // 若写入，AI 临时抖动产生的兜底结果会被缓存住——之后即便 AI 已恢复，
+        // 同一简历仍命中兜底内容，用户体感「一直坏」。现改为不缓存（等价于下次重试）。
+        verify(valueOps, never()).set(anyString(), any(), anyLong(), any());
     }
 
     @Test
@@ -195,13 +200,14 @@ class ResumeAnalysisServiceTest {
         stubCacheMiss();
         stubChatClient(VALID_JSON);
         // delete 抛异常 → 被 catch (Exception ignored) 吞掉，后续入库照常执行
+        // v1.34.1（P2-6）：删除入口已改走 RagSearchService.removeFromVectorStore
         doThrow(new RuntimeException("delete 失败"))
-                .when(vectorStore).delete(anyList());
+                .when(ragSearchService).removeFromVectorStore(anyList());
 
         String result = service.analyze(USER_ID, RESUME, JOB);
 
         assertThat(result).isEqualTo(VALID_JSON);
-        verify(vectorStore, timeout(3000)).delete(anyList());
+        verify(ragSearchService, timeout(3000)).removeFromVectorStore(anyList());
         verify(ragSearchService, timeout(3000)).addToVectorStore(anyList());
     }
 
@@ -296,5 +302,45 @@ class ResumeAnalysisServiceTest {
 
         assertThat(result).isEqualTo("# 截断后仍正常生成");
         verify(chatClient).prompt();
+    }
+
+    // ───────────── 缓存降级兜底（v1.34.1 P2-5 修复回归）─────────────
+    // 背景：出题/简历缓存此前只依赖 Redis，读写异常时仅 WARN 后直连 AI，
+    // 因此在未部署 Redis 的环境缓存整体旁路——真机实测 cache.hit.count = 0、
+    // 重复请求耗时 7.12s（与首次 9.24s 同量级），即每次都全额调用 LLM。
+
+    @Test
+    @DisplayName("analyze: Redis 读写均失败时，第二次请求命中进程内兜底缓存，不再调用 AI（P2-5）")
+    void analyze_redisUnavailable_secondCallHitsLocalFallbackCache() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        // 读与写都抛异常 → 模拟「未部署 Redis」的真实形态
+        when(valueOps.get(anyString())).thenThrow(new RuntimeException("Redis 连接失败"));
+        doThrow(new RuntimeException("Redis 写入失败"))
+                .when(valueOps).set(anyString(), any(), anyLong(), any(TimeUnit.class));
+        stubChatClient(VALID_JSON);
+
+        String first = service.analyze(USER_ID, RESUME, JOB);
+        String second = service.analyze(USER_ID, RESUME, JOB);
+
+        assertThat(first).isEqualTo(VALID_JSON);
+        assertThat(second).isEqualTo(VALID_JSON);
+        // 关键断言：第二次命中进程内缓存，AI 只被调用一次（修复前每次都会调用）
+        verify(chatClient, times(1)).prompt();
+        verify(cacheHitCounter).increment();
+    }
+
+    @Test
+    @DisplayName("analyze: Redis 正常（未命中但无异常）时不启用进程内兜底，行为与改造前一致")
+    void analyze_redisHealthy_doesNotUseLocalFallback() {
+        // Redis 返回 null（正常未命中，不抛异常）
+        stubCacheMiss();
+        stubChatClient(VALID_JSON);
+
+        service.analyze(USER_ID, RESUME, JOB);
+        service.analyze(USER_ID, RESUME, JOB);
+
+        // 两次都是正常未命中 → 两次都调用 AI；兜底缓存不得介入（避免引入双写不一致）
+        verify(chatClient, times(2)).prompt();
+        verify(cacheHitCounter, never()).increment();
     }
 }
