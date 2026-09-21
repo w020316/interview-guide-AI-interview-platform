@@ -1,28 +1,24 @@
 # Cloudflare Pages 响应头配置
 #
-# ⚠️ 格式约束（2026-09-21 线上实测踩坑）：
-#   **注释行绝不能出现在某个路径区块内部**（即在「路径行」与「该区块的 header 行」之间），
-#   否则 Cloudflare 会整块忽略——不报错、不告警，静默失效。
-#   实测：原 `/*` 区块把 `# 安全响应头（全站）` 写在 `/*` 之后，结果该区块的
-#   X-Frame-Options / Permissions-Policy / X-XSS-Protection 全部未下发
-#   （而注释写在路径之前的区块——favicon / assets / *.html——均正常生效）。
-#   因此本文件所有注释一律置于路径行之前。
+# ⚠️ 格式与行为约束（2026-09-21 线上实测）：
+# 1) 注释行可以放在路径区块之间，但**不要写在某个区块的内部**（路径行与其 header 行之间），
+#    Cloudflare 对这种写法会静默忽略整块，不报错、不告警。
+# 2) 同一个路径模式（如 `/*`）**只写一个区块**。此前 `/*` 出现两次（安全头 + HSTS 各一块），
+#    实测两个区块的 header 都没有下发；已合并为单块验证。
+# 3) SPA 回退（_redirects 的 `/* /index.html 200`）命中的路径**不会**应用 _headers ——
+#    实测 `/`（被回退改写）拿不到任何自定义头，而真实存在的文件
+#    （/favicon.svg、/assets/*、/index.html）都能正常拿到。
+#    因此若 `/*` 仍不生效，说明全站安全头无法用 _headers 落地
+#    （pages.dev 不是用户可管的 zone，控制台加不了响应头规则），
+#    只能通过绑定自有域名后用 zone 级规则解决——该限制需明确记录，避免误以为已生效。
 
-# 安全响应头（全站）
-# ⚠️ 2026-09-21 实测：本文件中「具体路径」的区块（favicon/assets/*.html）均正常生效，
-# 但 `/*` 通配区块始终未下发（用一次性指纹头 X-Build-Stamp 验证确认，非缓存问题）。
-# 因此以下安全头当前**在 pages.dev 上不生效**，需在 Cloudflare 控制台
-# （Pages 项目 → Settings → Functions/Headers 或 Rules → Response Header Transform）
-# 配置等价规则才能落地——属于需要登录控制台的操作。
+# 全站响应头（安全 + HSTS，合并为单一区块）
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=()
   X-XSS-Protection: 0
-
-# 强制 HTTPS（HSTS，1 年；Cloudflare Pages 已全站 HTTPS）
-/*
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 
 # favicon 强缓存（内容不变，1 年）
