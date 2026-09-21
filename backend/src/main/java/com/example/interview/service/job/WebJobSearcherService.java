@@ -86,17 +86,35 @@ public class WebJobSearcherService {
 
     // ---------- 各候选源抓取实现 ----------
 
+    /**
+     * 把某个源的解析结果并入总列表，单源最多并入 {@code limit} 条。
+     *
+     * <p>v1.34.1 修复（P1）：必须按「本源已并入条数」计数，**不得**用共享总列表的
+     * {@code out.size()} 判断——否则首个源填满上限后，后续源首次判断即中断，
+     * 恒贡献 0 条，多源聚合名存实亡（且 MAX_TOTAL 永远达不到）。
+     *
+     * @return 本次实际并入的条数
+     */
+    static int mergeFromSource(List<WebJob> out, List<WebJob> fromSource, int limit) {
+        if (fromSource == null || fromSource.isEmpty()) {
+            return 0;
+        }
+        int added = 0;
+        for (WebJob w : fromSource) {
+            if (added >= limit) break;
+            out.add(w);
+            added++;
+        }
+        return added;
+    }
+
     /** 智联招聘搜索页：https://sou.zhaopin.com/?kw=&jl=（SSR 内嵌 JSON 岗位数据，真实可抓） */
     private void fetchFromZhilian(String kw, String loc, List<WebJob> out) {
         String url = "https://sou.zhaopin.com/?kw=" + enc(kw)
                 + (isNational(loc) ? "" : "&jl=" + enc(loc));
         Document doc = fetch(url);
         if (doc == null) return;
-        List<WebJob> parsed = parseZhilianHtml(doc.html(), loc);
-        for (WebJob w : parsed) {
-            if (out.size() >= MAX_PER_SOURCE) break;
-            out.add(w);
-        }
+        mergeFromSource(out, parseZhilianHtml(doc.html(), loc), MAX_PER_SOURCE);
     }
 
     /** 从智联 SSR HTML 提取岗位（包可见，便于测试；不依赖网络） */
@@ -164,16 +182,16 @@ public class WebJobSearcherService {
         if (doc == null) return;
         Elements cards = doc.select("li.con_list_item, li.job_list_li");
         if (cards.isEmpty()) return;
+        List<WebJob> parsed = new ArrayList<>();
         for (Element c : cards) {
-            if (out.size() >= MAX_PER_SOURCE) break;
             String title = text(c.select(".position_name, .position"));
             String company = text(c.select(".company_name, .company"));
             if (title.isBlank() && company.isBlank()) continue;
-            String salary = text(c.select(".salary, .money"));
-            String need = text(c.select(".position_labels, .labels"));
-            out.add(new WebJob(title.isBlank() ? kw : title, company, loc,
-                    salary, need, "", absHref(c.select("a"))));
+            parsed.add(new WebJob(title.isBlank() ? kw : title, company, loc,
+                    text(c.select(".salary, .money")), text(c.select(".position_labels, .labels")),
+                    "", absHref(c.select("a"))));
         }
+        mergeFromSource(out, parsed, MAX_PER_SOURCE);
     }
 
     /** 前程无忧搜索：https://we.51job.com/pc/search?keyword=&jobArea= */
@@ -183,14 +201,14 @@ public class WebJobSearcherService {
         if (doc == null) return;
         Elements cards = doc.select("div.joblist, div.job_title, div.e");
         if (cards.isEmpty()) return;
+        List<WebJob> parsed = new ArrayList<>();
         for (Element c : cards) {
-            if (out.size() >= MAX_PER_SOURCE) break;
             String title = text(c.select(".jname, .t1, .job_title"));
-            String company = text(c.select(".company_name, .cname"));
             if (title.isBlank()) continue;
-            out.add(new WebJob(title, company, loc,
+            parsed.add(new WebJob(title, text(c.select(".company_name, .cname")), loc,
                     text(c.select(".sal, .sl")), "", "", absHref(c.select("a"))));
         }
+        mergeFromSource(out, parsed, MAX_PER_SOURCE);
     }
 
     /** BOSS直聘搜索：https://www.zhipin.com/web/geek/job?query=&city= */
@@ -203,14 +221,14 @@ public class WebJobSearcherService {
         if (doc == null) return;
         Elements cards = doc.select(".job-card-wrapper, li.job-card-wrapper, .job-primary");
         if (cards.isEmpty()) return;
+        List<WebJob> parsed = new ArrayList<>();
         for (Element c : cards) {
-            if (out.size() >= MAX_PER_SOURCE) break;
             String title = text(c.select(".job-name, .job-title"));
-            String company = text(c.select(".company-name, .company-text"));
             if (title.isBlank()) continue;
-            out.add(new WebJob(title, company, loc,
+            parsed.add(new WebJob(title, text(c.select(".company-name, .company-text")), loc,
                     text(c.select(".salary")), "", "", absHref(c.select("a"))));
         }
+        mergeFromSource(out, parsed, MAX_PER_SOURCE);
     }
 
     // ---------- 辅助 ----------

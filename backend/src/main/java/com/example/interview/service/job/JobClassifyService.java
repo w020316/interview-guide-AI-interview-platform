@@ -82,9 +82,14 @@ public class JobClassifyService {
                 岗位列表：
                 %s""".formatted(String.join("/", INDUSTRIES), String.join("/", JOB_TYPES), sb);
 
-        String content = chatModel.call(
-                new org.springframework.ai.chat.prompt.Prompt(prompt)
-        ).getResult().getOutput().getText();
+        // v1.34.1 修复（P1-3 + P3-6）：此前直接 chatModel.call，完全绕开全局 AI 并发闸门。
+        // 定时刷新/手动刷新会批量分类（每批 10 条），若不过闸门，可与用户侧 AI 调用叠加
+        // 打满上游配额并触发第三方 429 限流，反向影响用户请求。
+        // 本方法是「系统触发的批处理、无用户在等」，故使用**后台专用许可池**
+        //（不与用户前台请求争抢 5 个前台许可）。
+        String content = com.example.interview.ai.AiConcurrencyGuard.callBackground(() ->
+                chatModel.call(new org.springframework.ai.chat.prompt.Prompt(prompt))
+                        .getResult().getOutput().getText());
 
         // 模型 JSON 容错修复（单引号/控制字符等），失败则抛出走规则降级
         String repaired = JsonRepairUtil.repair(content);
@@ -150,7 +155,8 @@ public class JobClassifyService {
         ));
         return new Classification(
                 industry == null ? "其他" : industry,
-                jobType == null ? (industry != null ? "综合" : "综合") : jobType,
+                // v1.34.1 清理（P3）：原三元 (industry != null ? "综合" : "综合") 两分支相同，为死代码
+                jobType == null ? "综合" : jobType,
                 "校招");
     }
 

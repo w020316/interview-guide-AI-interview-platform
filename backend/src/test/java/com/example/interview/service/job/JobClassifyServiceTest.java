@@ -189,4 +189,48 @@ class JobClassifyServiceTest {
         var c = service.classifyByRule(dto("x", "急聘英才", "某公司", "负责光伏电站运维"));
         assertThat(c.industry()).isEqualTo("能源");
     }
+
+    // ─────────── AI 并发闸门（v1.34.1 P1-3 / P3-6 修复回归）───────────
+    // 背景：classifyByAi 此前直接 chatModel.call，绕过全局闸门。
+    // 定时/手动刷新会批量分类（每批 10 条），可与用户侧 AI 调用叠加打满上游配额，
+    // 触发第三方 429 反向影响用户请求。现收敛到闸门内；又因属「系统触发、无用户在等」的
+    // 批处理，使用后台专用许可池（P3-6），不与用户前台请求争抢 5 个前台许可。
+
+    @Test
+    @DisplayName("classifyBatch: AI 分类在后台闸门内执行，且不占用前台许可")
+    void classifyBatch_aiCallRunsInsideConcurrencyGuard() {
+        java.util.concurrent.atomic.AtomicInteger bgPermits =
+                new java.util.concurrent.atomic.AtomicInteger(-1);
+        java.util.concurrent.atomic.AtomicInteger fgPermits =
+                new java.util.concurrent.atomic.AtomicInteger(-1);
+        when(chatModel.call(any(Prompt.class))).thenAnswer(inv -> {
+            bgPermits.set(com.example.interview.ai.AiConcurrencyGuard.availableBackgroundPermits());
+            fgPermits.set(com.example.interview.ai.AiConcurrencyGuard.availablePermits());
+            return chatResponse("[{\"index\":1,\"industry\":\"互联网\",\"jobType\":\"技术\"}]");
+        });
+
+        var result = service.classifyBatch(List.of(dto("j1", "Java 工程师", "阿里", "开发")));
+
+        assertThat(result).hasSize(1);
+        assertThat(bgPermits.get()).as("应在后台闸门内（后台许可 2-1=1）").isEqualTo(1);
+        assertThat(fgPermits.get()).as("前台许可不应被后台任务占用").isEqualTo(5);
+        // 调用结束后两类许可必须全部归还，否则闸门会逐渐枯竭
+        assertThat(com.example.interview.ai.AiConcurrencyGuard.availableBackgroundPermits()).isEqualTo(2);
+        assertThat(com.example.interview.ai.AiConcurrencyGuard.availablePermits()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("classifyBatch: 闸门排队超时时降级为规则分类，不影响入库")
+    void classifyBatch_gateTimeoutFallsBackToRule() throws Exception {
+        when(chatModel.call(any(Prompt.class)))
+                .thenThrow(new com.example.interview.ai.AiGateTimeoutException("AI 并发闸门排队超时（>30s），请稍后重试"));
+
+        // 用「某互联网公司 + 工程师」使规则分类结果确定：行业=互联网、职位类型=技术
+        var result = service.classifyBatch(List.of(dto("j1", "Java 工程师", "某互联网公司", "开发核心系统")));
+
+        // 闸门超时应被 classifyBatch 捕获并走规则兜底，而非向上抛出中断入库
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).industry()).isEqualTo("互联网");
+        assertThat(result.get(0).jobType()).isEqualTo("技术");
+    }
 }

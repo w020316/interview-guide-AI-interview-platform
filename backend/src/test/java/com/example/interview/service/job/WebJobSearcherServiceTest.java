@@ -3,6 +3,7 @@ package com.example.interview.service.job;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -114,5 +115,66 @@ class WebJobSearcherServiceTest {
 
         assertThat(jobs).hasSize(1);
         assertThat(jobs.get(0).title()).isEqualTo("Java=高级工程师");
+    }
+
+    // ─────────────── 多源聚合（v1.34.1 P1 修复回归）───────────────
+    // 背景：4 个招聘源共享同一个总列表，且每源用「共享列表 size >= MAX_PER_SOURCE」判断中断。
+    // 结果首个源填满 8 条后，后续源首次判断即中断、恒贡献 0 条，MAX_TOTAL(12) 永不达到，
+    // 「多源并行提升命中率」的设计意图完全落空。
+
+    private static List<WebJobSearcherService.WebJob> jobs(int n, String prefix) {
+        List<WebJobSearcherService.WebJob> list = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            list.add(new WebJobSearcherService.WebJob(prefix + i, "公司", "深圳", "面议", "", "", ""));
+        }
+        return list;
+    }
+
+    @Test
+    @DisplayName("mergeFromSource：单源最多并入 limit 条")
+    void mergeFromSource_capsPerSource() {
+        List<WebJobSearcherService.WebJob> out = new ArrayList<>();
+
+        int added = WebJobSearcherService.mergeFromSource(out, jobs(20, "A"), 8);
+
+        assertThat(added).isEqualTo(8);
+        assertThat(out).hasSize(8);
+        assertThat(out.get(0).title()).isEqualTo("A0");
+    }
+
+    @Test
+    @DisplayName("mergeFromSource：第一个源填满后，第二个源仍能正常贡献（P1 回归）")
+    void mergeFromSource_secondSourceStillContributes() {
+        List<WebJobSearcherService.WebJob> out = new ArrayList<>();
+
+        WebJobSearcherService.mergeFromSource(out, jobs(8, "A"), 8);   // 首源填满 8 条
+        int added2 = WebJobSearcherService.mergeFromSource(out, jobs(8, "B"), 8);
+
+        // 修复前：第二个源首次判断 out.size()=8 >= 8 即 break，added2 == 0
+        assertThat(added2).isEqualTo(8);
+        assertThat(out).hasSize(16);
+        assertThat(out.get(8).title()).isEqualTo("B0");
+    }
+
+    @Test
+    @DisplayName("mergeFromSource：多源可累计到全局上限之上，由调用方按 MAX_TOTAL 裁剪")
+    void mergeFromSource_aggregatesAcrossSourcesThenTruncated() {
+        List<WebJobSearcherService.WebJob> out = new ArrayList<>();
+        for (String p : List.of("A", "B", "C", "D")) {
+            WebJobSearcherService.mergeFromSource(out, jobs(8, p), 8);
+        }
+
+        // 4 源 × 8 条 = 32 条并入（MAX_TOTAL 由 searchWeb 负责裁剪）
+        assertThat(out).hasSize(32);
+    }
+
+    @Test
+    @DisplayName("mergeFromSource：空源/null 源返回 0 且不抛异常")
+    void mergeFromSource_nullOrEmptySource() {
+        List<WebJobSearcherService.WebJob> out = new ArrayList<>();
+
+        assertThat(WebJobSearcherService.mergeFromSource(out, null, 8)).isZero();
+        assertThat(WebJobSearcherService.mergeFromSource(out, List.of(), 8)).isZero();
+        assertThat(out).isEmpty();
     }
 }
