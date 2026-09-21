@@ -10,6 +10,7 @@
 
 # 安全响应头（全站）
 /*
+  X-Build-Stamp: 202609211519
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
