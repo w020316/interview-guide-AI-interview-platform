@@ -48,6 +48,33 @@ public interface InterviewQuestionRepository extends JpaRepository<InterviewQues
             "where q.sessionId in (select s.sessionId from InterviewSessionEntity s where s.userId = :userId)")
     Double avgEvaluationScoreByUserId(@Param("userId") String userId);
 
+    /**
+     * 指定用户的题目总数（v1.34.1，P3-9）。
+     *
+     * <p>背景：智能体每轮对话都要把用户画像（题目总数/错题数/平均分）注入 System Prompt，
+     * 而原实现走 {@code questionSummary}——它会加载该用户**全部**题目实体后在内存里流式聚合。
+     * 对话越多、题库越大，单轮开销越高，且每轮都重复一次。改为数据库聚合后为常数级查询。
+     */
+    @Query("select count(q.id) from InterviewQuestionEntity q " +
+            "where q.sessionId in (select s.sessionId from InterviewSessionEntity s where s.userId = :userId)")
+    long countByUserId(@Param("userId") String userId);
+
+    /** 指定用户评分低于阈值的题目数（v1.34.1，P3-9 智能体画像用） */
+    @Query("select count(q.id) from InterviewQuestionEntity q " +
+            "where q.evaluationScore is not null and q.evaluationScore < :threshold " +
+            "and q.sessionId in (select s.sessionId from InterviewSessionEntity s where s.userId = :userId)")
+    long countWrongByUserId(@Param("userId") String userId, @Param("threshold") int threshold);
+
+    /**
+     * 指定用户按分类的题目数与平均分（v1.34.1，P3-9 智能体画像用）。
+     * 每行 [category, count, avgScore]，仅返回有评分的题目。
+     */
+    @Query("select q.category, count(q.id), avg(q.evaluationScore) from InterviewQuestionEntity q " +
+            "where q.category is not null and q.evaluationScore is not null " +
+            "and q.sessionId in (select s.sessionId from InterviewSessionEntity s where s.userId = :userId) " +
+            "group by q.category")
+    List<Object[]> categoryStatsByUserId(@Param("userId") String userId);
+
     /** 按会话聚合平均分与已评分题数（趋势图用）：每行 [sessionId, avg, count] */
     @Query("select q.sessionId, avg(q.evaluationScore), count(q.evaluationScore) " +
             "from InterviewQuestionEntity q " +

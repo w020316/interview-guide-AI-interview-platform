@@ -121,7 +121,7 @@ class AgentServiceTest {
             c.setId(77L);
             return c;
         });
-        when(interviewSessionService.questionSummary(USER_ID)).thenReturn(Map.of(
+        when(interviewSessionService.questionProfile(eq(USER_ID), anyInt())).thenReturn(Map.of(
                 "totalQuestions", 10L, "wrongQuestions", 2L, "averageScore", 72.5,
                 "byCategory", List.of(Map.of("category", "Java基础", "avgScore", 70.0))));
 
@@ -203,7 +203,7 @@ class AgentServiceTest {
             c.setId(81L);
             return c;
         });
-        when(interviewSessionService.questionSummary(USER_ID)).thenThrow(new RuntimeException("db down"));
+        when(interviewSessionService.questionProfile(eq(USER_ID), anyInt())).thenThrow(new RuntimeException("db down"));
 
         AgentService.AgentStreamSession session =
                 service.streamChat(USER_ID, null, "你好", new AtomicBoolean(false));
@@ -686,7 +686,7 @@ class AgentServiceTest {
     void streamChat_unsavedConversation_historyEmpty() {
         // 新建会话但未赋 id（模拟异常场景）→ history 为空分支
         when(conversationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(interviewSessionService.questionSummary(USER_ID)).thenReturn(Map.of());
+        when(interviewSessionService.questionProfile(eq(USER_ID), anyInt())).thenReturn(Map.of());
 
         AgentService.AgentStreamSession session =
                 service.streamChat(USER_ID, null, "消息", new AtomicBoolean(false));

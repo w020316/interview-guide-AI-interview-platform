@@ -28,6 +28,8 @@ import java.util.function.BiFunction;
  */
 public class AgentTools {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AgentTools.class);
+
     private static final int MAX_TEXT_LEN = 1500;
 
     /** 工具规格：名称、用途描述、参数说明、执行器（paramsJson 原文 + 解析后的键值对 → 结果文本） */
@@ -46,6 +48,11 @@ public class AgentTools {
     private final com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
     private final com.example.interview.service.job.JobMatchService jobMatchService;
     private final com.example.interview.service.InterviewService interviewService;
+    /**
+     * 简历服务（v1.34.1 P3-11）：出题工具需要用户简历做个性化。
+     * 允许为 null（切片测试/未注入场景），使用时做空值保护并降级为通用出题。
+     */
+    private final com.example.interview.service.ResumeService resumeService;
 
     public AgentTools(String userId,
                       JobAgentService jobAgentService,
@@ -55,10 +62,24 @@ public class AgentTools {
                       com.example.interview.service.job.WebJobSearcherService webJobSearcherService,
                       com.example.interview.service.job.JobMatchService jobMatchService,
                       com.example.interview.service.InterviewService interviewService) {
+        this(userId, jobAgentService, interviewSessionService, interviewEventService, ragSearchService,
+                webJobSearcherService, jobMatchService, interviewService, null);
+    }
+
+    public AgentTools(String userId,
+                      JobAgentService jobAgentService,
+                      InterviewSessionService interviewSessionService,
+                      InterviewEventService interviewEventService,
+                      RagSearchService ragSearchService,
+                      com.example.interview.service.job.WebJobSearcherService webJobSearcherService,
+                      com.example.interview.service.job.JobMatchService jobMatchService,
+                      com.example.interview.service.InterviewService interviewService,
+                      com.example.interview.service.ResumeService resumeService) {
         this.userId = userId;
         this.jobAgentService = jobAgentService;
         this.interviewSessionService = interviewSessionService;
         this.interviewEventService = interviewEventService;
+        this.resumeService = resumeService;
         this.ragSearchService = ragSearchService;
         this.webJobSearcherService = webJobSearcherService;
         this.jobMatchService = jobMatchService;
@@ -259,7 +280,11 @@ public class AgentTools {
             if (!List.of("", "EASY", "MEDIUM", "HARD").contains(diff)) {
                 diff = "";
             }
-            String json = interviewService.generateQuestions(userId, "", jobDesc, n, diff, "");
+            // v1.34.1 修复（P3-11）：此前 resumeText 传空串，出题**丢失用户简历上下文**，
+            // 生成的是通用题而非针对该用户经历/技术栈的题。现取用户最近一次简历文本，
+            // 取不到时仍降级为空串（与旧行为一致，不影响可用性）。
+            String resumeContext = resolveLatestResumeText();
+            String json = interviewService.generateQuestions(userId, resumeContext, jobDesc, n, diff, "");
             if (json == null || json.isBlank()) {
                 return "出题失败，请稍后重试或换个岗位方向。";
             }
@@ -443,6 +468,29 @@ public class AgentTools {
     private static String shorten(String s, int max) {
         if (s == null) return "";
         return s.length() <= max ? s.replace("\n", " ") : s.substring(0, max).replace("\n", " ") + "...";
+    }
+
+    /**
+     * 取当前用户最近一次简历文本，供出题工具做个性化（v1.34.1，P3-11）。
+     *
+     * <p>取不到（未上传简历 / 服务不可用 / 切片测试未注入）时返回空串，
+     * 出题自动降级为「按岗位方向通用出题」，与修复前行为一致，不影响可用性。
+     */
+    private String resolveLatestResumeText() {
+        if (resumeService == null) {
+            return "";
+        }
+        try {
+            var history = resumeService.listByUser(userId);
+            if (history == null || history.isEmpty()) {
+                return "";
+            }
+            String content = history.get(0).getContent();
+            return content == null ? "" : content;
+        } catch (Exception e) {
+            log.warn("智能体出题取用户简历失败，降级为通用出题：{}", e.getMessage());
+            return "";
+        }
     }
 
     private static String truncate(StringBuilder sb) {

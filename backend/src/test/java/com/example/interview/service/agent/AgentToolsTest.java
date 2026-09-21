@@ -246,6 +246,71 @@ class AgentToolsTest {
         assertThat(newTools().generateInterviewQuestions(5, null, null)).contains("出题暂时不可用");
     }
 
+    // ───────── 出题带用户简历上下文（v1.34.1 P3-11 修复回归）─────────
+    // 背景：generateInterviewQuestions 此前把 resumeText 传空串，出题丢失用户简历上下文，
+    // 生成的是通用题而非针对该用户经历/技术栈的题。
+
+    /** 构造带指定简历服务的工具实例 */
+    private AgentTools toolsWithResume(com.example.interview.service.ResumeService rs) {
+        return new AgentTools("user-1", jobAgentService, interviewSessionService,
+                interviewEventService, ragSearchService, webJobSearcherService,
+                jobMatchService, interviewService, rs);
+    }
+
+    @Test
+    @DisplayName("generateInterviewQuestions：把用户最近简历传给出题服务（P3-11 回归）")
+    void genQuestionsPassesLatestResume() {
+        com.example.interview.service.ResumeService resumeService =
+                org.mockito.Mockito.mock(com.example.interview.service.ResumeService.class);
+        var resume = com.example.interview.entity.ResumeEntity.builder()
+                .content("三年 Java 经验，主导订单中心重构，QPS 峰值 3000")
+                .build();
+        when(resumeService.listByUser("user-1")).thenReturn(List.of(resume));
+        when(interviewService.generateQuestions(anyString(), anyString(), anyString(), anyInt(), anyString(), anyString()))
+                .thenReturn("[{\"question\":\"介绍订单中心重构\",\"category\":\"项目深挖\",\"difficulty\":\"MEDIUM\"}]");
+
+        String out = toolsWithResume(resumeService).generateInterviewQuestions(1, "Java后端", "MEDIUM");
+
+        assertThat(out).contains("介绍订单中心重构");
+        // 关键断言：简历文本确实被传给出题服务（修复前恒为空串）
+        var captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(interviewService).generateQuestions(anyString(), captor.capture(), anyString(), anyInt(), anyString(), anyString());
+        assertThat(captor.getValue()).contains("主导订单中心重构");
+    }
+
+    @Test
+    @DisplayName("generateInterviewQuestions：用户无简历时降级为通用出题（传空串，不报错）")
+    void genQuestionsWithoutResumeFallsBack() {
+        com.example.interview.service.ResumeService resumeService =
+                org.mockito.Mockito.mock(com.example.interview.service.ResumeService.class);
+        when(resumeService.listByUser("user-1")).thenReturn(List.of());
+        when(interviewService.generateQuestions(anyString(), anyString(), anyString(), anyInt(), anyString(), anyString()))
+                .thenReturn("[]");
+
+        toolsWithResume(resumeService).generateInterviewQuestions(1, "Java后端", null);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(interviewService).generateQuestions(anyString(), captor.capture(), anyString(), anyInt(), anyString(), anyString());
+        assertThat(captor.getValue()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("generateInterviewQuestions：简历服务抛异常时降级为通用出题，不中断工作流")
+    void genQuestionsResumeServiceErrorDegrades() {
+        com.example.interview.service.ResumeService resumeService =
+                org.mockito.Mockito.mock(com.example.interview.service.ResumeService.class);
+        when(resumeService.listByUser("user-1")).thenThrow(new RuntimeException("db down"));
+        when(interviewService.generateQuestions(anyString(), anyString(), anyString(), anyInt(), anyString(), anyString()))
+                .thenReturn("[]");
+
+        // 不得抛出，且仍完成出题调用
+        toolsWithResume(resumeService).generateInterviewQuestions(1, "Java后端", null);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(interviewService).generateQuestions(anyString(), captor.capture(), anyString(), anyInt(), anyString(), anyString());
+        assertThat(captor.getValue()).isEmpty();
+    }
+
     @Test
     @DisplayName("deepFollowUp：正常生成追问")
     void deepFollowUpOk() {

@@ -10,6 +10,8 @@ import com.example.interview.service.RagSearchService;
 import com.example.interview.service.job.JobAgentService;
 import com.example.interview.util.JsonRepairUtil;
 import com.example.interview.util.PromptSanitizer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import com.example.interview.util.SseConcurrencyGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,7 +41,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 自研 ReAct 循环（提示词层工具协议）：
  * 因 B.AI 网关不支持 API 级 function calling（带 tools 参数返回 400），
  * 工具以文本协议写入提示词，模型输出 {"action":...,"params":{...}} 动作 JSON
- * （经 JsonRepairUtil 修复解析），本地执行工具后将观察结果回填，最多 6 轮。
+ * （经 JsonRepairUtil 修复解析），本地执行工具后将观察结果回填，最多 {@link #MAX_TOOL_ROUNDS} 轮
+ * （v1.34.1：此前注释写死「6 轮」，与实现（v1.31.1 起为 8）不一致，改为引用常量避免再次漂移）。
  *
  * 职责：
  * 1. 会话与记忆管理：创建会话、装配最近 12 条历史消息窗口
@@ -59,6 +62,12 @@ public class AgentService {
     /** ReAct 最大工具调用轮次（v1.31.1 由 6 → 8，支持更复杂问题的多步推理） */
     private static final int MAX_TOOL_ROUNDS = 8;
 
+    /**
+     * 错题判定阈值（v1.34.1 P3-9）：评分低于此值计为错题，用于用户画像与错题工具。
+     * 与 {@code /api/knowledge/wrong-questions} 的默认 threshold 保持一致。
+     */
+    private static final int WRONG_SCORE_THRESHOLD = 60;
+
     /** 标题截断长度 */
     private static final int TITLE_MAX_LEN = 30;
 
@@ -72,13 +81,58 @@ public class AgentService {
     private final com.example.interview.service.job.WebJobSearcherService webJobSearcherService;
     private final com.example.interview.service.job.JobMatchService jobMatchService;
     private final com.example.interview.service.InterviewService interviewService;
+
+    /**
+     * 简历服务（v1.34.1 P3-11）：供出题工具取用户简历做个性化。
+     *
+     * <p>采用 **setter 注入**而非构造器参数——本类构造器已有 10 个参数，且被
+     * {@code AgentServiceTest} 等直接调用；新增参数会波及所有调用点。
+     * 允许为 null（切片测试未注入），出题工具会空值降级为通用出题。
+     */
+    private com.example.interview.service.ResumeService resumeService;
+
+    @Autowired(required = false)
+    public void setResumeService(com.example.interview.service.ResumeService resumeService) {
+        this.resumeService = resumeService;
+    }
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * SSE 并发控制：全局上限 + 每用户上限双层保护（P1-02）。
-     * 上限与原实现一致（全局 20）；每用户默认 1，防止单用户占满全部槽位拒绝其他用户服务
+     * 每用户默认 1，防止单用户占满全部槽位拒绝其他用户服务。
+     *
+     * <p>v1.34.1 修复（P3-5）：此前两个上限**硬编码为 (20, 1)**，导致
+     * {@code app.sse.max-concurrent} 配置项对智能体链路完全不生效
+     * （改了 yml 只影响面试问答，智能体仍是 20，运维无法统一调参）。
+     * 现从配置读取；为兼容单测中手动构造/字段注入（{@code @Value} 不会生效），
+     * 采用惰性初始化 + 非法值回退默认，行为与旧版完全一致。
      */
-    private final SseConcurrencyGuard sseGuard = new SseConcurrencyGuard(20, 1);
+    @Value("${app.sse.max-concurrent:20}")
+    private int sseMaxConcurrent;
+
+    @Value("${app.sse.max-per-user:1}")
+    private int sseMaxPerUser;
+
+    private volatile SseConcurrencyGuard sseGuard;
+
+    /** 惰性获取 SSE 闸门（测试环境未注入配置时回退 20/1，与历史行为一致） */
+    private SseConcurrencyGuard guard() {
+        SseConcurrencyGuard g = sseGuard;
+        if (g == null) {
+            synchronized (this) {
+                g = sseGuard;
+                if (g == null) {
+                    int max = sseMaxConcurrent > 0 ? sseMaxConcurrent : 20;
+                    int perUser = sseMaxPerUser > 0 ? sseMaxPerUser : 1;
+                    g = new SseConcurrencyGuard(max, perUser);
+                    sseGuard = g;
+                }
+            }
+        }
+        return g;
+    }
+
     private final ScheduledExecutorService heartbeat = new ScheduledThreadPoolExecutor(1);
 
     public AgentService(ChatClient chatClient,
@@ -143,7 +197,7 @@ public class AgentService {
         String safeMessage = PromptSanitizer.sanitize(session.userMessage());
         AgentTools tools = new AgentTools(conversation.getUserId(), jobAgentService,
                 interviewSessionService, interviewEventService, ragSearchService,
-                webJobSearcherService, jobMatchService, interviewService);
+                webJobSearcherService, jobMatchService, interviewService, resumeService);
 
         StringBuilder emitted = new StringBuilder();
         List<String> steps = new ArrayList<>();
@@ -246,7 +300,11 @@ public class AgentService {
         if (content == null || content.isBlank()) {
             return null;
         }
-        String trimmed = content.trim();
+        // v1.34.1 修复（P2-8）：模型可能用 ```json ... ``` 围栏包裹动作 JSON。
+        // 此前只判断 trimmed.startsWith("{")，遇到围栏包裹会被判为「最终回答」，
+        // 把一段裸动作 JSON 原样推给用户；而其余 AI 服务（出题/简历/分类）均统一走
+        // JsonRepairUtil 剥围栏，行为不一致。现统一：先剥 Markdown 围栏再判断。
+        String trimmed = JsonRepairUtil.stripMarkdownFence(content.trim());
         if (!trimmed.startsWith("{")) {
             return null; // 直接回答
         }
@@ -340,12 +398,12 @@ public class AgentService {
 
     /** 双层获取 SSE 槽位（全局 + 每用户）；失败时不占用任何资源 */
     public SseConcurrencyGuard.Result tryAcquire(String userId) {
-        return sseGuard.tryAcquire(userId);
+        return guard().tryAcquire(userId);
     }
 
     /** 归还 SSE 槽位（与 tryAcquire 成对调用，置于 emitter onCompletion） */
     public void release(String userId) {
-        sseGuard.release(userId);
+        guard().release(userId);
     }
 
     /** 心跳调度器（由 Controller 持有 future 并在 emitter 生命周期内取消，P2-15） */
@@ -433,14 +491,18 @@ public class AgentService {
         sb.append("- 使用中文回答，尽量详尽而不省略关键信息\n\n");
         sb.append("【当前用户画像（真实数据，可直接引用）】\n");
         try {
-            Map<String, Object> summary = interviewSessionService.questionSummary(userId);
+            // v1.34.1 修复（P3-9）：改用轻量聚合画像（questionProfile）。
+            // 此前调 questionSummary —— 它会加载该用户**全部**题目实体后在内存里流式聚合；
+            // 而本方法在**每轮对话**都会执行，练习量越大单轮开销越高。
+            // questionProfile 只做 3 个数据库聚合查询，返回标量 + 各分类均分，开销与题库规模无关。
+            Map<String, Object> summary = interviewSessionService.questionProfile(userId, WRONG_SCORE_THRESHOLD);
             Object total = summary.getOrDefault("totalQuestions", 0);
             Object wrong = summary.getOrDefault("wrongQuestions", 0);
             Object avg = summary.get("averageScore");
             sb.append("- 已练习题目：").append(total).append(" 道，错题 ").append(wrong)
                     .append(" 道，平均分 ").append(avg instanceof Double ? String.format("%.1f", (Double) avg) : avg).append("\n");
             if (summary.get("byCategory") instanceof List<?> cats && !cats.isEmpty()) {
-                sb.append("- 各分类掌握度：");
+                sb.append("- 各分类掌握度（由弱到强）：");
                 int i = 0;
                 for (Object o : cats) {
                     if (o instanceof Map<?, ?> m && i < 6) {

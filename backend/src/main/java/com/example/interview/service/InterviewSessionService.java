@@ -147,6 +147,45 @@ public class InterviewSessionService {
     // ─────────────────────────────── 知识库关联 ───────────────────────────────
 
     /**
+     * 用户题目画像（轻量聚合，v1.34.1 P3-9）。
+     *
+     * <p>与 {@link #questionSummary} 的区别：本方法只返回 3 个标量（总数/错题数/平均分），
+     * 全部由数据库聚合得出，**不加载任何题目实体**。
+     *
+     * <p>使用场景：智能体每轮对话都要把用户画像注入 System Prompt。此前走 questionSummary，
+     * 会加载该用户全部题目后在内存里流式聚合，对话越多、题库越大单轮开销越高，且每轮重复。
+     *
+     * @param threshold 错题判定阈值（评分低于此值计为错题）
+     * @return {totalQuestions, wrongQuestions, averageScore}
+     */
+    public Map<String, Object> questionProfile(String userId, int threshold) {
+        long total = questionRepository.countByUserId(userId);
+        long wrong = questionRepository.countWrongByUserId(userId, threshold);
+        Double avg = questionRepository.avgEvaluationScoreByUserId(userId);
+        double roundedAvg = avg == null ? 0.0 : Math.round(avg * 10) / 10.0;
+
+        // 各分类掌握度（按平均分升序，最薄弱的排前面，便于直接取 Top3 注入画像）
+        List<Map<String, Object>> byCategory = new java.util.ArrayList<>();
+        for (Object[] row : questionRepository.categoryStatsByUserId(userId)) {
+            if (row == null || row[0] == null) continue;
+            double catAvg = row[2] instanceof Number n ? n.doubleValue() : 0.0;
+            Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("category", row[0]);
+            item.put("total", row[1] instanceof Number n ? n.longValue() : 0L);
+            item.put("avgScore", Math.round(catAvg * 10) / 10.0);
+            byCategory.add(item);
+        }
+        byCategory.sort((a, b) -> Double.compare((Double) a.get("avgScore"), (Double) b.get("avgScore")));
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("totalQuestions", total);
+        result.put("wrongQuestions", wrong);
+        result.put("averageScore", roundedAvg);
+        result.put("byCategory", byCategory);
+        return result;
+    }
+
+    /**
      * 查询用户所有面试题目（关联所有会话）
      * 用于知识库"题目汇总"功能
      */
