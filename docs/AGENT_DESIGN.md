@@ -2,6 +2,9 @@
 
 > 版本：v1.23.0 · 2026-09-10
 > 状态：已实现并上线
+> **v1.34.1 同步说明（2026-09-21）**：本文档此前与实现存在漂移，已按源码校正如下——
+> ① ReAct 轮次上限由「最多 6 轮」更正为 **8 轮**（`AgentService.MAX_TOOL_ROUNDS`，v1.31.1 起调整）；
+> ② 工具数由「5 个」更正为 **9 个**（详见 §2/§4.2）；③ 工具协议实现细节以源码为准。
 
 ---
 
@@ -50,8 +53,10 @@
 │  4. Spring AI 内部工具执行循环（ReAct）            │
 │  5. 流式返回 + 异步落库                            │
 ├──────────────────────────────────────────────────┤
-│ AgentTools（工具层，@Tool 注解）                  │
-│  searchJobs │ searchKnowledge │ getMyStats       │
+│ AgentTools（工具层，@Tool 注解，共 9 个）        │
+│  searchJobs │ searchWebJobs │ matchResumeJobs    │
+│  generateInterviewQuestions │ deepFollowUp       │
+│  searchKnowledge │ getMyInterviewStats           │
 │  listWrongQuestions │ getUpcomingInterviews      │
 ├──────────────────────────────────────────────────┤
 │ FallbackChatModel（v1.22.0 降级链）               │
@@ -65,7 +70,7 @@
 |------|------|
 | `controller/AgentController` | 协议层：SSE 流式、会话 CRUD、参数校验 |
 | `service/agent/AgentService` | 编排：记忆装配、Prompt 构建、工具注册、流式推送、落库 |
-| `service/agent/AgentTools` | 能力层：5 个只读工具，包装既有 Service，输出裁剪防 token 爆炸 |
+| `service/agent/AgentTools` | 能力层：9 个只读工具（岗位检索/联网招聘/简历匹配/出题/深挖追问/知识检索/面试统计/错题本/面试日历），包装既有 Service，输出裁剪防 token 爆炸 |
 | `entity/AgentConversationEntity` / `AgentMessageEntity` | 会话与消息持久化 |
 | `repository/AgentConversationRepository` / `AgentMessageRepository` | 数据访问（批量查询防 N+1） |
 
@@ -95,7 +100,7 @@
                      AgentTools 执行（≤200 行/结果裁剪）
                               │
                               ▼
-                     工具结果回填上下文 ──► 回到模型推理（最多 6 轮）
+                     工具结果回填上下文 ──► 回到模型推理（最多 8 轮）
 ```
 
 ### 4.2 关键设计决策

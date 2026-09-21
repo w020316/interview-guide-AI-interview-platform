@@ -1,0 +1,38 @@
+event:meta
+data:{"conversationId":33,"title":"Java后端开发求职咨询"}
+
+event:start
+data:
+
+event:token
+data:我记得。你最初问的是：
+data:
+data:**"我是一名Java后端开发，帮我看看有哪些适合的岗位？"**
+data:
+data:当时我帮你搜索了岗位，但返回结果显示未找到匹配的职位。随后我们讨论了调整搜索策略和简历匹配的替代方案。
+data:
+
+event:token
+data:
+data:如果你现在想继续求职匹配，可以提供以下任一信息，我立即为你处理：
+data:1. **简历核心要点**（技术栈/项目/学历）→ 我用 `matchResumeJobs` 智能匹配岗位
+data:
+
+event:token
+data:2. **技能关键词**（如 Java/Spring Boot/Redis/MySQL）→ 我用 `searchWebJ
+
+event:token
+data:obs` 联网搜索最新全国岗位
+
+event:token
+data:3. **模拟面试练习** → 我为你生成 Java 后端面试题，边练边投
+data:
+data:你想从哪个方向继续？
+data:
+
+event:done
+data:[DONE]
+
+curl: (18) transfer closed with outstanding read data remaining
+
+[HTTP=200 total=4.226676s]

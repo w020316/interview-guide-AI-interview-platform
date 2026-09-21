@@ -1,0 +1,100 @@
+event:meta
+data:{"conversationId":33,"title":"我是一名Java后端开发，帮我看看有哪些适合的岗位？"}
+
+event:start
+data:
+
+event:token
+data:根据你的描述，我已为你搜索了 Java 后端开发相关的岗位，但当前未匹配到合适的职位。可能的原因包括：本地数据库暂无最新
+
+event:token
+data:职位、搜索条件过于严格，或网络未能实时获取公开职位信息。
+
+event:token
+data:
+data:以下是针对 Java 后端开发的求职建议与替代方案：
+data:
+data:### 🔍 搜索策略调整
+data:1. **扩展关键词**  
+data:   - 尝试更宽泛的岗位名称：如 `Java工程师`、`后端开发工程师`、`软件工程师`、`技术类`。
+data:
+
+event:token
+data:   - 组合技术栈关键词：如 `Spring Boot`、`微服务`、`分布式`。
+data:
+data:2. **切换招聘类型**  
+data:
+
+event:token
+data:   - 秋招（AUTUMN）可能已结束，建议尝试：
+data:     - **社招（SOCIAL）**：适用于有工作经验的开发者。
+data:
+
+event:token
+data:     - **实习（INTERN）**：如果你是学生或考虑实习机会。
+data:   - 当前你选择的是秋招，可改为社招再次搜索。
+data:
+
+event:token
+data:
+data:3. **不限地区搜索**  
+data:   - 原搜索未指定城市，可先尝试全国范围，再根据结果筛选心仪城市。
+data:
+data:4. **手动刷新招聘广场**  
+data:
+
+event:token
+data:   - 在平台的「招聘广场」页面手动刷新，有时能获取更实时的职位数据。
+data:
+data:### 💼 可能的岗位方向（基于行业常见需求）
+data:
+
+event:token
+data:- **互联网行业**：后端开发工程师、Java开发工程师、服务端开发工程师。
+data:- **金融科技**：支付系统开发、风控平台开发。
+data:
+
+event:token
+data:- **企业服务**：SaaS 产品后端开发、数据库开发工程师。
+data:- **传统企业数字化**：ERP/CRM 系统开发、物联网后端开发。
+data:
+
+event:token
+data:
+data:### ⚠️ 注意事项
+data:
+
+event:token
+data:- 联网搜索功能已启用，但若你的网络环境或授权受限，可能导致无法获取外部岗位数据。请确保网络畅通，并尝试在「招聘广场」刷
+
+event:token
+data:新。
+
+event:token
+data:- 若以上方法仍无效，建议：
+data:  - 直接访问招聘平台官网（如 BOSS 直聘、拉勾网、智联招聘）进行手动搜索。
+data:  - 使用更个性化的技能标签搜索，例如 `Redis`、`Kafka`、`MySQL` 等中间件/数据库关键词。
+data:
+
+event:token
+data:
+data:### 📌 下一步操作建议
+data:1. 调用搜索工具时，尝试使用不同的 `recruitType`（如 `SOCIAL` 或 `INTERN`）。
+data:
+
+event:token
+data:2. 提供你的详细技能栈（如 Java 版本、框架、中间件经验），以便我为你生成更精准的岗位匹配建议。
+data:3. 如需模拟面试练习，我可以为你生成 Java 后端方向的面试题，帮助你提升竞争力。
+data:
+
+event:token
+data:
+data:请告诉我你希望尝试哪种调整，或提供更多个人背景（如经验年限、技术偏好），我会进一步协助你。
+data:
+
+event:done
+data:[DONE]
+
+curl: (18) transfer closed with outstanding read data remaining
+
+[HTTP=200 total=14.929637s]
