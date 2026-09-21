@@ -56,6 +56,7 @@ interview-guide/
 │   └── package.json
 ├── docker-compose.yml          # 本地开发环境
 ├── render.yaml                 # Render 后端部署配置（Blueprint）
+├── vercel.json                 # 【仅兼容】Vercel 项目仍连接中；断开后可删，前端真实入口是 pages.dev
 ├── .github/workflows/          # CI（测试门禁）+ Keepalive（Render 保活）
 └── .env.example                # 环境变量模板
 ```

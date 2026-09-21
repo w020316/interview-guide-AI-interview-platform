@@ -218,6 +218,7 @@ interview-guide/
 │   └── quality-assessment-2026-09/   # 六阶段质量评估报告（基线/修复记录/遗留风险）
 ├── render.yaml                       # Render Blueprint（服务定义 + 环境变量清单）
 # 前端部署文件：frontend/public/_redirects（SPA 回退）、frontend/public/_headers（安全头 + 缓存策略）
+# vercel.json 仍保留：仓库上还连接着一个 Vercel 项目，删除会导致其构建失败；断开连接后可删
 ├── supabase-init.sql                 # Supabase 初始化 SQL（建表 + 启用扩展）
 ├── scripts/loadtest.mjs              # 压测脚本
 ├── start-dev.ps1 / start-dev.sh      # 一键开发启动
