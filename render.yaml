@@ -64,13 +64,13 @@ services:
       # ⚠️ Key 与地域强绑定：北京地域的 Key 不能用于新加坡端点。
       #   开通：https://bailian.console.aliyun.com/ → 实名 → 模型广场取 Key
       - key: AI_EMBEDDING_BASE_URL
-        value: https://dashscope.aliyuncs.com/compatible-mode/v1
+        value: https://interview-guide-embedding.onrender.com
       - key: AI_EMBEDDING_API_KEY
-        sync: false
+        value: wb-embed-2026
       - key: AI_EMBEDDING_MODEL
-        value: text-embedding-v4
+        value: BAAI/bge-small-zh-v1.5
       - key: AI_EMBEDDING_DIMENSIONS
-        value: "1024"
+        value: 512
 
       # ══ 3. RAG 自动补充知识（全行业覆盖的机制）═════════════════════
       - key: RAG_AUTO_SUPPLEMENT
