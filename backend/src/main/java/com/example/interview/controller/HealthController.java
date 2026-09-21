@@ -1,6 +1,8 @@
 package com.example.interview.controller;
 
 import com.example.interview.common.Result;
+import com.example.interview.service.RagHealthTracker;
+import com.example.interview.service.RagSearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -12,6 +14,7 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,10 +33,15 @@ public class HealthController {
 
     private final JdbcTemplate jdbcTemplate;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final RagSearchService ragSearchService;
+    private final RagHealthTracker ragHealthTracker;
 
-    public HealthController(JdbcTemplate jdbcTemplate, RedisTemplate<String, Object> redisTemplate) {
+    public HealthController(JdbcTemplate jdbcTemplate, RedisTemplate<String, Object> redisTemplate,
+                            RagSearchService ragSearchService, RagHealthTracker ragHealthTracker) {
         this.jdbcTemplate = jdbcTemplate;
         this.redisTemplate = redisTemplate;
+        this.ragSearchService = ragSearchService;
+        this.ragHealthTracker = ragHealthTracker;
     }
 
     /**
@@ -61,16 +69,38 @@ public class HealthController {
     }
 
     /**
-     * 深度健康体检（需登录）：数据库 / Redis / JVM / 运行时长（v1.32.0 引入，P2-08 起需认证）
+     * 深度健康体检（需登录）：数据库 / Redis / JVM / 运行时长 / **RAG 知识库**（v1.32.0 引入，P2-08 起需认证）
+     *
+     * <p>v1.34.1 增补 {@code rag} 与 {@code degraded}：知识库链路依赖外部 Embedding 服务，
+     * 其故障（Key 失效/欠费/维度不匹配）此前只在启动日志里留一条 WARN，
+     * 而本接口恒报 {@code status: UP} —— 2026-09-21 生产实测正是「体检全绿但知识库完全不可用」。
+     * 现把播种结果与最近一次向量化失败原因一并暴露，使该故障无需登录平台即可自诊断。
      */
     @GetMapping("/health/detail")
     public Result<Map<String, Object>> healthDetail() {
         Map<String, Object> data = new LinkedHashMap<>();
+        Map<String, Object> rag = ragHealthTracker == null
+                ? null
+                : ragHealthTracker.snapshot(ragSearchService.storedCount(), ragSearchService.maxDocuments());
+        // 健康检查接口绝不应因可选子系统缺位而 500，也不应产出「无 status 的区块」：
+        // 跟踪器缺位、或返回 null/不完整快照时，如实报 UNKNOWN（而非让调用方拿到空对象误判）
+        if (rag == null || !rag.containsKey("status")) {
+            rag = new LinkedHashMap<>();
+            rag.put("status", "UNKNOWN");
+        }
+
+        // 核心依赖（DB/Redis）决定 status；RAG 属可选子系统，只计入 degraded 列表，
+        // 避免知识库故障被误判为「整个服务不可用」
         data.put("status", "UP");
         data.put("uptimeSec", ManagementFactory.getRuntimeMXBean().getUptime() / 1000);
         data.put("database", databaseStatus());
         data.put("redis", redisStatus());
         data.put("jvm", jvmStatus());
+        data.put("rag", rag);
+
+        if (!"UP".equals(rag.get("status")) && !"UNKNOWN".equals(rag.get("status"))) {
+            data.put("degraded", List.of("rag"));
+        }
         return Result.success(data);
     }
 

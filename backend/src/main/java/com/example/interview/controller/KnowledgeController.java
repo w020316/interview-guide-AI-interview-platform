@@ -29,6 +29,11 @@ public class KnowledgeController {
 
     @Autowired private RagSearchService ragSearchService;
     @Autowired private InterviewSessionService sessionService;
+    /**
+     * RAG 健康跟踪（v1.34.1）：用于向用户暴露「知识库是否可用」。
+     * {@code required = false} + 空值保护，避免切片单测未声明该 mock 时 NPE。
+     */
+    @Autowired(required = false) private com.example.interview.service.RagHealthTracker ragHealthTracker;
 
     /** 从 SecurityContext 获取当前登录用户 ID（JWT subject） */
     private String currentUserId() {
@@ -58,8 +63,7 @@ public class KnowledgeController {
 
     @Operation(summary = "导入知识文档（简单模式，按用户隔离）")
     @PostMapping("/import")
-    public Result<String> importKnowledge(@RequestBody Map<String, List<String>> request) {
-        List<String> documents = request.get("documents");
+    public Result<String> importKnowledge(@RequestBody Map<String, List<String>> request) {        List<String> documents = request.get("documents");
         if (documents == null || documents.isEmpty()) return Result.error(400, "文档列表不能为空");
         // 限制单次导入数量，防止滥用
         if (documents.size() > 100) return Result.error(400, "单次最多导入 100 条文档");
@@ -105,6 +109,43 @@ public class KnowledgeController {
                     "AI 服务暂时不可用，知识导入失败，请稍后重试");
         }
         return Result.success(Map.of("imported", stored, "category", category));
+    }
+
+    /**
+     * 知识库可用状态（v1.34.1，UX P3-5）
+     *
+     * <p><b>为什么需要</b>：知识库是一条依赖外部 Embedding 的服务链。当 Embedding 的 Key
+     * 未配置/失效/欠费时，检索恒返回空、问答只能靠通用知识作答、导入直接失败——但从用户视角看
+     * 「知识库」页面看起来一切正常，只是**永远搜不到东西**，无从判断是自己没导入还是服务有问题
+     * （2026-09-21 生产实测即为此状态，且应用健康检查仍报 UP）。
+     *
+     * <p>本接口只返回**面向用户的粗粒度状态**，刻意不暴露堆内存/Redis/JVM 等基础设施细节
+     * （那些保留在需认证的 {@code /api/health/detail}）：
+     * <ul>
+     *   <li>{@code available}：知识库当前是否可用；</li>
+     *   <li>{@code documents}：已收录的知识条数（用户可据此判断「库是不是空的」）；</li>
+     *   <li>{@code notice}：不可用时给用户看的一句人话解释。</li>
+     * </ul>
+     */
+    @Operation(summary = "知识库可用状态（面向用户，不暴露基础设施细节）")
+    @GetMapping("/status")
+    public Result<Map<String, Object>> status() {
+        int documents = ragSearchService.storedCount();
+        Map<String, Object> rag = ragHealthTracker == null ? null
+                : ragHealthTracker.snapshot(documents, ragSearchService.maxDocuments());
+
+        String health = rag == null ? "UNKNOWN" : String.valueOf(rag.getOrDefault("status", "UNKNOWN"));
+        // 对用户而言「播种失败」与「运行期向量化失败」都是同一件事：库不可用
+        boolean available = "UP".equals(health) || "UNKNOWN".equals(health);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("available", available);
+        data.put("documents", documents);
+        if (!available) {
+            data.put("notice", "知识库暂时不可用，AI 问答将基于通用知识作答；"
+                    + "你仍可正常提问，也可稍后在「知识导入」中重试。");
+        }
+        return Result.success(data);
     }
 
     // ─────────────────────────── 关联模拟面试 ───────────────────────────

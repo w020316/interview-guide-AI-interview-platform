@@ -66,6 +66,13 @@ class SecurityConfigTest {
     @MockBean
     private RedisTemplate<String, Object> redisTemplate;
 
+    /** v1.34.1：深度体检新增 RAG 区块，构造依赖这两个 Bean */
+    @MockBean
+    private com.example.interview.service.RagSearchService ragSearchService;
+
+    @MockBean
+    private com.example.interview.service.RagHealthTracker ragHealthTracker;
+
     /** 测试专用受保护端点（不在 permitAll 列表，需认证） */
     @RestController
     @RequestMapping("/api/test-secure")

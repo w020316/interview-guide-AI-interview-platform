@@ -108,6 +108,15 @@ public class RagSearchService {
     @Value("${app.rag.max-documents:500}")
     private int maxDocuments;
 
+    /**
+     * RAG 健康跟踪（v1.34.1）：旁路记录向量化失败原因，供 {@code /api/health/detail} 暴露。
+     *
+     * <p>声明为 {@code required = false} 并处处空值保护——本类在切片单测中以
+     * {@code @InjectMocks} 构造，未声明该 mock 时为 null，不应因此 NPE。
+     */
+    @Autowired(required = false)
+    private RagHealthTracker ragHealthTracker;
+
     /** 已入库文档计数（与内存向量库同生命周期） */
     private final java.util.concurrent.atomic.AtomicInteger storedDocs = new java.util.concurrent.atomic.AtomicInteger(0);
 
@@ -319,7 +328,22 @@ public class RagSearchService {
             return 0;
         }
         List<Document> accepted = docs.size() <= remaining ? docs : new ArrayList<>(docs.subList(0, remaining));
-        vectorStore.add(accepted);
+        // v1.34.1：记录向量化故障供 /api/health/detail 暴露。
+        // 入库失败最常见的原因是 Embedding 服务不可用（Key 缺失/失效/欠费/维度不匹配），
+        // 而调用方（如批量导入）会把它转成 503，日志在平台上不易翻查；
+        // 旁路记录最近一次失败原因后，监控侧无需登录平台即可定位。
+        try {
+            vectorStore.add(accepted);
+        } catch (RuntimeException e) {
+            if (ragHealthTracker != null) {
+                ragHealthTracker.markFailure("向量化入库失败：" + e.getMessage());
+            }
+            throw e;
+        }
+        if (ragHealthTracker != null) {
+            // 一次成功入库即清除历史失败，避免旧故障长期驻留造成误判
+            ragHealthTracker.clearFailure();
+        }
         storedDocs.addAndGet(accepted.size());
         if (accepted.size() < docs.size()) {
             log.warn("向量库容量不足：请求 {} 条，仅入库 {} 条（上限 {}）", docs.size(), accepted.size(), maxDocuments);

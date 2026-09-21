@@ -46,6 +46,13 @@ class HealthControllerTest {
     @MockBean
     private RedisTemplate<String, Object> redisTemplate;
 
+    /** v1.34.1：深度体检新增 RAG 区块，构造依赖这两个 Bean */
+    @MockBean
+    private com.example.interview.service.RagSearchService ragSearchService;
+
+    @MockBean
+    private com.example.interview.service.RagHealthTracker ragHealthTracker;
+
     @Test
     @DisplayName("GET /api/info 返回 200 + 系统信息")
     void info_returnsSystemInfo() throws Exception {
@@ -116,5 +123,70 @@ class HealthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.database.status").value("UP"))
                 .andExpect(jsonPath("$.data.redis.status").value("DOWN"));
+    }
+
+    // ───────── RAG 子系统状态暴露（v1.34.1）─────────
+    // 背景：2026-09-21 生产实测——Embedding 失效导致知识库完全不可用（导入返回 503、向量库 0 条），
+    // 但 /api/health/detail 恒报 status UP，属「监控全绿、功能全废」的静默降级。
+    // 现把播种结果与最近一次向量化失败暴露出来，使该故障无需登录平台即可自诊断。
+
+    @Test
+    @DisplayName("GET /api/health/detail 知识库正常时 rag.status=UP 且不计入 degraded")
+    void healthDetail_ragHealthy() throws Exception {
+        when(jdbcTemplate.queryForObject(any(String.class), any(Class.class))).thenReturn(1L);
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn("PONG");
+        when(ragSearchService.storedCount()).thenReturn(120);
+        when(ragSearchService.maxDocuments()).thenReturn(500);
+        when(ragHealthTracker.snapshot(120, 500))
+                .thenReturn(new java.util.LinkedHashMap<>(java.util.Map.of(
+                        "status", "UP", "seedStatus", "SUCCESS", "documents", 120, "maxDocuments", 500)));
+
+        mockMvc.perform(get("/api/health/detail"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.rag.status").value("UP"))
+                .andExpect(jsonPath("$.data.rag.seedStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.rag.documents").value(120))
+                .andExpect(jsonPath("$.data.degraded").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /api/health/detail 知识库不可用时暴露 DEGRADED 与排查提示，且标出 degraded 子系统")
+    void healthDetail_ragDegraded() throws Exception {
+        when(jdbcTemplate.queryForObject(any(String.class), any(Class.class))).thenReturn(1L);
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn("PONG");
+        when(ragSearchService.storedCount()).thenReturn(0);
+        when(ragSearchService.maxDocuments()).thenReturn(500);
+        when(ragHealthTracker.snapshot(0, 500))
+                .thenReturn(new java.util.LinkedHashMap<>(java.util.Map.of(
+                        "status", "DEGRADED",
+                        "seedStatus", "FAILED",
+                        "seedDetail", "播种失败：401 Invalid token",
+                        "hint", "知识库不可用：请检查 Embedding 配置")));
+
+        mockMvc.perform(get("/api/health/detail"))
+                .andExpect(status().isOk())
+                // 核心依赖仍 UP —— 知识库是可选子系统，不应把整体判为不可用
+                .andExpect(jsonPath("$.data.status").value("UP"))
+                .andExpect(jsonPath("$.data.database.status").value("UP"))
+                .andExpect(jsonPath("$.data.rag.status").value("DEGRADED"))
+                .andExpect(jsonPath("$.data.rag.seedStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.rag.seedDetail").value("播种失败：401 Invalid token"))
+                .andExpect(jsonPath("$.data.rag.hint").exists())
+                .andExpect(jsonPath("$.data.degraded[0]").value("rag"));
+    }
+
+    @Test
+    @DisplayName("GET /api/health/detail 跟踪器未提供快照时 rag.status=UNKNOWN，接口不 500")
+    void healthDetail_trackerMissing_reportsUnknown() throws Exception {
+        when(jdbcTemplate.queryForObject(any(String.class), any(Class.class))).thenReturn(1L);
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn("PONG");
+        // 不 stub snapshot：Mockito 对 Map 返回类型默认给「空 Map」（而非 null），
+        // 正好覆盖「不完整快照」这一边界——控制器必须兜成 UNKNOWN，而不是产出无 status 的区块
+        // 并据此误判为 degraded
+
+        mockMvc.perform(get("/api/health/detail"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.rag.status").value("UNKNOWN"))
+                .andExpect(jsonPath("$.data.degraded").doesNotExist());
     }
 }

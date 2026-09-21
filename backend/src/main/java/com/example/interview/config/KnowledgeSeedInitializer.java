@@ -1,5 +1,6 @@
 package com.example.interview.config;
 
+import com.example.interview.service.RagHealthTracker;
 import com.example.interview.service.RagSearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,16 @@ public class KnowledgeSeedInitializer implements ApplicationRunner {
 
     @Value("${app.rag.seed-enabled:true}")
     private boolean seedEnabled;
+
+    /**
+     * RAG 健康跟踪（v1.34.1）：把播种结果写入，供 {@code /api/health/detail} 暴露。
+     *
+     * <p>此前播种失败只打一条 WARN 就继续启动，外部监控看到的仍是
+     * 「应用 UP」，形成「监控全绿、知识库全废」的静默降级。
+     * 声明为 {@code required = false} + 空值保护，避免影响既有单测的直接构造。
+     */
+    @Autowired(required = false)
+    private RagHealthTracker ragHealthTracker;
 
     /** 进程内只播种一次（应用生命周期内不会重复） */
     private volatile boolean seeded = false;
@@ -248,6 +259,7 @@ public class KnowledgeSeedInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         if (!seedEnabled) {
             log.info("共享知识库播种已禁用（app.rag.seed-enabled=false）");
+            markSeed(RagHealthTracker.SeedStatus.DISABLED, "app.rag.seed-enabled=false");
             return;
         }
         if (seeded) {
@@ -282,9 +294,21 @@ public class KnowledgeSeedInitializer implements ApplicationRunner {
             log.info("共享知识库播种完成：{} 条预置知识已写入向量库"
                             + "（IT 基础 {} 条 + 全行业 {} 条；shared=true，全部用户可检索）",
                     stored, SEED_KNOWLEDGE.length, all.length - SEED_KNOWLEDGE.length);
+            markSeed(RagHealthTracker.SeedStatus.SUCCESS,
+                    stored + " 条预置知识已入库（IT 基础 " + SEED_KNOWLEDGE.length
+                            + " + 全行业 " + (all.length - SEED_KNOWLEDGE.length) + "）");
         } catch (Exception e) {
             // 播种失败不阻断启动：embedding 未配置时知识库为空，但登录/面试等核心功能不受影响
             log.warn("共享知识库播种失败（已忽略，RAG 检索将为空，请检查 Embedding 配置）：{}", e.getMessage());
+            // v1.34.1：把失败写入健康跟踪——否则「知识库不可用」在外部完全不可见
+            markSeed(RagHealthTracker.SeedStatus.FAILED, "播种失败：" + e.getMessage());
+        }
+    }
+
+    /** 写入播种状态（跟踪器可能为空：切片单测直接构造本类时未注入） */
+    private void markSeed(RagHealthTracker.SeedStatus status, String detail) {
+        if (ragHealthTracker != null) {
+            ragHealthTracker.markSeed(status, detail);
         }
     }
 
