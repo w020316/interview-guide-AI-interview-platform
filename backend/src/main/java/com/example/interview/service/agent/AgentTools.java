@@ -143,10 +143,20 @@ public class AgentTools {
 
     private void registerTools() {
         registry.put("searchJobs", new ToolSpec("searchJobs",
-                "搜索招聘平台聚合的岗位信息（秋招/社招/实习），返回岗位列表：标题、企业、地点、薪资、截止日期、申请链接",
-                "keyword(可选,岗位名/企业名/标签), industry(可选,如:互联网/金融/制造/能源), jobType(可选,如:技术/产品/运营), location(可选,如:深圳), recruitType(可选,AUTUMN/SPRING/INTERN/SOCIAL,默认AUTUMN)",
+                "搜索本平台的岗位库（含秋招/春招/社招/实习/兼职/定向专项，覆盖互联网、制造、能源、医药、"
+                        + "金融、建筑、物流、教育、政务、法律等行业，也包含海外远程岗位），"
+                        + "返回岗位列表：标题、企业、地点、薪资、学历、招聘类型、数据来源、截止日期、申请链接。"
+                        + "默认只检索国内岗位；用户明确想看海外/远程机会时才传 overseas=true。"
+                        + "回答用户「有什么岗位/帮我找岗位」时必须以本工具的真实返回为准，"
+                        + "并把筛选范围与命中数量一并说明，不得凭记忆编造岗位",
+                "keyword(可选,岗位名/企业名/标签), industry(可选,如:互联网/金融/制造/能源/医疗/建筑), "
+                        + "jobType(可选,如:技术/产品/运营/销售/职能/金融/教研), location(可选,如:深圳/杭州), "
+                        + "recruitType(可选,AUTUMN秋招/SPRING春招/SOCIAL社招/INTERN实习/PART_TIME兼职/"
+                        + "TARGETED定向专项；用户未指定或不确定时留空表示不限，不要臆断为秋招), "
+                        + "overseas(可选,true=只看海外/远程岗位；缺省或 false=只看国内岗位)",
                 (raw, params) -> searchJobs(str(params, "keyword"), str(params, "industry"),
-                        str(params, "jobType"), str(params, "location"), str(params, "recruitType"))));
+                        str(params, "jobType"), str(params, "location"), str(params, "recruitType"),
+                        asBool(params, "overseas"))));
         registry.put("searchWebJobs", new ToolSpec("searchWebJobs",
                 "【联网实时搜索】通过联网搜索各大招聘平台（BOSS直聘/智联/拉勾/前程无忧等）的全国实时岗位信息，返回真实岗位：标题、企业、地点、薪资。用于用户要求最新/全网岗位，或本地岗位不足时",
                 "keyword(必填,岗位关键词如:Java/产品/算法), location(可选,城市如:深圳,空或全国表示全国范围)",
@@ -220,26 +230,64 @@ public class AgentTools {
 
     // ---------- 具体工具实现 ----------
 
-    /** 1. 岗位检索 */
+    /**
+     * 岗位检索（兼容旧签名：不传海外标识，等价于只检索国内岗位）。
+     *
+     * <p>保留重载是为了让既有调用点与单测不必为一个新增筛选维度全体改签名。
+     * 注意参数表已到 6 个，可读性接近上限——将来若还要加维度，应像
+     * {@code JobQuery} 那样收敛成条件对象，而不是继续堆参数。
+     */
     public String searchJobs(String keyword, String industry, String jobType, String location, String recruitType) {
+        return searchJobs(keyword, industry, jobType, location, recruitType, null);
+    }
+
+    /**
+     * 1. 岗位检索
+     *
+     * <p><b>v1.38.0 修正「智能体给的岗位不准」的根因</b>：此前 {@code recruitType} 缺省时被
+     * 硬编码为 {@code AUTUMN}，于是当用户问「有社招的 Java 岗位吗」而模型没显式传类型时，
+     * 智能体只在秋招里检索，再把「秋招里没有」当成「平台没有这类岗位」答复用户。
+     *
+     * <p>现在：① 缺省即不限类型；② 返回内容带上「筛选范围 + 命中总数」，让模型能如实转述
+     * 「在什么范围内、找到多少个」，而不是含糊其辞；③ 每条岗位补上招聘类型与数据来源，
+     * 用户追问「这岗位哪来的/什么时候的」时有据可依。
+     */
+    public String searchJobs(String keyword, String industry, String jobType, String location,
+                             String recruitType, Boolean overseas) {
         try {
+            String type = normalizeRecruitType(recruitType);
+            // v1.38.0：默认只检索国内岗位。海外/远程源（RemoteOK、Remotive、Jobicy、
+            // Himalayas、Arbeitnow）的岗位是英文的，用户问「社招岗位」时混进来会明显降低
+            // 回答可用性；只有用户明确想看海外/远程机会时才由模型传 overseas=true。
+            boolean onlyOverseas = Boolean.TRUE.equals(overseas);
             var page = jobAgentService.search(
                     blankToNull(keyword), blankToNull(industry), blankToNull(jobType), blankToNull(location),
-                    (recruitType == null || recruitType.isBlank() || "null".equalsIgnoreCase(recruitType))
-                            ? "AUTUMN" : recruitType.toUpperCase(),
-                    null, null, null, 0, 8);
+                    type, null, null, null, onlyOverseas, 0, 8);
+
+            String scope = describeJobFilters(keyword, industry, jobType, location, type, onlyOverseas);
             List<com.example.interview.entity.JobPostingEntity> items = page.getContent();
             if (items.isEmpty()) {
-                return "未找到匹配岗位。建议：放宽筛选条件，或提示用户在「招聘广场」页手动刷新数据。";
+                return "未找到匹配岗位。本次筛选范围：" + scope
+                        + "｜当前岗位库共有 " + jobAgentService.activeJobCount() + " 个有效岗位。"
+                        + "请如实告知用户「在你给的条件范围内没有找到」，并引导其放宽关键词/城市、"
+                        + "明确想要的招聘类型（秋招/春招/社招/实习/兼职），"
+                        + "或建议其在「招聘广场」手动刷新数据后再查。不要编造岗位，也不要声称平台没有岗位。";
             }
-            StringBuilder sb = new StringBuilder("共 ").append(page.getTotalElements())
-                    .append(" 个匹配岗位，前 ").append(items.size()).append(" 个：\n");
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("筛选范围：").append(scope)
+                    .append("｜命中 ").append(page.getTotalElements()).append(" 个，")
+                    .append("展示前 ").append(items.size()).append(" 个（均为本平台岗位库的真实数据）：\n");
             for (var j : items) {
                 sb.append("- ").append(j.getTitle())
                         .append(" | ").append(j.getCompanyName())
                         .append(" | ").append(j.getLocation() == null ? "地点未标注" : j.getLocation())
                         .append(" | ").append(j.getSalary() == null ? "面议" : j.getSalary())
-                        .append(" | 学历:").append(j.getDegree() == null ? "不限" : j.getDegree());
+                        .append(" | 学历:").append(j.getDegree() == null ? "不限" : j.getDegree())
+                        .append(" | 类型:").append(recruitTypeLabel(j.getRecruitType()));
+                if (j.getPlatform() != null && !j.getPlatform().isBlank()) {
+                    sb.append(" | 来源:").append(j.getPlatform());
+                }
                 if (j.getDeadline() != null) {
                     sb.append(" | 截止:").append(j.getDeadline());
                 }
@@ -254,10 +302,83 @@ public class AgentTools {
         }
     }
 
+    /**
+     * 招聘类型归一。
+     *
+     * <p>把「空值 / 模型爱写的字符串 "null" / 中文类型名 / 非法值」统一处理成
+     * 平台使用的枚举或 {@code null}（表示不限）。非法值一律归为不限而不是原样下传——
+     * 否则模型偶尔吐出的自由文本会让查询条件变成「类型必须等于 JAVA」这类永远为假的过滤，
+     * 用户看到的就是「平台没岗位」。
+     */
+    private static String normalizeRecruitType(String raw) {
+        if (raw == null) return null;
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty() || "null".equalsIgnoreCase(trimmed)
+                || "不限".equals(trimmed) || "全部".equals(trimmed) || "any".equalsIgnoreCase(trimmed)) {
+            return null;
+        }
+        String v = trimmed.toUpperCase();
+        return switch (v) {
+            case "秋招", "校招", "校园招聘" -> "AUTUMN";
+            case "春招" -> "SPRING";
+            case "社招", "社会招聘" -> "SOCIAL";
+            case "实习", "实习生" -> "INTERN";
+            case "兼职", "临时" -> "PART_TIME";
+            case "定向", "专项", "选调" -> "TARGETED";
+            case "AUTUMN", "SPRING", "SOCIAL", "INTERN", "PART_TIME", "TARGETED" -> v;
+            default -> null;
+        };
+    }
+
+    /** 招聘类型中文名：让模型转述人话，而不是把 AUTUMN 这样的枚举念给用户 */
+    private static String recruitTypeLabel(String type) {
+        if (type == null || type.isBlank()) return "未标注";
+        return switch (type.toUpperCase()) {
+            case "AUTUMN" -> "秋招";
+            case "SPRING" -> "春招";
+            case "SOCIAL" -> "社招";
+            case "INTERN" -> "实习";
+            case "PART_TIME" -> "兼职";
+            case "TARGETED" -> "定向专项";
+            default -> type;
+        };
+    }
+
+    /** 把本次筛选条件转成人类可读的一句话，供模型如实说明检索范围 */
+    private static String describeJobFilters(String keyword, String industry, String jobType,
+                                             String location, String recruitType, boolean onlyOverseas) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        // 地域范围始终显式写出：海外岗位是英文的，用户需要知道结果切的是哪个池子
+        parts.add(onlyOverseas ? "范围=海外远程岗位" : "范围=国内岗位");
+        if (blankToNull(keyword) != null) parts.add("关键词=" + keyword.trim());
+        if (blankToNull(industry) != null) parts.add("行业=" + industry.trim());
+        if (blankToNull(jobType) != null) parts.add("职位类型=" + jobType.trim());
+        if (blankToNull(location) != null) parts.add("地点=" + location.trim());
+        if (blankToNull(recruitType) != null) parts.add("招聘类型=" + recruitTypeLabel(recruitType));
+        return String.join("、", parts);
+    }
+
+    /** 从工具参数里取布尔值：兼容模型输出 true/"true"/"null"/空 等形态 */
+    private static Boolean asBool(Map<String, Object> params, String key) {
+        Object v = params.get(key);
+        if (v == null) return null;
+        if (v instanceof Boolean b) return b;
+        String s = v.toString().trim();
+        if (s.isEmpty() || "null".equalsIgnoreCase(s)) return null;
+        return Boolean.parseBoolean(s);
+    }
+
     /** 2. 联网实时岗位搜索（v1.31.0：全国范围，真实抓取为主，失败降级本地库） */
     public String searchWebJobs(String keyword, String location) {
-        String kw = (keyword == null || keyword.isBlank() || "null".equalsIgnoreCase(keyword)) ? "Java" : keyword.trim();
+        String kw = blankToNull(keyword);
         String loc = blankToNull(location);
+        // v1.38.0：此前关键词缺省时硬编码为 "Java"。用户说「帮我找产品经理岗位」而模型漏传
+        // 关键词时，智能体会拿回一堆 Java 岗位并当成用户想要的结果回复——这是「岗位不准」
+        // 的另一处根因。现在缺关键词直接走本地岗位库，按用户给出的其他条件检索，
+        // 不再凭空假设技术栈。
+        if (kw == null || "null".equalsIgnoreCase(kw)) {
+            return fallbackToLocalJobs(null, loc);
+        }
         List<com.example.interview.service.job.WebJobSearcherService.WebJob> jobs;
         try {
             jobs = webJobSearcherService.searchWeb(kw, loc);
@@ -289,7 +410,9 @@ public class AgentTools {
     /** 联网搜索无结果时回退本地聚合岗位（两种数据合流，保证回复可用） */
     private String fallbackToLocalJobs(String kw, String loc) {
         try {
-            var page = jobAgentService.search(kw, null, null, loc, null, null, null, null, 0, 8);
+            // 兜底同样只查国内岗位（overseas=false）：与 searchJobs 的口径一致，
+            // 否则「联网搜不到」时会拿一堆英文海外岗位来充数
+            var page = jobAgentService.search(kw, null, null, loc, null, null, null, null, false, 0, 8);
             List<com.example.interview.entity.JobPostingEntity> items = page.getContent();
             if (items.isEmpty()) {
                 return "当前联网搜索与本地岗位库均未找到匹配岗位。可提示用户：换关键词（如 Java/产品/算法）、换城市，或确认网络可访问公开招聘站点；也可在「招聘广场」刷新数据。";

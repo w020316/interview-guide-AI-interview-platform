@@ -67,7 +67,7 @@ public class JobAgentController {
      * 岗位列表（多条件筛选）
      * GET /api/jobs?keyword=java&industry=互联网&jobType=技术&location=深圳&recruitType=AUTUMN&source=内置精选&degree=本科及以上&experience=1-3 年&page=0&size=10
      */
-    @Operation(summary = "岗位列表（多条件筛选搜索）")
+    @Operation(summary = "岗位列表（多条件筛选搜索，含海外/远程分栏）")
     @GetMapping
     public Result<Map<String, Object>> list(
             @RequestParam(required = false) String keyword,
@@ -78,10 +78,13 @@ public class JobAgentController {
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String degree,
             @RequestParam(required = false) String experience,
+            // v1.38.0：海外/远程分栏——true 仅海外源、false 仅国内源、缺省不限
+            @RequestParam(required = false) Boolean overseas,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "10") int size) {
         Page<JobPostingEntity> result = jobAgentService.search(
-                keyword, industry, jobType, location, recruitType, source, degree, experience, page, size);
+                keyword, industry, jobType, location, recruitType, source, degree, experience,
+                overseas, page, size);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("total", result.getTotalElements());
         data.put("page", result.getNumber());

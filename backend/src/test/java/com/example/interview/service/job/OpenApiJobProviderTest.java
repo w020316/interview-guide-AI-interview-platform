@@ -166,35 +166,176 @@ class OpenApiJobProviderTest {
         assertThat(jobs.get(0).tags()).isNull();
     }
 
+    // ── Jobicy ──
+
+    @Test
+    @DisplayName("Jobicy: 解析 jobs，结构化行业/用工类型/职级与年薪区间映射正确")
+    void jobicy_parsesStructuredFields() throws Exception {
+        String json = """
+                {"jobCount":1,"jobs":[
+                  {"id":555,"url":"https://jobicy.com/jobs/555","jobSlug":"acme-data",
+                   "jobTitle":"Senior Data Engineer","companyName":"Acme",
+                   "jobIndustry":["Engineering"],"jobType":["full-time"],
+                   "jobGeo":"Anywhere","jobLevel":"Senior",
+                   "jobDescription":"<p>Build pipelines</p>",
+                   "pubDate":"2026-09-05T00:00:00",
+                   "annualSalaryMin":"120000","annualSalaryMax":"170000","salaryCurrency":"USD"}
+                ]}
+                """;
+
+        List<JobPlatformAdapter.JobDto> jobs =
+                new JobicyJobProvider(mapper, properties).parse(mapper.readTree(json));
+
+        assertThat(jobs).hasSize(1);
+        var job = jobs.get(0);
+        assertThat(job.externalId()).isEqualTo("jby-555");
+        assertThat(job.title()).isEqualTo("Senior Data Engineer");
+        assertThat(job.companyName()).isEqualTo("Acme");
+        assertThat(job.industry()).isEqualTo("互联网");
+        assertThat(job.jobType()).isEqualTo("技术");
+        assertThat(job.location()).isEqualTo("全球远程");
+        assertThat(job.salary()).isEqualTo("$120000 - $170000 / 年");
+        assertThat(job.tags()).isEqualTo("full-time,Senior");
+        assertThat(job.description()).isEqualTo("Build pipelines");
+        assertThat(job.deadline()).isEqualTo(LocalDate.of(2026, 9, 5).plusDays(60));
+    }
+
+    @Test
+    @DisplayName("Jobicy: 缺 title/company 丢弃；id 缺失时用 jobSlug；非 Anywhere 地点标注远程")
+    void jobicy_fallbacksAndDirtyData() throws Exception {
+        String json = """
+                {"jobs":[
+                  {"id":1,"companyName":"NoTitle"},
+                  {"id":2,"jobTitle":"NoCompany"},
+                  {"jobSlug":"slug-only","jobTitle":"Dev","companyName":"Co","jobGeo":"Germany","jobType":[]}
+                ]}
+                """;
+
+        List<JobPlatformAdapter.JobDto> jobs =
+                new JobicyJobProvider(mapper, properties).parse(mapper.readTree(json));
+
+        assertThat(jobs).hasSize(1);
+        assertThat(jobs.get(0).externalId()).isEqualTo("jby-slug-only");
+        assertThat(jobs.get(0).location()).isEqualTo("Germany（远程）");
+        assertThat(jobs.get(0).salary()).isNull();
+        assertThat(jobs.get(0).tags()).isNull();
+    }
+
+    // ── Himalayas ──
+
+    @Test
+    @DisplayName("Himalayas: guid 末段作短 ID，expiryDate 优先作截止日")
+    void himalayas_parsesGuidAndExpiry() throws Exception {
+        String json = """
+                {"jobs":[
+                  {"title":"Staff Backend Engineer","companyName":"Initech",
+                   "excerpt":"Build systems","description":"<p>Go and Kubernetes</p>",
+                   "pubDate":1780000000,"expiryDate":1789000000,
+                   "applicationLink":"https://himalayas.app/companies/initech/jobs/staff-backend",
+                   "guid":"https://himalayas.app/companies/initech/jobs/staff-backend",
+                   "locationRestrictions":["Worldwide"],"categories":["Engineering"],
+                   "seniority":["Staff"],"employmentType":"Full Time",
+                   "minSalary":150000,"maxSalary":200000,"currency":"USD"}
+                ]}
+                """;
+
+        List<JobPlatformAdapter.JobDto> jobs =
+                new HimalayasJobProvider(mapper, properties).parse(mapper.readTree(json));
+
+        assertThat(jobs).hasSize(1);
+        var job = jobs.get(0);
+        // guid 是完整 URL，直接入库会超 128 字符列上限，因此取末段并拼公司名
+        assertThat(job.externalId()).isEqualTo("hml-Initech-staff-backend");
+        assertThat(job.location()).isEqualTo("全球远程");
+        assertThat(job.salary()).isEqualTo("$150000 - $200000 / 年");
+        assertThat(job.tags()).isEqualTo("Full Time,Staff,Engineering");
+        assertThat(job.description()).isEqualTo("Go and Kubernetes");
+        assertThat(job.jobType()).isEqualTo("技术");
+        // 唯一提供到期时间的海外源：不能再按发帖日推算
+        assertThat(job.deadline()).isEqualTo(AbstractOpenApiJobProvider.fromEpochSecond(1789000000));
+    }
+
+    @Test
+    @DisplayName("Himalayas: 无 expiryDate 时按发帖日 +60 天；缺链接时用标题兜底作 ID")
+    void himalayas_fallbacks() throws Exception {
+        String json = """
+                {"jobs":[
+                  {"title":"Designer","companyName":"Co","pubDate":1780000000,"categories":["Design"]}
+                ]}
+                """;
+
+        List<JobPlatformAdapter.JobDto> jobs =
+                new HimalayasJobProvider(mapper, properties).parse(mapper.readTree(json));
+
+        assertThat(jobs).hasSize(1);
+        assertThat(jobs.get(0).externalId()).isEqualTo("hml-Co-Designer");
+        assertThat(jobs.get(0).jobType()).isEqualTo("设计");
+        assertThat(jobs.get(0).deadline())
+                .isEqualTo(AbstractOpenApiJobProvider.fromEpochSecond(1780000000).plusDays(60));
+    }
+
     // ── 开关 ──
+
+    /** 全部公开 API 数据源（新增源时只改这一处，其余断言自动覆盖） */
+    private List<JobPlatformAdapter> allPublicProviders(JobAgentProperties props) {
+        return List.of(
+                new RemoteOkJobProvider(mapper, props),
+                new RemotiveJobProvider(mapper, props),
+                new ArbeitnowJobProvider(mapper, props),
+                new JobicyJobProvider(mapper, props),
+                new HimalayasJobProvider(mapper, props));
+    }
 
     @Test
     @DisplayName("公开数据源受 app.job-agent.open-api-enabled 开关控制")
     void publicProviders_respectSwitch() {
-        assertThat(new RemoteOkJobProvider(mapper, properties).isEnabled()).isTrue();
-        assertThat(new RemotiveJobProvider(mapper, properties).isEnabled()).isTrue();
-        assertThat(new ArbeitnowJobProvider(mapper, properties).isEnabled()).isTrue();
-
         JobAgentProperties off = new JobAgentProperties();
         off.setOpenApiEnabled(false);
-        assertThat(new RemoteOkJobProvider(mapper, off).isEnabled()).isFalse();
-        assertThat(new RemotiveJobProvider(mapper, off).isEnabled()).isFalse();
-        assertThat(new ArbeitnowJobProvider(mapper, off).isEnabled()).isFalse();
+
+        for (JobPlatformAdapter a : allPublicProviders(properties)) {
+            assertThat(a.isEnabled()).as("%s 默认应启用", a.platform()).isTrue();
+        }
+        for (JobPlatformAdapter a : allPublicProviders(off)) {
+            assertThat(a.isEnabled()).as("%s 关开关后应停用", a.platform()).isFalse();
+        }
     }
 
     @Test
-    @DisplayName("各公开数据源的展示名与 endpoint 稳定（用于按来源筛选与后台视图）")
-    void publicProviders_platformAndEndpointStable() {
+    @DisplayName("公开数据源统一归为海外源，并按 6 小时节流（不按小时打扰上游）")
+    void publicProviders_areOverseasAndThrottled() {
+        for (JobPlatformAdapter a : allPublicProviders(properties)) {
+            assertThat(a.overseas()).as("%s 应归入海外远程分栏", a.platform()).isTrue();
+            assertThat(a.minRefreshIntervalMs()).as("%s 应有刷新冷却", a.platform())
+                    .isEqualTo(6 * 3600 * 1000L);
+        }
+        // 内置种子数据源每轮都刷新（幂等 upsert，开销极低），不参与节流
+        assertThat(new SeedAutumn2027JobProvider().overseas()).isFalse();
+        assertThat(new SeedAutumn2027JobProvider().minRefreshIntervalMs()).isZero();
+        assertThat(new SeedPartTimeJobProvider().overseas()).isFalse();
+        assertThat(new SeedPartTimeJobProvider().minRefreshIntervalMs()).isZero();
+    }
+
+    @Test
+    @DisplayName("各公开数据源展示名稳定且不超列长上限（按来源筛选与后台视图依赖它）")
+    void publicProviders_platformStable() {
         assertThat(new RemoteOkJobProvider(mapper, properties).platform()).isEqualTo("RemoteOK 全球远程");
         assertThat(new RemotiveJobProvider(mapper, properties).platform()).isEqualTo("Remotive 全球远程");
         assertThat(new ArbeitnowJobProvider(mapper, properties).platform()).isEqualTo("Arbeitnow 欧洲");
-        // 展示名有 50 字符列上限
-        for (JobPlatformAdapter a : List.of(
-                new RemoteOkJobProvider(mapper, properties),
-                new RemotiveJobProvider(mapper, properties),
-                new ArbeitnowJobProvider(mapper, properties))) {
+        assertThat(new JobicyJobProvider(mapper, properties).platform()).isEqualTo("Jobicy 全球远程");
+        assertThat(new HimalayasJobProvider(mapper, properties).platform()).isEqualTo("Himalayas 全球远程");
+
+        // platform 列上限 50；同时不能重名（重名会让按来源分组的统计互相覆盖）
+        for (JobPlatformAdapter a : allPublicProviders(properties)) {
             assertThat(a.platform().length()).isLessThanOrEqualTo(50);
         }
+    }
+
+    @Test
+    @DisplayName("公开数据源平台名互不重复（重名会让数据源统计互相覆盖）")
+    void publicProviders_haveDistinctPlatforms() {
+        assertThat(allPublicProviders(properties))
+                .extracting(JobPlatformAdapter::platform)
+                .doesNotHaveDuplicates();
     }
 
     // ── 基类工具 ──

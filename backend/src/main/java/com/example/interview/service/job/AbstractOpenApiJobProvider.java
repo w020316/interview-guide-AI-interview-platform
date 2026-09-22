@@ -23,8 +23,10 @@ import java.util.List;
  *
  * <p><b>设计约束</b>：
  * <ul>
- *   <li><b>失败隔离</b>：任何网络/解析异常都在本层吞掉并记日志、返回空列表，
- *       绝不影响其它数据源与整体刷新流程（Render 免费层网络抖动是常态）。</li>
+ *   <li><b>失败隔离</b>：网络/解析异常会抛出带原因的异常，但调度层（{@code JobAgentService}）
+ *       对每个数据源单独 try/catch，因此一个源失败绝不影响其它源与整体刷新流程
+ *       （Render 免费层网络抖动是常态）。抛出而非吞掉是为了让管理后台能告警——
+ *       「这个源挂了」和「这个源正常但没有岗位」必须能被区分开。</li>
  *   <li><b>列长保护</b>：岗位的 platform/external_id/title/company/location/salary/tags/apply_url
  *       在库中都有长度上限（见 {@code JobPostingEntity}），入库前统一裁剪，
  *       避免单条超长文本触发 DataIntegrityViolation 让整批 upsert 回滚。</li>
@@ -49,6 +51,14 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     /** description 入库长度上限（纯文本字符数） */
     private static final int DESC_MAX_LEN = 1200;
 
+    /**
+     * 公开 API 数据源的最小刷新间隔：6 小时。
+     *
+     * <p>内置种子数据是幂等的本地数据，每小时全量刷新开销极低；
+     * 但外部公开 API 有礼貌性调用要求（且不会小时级更新），6 小时足够。
+     */
+    protected static final long OPEN_API_REFRESH_INTERVAL_MS = 6 * 3600 * 1000L;
+
     /** 列长度上限（与 JobPostingEntity 保持一致） */
     protected static final int LEN_PLATFORM = 50;
     protected static final int LEN_EXTERNAL_ID = 128;
@@ -70,12 +80,38 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
         this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
+    /**
+     * 公开 API 数据源统一归类为「海外 / 远程」。
+     *
+     * <p>这三家接口的岗位以欧美远程为主，与国内校招/社招场景差异明显，
+     * 因此在招聘广场独立成栏，不混进国内列表。
+     */
+    @Override
+    public boolean overseas() {
+        return true;
+    }
+
+    /** 统一 6 小时刷新一次，避免高频打扰上游 */
+    @Override
+    public long minRefreshIntervalMs() {
+        return OPEN_API_REFRESH_INTERVAL_MS;
+    }
+
     /** 该数据源的 JSON 接口地址 */
     protected abstract String endpoint();
 
     /** 解析上游 JSON 为统一 JobDto 列表（同源内无需去重，跨源去重由 JobAgentService 负责） */
     protected abstract List<JobDto> parse(JsonNode root);
 
+    /**
+     * 拉取并解析。
+     *
+     * <p><b>失败时抛异常而不是返回空列表</b>（v1.38.0 调整）：早先的实现把异常吞掉、
+     * 返回空列表，导致「这个源挂了」与「这个源正常但没有岗位」在调用方看来完全一样，
+     * 管理后台也就无从告警。现在抛出带原因的异常，由 {@code JobAgentService} 统一捕获，
+     * 在那里能同时拿到平台名与耗时并登记健康状态；失败隔离仍然成立——
+     * 调度层对每个源单独 try/catch，一个源失败不影响其他源。
+     */
     @Override
     public List<JobDto> fetch() {
         String body;
@@ -88,16 +124,17 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
                     .body(String.class);
         } catch (Exception e) {
             log.warn("公开数据源 {} 拉取失败：{}", platform(), e.getMessage());
-            return List.of();
+            throw new IllegalStateException("拉取失败：" + e.getMessage(), e);
         }
         if (body == null || body.isBlank()) {
-            return List.of();
+            log.warn("公开数据源 {} 返回空响应体", platform());
+            throw new IllegalStateException("拉取失败：上游返回空响应体");
         }
         try {
             return parse(objectMapper.readTree(body));
         } catch (Exception e) {
             log.warn("公开数据源 {} 数据解析失败：{}", platform(), e.getMessage());
-            return List.of();
+            throw new IllegalStateException("数据解析失败：" + e.getMessage(), e);
         }
     }
 

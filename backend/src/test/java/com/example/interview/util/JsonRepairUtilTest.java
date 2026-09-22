@@ -246,4 +246,55 @@ class JsonRepairUtilTest {
             assertEquals("", JsonRepairUtil.repairAndLog("", "test"));
         }
     }
+
+    @Nested
+    @DisplayName("Python 字面量归一（v1.38.0）")
+    class PythonLiterals {
+
+        @Test
+        @DisplayName("真实故障样本：模型输出的工具调用写成 Python 风格，可被修复")
+        void pythonStyleActionPayload() throws Exception {
+            // 该样本来自实测：智能体输出的动作 JSON 用了单引号 + Python 的 False，
+            // 修复失败后被当成「最终回答」推给用户，页面上直接显示这坨原始 JSON
+            String raw = "{'action': 'searchJobs', 'params': {'recruitType': 'SOCIAL社招', 'overseas': False}}";
+
+            var node = parseStrict(JsonRepairUtil.repair(raw));
+
+            assertNotNull(node);
+            assertEquals("searchJobs", node.get("action").asText());
+            assertEquals("SOCIAL社招", node.get("params").get("recruitType").asText());
+            assertEquals(false, node.get("params").get("overseas").asBoolean());
+        }
+
+        @Test
+        @DisplayName("None -> null；True/False -> true/false")
+        void pythonNoneAndBooleans() throws Exception {
+            var node = parseStrict(JsonRepairUtil.repair("{a: None, b: True, c: False}"));
+            assertNotNull(node);
+            assertEquals(true, node.get("a").isNull());
+            assertEquals(true, node.get("b").asBoolean());
+            assertEquals(false, node.get("c").asBoolean());
+        }
+
+        @Test
+        @DisplayName("只改值位置：字符串文案里的 False 与标识符 FalsePositive 不受影响")
+        void pythonLiteralsOnlyAtValuePosition() throws Exception {
+            var node = parseStrict(JsonRepairUtil.repair(
+                    "{\"note\":\"set overseas to False here\", \"name\":\"FalsePositiveDetector\", \"flag\": False}"));
+            assertNotNull(node);
+            assertEquals("set overseas to False here", node.get("note").asText());
+            assertEquals("FalsePositiveDetector", node.get("name").asText());
+            assertEquals(false, node.get("flag").asBoolean());
+        }
+
+        @Test
+        @DisplayName("数组元素位置同样生效")
+        void pythonLiteralsInArray() throws Exception {
+            var node = parseStrict(JsonRepairUtil.repair("{flags: [True, False, None]}"));
+            assertNotNull(node);
+            assertEquals(true, node.get("flags").get(0).asBoolean());
+            assertEquals(false, node.get("flags").get(1).asBoolean());
+            assertEquals(true, node.get("flags").get(2).isNull());
+        }
+    }
 }

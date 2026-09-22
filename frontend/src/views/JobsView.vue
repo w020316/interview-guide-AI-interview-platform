@@ -14,8 +14,7 @@
         @click="switchTab(t.value)"
       >
         {{ t.label }}
-        <span v-if="t.value === 'FAVORITE' && favCount" class="tab-count">{{ favCount }}</span>
-        <span v-else-if="t.value !== 'FAVORITE' && recruitCounts[t.value]" class="tab-count">{{ recruitCounts[t.value] }}</span>
+        <span v-if="tabCount(t.value)" class="tab-count">{{ tabCount(t.value) }}</span>
       </button>
     </div>
 
@@ -286,13 +285,27 @@ interface JobsMeta {
   experiences?: string[]
   recruitCounts: Record<string, number>
   lastUpdatedAt: string | null
+  /** 海外 / 远程数据源清单（v1.38.0，由后端适配器声明，新增海外源无需改前端） */
+  overseasSources?: string[]
+  /** 海外 / 远程有效岗位数（「海外远程」分栏角标） */
+  overseasCount?: number
 }
 
+/**
+ * 招聘广场分栏（v1.38.0：新增「兼职」与「海外远程」）
+ *
+ * - 前六项按 recruitType 精确筛选；其中 `OVERSEAS` 是**虚拟值**，
+ *   前端会转成 `overseas=true` 查询参数，库里并不存在这个 recruit_type。
+ * - 具体招聘类型分栏会额外带上「仅国内」，避免海外英文岗位稀释国内岗位列表；
+ *   「全部」不加地域限制。
+ */
 const recruitTabs = [
   { value: 'AUTUMN', label: '秋招精选' },
   { value: 'SPRING', label: '春招' },
-  { value: 'INTERN', label: '实习' },
   { value: 'SOCIAL', label: '社招' },
+  { value: 'INTERN', label: '实习' },
+  { value: 'PART_TIME', label: '兼职' },
+  { value: 'OVERSEAS', label: '海外远程' },
   { value: 'TARGETED', label: '定向专项' },
   { value: 'FAVORITE', label: '我的收藏' },
   { value: '', label: '全部' },
@@ -332,7 +345,10 @@ const source = ref('')
 const degree = ref('')
 const experience = ref('')
 
-const meta = ref<JobsMeta>({ industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null })
+const meta = ref<JobsMeta>({
+  industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null,
+  overseasSources: [], overseasCount: 0,
+})
 const recruitCounts = computed(() => meta.value.recruitCounts || {})
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 
@@ -471,13 +487,18 @@ async function fetchJobs() {
   loading.value = true
   loadError.value = false
   try {
+    // v1.38.0：「海外远程」是虚拟分栏，转成 overseas=true；
+    // 其余具体类型分栏带 overseas=false 只看国内，避免海外英文岗位稀释结果；
+    // 「全部」不加地域限制（用户可按来源 chips 自行收窄）。
+    const isOverseasTab = recruitType.value === 'OVERSEAS'
     const res = await api.get('/api/jobs', {
       params: {
         keyword: keyword.value || undefined,
         industry: industry.value || undefined,
         jobType: jobType.value || undefined,
         location: location.value || undefined,
-        recruitType: recruitType.value || undefined,
+        recruitType: isOverseasTab ? undefined : (recruitType.value || undefined),
+        overseas: isOverseasTab ? true : (recruitType.value ? false : undefined),
         source: source.value || undefined,
         degree: degree.value || undefined,
         experience: experience.value || undefined,
@@ -500,7 +521,10 @@ async function fetchJobs() {
 async function fetchMeta() {
   try {
     const res = await api.get('/api/jobs/meta')
-    meta.value = (res as unknown as JobsMeta) || { industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null }
+    meta.value = (res as unknown as JobsMeta) || {
+      industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null,
+      overseasSources: [], overseasCount: 0,
+    }
   } catch {
     // 元数据加载失败不阻断主列表
   }
@@ -515,11 +539,31 @@ function applyFilters() {
    多源聚合后来源数量上升（内置精选 + 公开 API + 可配置第三方渠道），
    用 chips 直选比下拉更直观，也让「岗位来自多个数据源」对用户可见。 */
 
-/** 海外 / 远程数据源标识：这些来源以英文海外岗位为主，UI 上做视觉区分 */
-const OVERSEAS_SOURCE_MARKERS = ['RemoteOK', 'Remotive', 'Arbeitnow']
+/**
+ * 海外 / 远程数据源品牌关键词。
+ *
+ * 仅作为**兜底**：优先使用后端声明的清单（适配器自己知道是不是海外源，新增海外源时
+ * 前端零改动）；只有接口未返回该字段（老版本后端）时才回退到品牌名匹配。
+ */
+const OVERSEAS_SOURCE_MARKERS = ['RemoteOK', 'Remotive', 'Arbeitnow', 'Jobicy', 'Himalayas']
+
+const overseasSet = computed(() => new Set(meta.value.overseasSources || []))
 
 function isOverseasSource(s: string): boolean {
+  if (overseasSet.value.size) return overseasSet.value.has(s)
   return OVERSEAS_SOURCE_MARKERS.some((m) => s.includes(m))
+}
+
+/**
+ * 分栏角标数量。
+ *
+ * 收藏看收藏数、「海外远程」看后端给的海外岗位数（虚拟分栏在 recruitCounts 里没有对应项），
+ * 其余按 recruitType 查计数表——新增「兼职」「海外远程」时无需再写分支逻辑。
+ */
+function tabCount(value: string): number {
+  if (value === 'FAVORITE') return favCount.value
+  if (value === 'OVERSEAS') return meta.value.overseasCount || 0
+  return recruitCounts.value[value] || 0
 }
 
 /** 来源名缩短：chips 只保留核心品牌词（「RemoteOK 全球远程」→「RemoteOK」） */

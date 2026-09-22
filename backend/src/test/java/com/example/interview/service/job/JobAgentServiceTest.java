@@ -59,6 +59,13 @@ class JobAgentServiceTest {
     private final JobClassifyService classifyService = mock(JobClassifyService.class);
     private final PlatformTransactionManager txManager = mock(PlatformTransactionManager.class);
 
+    /**
+     * 数据源健康登记表（v1.38.0）用**真实实例**而非 mock：
+     * 它本身无外部依赖、纯内存，用真实验例才能顺带验证「刷新流程确实登记了成败」
+     * 这一行为，而不是只验证「调用过一次 recordXxx」。
+     */
+    private final JobSourceHealthRegistry healthRegistry = new JobSourceHealthRegistry();
+
     /** H2 真实仓库（refresh/upsert/search/meta 用例） */
     @Autowired
     private JobPostingRepository jpaRepository;
@@ -68,12 +75,12 @@ class JobAgentServiceTest {
     private PlatformTransactionManager jpaTxManager;
 
     private JobAgentService newService() {
-        return new JobAgentService(repository, List.of(), httpAdapter, classifyService, txManager);
+        return new JobAgentService(repository, List.of(), httpAdapter, classifyService, healthRegistry, txManager);
     }
 
     /** 真实仓库版服务构造 */
     private JobAgentService newH2Service(List<JobPlatformAdapter> adapters) {
-        return new JobAgentService(jpaRepository, adapters, httpAdapter, classifyService, jpaTxManager);
+        return new JobAgentService(jpaRepository, adapters, httpAdapter, classifyService, healthRegistry, jpaTxManager);
     }
 
     /** 测试用岗位 DTO（recruitType/deadline 置空走默认分支） */
@@ -309,7 +316,7 @@ class JobAgentServiceTest {
                 List.of(dto("e1", "Java 工程师", "阿里", "互联网", "技术")),
                 (Runnable) () -> innerResult.set(serviceHolder.get().refresh()));
         JobAgentService service = new JobAgentService(
-                jpaRepository, List.of(adapter), httpAdapter, classifyService, jpaTxManager);
+                jpaRepository, List.of(adapter), httpAdapter, classifyService, healthRegistry, jpaTxManager);
         serviceHolder.set(service);
 
         JobAgentService.RefreshResult outer = service.refresh();
@@ -330,7 +337,7 @@ class JobAgentServiceTest {
                 jpaRepository,
                 List.of(new FakeAdapter("内置精选", List.of(dto("e1", "Java 工程师", "阿里", "互联网", "技术"))),
                         httpAdapter),
-                httpAdapter, classifyService, jpaTxManager);
+                httpAdapter, classifyService, healthRegistry, jpaTxManager);
 
         JobAgentService.RefreshResult result = service.refresh();
 
@@ -348,7 +355,7 @@ class JobAgentServiceTest {
                 jpaRepository,
                 List.of(new FakeAdapter("空平台", List.of()),
                         new FakeAdapter("内置精选", List.of(dto("e1", "Java 工程师", "阿里", "互联网", "技术")))),
-                httpAdapter, classifyService, jpaTxManager);
+                httpAdapter, classifyService, healthRegistry, jpaTxManager);
 
         JobAgentService.RefreshResult result = service.refresh();
 
@@ -499,5 +506,119 @@ class JobAgentServiceTest {
         Map<String, Long> recruitCounts = (Map<String, Long>) meta.get("recruitCounts");
         assertThat(recruitCounts).containsEntry("AUTUMN", 1L).containsEntry("SOCIAL", 1L);
         assertThat(meta.get("lastUpdatedAt")).isNotNull();
+    }
+
+    // ─────────────────── 海外分栏与数据源健康（v1.38.0） ───────────────────
+
+    @Test
+    @DisplayName("overseasPlatforms：只返回适配器声明为海外的来源（「海外远程」分栏依赖它）")
+    void overseasPlatforms_filtersByAdapterFlag() {
+        JobPlatformAdapter overseas = mock(JobPlatformAdapter.class);
+        when(overseas.platform()).thenReturn("RemoteOK 全球远程");
+        when(overseas.overseas()).thenReturn(true);
+        // 国内源只保留默认 overseas()=false；platform() 在本方法中不会被读取
+        JobPlatformAdapter domestic = mock(JobPlatformAdapter.class);
+
+        JobAgentService service = new JobAgentService(jpaRepository, List.of(overseas, domestic),
+                httpAdapter, classifyService, healthRegistry, jpaTxManager);
+
+        assertThat(service.overseasPlatforms()).containsExactly("RemoteOK 全球远程");
+    }
+
+    @Test
+    @DisplayName("sourceAlerts：转发健康登记表中的异常源（管理后台告警横幅依赖它）")
+    void sourceAlerts_forwardsRegistry() {
+        JobAgentService service = new JobAgentService(jpaRepository, List.of(),
+                httpAdapter, classifyService, healthRegistry, jpaTxManager);
+
+        assertThat(service.sourceAlerts()).isEmpty();
+
+        healthRegistry.recordFailure("行业精选", "HTTP 403 Forbidden", 120);
+
+        assertThat(service.sourceAlerts())
+                .extracting(JobSourceHealthRegistry.Health::platform)
+                .containsExactly("行业精选");
+    }
+
+    @Test
+    @DisplayName("refresh：成功与失败都登记健康状态；未启用的源不参与拉取")
+    void refresh_recordsHealthAndSkipsDisabled() {
+        JobPlatformAdapter ok = mock(JobPlatformAdapter.class);
+        when(ok.platform()).thenReturn("正常源");
+        when(ok.isEnabled()).thenReturn(true);
+        when(ok.fetch()).thenReturn(List.of(dto("ok1", "Java 工程师", "阿里", "互联网", "技术")));
+
+        JobPlatformAdapter broken = mock(JobPlatformAdapter.class);
+        when(broken.platform()).thenReturn("故障源");
+        when(broken.isEnabled()).thenReturn(true);
+        when(broken.fetch()).thenThrow(new IllegalStateException("拉取失败：HTTP 403"));
+
+        JobPlatformAdapter disabled = mock(JobPlatformAdapter.class);
+        when(disabled.platform()).thenReturn("停用源");
+        when(disabled.isEnabled()).thenReturn(false);
+
+        when(httpAdapter.fetchAllByPlatform()).thenReturn(Map.of());
+
+        JobAgentService service = new JobAgentService(jpaRepository, List.of(ok, broken, disabled),
+                httpAdapter, classifyService, healthRegistry, jpaTxManager);
+        service.refresh();
+
+        assertThat(healthRegistry.get("正常源").healthy()).isTrue();
+        assertThat(healthRegistry.get("正常源").lastCount()).isEqualTo(1);
+        assertThat(healthRegistry.get("故障源").healthy()).isFalse();
+        assertThat(healthRegistry.get("故障源").lastError()).contains("HTTP 403");
+        // v1.38.0 修复点：启用开关此前只影响后台展示，实际仍会去拉取
+        assertThat(healthRegistry.get("停用源")).as("停用的源不应被拉取").isNull();
+        verify(disabled, never()).fetch();
+    }
+
+    @Test
+    @DisplayName("refresh：处于冷却期的低频源本轮跳过（公开 API 6 小时才拉一次）")
+    void refresh_skipsCoolingDownSource() {
+        JobPlatformAdapter slow = mock(JobPlatformAdapter.class);
+        when(slow.platform()).thenReturn("低频源");
+        when(slow.isEnabled()).thenReturn(true);
+        when(slow.minRefreshIntervalMs()).thenReturn(6 * 3600 * 1000L);
+        when(httpAdapter.fetchAllByPlatform()).thenReturn(Map.of());
+
+        // 刚拉过 → 处于冷却期
+        healthRegistry.recordSuccess("低频源", 10, 100);
+
+        JobAgentService service = new JobAgentService(jpaRepository, List.of(slow),
+                httpAdapter, classifyService, healthRegistry, jpaTxManager);
+        service.refresh();
+
+        verify(slow, never()).fetch();
+    }
+
+    @Test
+    @DisplayName("search：overseas 条件按适配器声明的海外源做 IN / NOT IN 过滤")
+    void search_filtersByOverseasFlag() {
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("RemoteOK 全球远程").externalId("o1").title("Remote Dev").companyName("Acme")
+                .recruitType("SOCIAL").active(true).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("行业精选").externalId("d1").title("国内开发").companyName("阿里")
+                .recruitType("SOCIAL").active(true).build());
+
+        JobPlatformAdapter overseasAdapter = mock(JobPlatformAdapter.class);
+        when(overseasAdapter.platform()).thenReturn("RemoteOK 全球远程");
+        when(overseasAdapter.overseas()).thenReturn(true);
+
+        JobAgentService service = new JobAgentService(jpaRepository, List.of(overseasAdapter),
+                httpAdapter, classifyService, healthRegistry, jpaTxManager);
+
+        assertThat(service.search(null, null, null, null, null, null, null, null, true, 0, 20).getContent())
+                .extracting(JobPostingEntity::getPlatform).containsExactly("RemoteOK 全球远程");
+
+        assertThat(service.search(null, null, null, null, null, null, null, null, false, 0, 20).getContent())
+                .extracting(JobPostingEntity::getPlatform)
+                .contains("行业精选")
+                .doesNotContain("RemoteOK 全球远程");
+
+        // 旧签名（不限来源）仍可用，智能体与简历匹配走的正是这条路径
+        assertThat(service.search(null, null, null, null, null, null, null, null, 0, 20).getContent())
+                .extracting(JobPostingEntity::getPlatform)
+                .contains("行业精选", "RemoteOK 全球远程");
     }
 }

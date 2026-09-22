@@ -19,9 +19,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("内置种子数据源一致性测试")
 class SeedJobProviderTest {
 
-    /** recruit_type 列的合法枚举（与 JobAgentService / 前端 Tab 对齐） */
+    /**
+     * recruit_type 列的合法枚举（与 JobAgentService / 前端分栏对齐）。
+     *
+     * <p>PART_TIME 是 v1.38.0 新增的「兼职」类型——它既是招聘类型也是工作性质，
+     * 与 AUTUMN/SPRING/SOCIAL 这类「招聘批次」并存在同一列里，
+     * 因此写错值会让前端的兼职分栏静默筛不出数据。
+     */
     private static final List<String> RECRUIT_TYPES =
-            List.of("AUTUMN", "SPRING", "SOCIAL", "INTERN", "TARGETED");
+            List.of("AUTUMN", "SPRING", "SOCIAL", "INTERN", "TARGETED", "PART_TIME");
 
     @Test
     @DisplayName("行业精选：数据量达标、字段完整、externalId 唯一、列长与枚举合法")
@@ -53,14 +59,63 @@ class SeedJobProviderTest {
     }
 
     @Test
-    @DisplayName("两个种子源之间 externalId 不冲突（跨源撞 key 会互相覆盖）")
+    @DisplayName("秋招精选2027：数据量达标且全部为秋招类型")
+    void autumn2027Seed_isConsistent() {
+        var provider = new SeedAutumn2027JobProvider();
+        assertSeedConsistent(provider, "秋招精选2027", 55);
+        assertThat(provider.fetch())
+                .extracting(JobPlatformAdapter.JobDto::recruitType)
+                .containsOnly("AUTUMN");
+    }
+
+    @Test
+    @DisplayName("秋招精选2027：覆盖互联网/硬件/汽车/银行/快消/游戏/央企/咨询多方向")
+    void autumn2027Seed_coversMultipleSectors() {
+        assertThat(new SeedAutumn2027JobProvider().fetch())
+                .extracting(JobPlatformAdapter.JobDto::industry)
+                .contains("互联网", "通信", "金融", "汽车", "快消", "游戏", "建筑", "咨询", "制造", "能源");
+    }
+
+    @Test
+    @DisplayName("兼职专区：全部为 PART_TIME，薪资按时/日/单计价，且不设截止日")
+    void partTimeSeed_isConsistent() {
+        var provider = new SeedPartTimeJobProvider();
+        assertSeedConsistent(provider, "兼职专区", 30);
+
+        var jobs = provider.fetch();
+        assertThat(jobs).extracting(JobPlatformAdapter.JobDto::recruitType).containsOnly("PART_TIME");
+
+        // 兼职的计价单位是小时/天/单/篇，写成月薪会误导求职者——把表达方式也锁进契约
+        assertThat(jobs).extracting(JobPlatformAdapter.JobDto::salary).allSatisfy(s ->
+                assertThat(s).containsAnyOf("/时", "/天", "/单", "/篇", "/千字", "/月", "/条"));
+
+        // 兼职多为长期滚动招聘，留空截止日才能避免被「过期自动下架」误清理
+        assertThat(jobs).extracting(JobPlatformAdapter.JobDto::deadline)
+                .allSatisfy(d -> assertThat(d).isNull());
+    }
+
+    @Test
+    @DisplayName("全部种子源之间 externalId 不冲突（撞 key 会让岗位互相覆盖）")
     void seedProviders_doNotShareExternalIds() {
-        var industry = new SeedIndustryJobProvider().fetch();
-        var service = new SeedServiceJobProvider().fetch();
-        var all = new java.util.ArrayList<JobPlatformAdapter.JobDto>(industry);
-        all.addAll(service);
+        var all = new java.util.ArrayList<JobPlatformAdapter.JobDto>();
+        all.addAll(new SeedIndustryJobProvider().fetch());
+        all.addAll(new SeedServiceJobProvider().fetch());
+        all.addAll(new SeedAutumn2027JobProvider().fetch());
+        all.addAll(new SeedPartTimeJobProvider().fetch());
         // 同一 platform 内唯一 + 跨 platform 也不复用 ID（便于人工排查与迁移）
         assertThat(all).extracting(JobPlatformAdapter.JobDto::externalId).doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("全部种子源平台名互不重复（重名会让来源统计互相覆盖）")
+    void seedProviders_haveDistinctPlatforms() {
+        assertThat(List.of(
+                new SeedIndustryJobProvider(),
+                new SeedServiceJobProvider(),
+                new SeedAutumn2027JobProvider(),
+                new SeedPartTimeJobProvider()))
+                .extracting(JobPlatformAdapter::platform)
+                .doesNotHaveDuplicates();
     }
 
     /** 逐条校验数据契约 */

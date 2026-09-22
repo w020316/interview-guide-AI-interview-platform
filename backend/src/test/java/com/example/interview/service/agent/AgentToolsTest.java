@@ -69,7 +69,7 @@ class AgentToolsTest {
                 .title("Java 后端").companyName("腾讯").location("深圳")
                 .salary("25k").degree("本科").deadline(LocalDate.of(2026, 10, 1))
                 .applyUrl("https://join.qq.com").build();
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job)));
 
         String out = newTools().searchJobs("java", null, null, null, null);
@@ -77,18 +77,9 @@ class AgentToolsTest {
     }
 
     @Test
-    @DisplayName("searchJobs：空结果返回引导文案")
-    void searchJobsEmpty() {
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(new PageImpl<>(List.of()));
-        String out = newTools().searchJobs("不存在的岗位", null, null, null, null);
-        assertThat(out).contains("未找到匹配岗位");
-    }
-
-    @Test
     @DisplayName("searchJobs：异常时返回降级文案而非抛出")
     void searchJobsError() {
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenThrow(new RuntimeException("db down"));
         String out = newTools().searchJobs(null, null, null, null, null);
         assertThat(out).contains("暂时不可用");
@@ -169,7 +160,7 @@ class AgentToolsTest {
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .title("Java 后端").companyName("腾讯").location("深圳").salary("25k")
                 .applyUrl("https://join.qq.com").build();
-        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job)));
         String out = newTools().searchWebJobs("Java", null);
         assertThat(out).contains("本地岗位库").contains("Java 后端");
@@ -179,7 +170,7 @@ class AgentToolsTest {
     @DisplayName("searchWebJobs：联网与本地均无数据返回引导文案")
     void searchWebJobsBothEmpty() {
         when(webJobSearcherService.searchWeb(anyString(), any())).thenReturn(List.of());
-        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
         String out = newTools().searchWebJobs("Java", "沈阳");
         assertThat(out).contains("搜索与本地岗位库均未找到");
@@ -191,7 +182,7 @@ class AgentToolsTest {
         StringBuilder longText = new StringBuilder("x".repeat(3000));
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .title(longText.toString()).companyName("T").build();
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job)));
         String out = newTools().searchJobs(null, null, null, null, null);
         assertThat(out.length()).isLessThan(1600);
@@ -382,22 +373,91 @@ class AgentToolsTest {
 
     // ───────────────────── searchJobs：字段格式化与参数归一 ─────────────────────
 
+    /**
+     * v1.38.0：recruitType 缺省不再硬编码为 AUTUMN。
+     *
+     * <p>这条断言是「智能体岗位数据不准」的回归防线——旧行为下，用户问「有社招的 Java 岗位吗」
+     * 而模型没显式传类型时，智能体只在秋招里检索，再把「秋招没有」当成「平台没有」告诉用户。
+     */
     @Test
-    @DisplayName("searchJobs：recruitType 归一为大写，缺省时为 AUTUMN")
+    @DisplayName("searchJobs：recruitType 归一（spring→SPRING、中文→枚举、空/null/非法值→不限）")
     void searchJobs_recruitTypeNormalized() {
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
-        newTools().searchJobs(null, null, null, null, "spring");
         org.mockito.ArgumentCaptor<String> captor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(jobAgentService).search(isNull(), isNull(), isNull(), isNull(),
-                captor.capture(), isNull(), isNull(), isNull(), eq(0), eq(8));
-        assertThat(captor.getValue()).isEqualTo("SPRING");
 
-        // 字符串 "null"（模型常见输出）→ AUTUMN
-        newTools().searchJobs(null, null, null, null, "null");
-        verify(jobAgentService, org.mockito.Mockito.times(2))
-                .search(isNull(), isNull(), isNull(), isNull(), captor.capture(), isNull(), isNull(), isNull(), eq(0), eq(8));
-        assertThat(captor.getAllValues()).contains("AUTUMN");
+        // 四次调用一次性验证：ArgumentCaptor 在每次 verify 时都会把匹配到的调用追加进来，
+        // 拆成两次 verify 会让同一批调用被重复捕获（实测得到 5 个值而非 4 个）
+        newTools().searchJobs(null, null, null, null, "spring");
+        newTools().searchJobs(null, null, null, null, "社招");      // 中文类型名 → 枚举
+        newTools().searchJobs(null, null, null, null, "null");      // 模型常见输出 → 不限
+        newTools().searchJobs(null, null, null, null, "随便看看");   // 非法自由文本 → 不限
+
+        verify(jobAgentService, org.mockito.Mockito.times(4))
+                .search(isNull(), isNull(), isNull(), isNull(), captor.capture(), isNull(), isNull(), isNull(), eq(Boolean.FALSE), eq(0), eq(8));
+        // 后三次都必须是 null（不限）：传非法值下去会变成永远为假的过滤条件，
+        // 用户看到的就是「平台没岗位」
+        assertThat(captor.getAllValues()).containsExactly("SPRING", "SOCIAL", null, null);
+    }
+
+    @Test
+    @DisplayName("searchJobs：返回内容带上筛选范围、命中数与岗位来源，供模型如实转述")
+    void searchJobs_reportsScopeAndSource() {
+        var job = com.example.interview.entity.JobPostingEntity.builder()
+                .title("Java 后端").companyName("腾讯").location("深圳")
+                .recruitType("SOCIAL").platform("行业精选").build();
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of(job)));
+
+        String out = newTools().searchJobs("java", null, null, "深圳", null);
+        assertThat(out)
+                .contains("筛选范围：")
+                .contains("范围=国内岗位")
+                .contains("关键词=java")
+                .contains("地点=深圳")
+                .contains("类型:社招")
+                .contains("来源:行业精选");
+    }
+
+    /**
+     * v1.38.0：检索默认只查国内岗位。
+     *
+     * <p>海外源（RemoteOK/Remotive/Jobicy/Himalayas/Arbeitnow）的岗位是英文的，
+     * 用户问「社招岗位」时混进来会明显降低回答可用性；只有用户明确要海外/远程机会
+     * 才传 overseas=true。这条断言防止「默认值被改成不限」导致英文岗位回流。
+     */
+    @Test
+    @DisplayName("searchJobs：overseas=true 才查海外；缺省/false/旧签名重载都只查国内")
+    void searchJobs_overseasFlag() {
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+        org.mockito.ArgumentCaptor<Boolean> captor = org.mockito.ArgumentCaptor.forClass(Boolean.class);
+
+        newTools().searchJobs(null, null, null, null, null, Boolean.TRUE);   // 显式要海外
+        newTools().searchJobs(null, null, null, null, null, null);           // 缺省
+        newTools().searchJobs(null, null, null, null, null, Boolean.FALSE);  // 显式国内
+        newTools().searchJobs(null, null, null, null, null);                 // 旧签名重载
+
+        verify(jobAgentService, org.mockito.Mockito.times(4))
+                .search(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
+                        captor.capture(), eq(0), eq(8));
+        assertThat(captor.getAllValues()).containsExactly(true, false, false, false);
+    }
+
+    @Test
+    @DisplayName("searchJobs：无结果时说明筛选范围与库内总量，并明确禁止编造")
+    void searchJobs_emptyExplainsScope() {
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(jobAgentService.activeJobCount()).thenReturn(286L);
+
+        String out = newTools().searchJobs("不存在的岗位", null, null, null, null);
+        assertThat(out)
+                .contains("未找到匹配岗位")
+                .contains("本次筛选范围：")
+                .contains("关键词=不存在的岗位")
+                .contains("286")
+                .contains("不要编造岗位");
     }
 
     @Test
@@ -405,7 +465,7 @@ class AgentToolsTest {
     void searchJobs_nullFieldsFormatting() {
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .title("算法工程师").companyName("某公司").build();
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job)));
 
         String out = newTools().searchJobs(null, null, null, null, null);
@@ -420,7 +480,7 @@ class AgentToolsTest {
     @DisplayName("searchWebJobs：抓取异常（非空结果路径之外的失败）降级到本地库")
     void searchWebJobs_searchWebThrows_fallsBackToLocal() {
         when(webJobSearcherService.searchWeb(anyString(), any())).thenThrow(new RuntimeException("network down"));
-        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
         assertThat(newTools().searchWebJobs("Java", "深圳")).contains("均未找到匹配岗位");
     }
@@ -439,21 +499,26 @@ class AgentToolsTest {
 
     @Test
     @DisplayName("searchWebJobs：关键词为 null 或“null”回退默认 Java")
-    void searchWebJobs_blankKeywordDefaultsToJava() {
-        when(webJobSearcherService.searchWeb(org.mockito.ArgumentMatchers.eq("Java"), any()))
-                .thenReturn(List.of());
-        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+    void searchWebJobs_blankKeywordFallsBackToLocal() {
+        // v1.38.0 行为变更：此前关键词缺省被硬编码为 "Java"，用户说「帮我找产品经理岗位」
+        // 而模型漏传关键词时，智能体会拿回一堆 Java 岗位并当成用户想要的结果——
+        // 这是「智能体岗位不准」的另一处根因。现在缺关键词直接查本地库，不臆断技术栈。
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
-        newTools().searchWebJobs(null, null);
-        newTools().searchWebJobs("null", "  ");
-        verify(webJobSearcherService, org.mockito.Mockito.times(2)).searchWeb(eq("Java"), any());
+
+        String out = newTools().searchWebJobs(null, "深圳");
+        String out2 = newTools().searchWebJobs("null", "  ");
+
+        verify(webJobSearcherService, org.mockito.Mockito.never()).searchWeb(any(), any());
+        assertThat(out).contains("本地岗位库");
+        assertThat(out2).contains("本地岗位库");
     }
 
     @Test
     @DisplayName("searchWebJobs：联网降级时本地库检索也异常→双降级文案")
     void searchWebJobs_fallbackLocalThrows() {
         when(webJobSearcherService.searchWeb(anyString(), any())).thenReturn(List.of());
-        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenThrow(new RuntimeException("db down"));
         assertThat(newTools().searchWebJobs("Java", null)).contains("联网搜索与本地岗位库暂时都不可用");
     }
@@ -464,7 +529,7 @@ class AgentToolsTest {
         when(webJobSearcherService.searchWeb(anyString(), any())).thenReturn(List.of());
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .title("Java 后端").companyName("腾讯").location("深圳").salary("25k").build();
-        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job)));
         String out = newTools().searchWebJobs("Java", null);
         assertThat(out).contains("本地岗位库推荐").doesNotContain("申请:");

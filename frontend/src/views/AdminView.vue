@@ -41,6 +41,27 @@
         </span>
       </div>
 
+      <!-- 数据源告警横幅（v1.38.0）：某个源被上游停用或网络不可达时，
+           此前只能靠「岗位总数慢慢变少」察觉，现在总览直接点出是哪个源、什么原因 -->
+      <div v-if="sourceAlerts.length" class="alert-banner" role="alert">
+        <span class="alert-icon" aria-hidden="true">!</span>
+        <div class="alert-body">
+          <b>{{ sourceAlerts.length }} 个数据源拉取异常</b>
+          <ul class="alert-list">
+            <li v-for="a in sourceAlerts" :key="a.platform">
+              <span class="alert-src">{{ a.platform }}</span>
+              <span class="alert-err">{{ a.lastError || '未知错误' }}</span>
+              <span class="alert-times">连续失败 {{ a.consecutiveFailures }} 次 · {{ relativeTime(a.lastAttemptAt) }}</span>
+            </li>
+          </ul>
+          <p class="alert-hint">
+            海外公开 API 偶发超时会自动重试；若持续失败，可在
+            <code>app.job-agent.open-api-enabled=false</code> 关闭海外源，或检查网络出口。
+          </p>
+        </div>
+        <button class="alert-action" @click="switchTab('sources')">查看数据源</button>
+      </div>
+
       <div class="chart-grid">
         <!-- 数据源分布 -->
         <div class="chart-card">
@@ -113,23 +134,24 @@
         <table class="data-table" v-loading="sourcesLoading">
           <thead>
             <tr>
-              <th>数据来源</th><th>状态</th><th>有效</th><th>失效</th><th>总计</th><th>最近更新</th><th>说明</th>
+              <th>数据来源</th><th>状态</th><th>最近拉取</th><th>有效</th><th>失效</th><th>总计</th><th>最近入库</th><th>说明 / 错误</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="s in sources" :key="s.platform">
               <td class="strong">
                 {{ s.platform }}
-                <span v-if="isOverseas(s.platform)" class="pill accent">海外</span>
+                <span v-if="s.overseas || isOverseas(s.platform)" class="pill accent">海外</span>
               </td>
               <td><span :class="statusOf(s).cls">{{ statusOf(s).label }}</span></td>
+              <td class="mono" :class="{ 'cell-error': s.health && !s.health.healthy }">{{ healthText(s) }}</td>
               <td>{{ s.active }}</td>
               <td>{{ Math.max(0, s.total - s.active) }}</td>
               <td>{{ s.total }}</td>
-              <td class="mono">{{ fmtDate(s.lastUpdatedAt) }}</td>
-              <td class="note">{{ s.note || '—' }}</td>
+              <td class="mono">{{ relativeTime(s.lastUpdatedAt) }}</td>
+              <td class="note">{{ noteText(s) }}</td>
             </tr>
-            <tr v-if="!sources.length"><td colspan="7" class="empty-cell">暂无数据源</td></tr>
+            <tr v-if="!sources.length"><td colspan="8" class="empty-cell">暂无数据源</td></tr>
           </tbody>
         </table>
       </div>
@@ -285,6 +307,20 @@ interface Overview {
   sourceDist?: SourceDist[]
   recruitDist?: Record<string, number>
   trend?: TrendPoint[]
+  /** 拉取异常的数据源（v1.38.0，总览告警横幅据此渲染） */
+  sourceAlerts?: SourceHealth[]
+}
+
+/** 数据源最近一次拉取的健康快照（对应后端 JobSourceHealthRegistry.Health） */
+interface SourceHealth {
+  platform: string
+  lastAttemptAt: string | null
+  lastSuccessAt: string | null
+  healthy: boolean
+  lastCount: number
+  lastElapsedMs: number
+  lastError: string | null
+  consecutiveFailures: number
 }
 interface RefreshResult { upserted: number; inserted: number; updated: number; expired: number; removed: number }
 interface JobRow {
@@ -304,10 +340,13 @@ interface SourceRow {
   enabled: boolean
   aggregate: boolean
   builtin: boolean
+  overseas?: boolean
   total: number
   active: number
   lastUpdatedAt: string | null
   note: string | null
+  /** 最近一次拉取的健康快照；从未拉取过为 null */
+  health?: SourceHealth | null
 }
 interface Metrics {
   aiCalls: Record<string, number>
@@ -449,12 +488,48 @@ const donutStyle = computed(() => {
 const barWidth = (v: number, max: number) => `${Math.max(2, Math.round((v / max) * 100))}%`
 const barHeight = (v: number) => `${Math.max(4, Math.round((v / maxTrend.value) * 100))}%`
 
-/** 数据源状态判定：正常 / 待产出 / 已关闭 / 未启用 */
+/** 拉取异常的数据源清单（总览告警横幅） */
+const sourceAlerts = computed<SourceHealth[]>(() => overview.value?.sourceAlerts || [])
+
+/**
+ * 数据源状态判定。
+ *
+ * 优先看**最近一次拉取是否成功**：一个源「库里有历史数据」≠「现在还能拉通」，
+ * 后者才是需要运维介入的信号。此前只看 enabled + total，导致源挂掉后仍显示「正常」。
+ */
 function statusOf(s: SourceRow): { label: string; cls: string } {
+  if (s.health && !s.health.healthy) return { label: '拉取失败', cls: 'badge-off' }
   if (s.enabled && s.total > 0) return { label: '正常', cls: 'badge-ok' }
   if (s.enabled && s.total === 0) return { label: '已启用·待产出', cls: 'badge-warn' }
   if (!s.enabled && s.total > 0) return { label: '已关闭·有存量', cls: 'badge-warn' }
   return { label: '未启用', cls: 'badge-mute' }
+}
+
+/** 相对时间：后台看板关注「多久以前」，绝对时间戳反而需要心算 */
+function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const diff = Date.now() - new Date(iso).getTime()
+  if (Number.isNaN(diff)) return '—'
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  return `${Math.floor(hours / 24)} 天前`
+}
+
+/** 最近拉取结果摘要：成功给条数与耗时，失败给连续次数（错误正文单独一列） */
+function healthText(s: SourceRow): string {
+  const h = s.health
+  if (!h) return '—'
+  const when = relativeTime(h.lastAttemptAt)
+  return h.healthy ? `成功 ${h.lastCount} 条 · ${h.lastElapsedMs}ms · ${when}` : `失败 ${h.consecutiveFailures} 次 · ${when}`
+}
+
+/** 说明列：失败时优先展示错误摘要（这是排查的第一手线索） */
+function noteText(s: SourceRow): string {
+  if (s.health && !s.health.healthy && s.health.lastError) return s.health.lastError
+  return s.note || '—'
 }
 
 function switchTab(k: TabKey) {
@@ -793,6 +868,120 @@ onMounted(() => {
 }
 
 .overview-meta b { color: var(--c-text); font-weight: 600; }
+
+/* ── 数据源告警横幅（v1.38.0）── */
+.alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--c-danger-light);
+  border: 1px solid var(--c-danger);
+  border-radius: var(--radius-lg);
+}
+
+.alert-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--c-danger);
+  border-radius: 50%;
+}
+
+.alert-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-body b {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13.5px;
+  color: var(--c-danger);
+}
+
+.alert-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.alert-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.alert-src {
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.alert-err {
+  color: var(--c-text-secondary);
+  word-break: break-all;
+}
+
+.alert-times {
+  font-size: 11.5px;
+  color: var(--c-text-tertiary);
+}
+
+.alert-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--c-text-tertiary);
+}
+
+.alert-hint code {
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border-radius: var(--radius-xs);
+}
+
+.alert-action {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 8px 16px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-danger);
+  background: var(--c-surface);
+  border: 1px solid var(--c-danger);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.alert-action:hover {
+  color: #fff;
+  background: var(--c-danger);
+}
+
+/* 拉取失败的单元格：让异常行在表格里能一眼扫出来 */
+.cell-error {
+  color: var(--c-danger);
+  font-weight: 600;
+}
 
 /* ── 图表区 ── */
 .chart-grid {

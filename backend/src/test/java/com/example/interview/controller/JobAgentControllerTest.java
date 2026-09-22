@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -113,7 +114,7 @@ class JobAgentControllerTest {
         JobPostingEntity job = JobPostingEntity.builder()
                 .id(1L).platform("内置精选").externalId("e1")
                 .title("Java 后端工程师").companyName("阿里巴巴").active(true).build();
-        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job), PageRequest.of(0, 10), 25));
 
         mockMvc.perform(get("/api/jobs")
@@ -127,6 +128,21 @@ class JobAgentControllerTest {
                 .andExpect(jsonPath("$.data.page").value(0))
                 .andExpect(jsonPath("$.data.size").value(10))
                 .andExpect(jsonPath("$.data.items[0].title").value("Java 后端工程师"));
+    }
+
+    @Test
+    @DisplayName("GET /api/jobs: overseas 分栏参数透传到检索（v1.38.0 海外远程 Tab）")
+    void list_passesOverseasFlag() throws Exception {
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/jobs").param("overseas", "true"))
+                .andExpect(status().isOk());
+
+        // 参数名/顺序写错会让「海外远程」分栏静默返回国内岗位，这里锁住透传
+        verify(jobAgentService).search(any(), any(), any(), any(), any(), any(), any(), any(),
+                eq(Boolean.TRUE), anyInt(), anyInt());
     }
 
     @Test

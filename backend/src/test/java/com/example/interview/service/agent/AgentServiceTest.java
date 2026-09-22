@@ -256,7 +256,7 @@ class AgentServiceTest {
         var session = new AgentService.AgentStreamSession(conversation, "SYS", history, "帮我找 Java 岗位", new AtomicBoolean(false));
         when(callResponseSpec.content())
                 .thenReturn(ACTION_JSON, "根据检索结果为你推荐以下岗位。");
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(
                         com.example.interview.entity.JobPostingEntity.builder()
                                 .title("Java 后端").companyName("腾讯").location("深圳")
@@ -268,7 +268,7 @@ class AgentServiceTest {
         awaitDone(d);
 
         // 工具真实执行（经 AgentTools.dispatch → jobAgentService.search）
-        verify(jobAgentService).search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt());
+        verify(jobAgentService).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt());
         // 第 2 轮提示词包含观察结果与历史消息
         org.mockito.ArgumentCaptor<String> userCap = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(requestSpec, timeout(3000).times(2)).user(userCap.capture());
@@ -295,7 +295,7 @@ class AgentServiceTest {
         java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
         when(callResponseSpec.content()).thenAnswer(inv ->
                 calls.incrementAndGet() <= 8 ? ACTION_JSON : "基于观察结果的收尾回答。");
-        when(jobAgentService.search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         Disposable d = service.runStream(session, t -> {}, () -> {}, err -> {});
@@ -377,7 +377,7 @@ class AgentServiceTest {
         awaitDone(d);
 
         assertThat(String.join("", tokens)).contains("noSuchTool");
-        verify(jobAgentService, never()).search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt());
+        verify(jobAgentService, never()).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt());
     }
 
     @Test
@@ -505,7 +505,7 @@ class AgentServiceTest {
         awaitDone(d);
 
         assertThat(String.join("", tokens)).contains("{\"foo\":1}");
-        verify(jobAgentService, never()).search(any(), any(), any(), any(), anyString(), any(), any(), any(), anyInt(), anyInt());
+        verify(jobAgentService, never()).search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt());
     }
 
     @Test

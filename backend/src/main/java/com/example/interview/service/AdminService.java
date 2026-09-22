@@ -80,6 +80,9 @@ public class AdminService {
         result.put("sourceDist", sourceDistribution());
         result.put("recruitDist", recruitDistribution());
         result.put("trend", buildTrend(TREND_DAYS));
+        // v1.38.0：数据源拉取失败的告警列表——某个源被上游停用/网络不可达时，
+        // 此前只能靠「岗位总数慢慢变少」察觉，现在总览直接给出待处理的源
+        result.put("sourceAlerts", jobAgentService.sourceAlerts());
         return result;
     }
 
@@ -202,6 +205,9 @@ public class AdminService {
             row.put("enabled", enabled);
             row.put("aggregate", aggregate);
             row.put("builtin", true);
+            row.put("overseas", a.get("overseas"));
+            // v1.38.0：最近一次拉取的健康快照（成败/条数/耗时/错误摘要/连续失败次数）
+            row.put("health", a.get("health"));
             long[] s = stat.getOrDefault(name, new long[]{0L, 0L});
             row.put("total", s[0]);
             row.put("active", s[1]);

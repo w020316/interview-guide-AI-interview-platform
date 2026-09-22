@@ -37,6 +37,7 @@ public class JobAgentService {
     private final List<JobPlatformAdapter> adapters;
     private final HttpJobPlatformAdapter httpAdapter;
     private final JobClassifyService classifyService;
+    private final JobSourceHealthRegistry healthRegistry;
     private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     /** 刷新互斥锁：手动刷新与定时任务并发时后到者跳过（单实例部署，实例内互斥已足够） */
@@ -47,11 +48,13 @@ public class JobAgentService {
                            List<JobPlatformAdapter> adapters,
                            HttpJobPlatformAdapter httpAdapter,
                            JobClassifyService classifyService,
+                           JobSourceHealthRegistry healthRegistry,
                            org.springframework.transaction.PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.adapters = adapters;
         this.httpAdapter = httpAdapter;
         this.classifyService = classifyService;
+        this.healthRegistry = healthRegistry;
         this.transactionTemplate = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
     }
 
@@ -101,16 +104,43 @@ public class JobAgentService {
             if (adapter == httpAdapter) {
                 continue; // 第三方平台单独处理
             }
+            String name = adapter.platform();
+            // v1.38.0 修复：此前漏了 isEnabled 判断，open-api-enabled=false 只能让
+            // 管理后台显示「未启用」，实际仍会向海外 API 发请求——开关形同虚设
+            if (!adapter.isEnabled()) {
+                log.info("数据源 {} 已停用，本轮跳过", name);
+                continue;
+            }
+            // 低频源节流：公开 API 按各自 minRefreshIntervalMs 冷却，避免反复打扰上游
+            if (healthRegistry.isCoolingDown(name, adapter.minRefreshIntervalMs())) {
+                log.info("数据源 {} 处于刷新冷却期，本轮跳过", name);
+                continue;
+            }
+            long startedAt = System.currentTimeMillis();
             try {
-                platformJobs.put(adapter.platform(), adapter.fetch());
+                List<JobDto> fetched = adapter.fetch();
+                platformJobs.put(name, fetched);
+                healthRegistry.recordSuccess(name, fetched == null ? 0 : fetched.size(),
+                        System.currentTimeMillis() - startedAt);
             } catch (Exception e) {
-                log.warn("平台 {} 岗位拉取失败：{}", adapter.platform(), e.getMessage());
+                // 失败隔离：单个源失败不影响其他源；同时登记健康状态，供管理后台告警
+                log.warn("平台 {} 岗位拉取失败：{}", name, e.getMessage());
+                healthRegistry.recordFailure(name, e.getMessage(), System.currentTimeMillis() - startedAt);
             }
         }
         try {
-            platformJobs.putAll(httpAdapter.fetchAllByPlatform());
+            long startedAt = System.currentTimeMillis();
+            Map<String, List<JobDto>> thirdParty = httpAdapter.fetchAllByPlatform();
+            platformJobs.putAll(thirdParty);
+            // 第三方适配器是「一个适配器按渠道名展开」，因此逐渠道登记健康状态
+            for (var entry : thirdParty.entrySet()) {
+                healthRegistry.recordSuccess(entry.getKey(),
+                        entry.getValue() == null ? 0 : entry.getValue().size(),
+                        System.currentTimeMillis() - startedAt);
+            }
         } catch (Exception e) {
             log.warn("第三方平台岗位拉取失败：{}", e.getMessage());
+            healthRegistry.recordFailure("第三方平台", e.getMessage(), 0L);
         }
 
         // 跨数据源去重：同一真实岗位可能被多个 provider 收录（不同 externalId 但同公司+同岗位），
@@ -263,6 +293,24 @@ public class JobAgentService {
                                          String location, String recruitType, String source,
                                          String degree, String experience,
                                          int page, int size) {
+        return search(keyword, industry, jobType, location, recruitType, source, degree, experience,
+                null, page, size);
+    }
+
+    /**
+     * 岗位检索（v1.38.0 增加 overseas 分栏条件）
+     *
+     * <p>保留上面 10 参数的重载：既有的智能体工具、简历匹配降级路径与测试都按旧签名调用，
+     * 全部迁移到新签名的收益（少改 20 处 mock 桩）不足以抵消回归风险。
+     *
+     * @param overseas true 仅海外/远程数据源；false 仅国内数据源；null 不限。
+     *                 数据同库同表，仅按来源类别隔离——国内求职者按「秋招」筛选时
+     *                 不会再被欧美远程岗位稀释。
+     */
+    public Page<JobPostingEntity> search(String keyword, String industry, String jobType,
+                                         String location, String recruitType, String source,
+                                         String degree, String experience, Boolean overseas,
+                                         int page, int size) {
         var spec = org.springframework.data.jpa.domain.Specification.where(emptySpec());
         if (!isBlank(keyword)) {
             // 转义 LIKE 通配符（% _ \），避免用户输入破坏精确匹配语义
@@ -287,6 +335,18 @@ public class JobAgentService {
         }
         if (!isBlank(source)) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("platform"), source.trim()));
+        }
+        // v1.38.0：海外/远程分栏。海外源清单由适配器自己声明（JobPlatformAdapter#overseas），
+        // 而不是在查询层硬编码平台名——将来新增海外源无需改动这里
+        if (overseas != null) {
+            List<String> overseasNames = overseasPlatforms();
+            if (!overseasNames.isEmpty()) {
+                if (overseas) {
+                    spec = spec.and((root, query, cb) -> root.get("platform").in(overseasNames));
+                } else {
+                    spec = spec.and((root, query, cb) -> cb.not(root.get("platform").in(overseasNames)));
+                }
+            }
         }
         // v1.26.0：学历/经验精确筛选（值来自 meta 中的去重列表，与入库值一致）
         if (!isBlank(degree)) {
@@ -322,28 +382,59 @@ public class JobAgentService {
         }
         meta.put("recruitCounts", recruitCounts);
 
+        // v1.38.0：海外/远程分栏元数据——前端据此渲染「海外远程」Tab 与角标，
+        // 也用于在来源 chips 上区分海外源
+        List<String> overseas = overseasPlatforms();
+        meta.put("overseasSources", overseas);
+        meta.put("overseasCount", overseas.isEmpty() ? 0L : repository.countActiveByPlatformIn(overseas));
+
         LocalDateTime last = repository.findLastUpdatedAt();
         meta.put("lastUpdatedAt", last == null ? null : last.toString());
         return meta;
     }
 
     /**
-     * 全部数据源状态（v1.37.0，管理后台数据源视图）
+     * 全部数据源状态（v1.37.0 建立，v1.38.0 补充海外标识与健康信息）
      *
-     * <p>返回每个适配器的展示名与启用状态。注意第三方 HTTP 适配器的 platform() 返回
-     * 聚合名「第三方平台」，其实际入库是按各渠道名展开的——管理后台会把它标注为
-     * 「按渠道展开」，避免运营者以为有一个叫「第三方平台」的来源却没有数据。
+     * <p>返回每个适配器的展示名、启用状态、是否海外源，以及最近一次拉取的健康快照。
+     * 注意第三方 HTTP 适配器的 platform() 返回聚合名「第三方平台」，其实际入库是按各渠道名
+     * 展开的——管理后台会把它标注为「按渠道展开」，避免运营者以为有一个叫「第三方平台」
+     * 的来源却没有数据。
      */
     public List<Map<String, Object>> platformStatus() {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (JobPlatformAdapter a : adapters) {
+            String name = a.platform();
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("platform", a.platform());
+            row.put("platform", name);
             row.put("enabled", a.isEnabled());
             row.put("aggregate", a == httpAdapter);
+            row.put("overseas", a.overseas());
+            row.put("health", healthRegistry.get(name));
             rows.add(row);
         }
         return rows;
+    }
+
+    /**
+     * 海外 / 远程数据源展示名清单（v1.38.0）
+     *
+     * <p>供「海外远程」分栏与筛选使用。由适配器声明而非硬编码平台名，
+     * 新增海外源时这里自动跟随。
+     */
+    public List<String> overseasPlatforms() {
+        List<String> names = new ArrayList<>();
+        for (JobPlatformAdapter a : adapters) {
+            if (a.overseas()) {
+                names.add(a.platform());
+            }
+        }
+        return names;
+    }
+
+    /** 需要告警的数据源（最近一次失败，或连续失败 ≥ 2 次），供管理后台总览横幅使用 */
+    public List<JobSourceHealthRegistry.Health> sourceAlerts() {
+        return healthRegistry.alerts();
     }
 
     /** 定时刷新调度（由 JobRefreshScheduler 调用与手动接口共用） */
@@ -364,6 +455,17 @@ public class JobAgentService {
     /** 全部有效岗位（供简历匹配推荐） */
     public List<JobPostingEntity> activeJobs() {
         return repository.findByActiveTrue();
+    }
+
+    /**
+     * 有效岗位总数（v1.38.0）。
+     *
+     * <p>供智能体在「没找到」时如实说明库里究竟有多少岗位，用户据此能判断
+     * 是「确实没有这类岗位」还是「筛选条件太窄」，而不是误以为平台空空如也。
+     * 用 count 查询而非 {@code activeJobs().size()}——后者会把全部岗位实体拉进内存。
+     */
+    public long activeJobCount() {
+        return repository.countByActiveTrue();
     }
 
     private static boolean isBlank(String s) {

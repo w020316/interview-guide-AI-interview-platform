@@ -249,6 +249,16 @@ public class AgentService {
                     log.info("智能体工具调用 round={}: action={}", round + 1, action.action());
                     String observation = tools.dispatch(action.action(), action.paramsJson());
                     steps.add("调用工具 " + action.action() + "(" + action.paramsJson() + ")\n观察结果：" + observation);
+                } else if (looksLikeActionPayload(content)) {
+                    // 防御（v1.38.0）：模型偶尔输出非严格 JSON 的动作（Python 字面量 False、
+                    // 中文引号等），修复后仍解析失败时**绝不能**把它当最终回答推给用户——
+                    // 实测用户看到的会是 {'action': 'searchJobs', 'params': {...}} 这种原始 JSON。
+                    // 记为一次无效轮次并要求模型重新输出，由外层轮次上限兜底。
+                    log.warn("智能体输出疑似工具动作但解析失败，已忽略并要求重试。内容前 200 字：{}",
+                            content.length() > 200 ? content.substring(0, 200) : content);
+                    steps.add("上一轮输出不是合法的动作 JSON，已忽略。请严格二选一："
+                            + "要么输出单行标准 JSON（双引号、小写 true/false）调用工具，"
+                            + "要么直接给出面向用户的最终回答。");
                 } else {
                     finalAnswer = content;
                 }
@@ -329,6 +339,20 @@ public class AgentService {
             }
             return com.example.interview.ai.AiConcurrencyGuard.call(() -> request.call().content());
         }
+    }
+
+    /**
+     * 输出是否「看起来像工具动作但格式不合法」（v1.38.0）。
+     *
+     * <p>判据刻意保守：只在文本较短、且带 action/params 特征时才认定为动作载荷——
+     * 真正给用户的回答通常更长，被误判会导致无谓的重试与轮次浪费。
+     */
+    private static boolean looksLikeActionPayload(String content) {
+        if (content == null) return false;
+        String t = content.trim();
+        if (t.isEmpty() || t.length() > 600) return false;
+        if (t.contains("\"action\"") || t.contains("'action'") || t.contains("action：")) return true;
+        return t.startsWith("{") && t.endsWith("}") && t.contains("params");
     }
 
     /** 解析模型输出是否为工具动作 JSON（严格：仅当整段内容是 JSON 且 action 匹配注册表） */

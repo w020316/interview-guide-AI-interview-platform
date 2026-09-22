@@ -85,9 +85,33 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.37.0'
+export const CURRENT_VERSION = '1.38.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.38.0',
+    date: '2026-09-22',
+    title: '版本 1.38.0 · 兼职上线，海外远程独立成栏',
+    items: [
+      { text: '招聘广场：新增「海外远程」分栏，海外岗位与国内岗位分开看——按「秋招」筛选时不会再被英文海外职位稀释', level: 'user' },
+      { text: '招聘广场：新增「兼职」分栏，收录门店、餐饮、配送、在线答疑、数据标注、促销、校园大使等兼职岗位，薪资按时薪/日薪/单价展示', level: 'user' },
+      { text: '招聘广场：秋招岗位大幅增加（新增 60 个主流雇主的 2027 届岗位，覆盖互联网、芯片通信、汽车新能源、银行、快消、游戏、央企、咨询等方向）', level: 'user' },
+      { text: '招聘广场：海外岗位来源新增 Jobicy 与 Himalayas 两家，海外远程岗位数量接近翻倍', level: 'user' },
+      { text: '智能体：修复「问社招岗位却只返回秋招结果」的问题——此前智能体在没有明确类型时会把范围锁死在秋招，现在改为不限类型，并在回答里说明检索范围与命中数量', level: 'user' },
+      { text: '智能体：岗位回答会标注每条岗位的招聘类型与数据来源，并明确说明「在你给的条件范围内没找到」而不是笼统地说没有岗位', level: 'user' },
+      { text: '智能体：修复偶发地把内部调用指令整段显示成回答的问题（此前会看到形如 {"action": "searchJobs"} 的原始 JSON）', level: 'user' },
+      { text: '管理后台：新增数据源拉取失败告警，某个数据源挂掉时总览页会直接列出是哪个源、什么原因、连续失败几次；数据源页新增「最近拉取」列', level: 'user' },
+      { text: '后端：新增 JobSourceHealthRegistry 记录每个数据源的最近一次拉取结果（成败/条数/耗时/错误摘要/连续失败次数）', level: 'tech' },
+      { text: '后端：修复 open-api-enabled=false 只影响后台展示、实际仍会请求海外 API 的问题（刷新前补 isEnabled 判断）', level: 'tech' },
+      { text: '后端：公开 API 数据源失败时改为抛异常交由调度层统一登记，使「源挂了」与「源正常但没岗位」可被区分；并按 6 小时冷却节流，避免高频打扰上游', level: 'tech' },
+      { text: '后端：JobPlatformAdapter 新增 overseas() 与 minRefreshIntervalMs() 声明；检索新增 overseas 条件（IN / NOT IN 适配器声明的海外源清单），旧 10 参数签名保留兼容', level: 'tech' },
+      { text: '后端：JsonRepairUtil 支持 Python 字面量（True/False/None → true/false/null），只匹配值位置以免误伤字符串文案；AgentService 增加「疑似动作载荷但解析失败」防御，避免原始 JSON 被当回答推送', level: 'tech' },
+      { text: '后端：智能体 searchJobs 新增 overseas 参数并默认只查国内；fallbackToLocalJobs 口径对齐', level: 'tech' },
+      { text: '验证：本地启动 embedding + 后端跑通 39 项 AI 端到端断言（简历分析/优化、出题、评估、RAG、SSE、智能体岗位检索防编造）', level: 'tech' },
+      { text: '后端：新增 Jobicy / Himalayas 两个公开数据源适配器，以及秋招精选2027（60 条）、兼职专区（36 条）两个种子数据源', level: 'tech' },
+      { text: '测试：后端新增数据源健康、海外分栏、种子数据一致性与两个新 API 源解析用例，前端类型检查与构建通过', level: 'tech' },
+    ]
+  },
   {
     version: '1.37.0',
     date: '2026-09-22',

@@ -51,6 +51,16 @@ public final class JsonRepairUtil {
     /** 尾随逗号：}, ] 之前的逗号 */
     private static final Pattern TRAILING_COMMA = Pattern.compile(",\\s*([}\\]])");
 
+    /**
+     * Python 字面量：True / False / None（v1.38.0）。
+     *
+     * <p>只匹配**值位置**（前面是 {@code [ { , :} 之一、后面紧跟 {@code , } ]}），
+     * 这样既能命中 {@code 'overseas': False}，又不会误伤字符串文案里的
+     * {@code "set overseas to False here"} 或标识符 {@code FalsePositiveDetector}。
+     */
+    private static final Pattern PY_LITERAL = Pattern.compile(
+            "([\\[{,:]\\s*)(True|False|None)(?=\\s*[,\\}\\]])");
+
     private JsonRepairUtil() {}
 
     /**
@@ -89,6 +99,17 @@ public final class JsonRepairUtil {
 
         // 7. 尾随逗号清理
         s = TRAILING_COMMA.matcher(s).replaceAll("$1");
+
+        // 7.5 Python 字面量归一（v1.38.0）
+        // 模型偶尔按 Python 习惯输出 False / True / None，标准 JSON 解析器会直接拒绝。
+        // 后果不只是「解析失败」——在智能体链路里，这段非法的动作 JSON 会被当作**最终回答**
+        // 推给用户，实测用户看到的就是 {'action': 'searchJobs', 'params': {...'overseas': False}}。
+        // 注意用 Function 重载而非 replaceAll("$1...")：group(1) 原样保留分隔符与空白
+        s = PY_LITERAL.matcher(s).replaceAll(match -> match.group(1) + switch (match.group(2)) {
+            case "True" -> "true";
+            case "False" -> "false";
+            default -> "null";
+        });
 
         // 8. 字符串字面量内部的控制字符转义
         // JSON 规范要求：字符串内的 \n \r \t 等控制字符必须转义为 \n \r \t
