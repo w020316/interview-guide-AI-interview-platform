@@ -21,7 +21,24 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /actuator/health
-    autoDeploy: true
+    # ── 2026-09-22：改为「只在 backend 目录变更时部署」────────────────────
+    # 此前是 autoDeploy: true，导致**任何**推送（哪怕只改了前端或文档）都会
+    # 重新构建并重启后端 —— 白白吃掉一次冷启动窗口，还浪费 Render 的构建额度。
+    #
+    # autoDeployTrigger 是官方推荐字段（取代已废弃的布尔型 autoDeploy，
+    # 两者同时出现时以 autoDeployTrigger 为准）：
+    #   commit      = 每次提交都部署（等价于旧 autoDeploy: true）
+    #   checksPass  = 仅当分支 CI 通过才部署
+    #   off         = 关闭自动部署
+    autoDeployTrigger: commit
+    # buildFilter 使用 glob 语法，路径**相对仓库根目录**。
+    # ⚠️ 同步蓝图时该字段会**完全替换**服务上已有的过滤设置；若整个字段被省略，
+    #    已有设置会被清空为空列表 —— 所以这里必须显式写全。
+    # backend/ 下被跟踪的只有 .dockerignore / Dockerfile / pom.xml / src，
+    # 因此 backend/** 既覆盖全部真实源码，又不会被 target/ 等产物噪声触发。
+    buildFilter:
+      paths:
+        - backend/**
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
@@ -145,7 +162,11 @@ services:
     dockerfilePath: ./embedding-service/Dockerfile
     dockerContext: ./embedding-service
     healthCheckPath: /health
-    autoDeploy: true
+    # 同主后端：只在 embedding-service 目录变更时部署，避免无关推送触发重建
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - embedding-service/**
     envVars:
       - key: EMBED_MODEL
         value: BAAI/bge-small-zh-v1.5
