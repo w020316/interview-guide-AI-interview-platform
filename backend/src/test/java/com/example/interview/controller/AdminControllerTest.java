@@ -93,12 +93,34 @@ class AdminControllerTest {
     }
 
     @Test
+    @DisplayName("GET /sources: 返回数据源健康视图（v1.37.0）")
+    void admin_sources() throws Exception {
+        loginAs("ROLE_ADMIN");
+        java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("platform", "行业精选");
+        row.put("enabled", true);
+        row.put("total", 53L);
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("items", List.of(row));
+        payload.put("count", 1);
+        payload.put("enabledCount", 1L);
+        when(adminService.sources()).thenReturn(payload);
+
+        mockMvc.perform(get("/api/admin/sources"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.count").value(1))
+                .andExpect(jsonPath("$.data.items[0].platform").value("行业精选"))
+                .andExpect(jsonPath("$.data.items[0].enabled").value(true));
+    }
+
+    @Test
     @DisplayName("GET /jobs: 返回分页岗位列表（含失效）")
     void admin_listJobs() throws Exception {
         loginAsAdmin();
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .id(1L).title("Java 后端").companyName("某公司").active(false).build();
-        when(adminService.listJobs(any(), org.mockito.ArgumentMatchers.anyInt(),
+        when(adminService.listJobs(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyInt()))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(job)));
 

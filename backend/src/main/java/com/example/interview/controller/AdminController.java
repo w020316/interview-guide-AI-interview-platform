@@ -44,13 +44,22 @@ public class AdminController {
         return Result.success(adminService.refreshJobs());
     }
 
-    @Operation(summary = "岗位列表（含失效，可检索）")
+    @Operation(summary = "数据源健康视图（适配器状态 × 实际入库量）")
+    @GetMapping("/sources")
+    public Result<Map<String, Object>> sources() {
+        return Result.success(adminService.sources());
+    }
+
+    @Operation(summary = "岗位列表（含失效，可按来源/招聘类型/状态检索）")
     @GetMapping("/jobs")
     public Result<Map<String, Object>> listJobs(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String recruitType,
+            @RequestParam(required = false) Boolean active,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Page<JobPostingEntity> result = adminService.listJobs(keyword, page, size);
+        Page<JobPostingEntity> result = adminService.listJobs(keyword, source, recruitType, active, page, size);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("total", result.getTotalElements());
         body.put("page", result.getNumber());

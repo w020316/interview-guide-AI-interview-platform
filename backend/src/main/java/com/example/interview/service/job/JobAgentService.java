@@ -327,6 +327,25 @@ public class JobAgentService {
         return meta;
     }
 
+    /**
+     * 全部数据源状态（v1.37.0，管理后台数据源视图）
+     *
+     * <p>返回每个适配器的展示名与启用状态。注意第三方 HTTP 适配器的 platform() 返回
+     * 聚合名「第三方平台」，其实际入库是按各渠道名展开的——管理后台会把它标注为
+     * 「按渠道展开」，避免运营者以为有一个叫「第三方平台」的来源却没有数据。
+     */
+    public List<Map<String, Object>> platformStatus() {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (JobPlatformAdapter a : adapters) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("platform", a.platform());
+            row.put("enabled", a.isEnabled());
+            row.put("aggregate", a == httpAdapter);
+            rows.add(row);
+        }
+        return rows;
+    }
+
     /** 定时刷新调度（由 JobRefreshScheduler 调用与手动接口共用） */
     public List<String> enabledPlatforms() {
         List<String> names = new ArrayList<>();

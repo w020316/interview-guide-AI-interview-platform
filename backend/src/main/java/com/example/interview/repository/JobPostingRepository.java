@@ -63,6 +63,30 @@ public interface JobPostingRepository extends JpaRepository<JobPostingEntity, Lo
     @Query("SELECT MAX(j.updatedAt) FROM JobPostingEntity j")
     LocalDateTime findLastUpdatedAt();
 
+    // ── 管理后台数据源视图（v1.37.0）──
+
+    /**
+     * 数据源维度统计：平台 -> 岗位总数 / 有效数。
+     * 用于管理后台展示「岗位都来自哪些数据源、各自贡献多少、有多少已失效」。
+     */
+    @Query("SELECT j.platform, COUNT(j), SUM(CASE WHEN j.active = true THEN 1 ELSE 0 END) "
+            + "FROM JobPostingEntity j GROUP BY j.platform ORDER BY COUNT(j) DESC")
+    List<Object[]> countGroupByPlatform();
+
+    /** 各数据源最近一次入库/更新时间（判断该源是否还在正常产出） */
+    @Query("SELECT j.platform, MAX(j.updatedAt) FROM JobPostingEntity j GROUP BY j.platform")
+    List<Object[]> findLastUpdatedAtByPlatform();
+
+    /**
+     * 指定时间后创建的岗位时间戳。
+     *
+     * <p>近 N 天趋势刻意不在 SQL 里按天分组：`DATE()` / `CAST(... AS date)` 在
+     * H2（本地/测试）与 PostgreSQL（生产）上的写法不一致，容易「本地绿、线上红」。
+     * 改为取回时间戳后在 Java 侧归组，方言无关且数据量可控。
+     */
+    @Query("SELECT j.createdAt FROM JobPostingEntity j WHERE j.createdAt >= :since")
+    List<LocalDateTime> findCreatedAtSince(@Param("since") LocalDateTime since);
+
     /** 清理长期失效数据：截止日期已过 N 天的岗位批量下架（active=false） */
     @Modifying
     @Query("UPDATE JobPostingEntity j SET j.active = false WHERE j.active = true AND j.deadline < :date")

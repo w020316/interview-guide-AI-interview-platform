@@ -29,6 +29,23 @@ public class JobAgentProperties {
     /** 定时刷新间隔（毫秒），默认 1 小时（v1.27.0 由 6h 收紧） */
     private long refreshFixedDelayMs = 3600 * 1000L;
 
+    /**
+     * 是否启用免费公开招聘数据 API（v1.37.0）。
+     *
+     * <p>接入 RemoteOK / Remotive / Arbeitnow 等公开 JSON 接口以扩充岗位量。
+     * 这些源以海外与远程岗位为主，若发现与国内校招/社招场景不匹配，
+     * 可通过 {@code app.job-agent.open-api-enabled=false} 一键关闭，无需改代码与发版。
+     */
+    private boolean openApiEnabled = true;
+
+    public boolean isOpenApiEnabled() {
+        return openApiEnabled;
+    }
+
+    public void setOpenApiEnabled(boolean openApiEnabled) {
+        this.openApiEnabled = openApiEnabled;
+    }
+
     public Map<String, PlatformConfig> getPlatforms() {
         return platforms;
     }

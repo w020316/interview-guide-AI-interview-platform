@@ -102,10 +102,10 @@ class AdminServiceTest {
         when(jobPostingRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(empty);
 
         AdminService service = newService(new SimpleMeterRegistry());
-        assertThat(service.listJobs(null, 0, 10).getTotalElements()).isZero();
-        assertThat(service.listJobs("  ", 0, 10).getTotalElements()).isZero();
+        assertThat(service.listJobs(null, null, null, null, 0, 10).getTotalElements()).isZero();
+        assertThat(service.listJobs("  ", null, null, null, 0, 10).getTotalElements()).isZero();
         // 通配符与负页码/超大 size 均被夹紧
-        service.listJobs("100%_\\", -5, 999);
+        service.listJobs("100%_\\", null, null, null, -5, 999);
         verify(jobPostingRepository, org.mockito.Mockito.times(3))
                 .findAll(any(Specification.class), any(Pageable.class));
         org.mockito.ArgumentCaptor<Pageable> cap = org.mockito.ArgumentCaptor.forClass(Pageable.class);
@@ -113,6 +113,120 @@ class AdminServiceTest {
                 .findAll(any(Specification.class), cap.capture());
         assertThat(cap.getAllValues().get(2).getPageNumber()).isZero();
         assertThat(cap.getAllValues().get(2).getPageSize()).isEqualTo(50);
+    }
+
+    /**
+     * v1.37.0 新增：来源 / 招聘类型 / 状态三个筛选条件。
+     *
+     * <p>Specification 是 lambda，其内部谓词无法直接断言（渲染谓词需要一整套
+     * CriteriaBuilder mock，测试会变得比被测逻辑更脆）。这里只覆盖「参数可组合、
+     * 不抛异常、仍落到同一次分页查询」——条件的实际 SQL 语义由 JobAgentService
+     * 的查询路径与集成测试覆盖。
+     */
+    @Test
+    @DisplayName("listJobs: 来源/类型/状态筛选可组合传入")
+    void listJobs_acceptsOptionalFilters() {
+        when(jobPostingRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        AdminService service = newService(new SimpleMeterRegistry());
+        assertThat(service.listJobs(null, "行业精选", "AUTUMN", Boolean.TRUE, 0, 10).getTotalElements()).isZero();
+        assertThat(service.listJobs("java", "行业精选", null, Boolean.FALSE, 2, 20).getTotalElements()).isZero();
+        verify(jobPostingRepository, org.mockito.Mockito.times(2))
+                .findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("overview: 附带数据源分布、招聘类型分布与近 7 天趋势")
+    void overview_includesDistributionsAndTrend() {
+        when(jobPostingRepository.count()).thenReturn(10L);
+        when(jobPostingRepository.countByActiveTrue()).thenReturn(7L);
+        when(userRepository.count()).thenReturn(3L);
+        // 显式 List.<Object[]>of：否则泛型 + varargs 会让 javac 把 E 推断成 Object，
+        // 与 thenReturn 期望的 List<Object[]> 不匹配（编译期报错）
+        when(jobPostingRepository.countGroupByPlatform()).thenReturn(List.<Object[]>of(
+                new Object[]{"秋招精选", 6L, 4L},
+                new Object[]{"行业精选", 4L, 3L}));
+        when(jobPostingRepository.countByRecruitType()).thenReturn(List.<Object[]>of(
+                new Object[]{"AUTUMN", 6L},
+                new Object[]{"SOCIAL", 4L}));
+        LocalDateTime today = java.time.LocalDate.now().atTime(9, 0);
+        when(jobPostingRepository.findCreatedAtSince(any())).thenReturn(List.of(today, today));
+        when(userRepository.findCreatedAtSince(any())).thenReturn(List.of(today));
+
+        Map<String, Object> result = newService(new SimpleMeterRegistry()).overview();
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> dist = (List<Map<String, Object>>) result.get("sourceDist");
+        assertThat(dist).hasSize(2);
+        // 失效数由 total - active 推导（用于发现「某个源集体过期」）
+        assertThat(dist.get(0))
+                .containsEntry("platform", "秋招精选")
+                .containsEntry("total", 6L)
+                .containsEntry("active", 4L)
+                .containsEntry("inactive", 2L);
+
+        assertThat(result.get("recruitDist")).isEqualTo(Map.of("AUTUMN", 6L, "SOCIAL", 4L));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> trend = (List<Map<String, Object>>) result.get("trend");
+        assertThat(trend).hasSize(7);
+        // 最后一天即今天，岗位 2 条、用户 1 名
+        assertThat(trend.get(6))
+                .containsEntry("date", java.time.LocalDate.now().toString())
+                .containsEntry("jobs", 2L)
+                .containsEntry("users", 1L);
+        // 前 6 天无新增，返回 0 而不是缺失键（前端据此渲染 0 高度柱）
+        assertThat(trend.get(0)).containsEntry("jobs", 0L).containsEntry("users", 0L);
+    }
+
+    @Test
+    @DisplayName("sources: 适配器状态与入库量对照；库中未被声明的来源单列并标注")
+    void sources_mergesAdapterStatusWithCounts() {
+        when(jobAgentService.platformStatus()).thenReturn(List.of(
+                adapterRow("秋招精选", true, false),
+                adapterRow("第三方平台", false, true)));
+        when(jobPostingRepository.countGroupByPlatform()).thenReturn(List.<Object[]>of(
+                new Object[]{"秋招精选", 6L, 4L},
+                new Object[]{"智联招聘", 3L, 3L}));
+        when(jobPostingRepository.findLastUpdatedAtByPlatform())
+                .thenReturn(List.<Object[]>of(new Object[]{"秋招精选", LocalDateTime.now()}));
+
+        Map<String, Object> result = newService(new SimpleMeterRegistry()).sources();
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) result.get("items");
+        assertThat(items).hasSize(3);
+
+        assertThat(items.get(0))
+                .containsEntry("platform", "秋招精选")
+                .containsEntry("enabled", true)
+                .containsEntry("builtin", true)
+                .containsEntry("total", 6L)
+                .containsEntry("active", 4L);
+
+        // 聚合适配器（第三方平台）自身不直接入库，标注 aggregate 供前端提示
+        assertThat(items.get(1))
+                .containsEntry("platform", "第三方平台")
+                .containsEntry("aggregate", true)
+                .containsEntry("total", 0L);
+
+        // 库中存在但无适配器声明 → 标为未内置，避免「有数据但不知来源」
+        assertThat(items.get(2))
+                .containsEntry("platform", "智联招聘")
+                .containsEntry("builtin", false)
+                .containsEntry("enabled", false);
+
+        assertThat(result.get("enabledCount")).isEqualTo(1L);
+    }
+
+    /** 构造 platformStatus() 的返回行（与 JobAgentService 的输出结构一致） */
+    private static Map<String, Object> adapterRow(String platform, boolean enabled, boolean aggregate) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("platform", platform);
+        m.put("enabled", enabled);
+        m.put("aggregate", aggregate);
+        return m;
     }
 
     @Test

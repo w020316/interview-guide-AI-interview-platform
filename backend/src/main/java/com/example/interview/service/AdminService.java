@@ -12,22 +12,35 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * 管理后台服务（v1.31.4，仅 ROLE_ADMIN 可访问）
- * - 数据总览 + 手动刷新（复用 JobAgentService）
- * - 岗位数据管理：分页检索全部（含失效）、下架/恢复/删除
- * - 用户管理：分页列表（含禁用状态）、禁用/解禁
- * - 系统指标：AI 调用统计、SSE 并发水位
+ * 管理后台服务（v1.31.4 建立，v1.37.0 扩展数据源视图与趋势统计）
+ *
+ * <ul>
+ *   <li>数据总览：岗位与用户总量、数据源分布、招聘类型分布、热门行业、近 7 天趋势</li>
+ *   <li>手动刷新（复用 {@link JobAgentService}）</li>
+ *   <li>岗位管理：分页检索（含失效）+ 来源/类型/状态筛选 + 下架/恢复/删除</li>
+ *   <li>用户管理：分页列表（含禁用状态）、禁用/解禁</li>
+ *   <li>数据源视图：适配器启用状态 × 实际入库量 × 最近更新时间（v1.37.0）</li>
+ *   <li>系统指标：AI 调用统计、SSE 并发水位、JVM 内存</li>
+ * </ul>
  */
 @Service
 public class AdminService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminService.class);
+
+    /** 总览趋势窗口（天） */
+    private static final int TREND_DAYS = 7;
 
     private final JobPostingRepository jobPostingRepository;
     private final UserRepository userRepository;
@@ -49,7 +62,10 @@ public class AdminService {
 
     // ── 数据总览 ──
 
-    /** 总览：岗位总量/有效量/失效量、用户总量、最近刷新时间、刷新中状态 */
+    /**
+     * 总览：岗位总量/有效量/失效量、用户总量、最近刷新时间、刷新中状态，
+     * 以及数据源分布、招聘类型分布、热门行业与近 7 天趋势（v1.37.0）。
+     */
     public Map<String, Object> overview() {
         Map<String, Object> result = new LinkedHashMap<>();
         long totalJobs = jobPostingRepository.count();
@@ -61,7 +77,76 @@ public class AdminService {
         result.put("bannedUsers", userBanRegistry.bannedSnapshot().size());
         result.put("lastRefreshedAt", jobPostingRepository.findLastUpdatedAt());
         result.put("refreshing", jobAgentService.isRefreshing());
+        result.put("sourceDist", sourceDistribution());
+        result.put("recruitDist", recruitDistribution());
+        result.put("trend", buildTrend(TREND_DAYS));
         return result;
+    }
+
+    /** 数据源分布（按有效岗位数降序，同时给出失效数便于发现「某个源集体过期」） */
+    private List<Map<String, Object>> sourceDistribution() {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Object[] row : jobPostingRepository.countGroupByPlatform()) {
+            long total = toLong(row[1]);
+            long active = toLong(row[2]);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("platform", String.valueOf(row[0]));
+            item.put("total", total);
+            item.put("active", active);
+            item.put("inactive", total - active);
+            rows.add(item);
+        }
+        return rows;
+    }
+
+    /** 招聘类型分布（秋招/春招/实习/社招/定向），用于总览的比例条 */
+    private Map<String, Long> recruitDistribution() {
+        Map<String, Long> dist = new LinkedHashMap<>();
+        for (Object[] row : jobPostingRepository.countByRecruitType()) {
+            dist.put(String.valueOf(row[0]), toLong(row[1]));
+        }
+        return dist;
+    }
+
+    /**
+     * 近 N 天「新增岗位 / 新增用户」趋势。
+     *
+     * <p>刻意不在 SQL 里按天分组：`DATE()` / `CAST(... AS date)` 在 H2（本地/测试）
+     * 与 PostgreSQL（生产）上的写法不一致，容易「本地绿、线上红」。
+     * 改为取回时间戳后在 Java 侧归组，方言无关且数据量可控。
+     */
+    private List<Map<String, Object>> buildTrend(int days) {
+        LocalDate today = LocalDate.now();
+        LocalDate from = today.minusDays(days - 1L);
+        LocalDateTime since = from.atStartOfDay();
+
+        Map<LocalDate, Long> jobsByDay = countByDay(jobPostingRepository.findCreatedAtSince(since));
+        Map<LocalDate, Long> usersByDay = countByDay(userRepository.findCreatedAtSince(since));
+
+        List<Map<String, Object>> trend = new ArrayList<>(days);
+        for (int i = 0; i < days; i++) {
+            LocalDate day = from.plusDays(i);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("date", day.toString());
+            row.put("label", day.getMonthValue() + "/" + day.getDayOfMonth());
+            row.put("jobs", jobsByDay.getOrDefault(day, 0L));
+            row.put("users", usersByDay.getOrDefault(day, 0L));
+            trend.add(row);
+        }
+        return trend;
+    }
+
+    private static Map<LocalDate, Long> countByDay(List<LocalDateTime> timestamps) {
+        Map<LocalDate, Long> map = new HashMap<>();
+        if (timestamps == null) {
+            return map;
+        }
+        for (LocalDateTime ts : timestamps) {
+            if (ts != null) {
+                map.merge(ts.toLocalDate(), 1L, Long::sum);
+            }
+        }
+        return map;
     }
 
     /** 手动刷新岗位数据（管理员调用，无按用户限流） */
@@ -73,10 +158,95 @@ public class AdminService {
         return result;
     }
 
+    // ── 数据源视图（v1.37.0）──
+
+    /**
+     * 数据源健康视图：把「适配器声明了哪些源、是否启用」与「库中实际有多少岗位、
+     * 最近何时更新」对照展示。
+     *
+     * <p>关键价值：刷新失败或某个源被平台停用时，此前在后台完全看不出来——
+     * 只有岗位总数慢慢变少。现在能直接看到每个源的贡献量与最后更新时间。
+     *
+     * <p>库里存在但没有任何适配器声明的来源（历史第三方渠道、已关闭的数据源）
+     * 也会列出并标注，避免「数据在但不知道哪来的」。
+     */
+    public Map<String, Object> sources() {
+        Map<String, long[]> stat = new LinkedHashMap<>();
+        for (Object[] row : jobPostingRepository.countGroupByPlatform()) {
+            stat.put(String.valueOf(row[0]), new long[]{toLong(row[1]), toLong(row[2])});
+        }
+        Map<String, LocalDateTime> lastUpdated = new LinkedHashMap<>();
+        for (Object[] row : jobPostingRepository.findLastUpdatedAtByPlatform()) {
+            if (row[1] instanceof LocalDateTime ldt) {
+                lastUpdated.put(String.valueOf(row[0]), ldt);
+            }
+        }
+
+        List<Map<String, Object>> adapterStatus = jobAgentService.platformStatus();
+        Set<String> declared = new LinkedHashSet<>();
+        for (Map<String, Object> a : adapterStatus) {
+            declared.add(String.valueOf(a.get("platform")));
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        long enabledCount = 0;
+        for (Map<String, Object> a : adapterStatus) {
+            String name = String.valueOf(a.get("platform"));
+            boolean enabled = Boolean.TRUE.equals(a.get("enabled"));
+            boolean aggregate = Boolean.TRUE.equals(a.get("aggregate"));
+            if (enabled) {
+                enabledCount++;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("platform", name);
+            row.put("enabled", enabled);
+            row.put("aggregate", aggregate);
+            row.put("builtin", true);
+            long[] s = stat.getOrDefault(name, new long[]{0L, 0L});
+            row.put("total", s[0]);
+            row.put("active", s[1]);
+            row.put("lastUpdatedAt", lastUpdated.get(name));
+            row.put("note", aggregate
+                    ? "按渠道名分别入库，实际来源见下方标记为「渠道」的条目"
+                    : null);
+            rows.add(row);
+        }
+
+        for (Map.Entry<String, long[]> e : stat.entrySet()) {
+            if (declared.contains(e.getKey())) {
+                continue;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("platform", e.getKey());
+            row.put("enabled", false);
+            row.put("aggregate", false);
+            row.put("builtin", false);
+            row.put("total", e.getValue()[0]);
+            row.put("active", e.getValue()[1]);
+            row.put("lastUpdatedAt", lastUpdated.get(e.getKey()));
+            row.put("note", "当前没有适配器申明该来源（可能是已配置的第三方渠道或已关闭的数据源）");
+            rows.add(row);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("items", rows);
+        result.put("count", rows.size());
+        result.put("enabledCount", enabledCount);
+        return result;
+    }
+
     // ── 岗位数据管理 ──
 
-    /** 全部岗位分页（含失效；keyword 模糊匹配标题/公司/标签） */
-    public Page<JobPostingEntity> listJobs(String keyword, int page, int size) {
+    /**
+     * 全部岗位分页（含失效）。
+     *
+     * @param keyword     模糊匹配标题/公司/标签
+     * @param source      精确匹配数据来源（platform）
+     * @param recruitType 精确匹配招聘类型（AUTUMN/SPRING/SOCIAL/INTERN/TARGETED）
+     * @param active      状态筛选：true 仅有效 / false 仅失效 / null 全部
+     */
+    public Page<JobPostingEntity> listJobs(String keyword, String source, String recruitType,
+                                           Boolean active, int page, int size) {
         var spec = (org.springframework.data.jpa.domain.Specification<JobPostingEntity>) (root, query, cb) -> cb.conjunction();
         if (keyword != null && !keyword.isBlank()) {
             String kw = keyword.trim().toLowerCase();
@@ -86,7 +256,18 @@ public class AdminService {
                     cb.like(cb.lower(root.get("companyName")), pattern, '\\'),
                     cb.like(cb.lower(root.get("tags")), pattern, '\\')));
         }
-        var pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50));
+        if (source != null && !source.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("platform"), source.trim()));
+        }
+        if (recruitType != null && !recruitType.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("recruitType"), recruitType.trim()));
+        }
+        if (active != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("active"), active));
+        }
+        // 默认按 id 倒序：新增的岗位排前面，便于运营快速确认「刚刷新的数据进来了」
+        var pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50),
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Order.desc("id")));
         return jobPostingRepository.findAll(spec, pageable);
     }
 
@@ -215,5 +396,10 @@ public class AdminService {
         summary.put("totalMb", rt.totalMemory() / 1024 / 1024);
         summary.put("maxMb", rt.maxMemory() / 1024 / 1024);
         return summary;
+    }
+
+    /** JPQL 聚合结果可能是 Long / Integer / BigInteger，统一转 long（SUM 无匹配时为 null） */
+    private static long toLong(Object value) {
+        return value instanceof Number n ? n.longValue() : 0L;
     }
 }

@@ -32,36 +32,87 @@
       </div>
 
       <div v-else-if="tab === 'import'" class="import-area">
-        <div class="import-tips">
-          <p class="import-tip-title">支持的导入方式</p>
-          <ul class="import-tip-list">
-            <li><strong>在线简历链接</strong>：超级简历、GitHub 主页、个人博客等公开页面</li>
-            <li><strong>剪贴板粘贴</strong>：从招聘 App 或其他简历工具复制文本后一键粘贴</li>
-            <li><strong>云盘文件</strong>：iOS 点击"上传文件"可从 iCloud Drive / 文件 App 选取</li>
-          </ul>
+        <!-- v1.37.0 新增：从其他软件提取简历。
+             场景：简历常常不在本地，而是躺在微信「文件传输助手」、网盘、WPS 云文档
+             或招聘 App 的在线简历里。此前只能靠用户自己找到并导出，取件成本高。
+             现在给出直达入口——移动端唤起对应 App，桌面端打开其网页版。 -->
+        <div class="extract-block">
+          <div class="extract-head">
+            <p class="extract-title">从其他软件提取简历</p>
+            <p class="extract-sub">
+              点对应入口直达取件，导出 PDF / 复制文本后回到本页
+            </p>
+          </div>
+
+          <div class="extract-grid">
+            <div v-for="s in EXTRACT_SOURCES" :key="s.key" class="extract-card">
+              <button class="ex-main" type="button" :title="`前往 ${s.name}（${s.hint}）`" @click="openExtractSource(s)">
+                <span class="ex-ico" :style="{ background: s.bg, color: s.color }">{{ s.glyph }}</span>
+                <span class="ex-body">
+                  <b>{{ s.name }}</b>
+                  <em>{{ s.hint }}</em>
+                </span>
+                <svg class="ex-enter" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M7 17L17 7 M9 7h8v8" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <!-- 唤起 App 失败时的兜底入口（用户手势触发，不会被浏览器拦截） -->
+              <a
+                v-if="failedKey === s.key"
+                class="ex-fallback"
+                :href="s.webUrl"
+                target="_blank"
+                rel="noopener"
+              >未唤起 App？打开网页版 →</a>
+            </div>
+          </div>
+
+          <div class="extract-actions">
+            <button class="btn-pick" type="button" @click="triggerFilePicker">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              选择本机文件
+            </button>
+            <button class="btn-clipboard" type="button" @click="pasteFromClipboard">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M9 2h6a1 1 0 011 1v1h2a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2V3a1 1 0 011-1z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M9 12h6 M9 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              从剪贴板粘贴
+            </button>
+            <!-- 原生文件选择：桌面打开文件管理器，iOS/Android 打开「文件」App（可从 iCloud / 云盘选取） -->
+            <input
+              ref="nativeFileInput"
+              class="hidden-file"
+              type="file"
+              accept=".pdf,.txt,.html,.htm,.md,.markdown"
+              @change="onNativeFile"
+            />
+          </div>
+
+          <p class="extract-note">
+            简历是 Word 文档？在 WPS / 腾讯文档里「导出为 PDF」后，再用上面的
+            「选择本机文件」上传即可（系统会自动识别 PDF 文本）。
+          </p>
         </div>
+
+        <div class="import-divider"><span>或从链接导入</span></div>
 
         <div class="field-row">
           <label>简历页面 URL</label>
           <BaseInput v-model="importUrl" type="url" block placeholder="https://your-resume-url.com" />
+          <p class="field-hint">支持超级简历、GitHub 主页、个人博客等公开页面</p>
         </div>
         <button class="btn-import" :disabled="importLoading" @click="importFromUrl">
           <span v-if="importLoading" class="spinner"></span>
           {{ importLoading ? '抓取分析中...' : '从 URL 导入' }}
         </button>
 
-        <div class="import-divider"><span>或</span></div>
-
-        <button class="btn-clipboard" @click="pasteFromClipboard">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M9 2h6a1 1 0 011 1v1h2a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2V3a1 1 0 011-1z"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M9 12h6 M9 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          从剪贴板粘贴
-        </button>
-
-        <div class="field-row" style="margin-top: 16px;">
+        <div class="field-row" style="margin-top: 4px;">
           <label>目标岗位</label>
           <BaseInput v-model="targetJob" block list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
         </div>
@@ -250,7 +301,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
@@ -295,6 +346,120 @@ const parseError = ref('')
 // 从其他平台导入相关状态
 const importUrl = ref('')
 const importLoading = ref(false)
+
+/* ─────────────────────────────────────────────────────────────
+   从其他软件提取简历（v1.37.0）
+   简历的常见存放位置并不在本地磁盘，而是在微信文件传输助手、网盘、
+   WPS 云文档或招聘 App 的在线简历里。这里给出直达取件入口：
+   移动端用 App scheme 唤起，桌面端打开其网页版，再配合「选择本机文件」
+   与「剪贴板粘贴」两条通用兜底通道。
+   ───────────────────────────────────────────────────────────── */
+
+interface ExtractSource {
+  key: string
+  name: string
+  /** 图标字形（单字/字母，避免依赖第三方图标资源） */
+  glyph: string
+  bg: string
+  color: string
+  /** 简历通常在该软件里的位置 */
+  hint: string
+  /** 移动端 App scheme；未提供则移动端也直接走网页版 */
+  scheme?: string
+  /** 桌面端（或唤起失败后）打开的网页地址 */
+  webUrl: string
+}
+
+const EXTRACT_SOURCES: ExtractSource[] = [
+  {
+    key: 'wechat', name: '微信', glyph: '微', bg: '#e8f7ec', color: '#07c160',
+    hint: '文件传输助手 / 收藏', scheme: 'weixin://',
+    webUrl: 'https://filehelper.weixin.qq.com/',
+  },
+  {
+    key: 'qq', name: 'QQ', glyph: 'Q', bg: '#e8f1ff', color: '#12b7f5',
+    hint: '我的电脑 / 文件中转站', scheme: 'mqq://', webUrl: 'https://im.qq.com',
+  },
+  {
+    key: 'dingtalk', name: '钉钉', glyph: '钉', bg: '#e9f2ff', color: '#1a73e8',
+    hint: '钉盘 / 我的文件', scheme: 'dingtalk://', webUrl: 'https://www.dingtalk.com',
+  },
+  {
+    key: 'wps', name: 'WPS 云文档', glyph: 'W', bg: '#fff1ec', color: '#e6432c',
+    hint: '最近文档', scheme: 'wps://', webUrl: 'https://www.kdocs.cn',
+  },
+  {
+    key: 'docs', name: '腾讯文档', glyph: '腾', bg: '#e8f0ff', color: '#1e6fff',
+    hint: '我的文档', scheme: 'tencentdocs://', webUrl: 'https://docs.qq.com',
+  },
+  {
+    key: 'pan', name: '百度网盘', glyph: '盘', bg: '#e9f3ff', color: '#2b7efb',
+    hint: '我的资源', scheme: 'baiduyun://', webUrl: 'https://pan.baidu.com',
+  },
+  {
+    key: 'wondercv', name: '超级简历', glyph: '超', bg: '#eaf7f4', color: '#0f9b7d',
+    hint: '在线简历 / 导出 PDF', webUrl: 'https://www.wondercv.com',
+  },
+  {
+    key: 'zhipin', name: 'BOSS 直聘', glyph: 'B', bg: '#e8f6f0', color: '#00a97f',
+    hint: '附件简历 / 在线简历', scheme: 'bosszp://', webUrl: 'https://www.zhipin.com',
+  },
+]
+
+const nativeFileInput = ref<HTMLInputElement | null>(null)
+const isMobile = ref(false)
+/** 唤起 App 失败的软件 key：命中后在该卡片内展开「打开网页版」兜底入口 */
+const failedKey = ref('')
+
+/** 终端判定：移动端优先唤起 App，桌面端直达网页版 */
+function detectMobile(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /Android|iPhone|iPad|iPod|HarmonyOS|Mobile|Windows Phone/i.test(navigator.userAgent)
+}
+
+/** 触发原生文件选择（桌面打开文件管理器；iOS/Android 打开「文件」App，可进 iCloud / 云盘取件） */
+function triggerFilePicker() {
+  nativeFileInput.value?.click()
+}
+
+function onNativeFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) void handleUpload(file)
+  // 重置 value，允许连续选择同一个文件
+  input.value = ''
+}
+
+/**
+ * 打开取件入口。
+ *
+ * - 移动端且配置了 scheme：直接跳 scheme 唤起 App，并在 1.6s 后检查页面是否被切到后台；
+ *   若仍可见说明「未安装 App / 唤起被拦截」，展开该卡片的网页版兜底链接
+ *   （兜底必须是 <a> 由用户手势触发，setTimeout 里 window.open 会被浏览器拦截）。
+ * - 其他情况：新标签打开网页版。
+ *
+ * 注意：scheme 跳转必须由用户手势同步发起，因此本函数不做任何 await。
+ */
+function openExtractSource(s: ExtractSource) {
+  failedKey.value = ''
+  if (isMobile.value && s.scheme) {
+    window.location.href = s.scheme
+    const startedAt = Date.now()
+    window.setTimeout(() => {
+      const stillVisible = typeof document === 'undefined' || document.visibilityState === 'visible'
+      if (stillVisible && Date.now() - startedAt < 3200) {
+        failedKey.value = s.key
+        ElMessage.info(`未检测到「${s.name}」App，可点下方「打开网页版」，或直接选择本机文件`)
+      }
+    }, 1600)
+    return
+  }
+  window.open(s.webUrl, '_blank', 'noopener')
+}
+
+onMounted(() => {
+  isMobile.value = detectMobile()
+})
 
 // 优化简历相关状态
 const optimizing = ref(false)
@@ -731,43 +896,157 @@ function formatDate() {
   gap: 16px;
 }
 
-.import-tips {
-  padding: 16px 20px;
-  background: var(--brand-primary-50);
-  border: 1px solid var(--brand-primary-100);
-  border-radius: var(--radius-md);
+/* ── 从其他软件提取简历（v1.37.0）── */
+.extract-block {
+  padding: 20px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
 }
 
-.import-tip-title {
-  font-size: 13px;
+.extract-head {
+  margin-bottom: 14px;
+}
+
+.extract-title {
+  margin: 0 0 4px;
+  font-family: var(--font-sans);
+  font-size: 15px;
   font-weight: 600;
-  color: var(--brand-primary);
-  margin: 0 0 8px;
+  color: var(--c-text);
 }
 
-.import-tip-list {
-  list-style: none;
-  padding: 0;
+.extract-sub {
   margin: 0;
-}
-
-.import-tip-list li {
-  position: relative;
-  padding: 3px 0 3px 16px;
   font-size: 13px;
   line-height: 1.6;
-  color: var(--c-text-secondary);
+  color: var(--c-text-tertiary);
 }
 
-.import-tip-list li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 11px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--brand-primary);
+.extract-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(208px, 1fr));
+  gap: 8px;
+}
+
+.extract-card {
+  border-radius: var(--radius-md);
+  background: var(--c-bg-alt);
+  border: 1px solid transparent;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.extract-card:hover {
+  background: var(--c-surface);
+  border-color: var(--brand-primary-200);
+}
+
+.ex-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--font-sans);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.ex-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ex-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ex-body b {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--c-text);
+}
+
+.ex-body em {
+  font-style: normal;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--c-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ex-enter {
+  flex-shrink: 0;
+  color: var(--c-text-quaternary);
+  opacity: 0;
+  transition: opacity var(--transition-fast), transform var(--transition-fast), color var(--transition-fast);
+}
+
+.extract-card:hover .ex-enter {
+  color: var(--brand-primary);
+  opacity: 1;
+  transform: translate(1px, -1px);
+}
+
+/* 唤起 App 失败后的网页版兜底入口 */
+.ex-fallback {
+  display: block;
+  margin: 0 12px 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-primary);
+  background: var(--brand-primary-50);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
+.ex-fallback:hover {
+  background: var(--brand-primary-100);
+}
+
+.extract-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--c-border);
+}
+
+.extract-note {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--c-text-tertiary);
+}
+
+/* 原生文件选择器：视觉隐藏，由 .click() 触发 */
+.hidden-file {
+  display: none;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--c-text-quaternary);
 }
 
 .btn-import {
@@ -813,25 +1092,41 @@ function formatDate() {
   background: var(--c-border);
 }
 
+/* 取件通用通道：选择本机文件 / 剪贴板粘贴，并列排布 */
+.btn-pick,
 .btn-clipboard {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 28px;
-  font-size: 15px;
+  padding: 10px 20px;
+  font-family: var(--font-sans);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--brand-primary);
-  background: var(--c-surface);
-  border: 2px solid var(--brand-primary);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.btn-pick {
+  color: #fff;
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+}
+
+.btn-pick:hover {
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.btn-clipboard {
+  color: var(--brand-primary);
+  background: var(--c-surface);
+  border: 1px solid var(--brand-primary);
 }
 
 .btn-clipboard:hover {
   background: var(--brand-primary-50);
-  transform: translateY(-1px);
 }
 
 .btn-analyze {

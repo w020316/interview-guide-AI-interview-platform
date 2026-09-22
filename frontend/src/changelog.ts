@@ -85,9 +85,32 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.33.3'
+export const CURRENT_VERSION = '1.37.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.37.0',
+    date: '2026-09-22',
+    title: '版本 1.37.0 · 导航更清爽，岗位更多更全',
+    items: [
+      { text: '顶部导航：原来挤在一起的十几个入口重新梳理为「5 个主入口 + 求职工具下拉菜单」，找功能更快，页面顶部不再拥挤', level: 'user' },
+      { text: '顶部导航：手机端改为分组抽屉菜单，各项功能不再需要左右滑动查找', level: 'user' },
+      { text: '简历分析：新增「从其他软件提取简历」，可一键直达微信、QQ、钉钉、WPS 云文档、腾讯文档、百度网盘、超级简历、BOSS 直聘取简历；新增「选择本机文件」按钮，从电脑文件夹或手机「文件」App 直接选取', level: 'user' },
+      { text: '招聘广场：岗位数量大幅增加（新增近百条覆盖制造、能源、建筑、医药、消费、物流、农业、金融、传媒、政务、法律、教育等行业的岗位），不再只集中在互联网大厂', level: 'user' },
+      { text: '招聘广场：接入 3 个公开岗位数据源，并新增「数据来源」快捷筛选，可一眼看到岗位来自哪些渠道、按来源筛选', level: 'user' },
+      { text: '招聘广场：新增秋招/春招/实习之外的定向专项（选调生、三支一扶、西部计划、军队文职、特岗教师）与欧洲/全球远程岗位', level: 'user' },
+      { text: '管理后台：新增「数据源」页，可查看每个数据源是否正常、贡献了多少岗位、最近一次更新是什么时候，某个渠道不再默默失效', level: 'user' },
+      { text: '管理后台：数据总览新增数据源分布、招聘类型分布与近 7 天新增趋势图，岗位管理的筛选条件新增来源、招聘类型、有效/失效', level: 'user' },
+      { text: '管理后台：界面配色统一到全站设计规范，深色模式下文字不再看不清', level: 'user' },
+      { text: '后端：新增公开招聘数据源适配器体系（AbstractOpenApiJobProvider + RemoteOK / Remotive / Arbeitnow），含失败隔离、列长裁剪、HTML 转纯文本；可用 app.job-agent.open-api-enabled 一键关闭', level: 'tech' },
+      { text: '后端：新增行业精选（53 条）与服务精选（43 条）种子数据源，覆盖实体产业与服务/公共部门，补齐此前完全缺位的行业方向', level: 'tech' },
+      { text: '后端：新增 GET /api/admin/sources 数据源健康接口；GET /api/admin/jobs 支持 source / recruitType / active 筛选；GET /api/admin/overview 返回 sourceDist / recruitDist / trend', level: 'tech' },
+      { text: '后端：聚合统计刻意不在 SQL 中按天分组（DATE() 在 H2 与 PostgreSQL 写法不一致，易「本地绿、线上红」），改为取回时间戳后 Java 侧归组', level: 'tech' },
+      { text: '前端：App.vue 导航重构——自定义 dropdown（hover/点击/ESC/外部点击/键盘可达）+ ≤960px 分组抽屉；导航滚动浮起阴影', level: 'tech' },
+      { text: '前端：AdminView 全面改用设计 token，新增 conic-gradient 环形图与纯 CSS 条形图、柱状趋势图（不引入图表库）', level: 'tech' },
+      { text: '测试：后端用例新增数据源/总览分布与趋势断言，前端 286 例全绿', level: 'tech' },
+    ]
+  },
   {
     version: '1.33.3',
     date: '2026-09-19',

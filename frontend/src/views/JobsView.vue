@@ -81,6 +81,25 @@
         </button>
       </div>
 
+      <!-- 数据来源快捷筛选（v1.37.0）：多源聚合后来源变多，用 chips 直选比下拉更直观，
+           同时让「岗位来自多个数据源」这件事对用户可见 -->
+      <div v-if="meta.sources.length" class="filter-row source-row">
+        <span class="source-label">数据来源</span>
+        <button
+          class="source-chip"
+          :class="{ active: !source }"
+          @click="pickSource('')"
+        >全部</button>
+        <button
+          v-for="s in meta.sources"
+          :key="s"
+          class="source-chip"
+          :class="{ active: source === s, overseas: isOverseasSource(s) }"
+          :title="isOverseasSource(s) ? '海外 / 远程岗位数据源' : '国内岗位数据源'"
+          @click="pickSource(s)"
+        >{{ shortSource(s) }}</button>
+      </div>
+
       <!-- 简历匹配推荐（v1.29.0） -->
       <div v-if="matchOpen" class="filter-row match-panel">
         <textarea v-model="matchResume" rows="3" class="filter-input ta"
@@ -492,6 +511,29 @@ function applyFilters() {
   fetchJobs()
 }
 
+/* ── 数据来源快捷筛选（v1.37.0）──
+   多源聚合后来源数量上升（内置精选 + 公开 API + 可配置第三方渠道），
+   用 chips 直选比下拉更直观，也让「岗位来自多个数据源」对用户可见。 */
+
+/** 海外 / 远程数据源标识：这些来源以英文海外岗位为主，UI 上做视觉区分 */
+const OVERSEAS_SOURCE_MARKERS = ['RemoteOK', 'Remotive', 'Arbeitnow']
+
+function isOverseasSource(s: string): boolean {
+  return OVERSEAS_SOURCE_MARKERS.some((m) => s.includes(m))
+}
+
+/** 来源名缩短：chips 只保留核心品牌词（「RemoteOK 全球远程」→「RemoteOK」） */
+function shortSource(s: string): string {
+  return s.split(/\s+/)[0] || s
+}
+
+/** 点击来源 chip：再点一次取消该来源筛选（「全部」chip 传空串） */
+function pickSource(s: string) {
+  source.value = s !== '' && s === source.value ? '' : s
+  page.value = 0
+  fetchJobs()
+}
+
 function switchTab(value: string) {
   recruitType.value = value
   if (value === 'FAVORITE') {
@@ -724,6 +766,60 @@ onMounted(() => {
 .refresh-btn:hover:not(:disabled) {
   border-color: var(--brand-primary);
   color: var(--brand-primary);
+}
+
+/* ── 数据来源快捷筛选 chips（v1.37.0）── */
+.source-row {
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px dashed var(--c-border);
+  margin-top: 4px;
+}
+
+.source-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-text-tertiary);
+  white-space: nowrap;
+}
+
+.source-chip {
+  padding: 5px 12px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+  background: var(--c-bg-alt);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.source-chip:hover {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary-200);
+}
+
+.source-chip.active {
+  color: #fff;
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  font-weight: 600;
+}
+
+/* 海外 / 远程来源：选中时用赭石橙区分，避免与国内来源混淆 */
+.source-chip.overseas.active {
+  background: var(--brand-accent);
+  border-color: var(--brand-accent);
+}
+
+.source-chip.overseas:not(.active) {
+  color: var(--brand-accent);
+  background: var(--brand-accent-light);
 }
 
 .job-list {
