@@ -96,6 +96,41 @@ public class AgentService {
         this.resumeService = resumeService;
     }
 
+    /**
+     * 求职 Skill 服务（v1.35.0）：供 mineCareerAssets 工具做职业资产四层挖掘。
+     *
+     * <p>同样采用 setter 注入：本类构造器已被多处测试直接调用，新增参数会波及所有调用点。
+     * 允许为 null（切片测试未注入），工具内会空值降级为引导文案。
+     */
+    private com.example.interview.service.career.CareerProfileService careerProfileService;
+
+    @Autowired(required = false)
+    public void setCareerProfileService(com.example.interview.service.career.CareerProfileService careerProfileService) {
+        this.careerProfileService = careerProfileService;
+    }
+
+    /**
+     * 投递台账服务（v1.35.0）：供 getMyApplications 工具读取用户投递进度与待跟进项。
+     * 允许为 null（切片测试未注入），工具内会空值降级。
+     */
+    private com.example.interview.service.job.JobApplicationService jobApplicationService;
+
+    @Autowired(required = false)
+    public void setJobApplicationService(com.example.interview.service.job.JobApplicationService jobApplicationService) {
+        this.jobApplicationService = jobApplicationService;
+    }
+
+    /**
+     * 面试故事库服务（v1.36.0）：供 prepareInterviewStories 工具提炼 STAR 面试故事。
+     * 允许为 null（切片测试未注入），工具内会空值降级为引导文案。
+     */
+    private com.example.interview.service.career.StoryBankService storyBankService;
+
+    @Autowired(required = false)
+    public void setStoryBankService(com.example.interview.service.career.StoryBankService storyBankService) {
+        this.storyBankService = storyBankService;
+    }
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -197,7 +232,8 @@ public class AgentService {
         String safeMessage = PromptSanitizer.sanitize(session.userMessage());
         AgentTools tools = new AgentTools(conversation.getUserId(), jobAgentService,
                 interviewSessionService, interviewEventService, ragSearchService,
-                webJobSearcherService, jobMatchService, interviewService, resumeService);
+                webJobSearcherService, jobMatchService, interviewService, resumeService,
+                careerProfileService, jobApplicationService, storyBankService);
 
         StringBuilder emitted = new StringBuilder();
         List<String> steps = new ArrayList<>();
@@ -481,7 +517,9 @@ public class AgentService {
         sb.append("2. 【联网实时搜索】当用户要求最新岗位、全网/全国岗位、或本地岗位不足时，调用 searchWebJobs 联网搜索各大招聘平台的全国实时岗位\n");
         sb.append("3. 检索知识库解答技术面试题\n");
         sb.append("4. 分析用户的面试表现、找出薄弱点并制定复习计划\n");
-        sb.append("5. 查看用户的面试日程\n\n");
+        sb.append("5. 查看用户的面试日程\n");
+        sb.append("6. 【求职Skill】当用户说不清自己能投什么岗、想挖自己的优势时，用 mineCareerAssets 按「证据→行为→能力→可投岗位信号」四层帮他挖掘\n");
+        sb.append("7. 跟踪用户的投递进度与回复情况（getMyApplications），提示该跟进谁、该换赛道\n\n");
         sb.append("【工作准则】\n");
         sb.append("- 需要用户数据（岗位/统计/错题/日程/知识点）时按协议调用工具，不要凭空编造数据；但可基于你的知识给出补充建议\n");
         sb.append("- 工具返回空结果时如实告知，并结合你的知识给出可操作的替代建议，不要简单只说''暂无''\n");

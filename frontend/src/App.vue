@@ -53,6 +53,20 @@
               </svg>
               <span>智能体</span>
             </router-link>
+            <router-link v-if="authState.token" to="/career" class="nav-link" :class="{ active: route.path === '/career' }">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2v4 M12 18v4 M4.9 4.9l2.8 2.8 M16.3 16.3l2.8 2.8 M2 12h4 M18 12h4 M4.9 19.1l2.8-2.8 M16.3 7.7l2.8-2.8 M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>求职诊断</span>
+            </router-link>
+            <router-link v-if="authState.token" to="/applications" class="nav-link" :class="{ active: route.path === '/applications' }">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M22 2L11 13 M22 2l-7 20-4-9-9-4 20-7z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>投递看板</span>
+            </router-link>
             <router-link to="/interview" class="nav-link" :class="{ active: route.path === '/interview' }">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"

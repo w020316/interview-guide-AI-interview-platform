@@ -9,6 +9,7 @@ import com.example.interview.entity.InterviewQuestionEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,24 @@ public class AgentTools {
      */
     private final com.example.interview.service.ResumeService resumeService;
 
+    /**
+     * 求职 Skill 服务（v1.35.0）：职业资产四层挖掘 + 岗位节奏计划。
+     * 允许为 null（切片测试未注入），使用时做空值保护并给出引导文案。
+     */
+    private final com.example.interview.service.career.CareerProfileService careerProfileService;
+
+    /**
+     * 投递台账服务（v1.35.0）：让智能体能读到用户的投递进度与待跟进项。
+     * 允许为 null（切片测试未注入），使用时做空值保护。
+     */
+    private final com.example.interview.service.job.JobApplicationService jobApplicationService;
+
+    /**
+     * 面试故事库服务（v1.36.0）：STAR 故事提炼（interview-story-bank 思路）。
+     * 允许为 null（切片测试未注入），使用时做空值保护。
+     */
+    private final com.example.interview.service.career.StoryBankService storyBankService;
+
     public AgentTools(String userId,
                       JobAgentService jobAgentService,
                       InterviewSessionService interviewSessionService,
@@ -63,7 +82,7 @@ public class AgentTools {
                       com.example.interview.service.job.JobMatchService jobMatchService,
                       com.example.interview.service.InterviewService interviewService) {
         this(userId, jobAgentService, interviewSessionService, interviewEventService, ragSearchService,
-                webJobSearcherService, jobMatchService, interviewService, null);
+                webJobSearcherService, jobMatchService, interviewService, null, null, null, null);
     }
 
     public AgentTools(String userId,
@@ -75,6 +94,38 @@ public class AgentTools {
                       com.example.interview.service.job.JobMatchService jobMatchService,
                       com.example.interview.service.InterviewService interviewService,
                       com.example.interview.service.ResumeService resumeService) {
+        this(userId, jobAgentService, interviewSessionService, interviewEventService, ragSearchService,
+                webJobSearcherService, jobMatchService, interviewService, resumeService, null, null, null);
+    }
+
+    public AgentTools(String userId,
+                      JobAgentService jobAgentService,
+                      InterviewSessionService interviewSessionService,
+                      InterviewEventService interviewEventService,
+                      RagSearchService ragSearchService,
+                      com.example.interview.service.job.WebJobSearcherService webJobSearcherService,
+                      com.example.interview.service.job.JobMatchService jobMatchService,
+                      com.example.interview.service.InterviewService interviewService,
+                      com.example.interview.service.ResumeService resumeService,
+                      com.example.interview.service.career.CareerProfileService careerProfileService,
+                      com.example.interview.service.job.JobApplicationService jobApplicationService) {
+        this(userId, jobAgentService, interviewSessionService, interviewEventService, ragSearchService,
+                webJobSearcherService, jobMatchService, interviewService, resumeService,
+                careerProfileService, jobApplicationService, null);
+    }
+
+    public AgentTools(String userId,
+                      JobAgentService jobAgentService,
+                      InterviewSessionService interviewSessionService,
+                      InterviewEventService interviewEventService,
+                      RagSearchService ragSearchService,
+                      com.example.interview.service.job.WebJobSearcherService webJobSearcherService,
+                      com.example.interview.service.job.JobMatchService jobMatchService,
+                      com.example.interview.service.InterviewService interviewService,
+                      com.example.interview.service.ResumeService resumeService,
+                      com.example.interview.service.career.CareerProfileService careerProfileService,
+                      com.example.interview.service.job.JobApplicationService jobApplicationService,
+                      com.example.interview.service.career.StoryBankService storyBankService) {
         this.userId = userId;
         this.jobAgentService = jobAgentService;
         this.interviewSessionService = interviewSessionService;
@@ -84,6 +135,9 @@ public class AgentTools {
         this.webJobSearcherService = webJobSearcherService;
         this.jobMatchService = jobMatchService;
         this.interviewService = interviewService;
+        this.careerProfileService = careerProfileService;
+        this.jobApplicationService = jobApplicationService;
+        this.storyBankService = storyBankService;
         registerTools();
     }
 
@@ -127,6 +181,22 @@ public class AgentTools {
                 "获取当前用户面试日历中的面试安排（企业、时间、状态）",
                 "无参数",
                 (raw, params) -> getUpcomingInterviews()));
+        registry.put("mineCareerAssets", new ToolSpec("mineCareerAssets",
+                "【求职Skill】用「证据→行为→能力→可投岗位信号」四层结构，从用户口语化的真实经历中挖掘可迁移能力与可投岗位方向。"
+                        + "用于用户说「不知道能投什么岗」「帮我看看我的优势」「我该找什么工作」时",
+                "narrative(必填,用户对自身经历的口语化描述,越具体越好), targetTrack(可选,期望赛道/岗位方向如:Java后端/数据分析)",
+                (raw, params) -> mineCareerAssets(str(params, "narrative"), str(params, "targetTrack"))));
+        registry.put("getMyApplications", new ToolSpec("getMyApplications",
+                "获取当前用户的投递台账概况：各状态数量、转化漏斗、以及需要跟进的投递（超过7天无回复或已到跟进时间）。"
+                        + "用于用户问「我投了哪些」「有没有回复」「谁该催一下」时",
+                "无参数",
+                (raw, params) -> getMyApplications()));
+        registry.put("prepareInterviewStories", new ToolSpec("prepareInterviewStories",
+                "【求职Skill·面试故事库】把用户的真实经历整理成 STAR 结构的面试故事候选（情境/任务/行动/结果/证据/能力标签），"
+                        + "并给出六项质检要点（结构/证据/贴合岗位/废话/风险表达/经得起追问）。"
+                        + "用于用户说「帮我准备面试自我介绍」「把我的经历整理成面试话术」「面试怎么讲这个项目」时",
+                "narrative(必填,用户对自身经历的口语化描述,越具体越好), targetTrack(可选,目标岗位/赛道)",
+                (raw, params) -> prepareInterviewStories(str(params, "narrative"), str(params, "targetTrack"))));
     }
 
     /** 全部工具规格（按注册顺序，用于生成提示词协议） */
@@ -410,7 +480,192 @@ public class AgentTools {
         }
     }
 
+    /**
+     * 求职 Skill：职业资产四层挖掘（v1.35.0）
+     *
+     * <p>把「证据→行为→能力→可投岗位信号」框架的产出整理为可读文本，
+     * 让智能体在对话里直接给出结构化诊断，而不是甩一段 JSON。
+     */
+    public String mineCareerAssets(String narrative, String targetTrack) {
+        if (narrative == null || narrative.isBlank() || "null".equalsIgnoreCase(narrative)) {
+            return "请先用几句口语把你自己真实做过的事讲出来（比如「我在学校做过一个XX项目，负责……结果……」），"
+                    + "我再帮你按「证据→行为→能力→可投岗位信号」四层挖出可迁移能力。";
+        }
+        if (careerProfileService == null) {
+            return "职业资产挖掘服务暂不可用，请稍后重试。";
+        }
+        try {
+            String json = careerProfileService.mine(userId, narrative.trim(),
+                    (targetTrack == null || "null".equalsIgnoreCase(targetTrack)) ? "" : targetTrack.trim());
+            var node = objectMapper.readTree(json);
+            StringBuilder sb = new StringBuilder();
+            String positioning = node.path("positioning").asText("");
+            if (!positioning.isBlank()) {
+                sb.append("【职业定位】").append(positioning).append("\n\n");
+            }
+            var assets = node.path("assets");
+            if (assets.isArray() && !assets.isEmpty()) {
+                sb.append("【职业资产（证据→行为→能力→岗位信号）】\n");
+                int i = 1;
+                for (var a : assets) {
+                    if (i > 6) break;
+                    sb.append(i++).append(". 证据：").append(oneLine(a.path("evidence").asText(""))).append("\n");
+                    sb.append("   行为：").append(oneLine(a.path("behavior").asText(""))).append("\n");
+                    sb.append("   能力：").append(oneLine(a.path("capability").asText(""))).append("\n");
+                    var signals = a.path("jobSignals");
+                    if (signals.isArray() && !signals.isEmpty()) {
+                        List<String> sig = new ArrayList<>();
+                        signals.forEach(s -> sig.add(s.asText("")));
+                        sb.append("   可投岗位信号：").append(String.join(" / ", sig)).append("\n");
+                    }
+                    sb.append("\n");
+                }
+            } else {
+                sb.append("（未能从这段描述中提取出足够具体的证据，建议补充：你具体做了什么、结果是什么、有没有数字）\n\n");
+            }
+            appendStringArray(sb, "优势标签", node.path("strengthTags"));
+            appendStringArray(sb, "信息缺口（需补充）", node.path("blindSpots"));
+            appendStringArray(sb, "下一步行动", node.path("nextSteps"));
+            sb.append("提示：想进一步定位到具体岗位，可以让我用 planCareerTrack 做一份「为什么适合/差距/30天补什么/适合什么赛道」的节奏计划。");
+            return truncate(sb);
+        } catch (Exception e) {
+            return "职业资产挖掘暂时不可用：" + e.getMessage();
+        }
+    }
+
+    /**
+     * 投递台账概况（v1.35.0）：各状态计数 + 转化漏斗 + 待跟进清单
+     */
+    public String getMyApplications() {
+        if (jobApplicationService == null) {
+            return "投递台账服务暂不可用，请稍后重试。";
+        }
+        try {
+            Map<String, Object> board = jobApplicationService.board(userId);
+            Object total = board.getOrDefault("total", 0);
+            if (total instanceof Number n && n.intValue() == 0) {
+                return "你的投递台账还是空的。可以在「招聘广场」或岗位收藏里点「加入投递计划」，"
+                        + "我会帮你跟踪每家的投递状态与回复情况。";
+            }
+            StringBuilder sb = new StringBuilder("投递台账概况（共 ").append(total).append(" 条）：\n");
+            if (board.get("counts") instanceof Map<?, ?> counts) {
+                for (var entry : counts.entrySet()) {
+                    int c = entry.getValue() instanceof Number cn ? cn.intValue() : 0;
+                    if (c > 0) {
+                        sb.append("- ").append(
+                                com.example.interview.service.job.JobApplicationService.label(String.valueOf(entry.getKey())))
+                                .append("：").append(c).append(" 条\n");
+                    }
+                }
+            }
+            if (board.get("funnel") instanceof Map<?, ?> funnel) {
+                sb.append("转化漏斗：已投 ").append(numOf(funnel, "submitted"))
+                        .append(" → 有回复 ").append(numOf(funnel, "repliedOrBeyond"))
+                        .append(" → 面试 ").append(numOf(funnel, "interviewOrBeyond"))
+                        .append(" → Offer ").append(numOf(funnel, "offer")).append("\n");
+            }
+            Object followUps = board.get("followUps");
+            if (followUps instanceof List<?> list && !list.isEmpty()) {
+                sb.append("\n【需要跟进】\n");
+                for (Object o : list) {
+                    if (o instanceof com.example.interview.entity.JobApplicationEntity a) {
+                        sb.append("- ").append(a.getTitle()).append(" | ").append(a.getCompanyName())
+                                .append(" | 当前状态：")
+                                .append(com.example.interview.service.job.JobApplicationService.label(a.getStatus()))
+                                .append(a.getApplyUrl() == null || a.getApplyUrl().isBlank()
+                                        ? "" : " | " + a.getApplyUrl())
+                                .append("\n");
+                    }
+                }
+                sb.append("建议：超过 7 天无回复的可以礼貌催一下 HR，或把精力转向新的机会。\n");
+            }
+            return truncate(sb);
+        } catch (Exception e) {
+            return "投递台账查询暂时不可用：" + e.getMessage();
+        }
+    }
+
+    /**
+     * 面试故事库（v1.36.0）：把真实经历整理成 STAR 故事候选 + 六项质检要点
+     *
+     * <p>落地「interview-story-bank」思路：面试不是背答案，是经得起追问。
+     * 提炼结果为候选，用户可在「求职诊断」页确认后存入故事库并反复练习。
+     */
+    public String prepareInterviewStories(String narrative, String targetTrack) {
+        if (narrative == null || narrative.isBlank() || "null".equalsIgnoreCase(narrative)) {
+            return "请先用几句口语把你自己真实做过的事讲出来（做了什么、结果怎样、有没有数字），"
+                    + "我再帮你整理成 STAR 结构的面试故事：情境-任务-行动-结果，确保经得起追问。";
+        }
+        if (storyBankService == null) {
+            return "面试故事库服务暂不可用，请稍后重试。";
+        }
+        try {
+            String json = storyBankService.extract(userId, narrative.trim(),
+                    (targetTrack == null || "null".equalsIgnoreCase(targetTrack)) ? "" : targetTrack.trim());
+            var node = objectMapper.readTree(json);
+            var stories = node.path("stories");
+            if (!stories.isArray() || stories.isEmpty()) {
+                return "这段描述还不足以提炼出完整的故事，建议补充：你具体做了什么、遇到了什么问题、"
+                        + "结果是什么、有没有数字。也可以到「求职诊断」页重新提炼。";
+            }
+            StringBuilder sb = new StringBuilder("已把你的经历整理成 ").append(stories.size())
+                    .append(" 条 STAR 面试故事候选：\n\n");
+            int i = 1;
+            for (var s : stories) {
+                if (i > 4) break;
+                sb.append("故事 ").append(i++).append("：").append(oneLine(s.path("title").asText(""))).append("\n");
+                sb.append("  情境：").append(oneLine(s.path("situation").asText(""))).append("\n");
+                sb.append("  任务：").append(oneLine(s.path("task").asText(""))).append("\n");
+                sb.append("  行动：").append(oneLine(s.path("action").asText(""))).append("\n");
+                sb.append("  结果：").append(oneLine(s.path("result").asText(""))).append("\n");
+                String evidence = oneLine(s.path("evidence").asText(""));
+                if (!evidence.isBlank()) {
+                    sb.append("  证据：").append(evidence).append("\n");
+                }
+                var caps = s.path("capabilities");
+                if (caps.isArray() && !caps.isEmpty()) {
+                    List<String> cap = new ArrayList<>();
+                    caps.forEach(c -> cap.add(c.asText("")));
+                    sb.append("  能力标签：").append(String.join(" / ", cap)).append("\n");
+                }
+                sb.append("\n");
+            }
+            sb.append("六项质检提醒（讲之前自查）：结构是否清楚 / 证据是否具体 / 是否贴合岗位 / ")
+              .append("有没有废话 / 有没有风险表达 / 能否被追问住。\n")
+              .append("提示：到「求职诊断」页可把这些故事存入你的面试故事库，反复练习「先回答，再追问，再复盘」。");
+            return truncate(sb);
+        } catch (Exception e) {
+            return "面试故事整理暂时不可用：" + e.getMessage();
+        }
+    }
+
     // ---------- 私有辅助 ----------
+
+    /** 追加字符串数组为列表行（用于 strengthTags / blindSpots / nextSteps） */
+    private static void appendStringArray(StringBuilder sb, String label, com.fasterxml.jackson.databind.JsonNode node) {
+        if (node == null || !node.isArray() || node.isEmpty()) {
+            return;
+        }
+        sb.append("【").append(label).append("】\n");
+        node.forEach(n -> {
+            String v = n.asText("");
+            if (!v.isBlank()) {
+                sb.append("- ").append(oneLine(v)).append("\n");
+            }
+        });
+        sb.append("\n");
+    }
+
+    /** 把多行文本压成单行，避免破坏列表结构 */
+    private static String oneLine(String s) {
+        return s == null ? "" : s.replace("\n", " ").replace("\r", " ").trim();
+    }
+
+    /** 从通配 Map 中读取数值（用于看板 funnel 等无固定泛型的结构） */
+    private static int numOf(Map<?, ?> map, String key) {
+        Object v = map.get(key);
+        return v instanceof Number n ? n.intValue() : 0;
+    }
 
     private Map<String, Object> parseParams(String paramsJson) {
         Map<String, Object> params = new LinkedHashMap<>();

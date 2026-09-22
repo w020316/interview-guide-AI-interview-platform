@@ -10,6 +10,9 @@ const routes = [
   { path: '/job',       component: () => import('../views/JobAnalysisView.vue'), meta: { requiresAuth: true  } },
   { path: '/jobs',      component: () => import('../views/JobsView.vue'),        meta: { requiresAuth: true  } },
   { path: '/agent',     component: () => import('../views/AgentView.vue'),       meta: { requiresAuth: true  } },
+  // v1.35.0：求职 Skill（职业资产挖掘 + 30 天节奏计划）与投递看板
+  { path: '/career',       component: () => import('../views/CareerView.vue'),      meta: { requiresAuth: true  } },
+  { path: '/applications', component: () => import('../views/ApplicationView.vue'), meta: { requiresAuth: true  } },
   { path: '/interview', component: () => import('../views/InterviewView.vue'),meta: { requiresAuth: true  } },
   { path: '/history',   component: () => import('../views/HistoryView.vue'),   meta: { requiresAuth: true  } },
   { path: '/learning',  component: () => import('../views/LearningView.vue'),   meta: { requiresAuth: true  } },

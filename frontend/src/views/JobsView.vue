@@ -203,6 +203,14 @@
         </div>
         <div class="detail-footer">
           <span class="detail-source">数据来源：{{ detail.platform }}</span>
+          <button
+            class="apply-btn"
+            :disabled="planning"
+            :title="'加入投递台账，跟踪投递状态与回复（不代替你投递）'"
+            @click="addToPlan(detail)"
+          >
+            {{ planning ? '加入中…' : '加入投递计划' }}
+          </button>
           <a
             v-if="detail.applyUrl"
             :href="detail.applyUrl"
@@ -313,6 +321,9 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize))
 const favIds = ref<Set<number>>(new Set())
 const favList = ref<JobFavorite[]>([])
 const favCount = ref(0)
+
+/** v1.35.0：加入投递计划的提交态（防重复点击） */
+const planning = ref(false)
 const favoriteMode = computed(() => recruitType.value === 'FAVORITE')
 
 // ── 简历匹配推荐（v1.29.0）──
@@ -413,8 +424,23 @@ async function toggleFavorite(job: JobPosting) {
   }
 }
 
-function tagList(tags: string | null): string[] {
-  if (!tags) return []
+/**
+ * 加入投递计划（v1.35.0）：把岗位加入本地投递台账，后续在「投递看板」跟踪状态与回复。
+ * 平台不代替用户投递，实际投递仍需点击「前往官方申请入口」自行完成。
+ */
+async function addToPlan(job: JobPosting) {
+  planning.value = true
+  try {
+    await api.post('/api/application/draft', { jobId: job.id })
+    ElMessage.success('已加入投递计划，可在「投递看板」跟踪进度')
+  } catch (e) {
+    ElMessage.error(getErrMessage(e, '加入投递计划失败'))
+  } finally {
+    planning.value = false
+  }
+}
+
+function tagList(tags: string | null): string[] {  if (!tags) return []
   return tags.split(/[,，]/).map((s) => s.trim()).filter(Boolean).slice(0, 4)
 }
 

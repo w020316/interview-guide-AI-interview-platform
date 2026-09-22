@@ -50,6 +50,12 @@ class AgentToolsTest {
     @Mock
     private com.example.interview.service.InterviewService interviewService;
 
+    /** v1.35.0：求职 Skill 与投递台账工具依赖 */
+    @Mock
+    private com.example.interview.service.career.CareerProfileService careerProfileService;
+    @Mock
+    private com.example.interview.service.job.JobApplicationService jobApplicationService;
+
     private AgentTools newTools() {
         return new AgentTools("user-1", jobAgentService, interviewSessionService,
                 interviewEventService, ragSearchService, webJobSearcherService,
@@ -364,13 +370,14 @@ class AgentToolsTest {
     }
 
     @Test
-    @DisplayName("all()：注册 9 个工具且关键工具在册")
+    @DisplayName("all()：注册 12 个工具且关键工具在册（v1.36.0 新增面试故事库）")
     void registryContainsAllTools() {
         var all = newTools().all();
-        assertThat(all).hasSize(9);
+        assertThat(all).hasSize(12);
         assertThat(all).containsKeys("searchJobs", "searchWebJobs", "matchResumeJobs",
                 "generateInterviewQuestions", "deepFollowUp", "searchKnowledge",
-                "getMyInterviewStats", "listWrongQuestions", "getUpcomingInterviews");
+                "getMyInterviewStats", "listWrongQuestions", "getUpcomingInterviews",
+                "mineCareerAssets", "getMyApplications", "prepareInterviewStories");
     }
 
     // ───────────────────── searchJobs：字段格式化与参数归一 ─────────────────────
@@ -687,5 +694,150 @@ class AgentToolsTest {
 
         String out = newTools().dispatch("getUpcomingInterviews", "{}");
         assertThat(out).contains("面试安排共 1 条").contains("腾讯一面");
+    }
+
+    // ───────── v1.35.0：求职 Skill 与投递台账工具 ─────────
+
+    /** 构造带求职 Skill + 投递台账服务的工具实例（11 参构造器） */
+    private AgentTools toolsWithCareer(com.example.interview.service.career.CareerProfileService career,
+                                       com.example.interview.service.job.JobApplicationService apps) {
+        return new AgentTools("user-1", jobAgentService, interviewSessionService,
+                interviewEventService, ragSearchService, webJobSearcherService,
+                jobMatchService, interviewService, null, career, apps);
+    }
+
+    @Test
+    @DisplayName("mineCareerAssets：把四层挖掘结果整理为可读文本")
+    void mineCareerAssets_formatsLayers() {
+        when(careerProfileService.mine(eq("user-1"), anyString(), anyString())).thenReturn(
+                "{\"positioning\":\"懂业务的 Java 后端\",\"assets\":[{\"evidence\":\"把慢查询改成 ES\","
+                        + "\"behavior\":\"定位瓶颈并重构\",\"capability\":\"性能优化能力\","
+                        + "\"jobSignals\":[\"Java 后端\",\"搜索研发\"]}],\"strengthTags\":[\"性能优化\"],"
+                        + "\"blindSpots\":[\"缺少量化结果\"],\"nextSteps\":[\"补一段 QPS 数据\"]}");
+
+        String out = toolsWithCareer(careerProfileService, jobApplicationService)
+                .mineCareerAssets("我做过二手交易平台", "Java 后端");
+
+        assertThat(out).contains("职业定位").contains("懂业务的 Java 后端")
+                .contains("证据：把慢查询改成 ES").contains("能力：性能优化能力")
+                .contains("Java 后端 / 搜索研发")
+                .contains("优势标签").contains("信息缺口").contains("下一步行动");
+    }
+
+    @Test
+    @DisplayName("mineCareerAssets：未提供经历时给出引导，不调用 AI")
+    void mineCareerAssets_blankNarrative() {
+        String out = toolsWithCareer(careerProfileService, jobApplicationService)
+                .mineCareerAssets("  ", null);
+
+        assertThat(out).contains("请先用几句口语");
+        verify(careerProfileService, org.mockito.Mockito.never()).mine(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("mineCareerAssets：服务未注入时降级提示（不抛异常）")
+    void mineCareerAssets_serviceMissing() {
+        String out = toolsWithCareer(null, null).mineCareerAssets("我做过项目", null);
+
+        assertThat(out).contains("暂不可用");
+    }
+
+    @Test
+    @DisplayName("getMyApplications：台账为空时给出引导文案")
+    void getMyApplications_empty() {
+        when(jobApplicationService.board("user-1")).thenReturn(Map.<String, Object>of("total", 0));
+
+        String out = toolsWithCareer(careerProfileService, jobApplicationService).getMyApplications();
+
+        assertThat(out).contains("投递台账还是空的");
+    }
+
+    @Test
+    @DisplayName("getMyApplications：输出状态计数、转化漏斗与待跟进")
+    void getMyApplications_withData() {
+        var followUp = com.example.interview.entity.JobApplicationEntity.builder()
+                .id(1L).userId("user-1").jobId(9L).title("Java 后端").companyName("腾讯")
+                .status("APPLIED").applyUrl("https://example.com/apply").build();
+        when(jobApplicationService.board("user-1")).thenReturn(Map.of(
+                "total", 3,
+                "counts", Map.of("APPLIED", 2, "OFFER", 1),
+                "funnel", Map.of("submitted", 3, "repliedOrBeyond", 1, "interviewOrBeyond", 1, "offer", 1),
+                "followUps", List.of(followUp)));
+
+        String out = toolsWithCareer(careerProfileService, jobApplicationService).getMyApplications();
+
+        assertThat(out).contains("共 3 条").contains("已投递：2 条").contains("已拿 Offer：1 条")
+                .contains("转化漏斗").contains("Java 后端").contains("需要跟进");
+    }
+
+    @Test
+    @DisplayName("dispatch getMyApplications：经注册表可被模型调用")
+    void dispatch_getMyApplications() {
+        when(jobApplicationService.board("user-1")).thenReturn(Map.<String, Object>of("total", 0));
+
+        String out = toolsWithCareer(careerProfileService, jobApplicationService)
+                .dispatch("getMyApplications", "{}");
+
+        assertThat(out).contains("投递台账还是空的");
+    }
+
+    // ───────── v1.36.0：面试故事库工具 ─────────
+
+    @Mock
+    private com.example.interview.service.career.StoryBankService storyBankService;
+
+    /** 构造带面试故事库服务的工具实例（12 参构造器） */
+    private AgentTools toolsWithStory(com.example.interview.service.career.StoryBankService story) {
+        return new AgentTools("user-1", jobAgentService, interviewSessionService,
+                interviewEventService, ragSearchService, webJobSearcherService,
+                jobMatchService, interviewService, null, careerProfileService,
+                jobApplicationService, story);
+    }
+
+    @Test
+    @DisplayName("prepareInterviewStories：把 STAR 提炼结果整理为可读故事卡")
+    void prepareInterviewStories_formatsStories() {
+        when(storyBankService.extract(eq("user-1"), anyString(), anyString())).thenReturn(
+                "{\"stories\":[{\"title\":\"二手交易平台性能优化\",\"situation\":\"校园平台没人用\","
+                        + "\"task\":\"负责搜索模块\",\"action\":\"把 MySQL 模糊查询改成 ES 并加缓存\","
+                        + "\"result\":\"日活从 30 涨到 200\",\"evidence\":\"上线前后监控数据\","
+                        + "\"capabilities\":[\"性能优化\",\"快速学习\"]}]}");
+
+        String out = toolsWithStory(storyBankService)
+                .prepareInterviewStories("我做过二手交易平台，把慢查询改成 ES", "Java 后端");
+
+        assertThat(out).contains("STAR 面试故事候选").contains("二手交易平台性能优化")
+                .contains("行动：把 MySQL 模糊查询改成 ES 并加缓存")
+                .contains("结果：日活从 30 涨到 200")
+                .contains("性能优化 / 快速学习")
+                .contains("六项质检提醒");
+    }
+
+    @Test
+    @DisplayName("prepareInterviewStories：未提供经历时给出引导，不调用 AI")
+    void prepareInterviewStories_blankNarrative() {
+        String out = toolsWithStory(storyBankService).prepareInterviewStories("  ", null);
+
+        assertThat(out).contains("请先用几句口语");
+        verify(storyBankService, org.mockito.Mockito.never()).extract(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("prepareInterviewStories：服务未注入时降级提示（不抛异常）")
+    void prepareInterviewStories_serviceMissing() {
+        String out = toolsWithStory(null).prepareInterviewStories("我做过项目", null);
+
+        assertThat(out).contains("暂不可用");
+    }
+
+    @Test
+    @DisplayName("prepareInterviewStories：提炼为空时给出补充建议")
+    void prepareInterviewStories_emptyStories() {
+        when(storyBankService.extract(eq("user-1"), anyString(), anyString()))
+                .thenReturn("{\"stories\":[]}");
+
+        String out = toolsWithStory(storyBankService).prepareInterviewStories("信息不足的描述", null);
+
+        assertThat(out).contains("不足以提炼");
     }
 }

@@ -17,6 +17,8 @@
 - **简历历史记录**：每次分析自动持久化，可回看完整评分与建议 ✨
 - **个人中心仪表盘**：统计数据卡片 + 平均分横幅 + 最近活动流 ✨
 - **知识库管理**：批量导入知识点，RAG 智能问答 ✨
+- **求职诊断（求职 Skill）**：按「证据→行为→能力→可投岗位信号」四层挖掘你的可迁移能力，并给出「为什么适合/差距在哪/30 天补什么 case/适合什么赛道」的求职节奏计划 🆕
+- **投递看板**：本地投递台账（人工确认投递 + 回复监测 + 待跟进提醒），并可针对每个岗位生成定制简历要点 🆕
 
 ## 技术栈
 
@@ -129,10 +131,19 @@ npm run dev
 | `/api/knowledge/import` | POST | 导入知识文档 |
 | `/api/knowledge/import/batch` | POST | 批量导入分块 |
 | `/api/stats/dashboard` | GET | 个人中心统计 ✨ |
+| `/api/career/mine` | POST | 求职 Skill：职业资产四层挖掘（证据→行为→能力→岗位信号）🆕 |
+| `/api/career/plan` | POST | 求职 Skill：岗位节奏计划（why-fit/gap/30天case/赛道）🆕 |
+| `/api/application/list` | GET | 投递台账列表 🆕 |
+| `/api/application/board` | GET | 投递看板与回复监测 🆕 |
+| `/api/application/draft` | POST | 加入投递台账（草稿）🆕 |
+| `/api/application/{id}/confirm` | POST | 人工确认已投递 🆕 |
+| `/api/application/{id}/status` | POST | 推进投递状态 🆕 |
+| `/api/application/{id}/tailor` | POST | 生成针对该岗位的定制简历 🆕 |
+| `/api/application/{id}` | DELETE | 移除投递记录 🆕 |
 | `/actuator/health` | GET | 健康检查 |
 | `/swagger-ui.html` | GET | API 文档 |
 
-✨ 标记为 v2 新增功能
+✨ 标记为 v2 新增功能　🆕 标记为 v1.35.0 新增（三个抖音求职视频的方法论落地，详见 [docs/video-skills-integration.md](./docs/video-skills-integration.md)）
 
 ## License
 

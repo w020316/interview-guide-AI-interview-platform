@@ -123,7 +123,46 @@ public class SchemaInitializer implements CommandLineRunner {
                     + "role VARCHAR(20) NOT NULL, "
                     + "content TEXT NOT NULL, "
                     + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-            "CREATE INDEX IF NOT EXISTS idx_agent_msg_conv ON agent_message(conversation_id)"
+            "CREATE INDEX IF NOT EXISTS idx_agent_msg_conv ON agent_message(conversation_id)",
+            // v1.35.0：投递台账（人工确认投递 + 回复监测 + 定制简历）
+            "CREATE TABLE IF NOT EXISTS job_application ("
+                    + "id BIGSERIAL PRIMARY KEY, "
+                    + "user_id VARCHAR(64) NOT NULL, "
+                    + "job_id BIGINT NOT NULL, "
+                    + "title VARCHAR(200) NOT NULL, "
+                    + "company_name VARCHAR(200) NOT NULL, "
+                    + "platform VARCHAR(50), "
+                    + "location VARCHAR(100), "
+                    + "salary VARCHAR(100), "
+                    + "deadline DATE, "
+                    + "apply_url VARCHAR(500), "
+                    + "status VARCHAR(20) NOT NULL DEFAULT 'PLANNED', "
+                    + "tailored_resume TEXT, "
+                    + "note TEXT, "
+                    + "applied_at TIMESTAMP, "
+                    + "last_reply_at TIMESTAMP, "
+                    + "next_action_at TIMESTAMP, "
+                    + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "CONSTRAINT uk_job_application_user_job UNIQUE (user_id, job_id))",
+            "CREATE INDEX IF NOT EXISTS idx_job_application_user ON job_application(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_job_application_status ON job_application(status)",
+            // v1.36.0：面试故事库（STAR 故事资产 + 六项质检快照）
+            "CREATE TABLE IF NOT EXISTS story_bank ("
+                    + "id BIGSERIAL PRIMARY KEY, "
+                    + "user_id VARCHAR(64) NOT NULL, "
+                    + "title VARCHAR(200) NOT NULL, "
+                    + "situation TEXT, "
+                    + "task TEXT, "
+                    + "action TEXT, "
+                    + "result TEXT, "
+                    + "evidence TEXT, "
+                    + "capability_tags VARCHAR(500), "
+                    + "target_track VARCHAR(200), "
+                    + "check_result TEXT, "
+                    + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+            "CREATE INDEX IF NOT EXISTS idx_story_bank_user ON story_bank(user_id)"
     };
 
     @Override

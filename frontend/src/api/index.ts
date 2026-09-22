@@ -63,6 +63,11 @@ const AI_PATH_FRAGMENTS: readonly string[] = [
   '/api/jobs/refresh',
   '/api/favorite/bank/start',
   '/api/agent/',
+  // v1.35.0：求职 Skill 与投递台账（定制简历为 AI 生成）
+  '/api/career/',
+  '/api/application/',
+  // v1.36.0：面试故事库（提炼/质检/追问均为 AI 调用）
+  '/api/story-bank/',
 ]
 
 /**
