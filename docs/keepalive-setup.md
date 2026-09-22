@@ -42,6 +42,26 @@
 前端已经托管在 Cloudflare Pages，用同一账号加一个 Worker 即可，**无需注册新服务**，
 免费套餐支持最小 1 分钟的 Cron Trigger。
 
+### 方式 A：脚本部署（推荐，可重复执行）
+
+```bash
+# Git Bash / macOS / Linux
+CF_API_TOKEN=你的token node scripts/deploy-keepalive-worker.mjs
+
+# PowerShell
+$env:CF_API_TOKEN="你的token"; node scripts/deploy-keepalive-worker.mjs
+```
+
+脚本会自动完成「上传 Worker → 设置 Cron Trigger → 打印验证地址并实测一次」，
+重复执行是幂等的（覆盖同名 Worker）。
+
+**token 只需一条权限**：`Account → Workers Scripts → Edit`。
+
+> ⚠️ **安全**：脚本只从环境变量读 token，**绝不写入文件**；也请勿把 token 提交进仓库。
+> 不要用 Global API Key（权限过大），用完即到 Dashboard 吊销。
+
+### 方式 B：Dashboard 手动操作
+
 1. Cloudflare Dashboard → **Workers & Pages** → **Create** → **Worker**
 2. 把 `scripts/keepalive-worker.mjs` 的**全部内容**粘进在线编辑器 → **Deploy**
 3. 进入该 Worker → **Settings** → **Triggers** → **Cron Triggers** → **Add Cron Trigger**
@@ -87,7 +107,30 @@ Render 免费层每个 workspace **每月共 750 instance hours**，**用超了�
 留着，作为**尽力而为的兜底**（它偶尔真能跑起来，聊胜于无），但**不要把它当作保活主力**。
 它的文件头已记录本次实测到的限流事实，避免后人再被「配置了每 5 分钟」误导。
 
-## 五、如果还是遇到冷启动
+## 五、减少「无意义重启」带来的冷启动
+
+保活解决的是「闲着睡着了」，但还有一类冷启动是**自己造出来的**：只要推送到 `main`，
+Render 就会重新构建并重启后端 —— 哪怕这次只改了前端或文档。
+
+`render.yaml` 已修正为按路径过滤：
+
+```yaml
+    autoDeployTrigger: commit      # 取代已废弃的布尔型 autoDeploy
+    buildFilter:
+      paths:
+        - backend/**               # 主后端：仅 backend 目录变更才部署
+```
+
+| 推送内容 | 修复前 | 修复后 |
+|---|---|---|
+| `frontend/**`、`docs/**` | 后端重建 + 重启（白吃一次冷启动） | 后端不动 ✅ |
+| `backend/**` | 后端重建 + 重启 | 后端重建 + 重启（符合预期） |
+
+> ⚠️ `buildFilter` 在蓝图同步时会**完全替换**服务上已有的过滤设置；若整个字段被省略，
+> 已有设置会被清空为空列表 —— 所以必须显式写全，别只写一半。
+> 另：Render 蓝图默认**自动同步**，改完 `render.yaml` 推上去即生效（会带来一次部署）。
+
+## 六、如果还是遇到冷启动
 
 前端已按真实冷启动时长（8 分钟上限）设计容错：
 
