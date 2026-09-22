@@ -270,7 +270,10 @@ async function main() {
     process.exit(1)
   }
   console.log('✅ 线上脚本与仓库一致，已注册定时也匹配')
-  console.log('   （本脚本只比对「配置与结构」；线上**行为**是否随时间窗变化，用 scripts/verify-window.mjs 取证。）')
+  console.log(
+    '   （本脚本只比对「配置与结构」；线上**行为**是否随时间窗变化，用 scripts/verify-window.mjs，' +
+      '或看云端每夜自动跑的 keepalive-observe.yml —— 两者都零额度成本。）'
+  )
 }
 
 // 仅在直接执行时跑 main；被测试 import 时不执行

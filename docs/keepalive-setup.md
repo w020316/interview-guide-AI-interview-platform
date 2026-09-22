@@ -429,7 +429,9 @@ git rev-parse df6eaa1:scripts/keepalive-worker.mjs   # → 同一个 blob
 ### 9.4 线上行为（一冷一热的对照）
 
 ```bash
-node scripts/verify-window.mjs          # 按当前时刻自动判定「应该热」还是「应该冷」
+node scripts/verify-window.mjs                 # 窗内探测（免费）；窗外只做零成本核对
+node scripts/verify-window.mjs --probe-backend # 窗外也探测后端（**会真的唤醒实例**，按需才用）
+VERIFY_FORCE_CST_HOUR=3 node scripts/verify-window.mjs   # 测试用：白天也能走一遍「窗外」分支
 ```
 
 | 时点 | 期望 | 实测 |
@@ -447,7 +449,11 @@ curl -s -x http://127.0.0.1:7890 https://render-keepalive.1181264839.workers.dev
 # 窗外期望 → {"cron":"*/5 * * * *","skipped":true,"reason":"outside warm window","cstHour":3}
 ```
 
-> ⚠️ `verify-window.mjs` 会真的唤醒一次后端（约 0.25 instance hours），所以**别反复跑**。
+> ✅ **`verify-window.mjs` 默认不花额度**（2026-09-22 改）：窗内探测是免费的（后端本就被保活着，
+> 不会额外拉起实例）；**窗外默认不探测**，改用 Worker 自述做零成本核对 —— 因为探测会把休眠实例
+> 拉起来（≈0.25 instance hours），而本脚本存在的意义恰恰是保护额度，为了验证额度安全而消耗额度
+> 方向反了。确实要在窗外测后端冷热时显式加 `--probe-backend`。
+> 每夜的自动观测见 9.7（跑在云端，同样零成本）。
 > 凌晨那次必须等兜底工作流的时间窗守卫**先上线**再做，否则它会随机把后端弄热，
 > 让「窗外应该冷」的结论不成立（这正是 9.3 那个漏的第二个代价）。
 
