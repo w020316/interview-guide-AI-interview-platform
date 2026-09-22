@@ -1,8 +1,12 @@
 # 后端保活配置（解决「登录长时间进不去」）
 
-> 结论先行：**Render 免费层冷启动实测 338s / 355s（≈6 分钟，最慢超过 8 分钟也出现过）**，
+> 结论先行：**Render 免费层冷启动实测中位约 258s，最慢超过 480s**（分布见第一节），
 > 而此前前端只等 150s，所以「点登录 → 干等 → 失败」是必然结果。前端容错已放宽到 8 分钟
-> （见 `frontend/src/utils/backendWake.ts`），但**真正的解法是别让它休眠** —— 按本文配置保活。
+> （见 `frontend/src/utils/backendWake.ts`），但**真正的解法是别让它休眠**。
+>
+> 配置保活有两条路，任选其一（都不花钱）：
+> - **二、Cloudflare Worker + Cron Trigger** —— 与本项目的数据库解耦，最稳，推荐
+> - **三、Supabase pg_cron** —— 本项目已在用 Supabase，**不需要任何新账号、不用分享 token**，最省事
 
 ## 一、问题是怎么定位的
 
@@ -103,7 +107,58 @@ Render 免费层每个 workspace **每月共 750 instance hours**，**用超了�
 
 想改成 7×24，把 `WARM_ALL_DAY` 设为 `true`，但请先确认当月 instance hours 有余量。
 
-## 三、备选方案
+## 三、更省事的替代：用 Supabase 的 pg_cron（本项目已在用 Supabase）
+
+如果不想再开一个 Cloudflare Worker，可以直接用**数据库自己的定时器**：
+Supabase 内置 `pg_cron`（调度）+ `pg_net`（发 HTTP 请求）。**不需要任何新账号、
+不需要分享任何 token**，只要在 Supabase Dashboard → SQL Editor 里跑一次下面的 SQL。
+
+```sql
+-- 1) 启用扩展（已启用则跳过）
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+-- 2) 每 5 分钟 ping 一次后端健康检查端点
+--    ⚠️ 时间窗按北京时间 07:00–01:00 限制，理由见下方「额度红线」：
+--       CST = UTC+8，故 07:00 CST = 23:00 UTC，次日 01:00 CST = 17:00 UTC
+--       → 小时字段为 23 与 0-16
+select cron.schedule(
+  'render-backend-keepalive',
+  '*/5 23,0-16 * * *',
+  $$
+    select net.http_get(
+      url := 'https://interview-guide-backend.onrender.com/api/health',
+      timeout_milliseconds := 30000
+    )
+  $$
+);
+```
+
+**验证**：
+
+```sql
+select jobid, jobname, schedule, active from cron.job;                  -- 任务是否登记
+select status, start_time, end_time from cron.job_run_details
+  order by start_time desc limit 10;                                    -- 最近几次执行
+select status_code, content from net._http_response
+  order by created desc limit 5;                                        -- 实际 HTTP 结果
+```
+
+**回滚**（不想要了就跑这一句）：
+
+```sql
+select cron.unschedule('render-backend-keepalive');
+```
+
+> 为什么时间窗写成 `23,0-16`：免费层每月 750 instance hours，**超额会暂停所有免费服务**，
+> 而主后端 7×24 常驻就要 ≈730h（余量仅约 20h）。限制在北京时间 07:00–01:00 约 540h/月，
+> 余量充足。想 7×24 就把表达式改成 `*/5 * * * *`，但请先确认当月额度有余量。
+>
+> ⚠️ 一个前提：Supabase 免费项目**连续 7 天无活动会被暂停**，暂停后 cron 也随之停止。
+> 本项目数据库在日常使用中会持续产生活动，正常不会触发；但若长期无人使用，
+> 这个保活会跟着失效（那种情况下站点本身也已经没人访问了）。
+
+## 四、其他备选方案
 
 若不想动 Cloudflare：
 
@@ -115,12 +170,12 @@ Render 免费层每个 workspace **每月共 750 instance hours**，**用超了�
 
 任选其一，URL 填 `https://interview-guide-backend.onrender.com/api/health`，间隔 5 分钟。
 
-## 四、`.github/workflows/keepalive.yml` 还留着吗
+## 五、`.github/workflows/keepalive.yml` 还留着吗
 
 留着，作为**尽力而为的兜底**（它偶尔真能跑起来，聊胜于无），但**不要把它当作保活主力**。
 它的文件头已记录本次实测到的限流事实，避免后人再被「配置了每 5 分钟」误导。
 
-## 五、减少「无意义重启」带来的冷启动
+## 六、减少「无意义重启」带来的冷启动
 
 保活解决的是「闲着睡着了」，但还有一类冷启动是**自己造出来的**：只要推送到 `main`，
 Render 就会重新构建并重启后端 —— 哪怕这次只改了前端或文档。
@@ -143,7 +198,7 @@ Render 就会重新构建并重启后端 —— 哪怕这次只改了前端或�
 > 已有设置会被清空为空列表 —— 所以必须显式写全，别只写一半。
 > 另：Render 蓝图默认**自动同步**，改完 `render.yaml` 推上去即生效（会带来一次部署）。
 
-## 六、如果还是遇到冷启动
+## 七、如果还是遇到冷启动
 
 前端已按真实冷启动时长（8 分钟上限）设计容错：
 
@@ -155,7 +210,7 @@ Render 就会重新构建并重启后端 —— 哪怕这次只改了前端或�
 需要进一步缩短冷启动，可参考 `render.yaml` 中 `JAVA_OPTS` 的说明调整 JVM 启动参数
 （如加 `-XX:TieredStopAtLevel=1` 换取更快的启动），但**必须实测验证**后再上线。
 
-## 七、缩短冷启动本身（已应用的优化 + 如何验证）
+## 八、缩短冷启动本身（已应用的优化 + 如何验证）
 
 保活解决「闲着睡着了」，但冷启动本身的耗时也该压。已确认启动期**没有阻塞式外部调用**
 （唯一的 `@PostConstruct` 外部依赖是 `UserBanRegistry` 读 Redis，而 prod 已排除 Redis
