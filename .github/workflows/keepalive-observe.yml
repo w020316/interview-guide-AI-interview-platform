@@ -1,6 +1,6 @@
 name: Keepalive Window Observation
 
-# 保活时间窗的**云端**观测（GitHub 托管 runner 执行）。
+# 保活时间窗的**云端**观测（GitHub 托管 runner 执行），**零额度成本**。
 #
 # ── 为什么必须放云端 ─────────────────────────────────────────────────
 # 保活窗口是北京时间 07:00–24:00，要验证「窗外确实没被保活」就得在凌晨取数，
@@ -8,17 +8,26 @@ name: Keepalive Window Observation
 # 要么在开机后延迟触发 —— 后者更糟：它会在错误的时间点上套用错误的期望，
 # 产生假失败或假通过。所以观测必须独立于本机存活。
 #
+# ── 为什么是零成本（2026-09-22 改）──────────────────────────────────
+# 最初的版本在窗外「直接探测后端，看它是不是冷的」。代价是：**任何请求都会把实例拉起来**，
+# 于是每次观测白吃约 0.25 instance hours（≈7.5h/月）。而这份观测的存在意义恰恰是
+# 保护额度 —— 为了验证额度安全而消耗额度，方向反了。
+#
+# 现在改成**验证「所有自动唤醒源都没动它」**，而不是自己去碰它：
+#   ① Worker 自述必须 `skipped`（窗外它直接返回、根本不发请求）—— 这是零成本的直接证据；
+#   ② 兜底工作流（keepalive.yml）若也在窗外跑过，它的**耗时必须很短**。
+#      跳过时整个作业只在 runner 上跑十几秒；若真的去唤醒后端，冷启动会让它跑数分钟。
+#      → 用耗时当指纹，零成本地判断它到底有没有发请求。
+# 两者都成立 + 深夜无人访问 ⇒ 后端处于冷态。**不直接探测**，所以不产生任何实例小时。
+#
 # ── 两个 cron 槽（UTC）─────────────────────────────────────────────
-#   19:10 UTC = 03:10 CST  → 预期「窗外」：Worker 应返回 skipped，后端应为冷态
+#   19:10 UTC = 03:10 CST  → 预期「窗外」：Worker 应 skipped；不探测后端（零成本）
 #   01:05 UTC = 09:05 CST  → 预期「窗内」：Worker 应探测，后端应为热态
+#      （窗内探测是免费的 —— 后端本来就被保活着，不会额外拉起实例）
 #
 # ⚠️ GitHub 的 schedule 是「尽力而为」调度，实测可能晚数小时（见 keepalive.yml 头部）。
 #    因此本工作流**按运行时的真实 CST 小时决定期望**，而不是按哪个 cron 触发 ——
 #    跑晚了就自动改测另一支，不会产生假失败，数据始终对应真实时刻。
-#
-# ⚠️ 成本（刻意取舍）：窗外那次探测会用超时打断冷启动，但**请求已经触发实例拉起**，
-#    约 0.25 instance hours/次 ≈ 7.5h/月，占留给 embedding 的约 233h 余量的 3%。
-#    换来的是每夜一次「窗外确实没被保活」的独立证据（不只看 Worker 的自述）。
 
 on:
   schedule:
@@ -49,6 +58,9 @@ jobs:
           WORKER_URL: https://render-keepalive.1181264839.workers.dev
           BACKEND: https://interview-guide-backend.onrender.com
           HOT_MS: '15000'
+          # 兜底工作流「跳过了」的耗时上限（秒）。跳过时只在 runner 上跑十几秒；
+          # 真去唤醒后端会因冷启动跑数分钟。用耗时当「有没有发请求」的指纹。
+          FALLBACK_SKIP_MAX_SEC: '120'
           EXPECT_OVERRIDE: ${{ inputs.expect_override || 'auto' }}
         run: |
           set -uo pipefail
@@ -71,7 +83,22 @@ jobs:
             echo "| 期望状态 | **${EXPECT}**（窗口为北京时间 07:00–24:00） |"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # ── 1) Worker 自述：窗外应 skipped（零成本，它根本不会碰后端）
+          # ── 额度预算（纯计算，零成本）：直接复用被单测覆盖的那个函数，避免再抄一遍窗口数学
+          BUDGET_JSON=$(node -e "import('./scripts/keepalive-worker.mjs').then(m=>process.stdout.write(JSON.stringify({h:m.effectiveWarmHoursPerDay(),allDay:m.WARM_ALL_DAY})))" 2>/dev/null || echo '{}')
+          HOURS_PER_DAY=$(printf '%s' "$BUDGET_JSON" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{process.stdout.write(String(JSON.parse(s).h))}catch{process.stdout.write('?')}})")
+          if [[ "$HOURS_PER_DAY" =~ ^[0-9]+$ ]]; then
+            MONTHLY=$(awk -v h="$HOURS_PER_DAY" 'BEGIN{printf "%.0f", h*30.44}')
+            LEFT=$(awk -v m="$MONTHLY" 'BEGIN{printf "%.0f", 750-m}')
+            echo "额度预算：保活 ${HOURS_PER_DAY}h/天 ≈ ${MONTHLY}h/月，免费层 750h/月 → 余 ${LEFT}h 留给 embedding 按需唤醒"
+            {
+              echo ""
+              echo "**额度预算**（只算窗口，零成本）：保活 ${HOURS_PER_DAY}h/天 ≈ **${MONTHLY}h/月** ｜ 免费层 750h/月 → 余 **${LEFT}h**"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::读不到保活窗口配置，本次不显示额度预算"
+          fi
+
+          # ── 1) Worker 自述：窗外应 skipped（零成本 —— 它根本不会碰后端）
           WORKER_BODY=$(curl -sS -m 30 "$WORKER_URL" 2>&1 || echo '__CURL_FAILED__')
           echo "Worker 自述：$WORKER_BODY"
           # ⚠️ 必须区分「真的答了 skipped=no」和「压根没拿到响应」——
@@ -94,25 +121,85 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # ── 2) 后端冷热：热态约 1~8s，冷启动 209~488s
-          START_MS=$(date +%s%3N)
-          CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 40 "$BACKEND/api/health" 2>/dev/null || echo 000)
-          MS=$(( $(date +%s%3N) - START_MS ))
-          if (( MS < HOT_MS )) && [[ "$CODE" == 2* ]]; then TEMP=hot; else TEMP=cold; fi
-          echo "后端：HTTP $CODE，耗时 ${MS}ms → $TEMP"
-          {
-            echo ""
-            echo "**后端探测**：HTTP ${CODE}，耗时 ${MS}ms → **${TEMP}**"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          # ── 3) 兜底工作流此刻是否也在唤醒后端（它有同一套时间窗守卫）
+          # ── 2) 兜底工作流：窗外跑过的那几次，耗时必须很短（= 它跳过了，没动后端）
+          #      只看**最近 4 小时**的运行：守卫是 2026-09-22 才加的，此前窗外运行会真的
+          #      唤醒后端（实测 318~488s）。把历史一起算进来会天天误报，而我们要回答的是
+          #      「刚才那几个小时里，有没有东西把它弄醒」。
+          FALLBACK_OK=yes
+          : > /tmp/fallback.txt
           if command -v gh >/dev/null 2>&1; then
             GH_TOKEN="${{ github.token }}" gh api \
-              "repos/${{ github.repository }}/actions/workflows/keepalive.yml/runs?per_page=5" \
-              --jq '.workflow_runs[] | "\(.created_at) \(.event) \(.conclusion)"' \
-              > /tmp/fallback.txt 2>/dev/null || echo "(查询失败)" > /tmp/fallback.txt
-            echo "兜底工作流最近运行："; cat /tmp/fallback.txt
+              "repos/${{ github.repository }}/actions/workflows/keepalive.yml/runs?per_page=30" \
+              --jq '.workflow_runs[] | select(.status=="completed" and .run_started_at != null and ((.created_at|fromdate) > (now - 14400))) | "\(.created_at)|\(.conclusion)|\((.updated_at|fromdate)-(.run_started_at|fromdate))"' \
+              > /tmp/fallback.txt 2>/dev/null || FALLBACK_OK=no
+          else
+            FALLBACK_OK=no
           fi
+
+          FALLBACK_NOTE="（无窗外运行）"
+          BAD_LINES=0
+          if [[ "$FALLBACK_OK" != yes ]]; then
+            FALLBACK_NOTE="⚠️ 查询失败，无法确认兜底工作流有没有在窗外唤醒后端"
+          else
+            while IFS='|' read -r created conclusion secs; do
+              # 行尾可能带 CR（不同工具链给出的行尾不同）—— 先去干净再判定
+              created=${created%$'\r'}
+              conclusion=${conclusion%$'\r'}
+              secs=${secs%$'\r'}
+              [[ -z "${created:-}" ]] && continue
+              if [[ ! "$secs" =~ ^[0-9]+$ ]]; then
+                # ⚠️ 解析不了的行**不能静默跳过** —— 那等价于「没有窗外运行」，会给出静默通过。
+                BAD_LINES=$((BAD_LINES + 1))
+                continue
+              fi
+              uh=${created:11:2}
+              ch=$(( (10#$uh + 8) % 24 ))
+              if (( ch < 7 )); then
+                if (( secs > FALLBACK_SKIP_MAX_SEC )); then
+                  echo "::error::兜底工作流在窗外（CST ${ch} 点，${created}）跑了 ${secs}s，超过 ${FALLBACK_SKIP_MAX_SEC}s —— 说明它的时间窗守卫没生效、真的发请求唤醒后端了"
+                  FAIL=1
+                  FALLBACK_NOTE="❌ 窗外运行 ${created} 耗时 ${secs}s（疑似真的发了请求）"
+                else
+                  echo "窗外兜底运行（CST ${ch} 点，${created}）：${secs}s → 已跳过，未动后端 ✅"
+                  FALLBACK_NOTE="✅ 窗外运行 ${created} 仅 ${secs}s（跳过）"
+                fi
+              else
+                echo "窗内兜底运行（CST ${ch} 点，${created}）：${secs}s（窗内本就该保活，正常）"
+              fi
+            done < /tmp/fallback.txt
+            if (( BAD_LINES > 0 )); then
+              FALLBACK_OK=no
+              FALLBACK_NOTE="⚠️ 有 ${BAD_LINES} 行无法解析，无法确认兜底工作流有没有在窗外唤醒后端"
+              echo "::warning::兜底工作流运行记录里有 ${BAD_LINES} 行解析失败（格式可能变了）"
+            fi
+          fi
+          {
+            echo ""
+            echo "**兜底工作流（keepalive.yml）**：${FALLBACK_NOTE}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # ── 3) 后端冷热：**只在窗内探测**（零成本 —— 那时它本来就被保活着）
+          #      窗外一律不探测：任何请求都会拉起实例，而那正是本工作流要守护的额度。
+          CODE=skipped
+          MS=0
+          TEMP=inferred-cold
+          if [[ "$EXPECT" == "inside" ]]; then
+            START_MS=$(date +%s%3N)
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 40 "$BACKEND/api/health" 2>/dev/null || echo 000)
+            MS=$(( $(date +%s%3N) - START_MS ))
+            if (( MS < HOT_MS )) && [[ "$CODE" == 2* ]]; then TEMP=hot; else TEMP=cold; fi
+            echo "后端（窗内探测）：HTTP $CODE，耗时 ${MS}ms → $TEMP"
+          else
+            echo "后端：**未探测**（窗外探测会把实例拉起来、白吃额度）——冷态由「两个自动唤醒源都没动它」推断"
+          fi
+          {
+            echo ""
+            if [[ "$EXPECT" == "inside" ]]; then
+              echo "**后端探测（窗内，零成本）**：HTTP ${CODE}，耗时 ${MS}ms → **${TEMP}**"
+            else
+              echo "**后端探测**：未探测（窗外探测会拉起实例、白吃额度）。冷态由上面两条推断：Worker 已跳过 + 兜底工作流未在窗外发请求。"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
           # ── 4) 断言
           {
@@ -126,19 +213,15 @@ jobs:
             echo "::error::拿不到线上 Worker 的响应 —— 本次观测无效，不能据此判断时间窗。原始响应：${WORKER_BODY:0:200}"
             FAIL=1
           fi
-          # 窗外若「冷」得异常快（<3s 就失败），更像是网络/DNS 问题而非实例休眠，别当成通过
-          if [[ "$EXPECT" == "outside" ]] && [[ "$TEMP" == cold ]] && (( MS < 3000 )); then
-            echo "::error::窗外探测 ${MS}ms 就失败（HTTP $CODE）—— 太快了，像是网络故障而不是实例休眠，本次不算通过"
-            FAIL=1
-          fi
 
           if [[ "$EXPECT" == "outside" ]]; then
             if [[ "$WORKER_OK" == yes ]] && [[ "$SKIPPED" != yes ]]; then
               echo "::error::窗外但 Worker 没有跳过（skipped=$SKIPPED）—— 时间窗过滤可能失效，后端会 7×24 常驻并撑爆额度"
               FAIL=1
             fi
-            if [[ "$TEMP" == hot ]]; then
-              echo "::warning::窗外后端却是热态（${MS}ms）—— 说明有别的唤醒源（真实访问/部署/兜底工作流），需排查"
+            # 窗外这一支靠「兜底工作流也没发请求」来支撑推断，所以查不到它的运行记录就不算通过
+            if [[ "$FALLBACK_OK" != yes ]]; then
+              echo "::error::窗外观测需要确认兜底工作流没有唤醒后端，但查不到它的运行记录 —— 本次不算通过"
               FAIL=1
             fi
           else
@@ -157,8 +240,11 @@ jobs:
             echo "❌ 与预期不符（CST ${CST_H} 点 / ${EXPECT}）—— 见上方 ::error:: 注解" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
-          printf '{"at":"%s","cstHour":%d,"expect":"%s","workerOk":"%s","workerSkipped":"%s","backendHttp":"%s","backendMs":%d,"backendTemp":"%s","pass":%s}\n' \
-            "$(date -u +%FT%TZ)" "$CST_H" "$EXPECT" "$WORKER_OK" "$SKIPPED" "$CODE" "$MS" "$TEMP" \
+          printf '{"at":"%s","cstHour":%d,"expect":"%s","hoursPerDay":%s,"monthlyHoursEstimate":%s,"workerOk":"%s","workerSkipped":"%s","fallbackOk":"%s","backendProbed":%s,"backendHttp":"%s","backendMs":%d,"backendTemp":"%s","pass":%s}\n' \
+            "$(date -u +%FT%TZ)" "$CST_H" "$EXPECT" \
+            "${HOURS_PER_DAY:-null}" "$( [[ "$HOURS_PER_DAY" =~ ^[0-9]+$ ]] && awk -v h="$HOURS_PER_DAY" 'BEGIN{printf "%.0f", h*30.44}' || echo null )" \
+            "$WORKER_OK" "$SKIPPED" "$FALLBACK_OK" "$( [[ "$EXPECT" == inside ]] && echo true || echo false )" \
+            "$CODE" "$MS" "$TEMP" \
             "$( (( FAIL == 0 )) && echo true || echo false )" > observation.json
           cat observation.json
           exit $FAIL
