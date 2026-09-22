@@ -76,6 +76,9 @@ const WARM_WINDOW_START_HOUR = 7
 const WARM_WINDOW_END_HOUR = 24
 const WARM_ALL_DAY = false
 
+/** 供测试断言「线上生效配置」用；Worker 逻辑一律走上面的模块常量，不读这些导出 */
+export { WARM_ALL_DAY, WARM_WINDOW_START_HOUR, WARM_WINDOW_END_HOUR }
+
 export default {
   /** Cron Trigger 入口 */
   async scheduled(event, env, ctx) {
@@ -121,6 +124,20 @@ export function warmHoursPerDay(start = WARM_WINDOW_START_HOUR, end = WARM_WINDO
   return end > 24 ? 24 - start + (end - 24) : end - start
 }
 
+/**
+ * 每天**实际**保活多少小时 —— 把 `WARM_ALL_DAY` 开关也算进去，供额度守卫使用。
+ *
+ * 为什么要有它：光看窗口常量（17h/天）会漏掉「开关一开就是 24h/天」这条路。
+ * 守卫必须盯住**实际生效值**，否则「恒为 true」会以另一种形式溜过去。
+ */
+export function effectiveWarmHoursPerDay(
+  start = WARM_WINDOW_START_HOUR,
+  end = WARM_WINDOW_END_HOUR,
+  allDay = WARM_ALL_DAY
+) {
+  return allDay ? 24 : warmHoursPerDay(start, end)
+}
+
 /** 供测试断言用：当前生效的定时表达式 */
 export const ACTIVE_CRON = CRON_EXPRESSION
 
@@ -134,12 +151,14 @@ export const ACTIVE_CRON = CRON_EXPRESSION
 async function warm() {
   const now = new Date()
   const startedAt = Date.now()
+  // ⚠️ 这里是**唯一**的窗口闸门，也是唯一的出口：下面那次 fetch 必须被它挡住。
+  //    改动本行参数 = 直接改生产保活行为（写错会让后端 7×24 常驻 → 撑爆额度）。
+  //    测试 scripts/keepalive-worker.test.mjs 里的「闸门行为」三条会在改错时失败。
   if (!inWarmWindow(now)) {
     return { skipped: true, reason: 'outside warm window', cstHour: (now.getUTCHours() + 8) % 24 }
   }
   const target = `${BACKEND}${PROBE_PATH}?_warm=${startedAt}`
-  try {
-    const res = await fetch(target, {
+  try {    const res = await fetch(target, {
       method: 'GET',
       redirect: 'follow',
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),

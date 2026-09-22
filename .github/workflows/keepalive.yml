@@ -27,7 +27,27 @@ name: Keep Render Backend Warm
 #
 # 本工作流**保留作为兜底**（偶尔真能跑起来，聊胜于无），但不要把它当作主要保障。
 # 同时请知悉：Render 免费层每月仅 750 instance hours，主后端 7×24 常驻约 730h，
-# 且**超额会暂停所有免费服务**，故保活默认只覆盖 07:00–01:00（详见上述文档）。
+# 且**超额会暂停所有免费服务**，故保活默认只覆盖北京时间 07:00–24:00（详见上述文档）。
+#
+# ── v1.38.2 修复（2026-09-22）：补上时间窗守卫 ─────────────────────────
+# 此前本工作流**没有任何时间窗过滤**，24 小时都在 ping —— 而它对「几点该醒」完全无感。
+# 实测最近 23 次定时运行中有 **9 次落在 07:00–24:00 之外**（CST 01/02/03/05/06 点）：
+#
+#   2026-09-21T22:03:39Z → CST 06 点   ⚠️
+#   2026-09-21T18:23:56Z → CST 02 点   ⚠️
+#   2026-09-20T21:30:43Z → CST 05 点   ⚠️
+#   2026-09-20T19:12:31Z → CST 03 点   ⚠️
+#   2026-09-20T16:57:26Z → CST 00 点   ⚠️
+#   2026-09-19T21:40:33Z → CST 05 点   ⚠️
+#   2026-09-19T19:28:17Z → CST 03 点   ⚠️
+#   2026-09-19T17:23:30Z → CST 01 点   ⚠️
+#
+# 每次窗外运行都会白唤醒一次后端（冷启动数分钟 + 保活 15 分钟 ≈ 0.3~0.4 instance hours），
+# 按 ~30% 的越窗比例折算约 15h/月 —— 纯浪费，且直接啃掉留给 embedding 的额度余量。
+# 更隐蔽的代价：它会在凌晨随机把后端弄热，**让「窗外应该冷」的验证无法成立**。
+#
+# 修复：作业第一步判定时间窗，窗外直接跳过（**不发出任何请求**）。
+# 守卫**失败方向是「跳过」**：宁可漏一次兜底（主力是 Cloudflare Worker），也不要白吃额度。
 #
 # ── v1.34.0 调整（2026-09-20）：10 分钟 → 5 分钟 ──────────────────────
 # 目的：把「用户遇到冷启动」的概率降到最低。
@@ -69,7 +89,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: 时间窗守卫（北京时间 07:00–24:00，窗外不唤醒后端）
+        id: window
+        run: |
+          set -euo pipefail
+          # 与 Cloudflare Worker 用同一套策略（scripts/keepalive-worker.mjs）：
+          # 免费层 750 instance hours/月，7×24 常驻 ≈730h，**超额会暂停所有免费服务**。
+          # CST = UTC+8；07:00 CST = 23:00 UTC，24:00 CST = 16:00 UTC。
+          UTC_H=$(date -u +%H)
+          if ! [[ "$UTC_H" =~ ^[0-9]{2}$ ]]; then
+            # 解析失败 → 按「窗外」处理。这是刻意的失败方向：
+            # 少一次兜底保活无所谓（主力是 Worker），白吃额度却会累积成超额。
+            echo "::warning::无法解析 UTC 小时（'$UTC_H'），按窗外处理并跳过本次保活"
+            echo "in_window=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CST_H=$(( (10#$UTC_H + 8) % 24 ))
+          if (( CST_H >= 7 && CST_H < 24 )); then
+            echo "in_window=true" >> "$GITHUB_OUTPUT"
+            echo "北京时间 ${CST_H} 点 → 窗内，继续保活"
+          else
+            echo "in_window=false" >> "$GITHUB_OUTPUT"
+            echo "北京时间 ${CST_H} 点 → 窗外，跳过本次保活（不向后端发出任何请求）"
+          fi
+
       - name: Wake & ping backend
+        if: steps.window.outputs.in_window == 'true'
         env:
           BACKEND_URL: https://interview-guide-backend.onrender.com
         run: |
@@ -93,6 +138,7 @@ jobs:
           done
 
       - name: Liveness & API sanity check
+        if: steps.window.outputs.in_window == 'true'
         env:
           BACKEND_URL: https://interview-guide-backend.onrender.com
         run: |
