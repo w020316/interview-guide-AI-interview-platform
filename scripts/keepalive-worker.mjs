@@ -49,6 +49,20 @@ const CRON_EXPRESSION = '*/5 * * * *'
 const PROBE_PATH = '/api/health'
 
 /**
+ * 单次探测的子请求超时。
+ *
+ * ⚠️ 2026-09-22 实测踩坑：**不设超时会直接把 Worker 的 HTTP 入口打挂**。
+ * 后端休眠时 Render 会把请求挂在连接上等实例启动（实测 200~480s），
+ * 而 Worker 单次调用有墙钟上限，于是调用方看到的是
+ * `ERR_CONNECTION_CLOSED` / 502 —— 看起来像脚本坏了，其实只是"后端正在启动"。
+ *
+ * 给 25s 超时后：超时即返回结构化的"仍在启动"结果，调用方一眼能看懂；
+ * 而**保活效果不受影响** —— 请求已经到达 Render 并触发/维持了实例启动，
+ * 下一个 5 分钟周期的定时任务就会命中一个正在启动或已就绪的实例。
+ */
+const PROBE_TIMEOUT_MS = 25000
+
+/**
  * 保活时间窗（北京时间，UTC+8）。
  *
  * 07:00 → 24:00，即 17h/天 ≈ 517h/月，为 embedding 服务与重部署留出约 233h 余量
@@ -93,9 +107,8 @@ function inWarmWindow(now) {
 /**
  * 执行一次保活。
  *
- * 注意：实例冷启动可能长达数分钟（实测 338s / 355s，最慢超过 8 分钟也出现过），
- * 而 Worker 单次调用有墙钟上限，请求可能被中断 —— 这**不影响保活效果**：
- * 中断的请求同样已经触发了 Render 拉起实例，
+ * 注意：实例冷启动可能长达数分钟（实测 209~488s），因此子请求带
+ * {@link PROBE_TIMEOUT_MS} 超时。**超时不算失败** —— 请求已经触发 Render 拉起实例，
  * 下一个 5 分钟周期的定时任务会命中一个正在启动/已就绪的实例。
  */
 async function warm() {
@@ -106,7 +119,11 @@ async function warm() {
   }
   const target = `${BACKEND}${PROBE_PATH}?_warm=${startedAt}`
   try {
-    const res = await fetch(target, { method: 'GET', redirect: 'follow' })
+    const res = await fetch(target, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
     const body = await res.text()
     return {
       ok: res.ok,
@@ -116,12 +133,17 @@ async function warm() {
       body: body.slice(0, 200),
     }
   } catch (e) {
+    // 超时 / 连接中断都归为「后端仍在启动」，而不是脚本出错
+    const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError'
     return {
       ok: false,
       status: 0,
       ms: Date.now() - startedAt,
       at: now.toISOString(),
-      error: String(e),
+      booting: timedOut,
+      error: timedOut
+        ? `后端仍在启动（${PROBE_TIMEOUT_MS}ms 内未响应），本次已触发唤醒，下一次定时任务会继续`
+        : String(e),
     }
   }
 }
