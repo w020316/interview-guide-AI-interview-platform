@@ -85,9 +85,22 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.38.0'
+export const CURRENT_VERSION = '1.38.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.38.1',
+    date: '2026-09-22',
+    title: '版本 1.38.1 · 登录等待体验修复',
+    items: [
+      { text: '登录体验：修复长时间未使用后打开网站，登录会长时间无响应、连续两次都进不去的问题——等待期间现在会显示真实进度，超时后可直接「继续等待」，不必再刷新页面把已等待的时间全部作废', level: 'user' },
+      { text: '登录体验：等待提示改为如实说明（免费实例冷启动通常 5-6 分钟），不再让用户在 2 分钟后误以为程序坏了，也不再在服务只是启动较慢时提示「请检查网络」', level: 'user' },
+      { text: '运维：保活主力由 GitHub Actions 定时任务改为 Cloudflare Worker 定时触发——实测 GitHub 的定时任务被降级到 3~6 小时才跑一次，导致后端几乎一直处于休眠状态（脚本 scripts/keepalive-worker.mjs，步骤 docs/keepalive-setup.md）', level: 'tech' },
+      { text: '前端：冷启动唤醒预算 150s → 480s、单次探测超时 20s → 45s（实例启动期间请求会被挂起，20s 超时会反复中断探测）；新增 1s 进度心跳，避免等待数字长时间不动；「继续等待」改为追加预算而非清零重来', level: 'tech' },
+      { text: '前端：探测判定收紧——边缘节点 502/503/504 且响应体不是业务 JSON 时不再视为已就绪，避免把「尚未启动」误判为就绪后紧接着登录秒失败', level: 'tech' },
+      { text: '验证：前端 291 个用例全过、类型检查 0 错误、生产构建通过', level: 'tech' },
+    ]
+  },
   {
     version: '1.38.0',
     date: '2026-09-22',

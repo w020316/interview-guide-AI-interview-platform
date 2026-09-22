@@ -90,9 +90,67 @@ describe('utils/backendWake 冷启动唤醒器', () => {
     expect(opts?.validateStatus?.()).toBe(true)
   })
 
-  it('服务器返回 5xx 仍判定为已唤醒（实例存活即算就绪）', async () => {
-    getMock.mockResolvedValue({ status: 503, data: 'warming' })
+  it('后端进程返回 5xx（业务 JSON）仍判定为已唤醒（实例存活即算就绪）', async () => {
+    getMock.mockResolvedValue({ status: 503, data: { code: 503, message: 'AI 服务暂时不可用' } })
     await expect(ensureAwake()).resolves.toBe(true)
     expect(wakeState.status).toBe('ready')
+  })
+
+  /**
+   * 回归防线（2026-09-22）：实例未就绪时 Render 边缘节点会返回 502/503/504 的 HTML 错误页。
+   * 这**不能**算就绪——否则唤醒器会立刻宣布 ready，紧接着的登录 POST 再吃一个 502，
+   * 用户看到的是「秒失败」，而不是「请耐心等待启动」。
+   */
+  it('边缘节点 5xx（非业务 JSON）不算就绪，继续轮询', async () => {
+    getMock.mockResolvedValue({ status: 502, data: '<html>Bad Gateway</html>' })
+    await expect(ensureAwake()).resolves.toBe(false)
+    expect(wakeState.status).toBe('failed')
+    expect(wakeState.errorKind).toBe('booting')
+  })
+
+  it('连接被挂起（本地超时）归类为 booting，而非网络故障', async () => {
+    getMock.mockRejectedValue(Object.assign(new Error('timeout'), { code: 'ECONNABORTED' }))
+    await expect(ensureAwake()).resolves.toBe(false)
+    expect(wakeState.errorKind).toBe('booting')
+  })
+
+  it('连接被拒（无响应体且非超时）归类为 network', async () => {
+    getMock.mockRejectedValue(new Error('Network Error'))
+    await expect(ensureAwake()).resolves.toBe(false)
+    expect(wakeState.errorKind).toBe('network')
+  })
+
+  /**
+   * 「继续等待」语义：探测进行中再次调用 ensureAwake，应把预算往后延，
+   * 而不是重开一轮（否则用户每点一次，已等待的几分钟就清零重来）。
+   */
+  it('探测进行中再次调用会延长本轮预算，不重新开始计时', async () => {
+    // 单次探测挂起 200ms；预算先给 30ms（不足以等到成功）
+    wakeConfig.probeTimeoutMs = 1000
+    wakeConfig.retryIntervalMs = 1
+    let resolveProbe: (v: unknown) => void = () => {}
+    getMock.mockImplementation(
+      () => new Promise((resolve) => { resolveProbe = resolve })
+    )
+    const first = ensureAwake(30)
+    const elapsedBefore = wakeState.elapsedMs
+    // 模拟用户点击「继续等待」：追加预算
+    const second = ensureAwake(5000)
+    expect(getMock).toHaveBeenCalledTimes(1)
+    resolveProbe({ status: 200 })
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true])
+    expect(wakeState.status).toBe('ready')
+    // 起点未被重置（elapsedMs 单调累计），说明是「追加」而非「重来」
+    expect(wakeState.elapsedMs).toBeGreaterThanOrEqual(elapsedBefore)
+  })
+
+  it('失败后继续等待不清零已等待时间，成功时复位', async () => {
+    wakeConfig.budgetMs = 0
+    await expect(ensureAwake()).resolves.toBe(false)
+    const waitedAfterFail = wakeState.elapsedMs
+    getMock.mockResolvedValue({ status: 200 })
+    await expect(ensureAwake()).resolves.toBe(true)
+    expect(wakeState.status).toBe('ready')
+    expect(wakeState.elapsedMs).toBeGreaterThanOrEqual(waitedAfterFail)
   })
 })

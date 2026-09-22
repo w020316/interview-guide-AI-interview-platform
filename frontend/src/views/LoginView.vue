@@ -130,8 +130,8 @@
             <span v-if="loading" class="spinner"></span>
             {{ loading ? '登录中...' : '登录' }}
           </button>
-          <button v-if="lastError" type="button" class="btn-retry" @click="handleLogin">
-            重试
+          <button v-if="showRetry" type="button" class="btn-retry" @click="handleLogin">
+            {{ retryLabel }}
           </button>
         </form>
 
@@ -195,8 +195,8 @@
             <span v-if="loading" class="spinner"></span>
             {{ loading ? '注册中...' : '注册' }}
           </button>
-          <button v-if="lastError" type="button" class="btn-retry" @click="handleRegister">
-            重试
+          <button v-if="showRetry" type="button" class="btn-retry" @click="handleRegister">
+            {{ retryLabel }}
           </button>
         </form>
 
@@ -236,15 +236,37 @@ const lastError = ref('')
  * 冷启动提示：由共享唤醒器状态（backendWake）驱动，而非仅在某次请求失败后才出现。
  * - 应用启动（main.ts）与登录页挂载都会触发预热，用户输入账号密码的时间通常已覆盖冷启动
  * - 预热进行中或失败时在表单上展示实时进度，避免"点了登录没反应"的观感
+ *
+ * 2026-09-22 修正：实测冷启动 338s / 355s（≈6 分钟，最慢超过 8 分钟也出现过），
+ * 此前的文案写"约需 1-2 分钟"会让用户在 2 分钟后以为程序坏了。现按真实区间给预期，
+ * 并把「网络不通」与「后端仍在启动」分开表述——后者占绝大多数，提示"检查网络"是误导。
  */
 const coldStartHint = computed(() => wakeState.status === 'probing' || wakeState.status === 'failed')
 const wakeElapsedSec = computed(() => Math.round(wakeState.elapsedMs / 1000))
-const coldStartMessage = computed(() =>
-  wakeState.status === 'failed'
-    ? '后端服务唤醒失败，请检查网络后点击「重试」'
-    : `后端服务正在冷启动（免费实例约需 1-2 分钟）${
-        wakeElapsedSec.value > 0 ? `，已等待 ${wakeElapsedSec.value}s` : ''
-      }...`
+const coldStartMessage = computed(() => {
+  const waited = wakeElapsedSec.value
+  if (wakeState.status === 'failed') {
+    if (wakeState.errorKind === 'network') {
+      return `无法连接后端服务（已等待 ${waited}s），请检查网络后点击「继续等待」`
+    }
+    return `后端服务仍在启动中（已等待 ${waited}s）。免费实例冷启动通常 5-6 分钟、最慢可能超过 8 分钟，点击「继续等待」即可，已填内容不会丢失`
+  }
+  return `后端服务正在启动（免费实例冷启动约 1-8 分钟）${
+    waited > 0 ? `，已等待 ${waited}s` : ''
+  }，请保持页面打开…`
+})
+
+/**
+ * 是否展示重试按钮：
+ * - 有真实错误（lastError）
+ * - 或唤醒本身失败（wakeState.status === 'failed'）
+ *
+ * 后者此前没有入口，用户只能刷新页面重来，等于把已等待的几分钟全部作废。
+ */
+const showRetry = computed(() => !!lastError.value || wakeState.status === 'failed')
+/** 重试按钮文案：后端还在启动时用「继续等待」，语义上更贴近实际发生的动作 */
+const retryLabel = computed(() =>
+  wakeState.status === 'failed' && wakeState.errorKind !== 'network' ? '继续等待' : '重试'
 )
 
 // 表单校验
@@ -264,7 +286,7 @@ onMounted(() => {
     rememberMe.value = true
   }
   // 挂载即预热：让后端在用户输入账号密码期间开始启动（main.ts 已先发起，此处为幂等补充）
-  if (wakeState.status !== 'ready') {
+  if (!isBackendKnownReady()) {
     prewarmBackend()
   }
 })
@@ -281,25 +303,37 @@ function redirectAfterAuth() {
  *
  * 为什么登录不走 api 拦截器的通用重放：登录/注册是 POST，通用重放会带来重复提交风险，
  * 因此这里显式控制——只在「后端明显未就绪（冷启动）」这一确定未送达的场景下重试一次。
+ *
+ * 2026-09-22：唤醒预算已提升到 8 分钟（实测冷启动 338s / 355s，且最慢超过 8 分钟的情况
+ * 也出现过），因此正常情况下这一轮等待就能等到后端就绪，用户不必再手动点一次。
  */
 async function authWithRetry(url: string, payload: unknown): Promise<unknown> {
   // 预热未完成时先等就绪，避免白白耗尽 AUTH_TIMEOUT 后才提示失败
   if (!isBackendKnownReady()) {
     const awake = await ensureAwake()
     if (!awake) {
-      throw new Error('后端服务唤醒超时（超过 150s），请稍后重试或刷新页面')
+      throw new Error(wakeFailureMessage())
     }
   }
   try {
     return await api.post(url, payload)
   } catch (e: unknown) {
     if (!isColdStartError(e)) throw e
+    // 冷启动导致的失败：再等一轮（对已在启动中的实例是追加预算，不会清零重来）后重试一次
     const awake = await ensureAwake()
     if (!awake) {
-      throw new Error('后端服务唤醒超时（超过 150s），请稍后重试或刷新页面')
+      throw new Error(wakeFailureMessage())
     }
     return await api.post(url, payload)
   }
+}
+
+/** 唤醒未成功时的文案：区分「网络不通」与「后端还在启动」，后者占绝大多数 */
+function wakeFailureMessage(): string {
+  if (wakeState.errorKind === 'network') {
+    return '无法连接后端服务，请检查网络后点击「继续等待」'
+  }
+  return `后端服务启动超时（已等待 ${Math.round(wakeState.elapsedMs / 1000)}s）。后端可能仍在启动，点击「继续等待」可继续等待`
 }
 
 async function handleLogin() {
@@ -322,7 +356,8 @@ async function handleLogin() {
   } catch (e: unknown) {
     const msg = getErrMessage(e, '登录失败')
     lastError.value = msg
-    if (isColdStartError(e)) {
+    // 唤醒未完成（后端仍在启动 / 网络异常）用黄色警示；其余业务错误才用红色
+    if (wakeState.status === 'failed' || isColdStartError(e)) {
       ElMessage.warning(msg)
     } else {
       ElMessage.error(msg)
@@ -350,7 +385,8 @@ async function handleRegister() {
   } catch (e: unknown) {
     const msg = getErrMessage(e, '注册失败')
     lastError.value = msg
-    if (isColdStartError(e)) {
+    // 唤醒未完成（后端仍在启动 / 网络异常）用黄色警示；其余业务错误才用红色
+    if (wakeState.status === 'failed' || isColdStartError(e)) {
       ElMessage.warning(msg)
     } else {
       ElMessage.error(msg)

@@ -46,13 +46,23 @@
 
 ## 四、监控与告警（已实施）
 
-1. **保活 + 健康监控**：GitHub Actions `Keep Render Backend Warm` **每 5 分钟**（v1.34.0 由 10 分钟收紧）：
-   - ping `/api/info`（唤醒免费实例，8 分钟耐心重试循环容忍冷启动）；
-   - 存活校验 `/api/health` 返回 `status: UP`，异常即 Run 失败 + 邮件告警。
-   - 收紧到 5 分钟的原因：Render 休眠阈值 15 分钟，而 GitHub 定时任务在高峰期
-     **常有数分钟延迟**（实测可达 5~15 分钟），原 10 分钟间隔叠加延迟后可能越过阈值。
-     本仓库为 public，Actions 分钟数不限量，加密无成本。
-   - ⚠️ 已知限制：GitHub 对「60 天无提交活动」的仓库会自动停用定时工作流；
+1. **保活 + 健康监控**（**2026-09-22 已更换主力方案**）：
+   - **主力：Cloudflare Worker + Cron Trigger，每 5 分钟**（脚本 `scripts/keepalive-worker.mjs`，
+     部署步骤见 [keepalive-setup.md](./keepalive-setup.md)）。准点触发，免费套餐最小 1 分钟粒度。
+   - **兜底：GitHub Actions `Keep Render Backend Warm`**（每 5 分钟，但见下方限制）。
+     ping `/api/info`（唤醒免费实例，8 分钟耐心重试循环容忍冷启动）；
+     存活校验 `/api/health` 返回 `status: UP`，异常即 Run 失败 + 邮件告警。
+   - ⚠️⚠️ **GitHub Actions 定时任务不能作为保活主力**：它是「尽力而为」调度，公共仓库上
+     被大幅降级。2026-09-22 实测本仓库配置为每 5 分钟，**真实间隔却是 3~6 小时**
+     （4h43m / 4h40m / 6h38m …），导致后端几乎一直休眠、每个用户都在吃冷启动。
+     改 cron 表达式无法修复，必须用准点触发的外部定时器。
+   - ⚠️ **冷启动实测 338s / 355s（≈6 分钟）**，且保活工作流自己 480s 的唤醒预算也失败过
+     （说明最慢可超 8 分钟）；早期记录的 98s 已随版本迭代失效。
+     前端唤醒预算按真实值设为 8 分钟（`frontend/src/utils/backendWake.ts`）。
+   - ⚠️ **Render 免费额度**：每 workspace 每月 750 instance hours，**超额会暂停所有免费服务**。
+     主后端 7×24 常驻约 730h（余量仅约 20h），故保活默认只覆盖北京时间 07:00–01:00
+     （约 540h/月），且只保活主后端、不保活 embedding 服务。
+   - ⚠️ 其他已知限制：GitHub 对「60 天无提交活动」的仓库会自动停用定时工作流；
      长期停更后需手动在 Actions 页重新启用。
 2. **内置指标**：Spring Boot Actuator `/actuator/health`、`/actuator/info`（公开）；`/actuator/metrics` 与 Prometheus 指标（`MetricsConfig`：AI 调用计数/耗时、缓存命中）需认证。
 3. **管理后台系统指标**：`/admin`（管理员）实时查看 AI 调用、缓存、SSE 并发、JVM 内存。
@@ -61,7 +71,9 @@
    - Dependabot 依赖漏洞 → 自动 PR + 通知；
    - Render Dashboard Events/Logs → 部署失败事件可见。
 
-> 注：免费方案下不引入外部 uptime 服务商；如需更高 SLA 可后续接入 UptimeRobot（免费 50 个监视器）对前端与后端域名做 5 分钟级探活。
+> 注：保活已改用 **Cloudflare Worker Cron Trigger**（复用现有 Cloudflare 账号，零新增服务商，
+> 免费且准点）。如需额外的可用性告警，可后续接入 UptimeRobot（免费 50 个监视器）
+> 对前端与后端域名做 5 分钟级探活。
 
 ---
 
