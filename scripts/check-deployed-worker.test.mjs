@@ -16,7 +16,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { extractFingerprint, diffFingerprints } from './check-deployed-worker.mjs'
+import { extractFingerprint, diffFingerprints, extractModuleSource } from './check-deployed-worker.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const LOCAL = await readFile(join(HERE, 'keepalive-worker.mjs'), 'utf8')
@@ -112,4 +112,49 @@ test('能抓住「常量读不到」这种更隐蔽的改写', () => {
     diffs.some((d) => d.includes('读不到窗口常量')),
     '常量被改成运行期取值却没报出来（线上窗口可能随环境变量漂移）'
   )
+})
+
+// ── multipart 剥壳：CF 的下载端点返回的不是裸 JS ──────────────────────────
+// 形状取自 2026-09-22 的真实响应（含 CRLF、boundary 在首行、结尾 `--boundary--`）。
+
+/** 按 CF 的真实形状把一段脚本包成 multipart */
+function wrapMultipart(script, { boundary = 'f717e855f2e77228d2b2c33cb340ba90cd6a16accab0ab6358ee96c0836b', nl = '\r\n' } = {}) {
+  return [
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="keepalive-worker.mjs"; filename="keepalive-worker.mjs"',
+    'Content-Type: application/javascript+module',
+    '',
+    script,
+    `--${boundary}--`,
+    '',
+  ].join(nl)
+}
+
+test('剥壳：纯脚本原样返回，不做任何改动', () => {
+  assert.equal(extractModuleSource(LOCAL), LOCAL)
+})
+
+test('剥壳：真实形状的 multipart（CRLF）能剥出正文，且抽出的指纹与纯脚本一致', () => {
+  const wrapped = wrapMultipart(LOCAL)
+  const unwrapped = extractModuleSource(wrapped)
+  assert.ok(unwrapped.startsWith('/**'), `剥壳后应以脚本开头的注释起始，实际开头：${JSON.stringify(unwrapped.slice(0, 40))}`)
+  assert.ok(!unwrapped.includes('Content-Disposition'), '剥壳后不该残留 multipart 头部')
+  assert.ok(!unwrapped.includes('--f717e855'), '剥壳后不该残留 boundary')
+  assert.deepEqual(
+    diffFingerprints(extractFingerprint(LOCAL), extractFingerprint(unwrapped)),
+    [],
+    '包进 multipart 再剥出来，指纹必须与原始脚本完全一致（否则比对会失真）'
+  )
+})
+
+test('剥壳：LF 行尾的 multipart 同样能剥（不同客户端/网关可能给出不同行尾）', () => {
+  const unwrapped = extractModuleSource(wrapMultipart(LOCAL, { nl: '\n' }))
+  assert.ok(unwrapped.startsWith('/**') && !unwrapped.includes('Content-Disposition'))
+  assert.deepEqual(diffFingerprints(extractFingerprint(LOCAL), extractFingerprint(unwrapped)), [])
+})
+
+test('剥壳：不是 multipart 的畸形输入不应抛异常（宁可原样返回，交给比对去报错）', () => {
+  assert.equal(extractModuleSource(''), '')
+  assert.equal(extractModuleSource('--only-a-boundary-line'), '--only-a-boundary-line')
+  assert.equal(extractModuleSource('const A = 1'), 'const A = 1')
 })

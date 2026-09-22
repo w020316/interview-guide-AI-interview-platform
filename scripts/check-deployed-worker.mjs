@@ -14,7 +14,9 @@
  *   # 走 Cloudflare API（需要一个只读 token，见下）
  *   CF_API_TOKEN=xxx node scripts/check-deployed-worker.mjs
  *
- *   # 离线：与一份导出的脚本文件比对（API 形状变动时的兜底，也可用于评审线上原文）
+ *   # 离线：与一份导出的脚本文件比对
+ *   #   —— 文件可以是「纯脚本」，也可以是 CF 下载端点的**原始 multipart 响应**
+ *   #      （会先剥包装再比对），后者便于把线上原文整份留档后再核
  *   node scripts/check-deployed-worker.mjs --source-file ./deployed-worker.mjs
  *
  * ── token 的最小权限 ────────────────────────────────────────────────
@@ -106,6 +108,36 @@ export function diffFingerprints(local, deployed) {
   return diffs
 }
 
+/**
+ * 从响应体里取出脚本正文。
+ *
+ * Cloudflare 对单模块脚本的下载端点返回的是 **multipart/form-data**（不是裸 JS）：
+ * 2026-09-22 实测的真实响应（4679 字符）形如
+ *
+ *   --<boundary>\r\n
+ *   Content-Disposition: form-data; name="keepalive-worker.mjs"; filename="keepalive-worker.mjs"\r\n
+ *   Content-Type: application/javascript+module\r\n
+ *   \r\n
+ *   <脚本正文 6891 字节 / 4406 字符>\r\n
+ *   --<boundary>--\r\n
+ *
+ * 所以必须剥掉包装再抽指纹；直接把整段丢给正则也能"凑巧"命中常量，但会让
+ * 「闸门顺序」这类基于位置的判断失真。不是 multipart 就原样返回（`--source-file`
+ * 传入纯脚本时走这条路）。
+ */
+export function extractModuleSource(text) {
+  if (!text.startsWith('--')) return text
+  const nl = text.includes('\r\n') ? '\r\n' : '\n'
+  const boundary = text.slice(0, text.indexOf(nl)).trim()
+  if (!/^--\S+$/.test(boundary)) return text
+  const headEnd = text.indexOf(nl + nl)
+  if (headEnd === -1) return text
+  const closingAt = text.lastIndexOf(nl + boundary)
+  return closingAt > headEnd
+    ? text.slice(headEnd + nl.length * 2, closingAt)
+    : text.slice(headEnd + nl.length * 2)
+}
+
 /** 统一的 API 调用（与 deploy-keepalive-worker.mjs 同风格，失败时打印 CF 的 errors 明细） */
 async function cf(path, { raw = false, accept } = {}) {
   const res = await fetch(`${API}${path}`, {
@@ -144,10 +176,13 @@ async function resolveAccountId() {
 
 /**
  * 下载线上脚本原文。
- * Cloudflare 对单模块（本项目用 main_module 上传）的下载端点是 .../content；
- * 多模块会返回 multipart，这里取出其中最长的一段作为脚本正文。
- * ⚠️ 本函数的 API 形状**未经实机验证**（开发环境到不了 CF 且无 token）——
- *    因此提供 --source-file 兜底：也可从 Dashboard 复制线上脚本比对。
+ *
+ * ⚠️ 这段**HTTP 调用本身仍未实机验证**（本机没有 token，无法用 Bearer 走一遍），
+ *    但返回体的**形状已按真实响应验证过**：2026-09-22 用已登录的浏览器会话在
+ *    dash 页面内调同一端点，拿到的是 multipart，已据此实现 extractModuleSource，
+ *    并与仓库 blob 做过逐字节比对（详见 docs/keepalive-setup.md 第 9 节）。
+ *    若 Cloudflare 改了返回形状，用 `--source-file` 兜底：把响应原文或 Dashboard
+ *    里复制的脚本存成文件传进来即可。
  */
 async function downloadDeployedSource(accountId) {
   const candidates = [
@@ -157,16 +192,12 @@ async function downloadDeployedSource(accountId) {
   const errors = []
   for (const path of candidates) {
     try {
-      const { text, contentType } = await cf(path, { raw: true })
-      if (text.includes('WARM_WINDOW_START_HOUR')) return { text, via: path }
-      if (contentType.includes('multipart')) {
-        const parts = text.split(/\r?\n\r?\n/)
-        const biggest = parts.reduce((a, b) => (b.length > a.length ? b : a), '')
-        if (biggest.includes('WARM_WINDOW_START_HOUR')) {
-          return { text: biggest, via: `${path}（multipart 中最长的一段）` }
-        }
+      const { text } = await cf(path, { raw: true })
+      const source = extractModuleSource(text)
+      if (source.includes('WARM_WINDOW_START_HOUR')) {
+        return { text: source, via: path + (source === text ? '' : '（已剥掉 multipart 包装）') }
       }
-      errors.push(`${path}：拿到了内容但里面没有窗口常量（${text.length} 字节）`)
+      errors.push(`${path}：拿到了内容但里面没有窗口常量（${text.length} 字符）`)
     } catch (e) {
       errors.push(`${path}：${e.message.split('\n')[0]}`)
     }
@@ -188,8 +219,10 @@ async function main() {
   let crons = null
 
   if (SOURCE_FILE) {
-    deployedSource = await readFile(SOURCE_FILE, 'utf8')
-    via = `本地文件 ${SOURCE_FILE}`
+    const rawText = await readFile(SOURCE_FILE, 'utf8')
+    deployedSource = extractModuleSource(rawText)
+    via =
+      `本地文件 ${SOURCE_FILE}` + (deployedSource === rawText ? '' : '（已剥掉 multipart 包装）')
   } else {
     if (!TOKEN) {
       console.error(

@@ -12,7 +12,7 @@
 > | 定时 | `*/5 * * * *`（每 5 分钟，已通过 Cloudflare API 确认登记） |
 > | 时间窗 | 北京时间 07:00–24:00（见第二节「额度限制」） |
 > | 实测 | 后端休眠时返回 `{"ok":false,"booting":true,...}`；启动完成后返回 `{"ok":true,"status":200,"ms":187}` |
-> | 窗内判定 | 11 条单元测试 + 一致性检查 + 线上实测，见「九、时间窗过滤的验证」 |
+> | 窗内判定 | 21 条单元测试 + 一致性检查 + 线上 blob 哈希比对 + 线上实测，见「九、时间窗过滤的验证」 |
 >
 > 以下两条路仍然保留作为参考（换账号/迁移时用），当前生效的是 Cloudflare Worker。
 > - **二、Cloudflare Worker + Cron Trigger**
@@ -107,7 +107,7 @@ $env:CF_API_TOKEN="你的token"; node scripts/deploy-keepalive-worker.mjs
 
 ```bash
 node --test scripts/keepalive-worker.test.mjs       # 11 条：判定函数 + 闸门行为 + 额度守卫
-node --test scripts/check-deployed-worker.test.mjs  # 6 条：线上↔仓库 指纹比对逻辑
+node --test scripts/check-deployed-worker.test.mjs  # 10 条：线上↔仓库 指纹比对 + multipart 剥壳
 node scripts/check-window-consistency.mjs           # 窗口在 JS 与 Actions YAML 两处必须一致
 ```
 
@@ -390,24 +390,32 @@ node scripts/coldstart-report.mjs --limit 50
 「时间窗写错 → 后端 7×24 常驻 → 撑爆 750h → **所有**免费服务被暂停」是本方案最严重的
 失败模式，所以单独做了四层验证。**代码对 ≠ 线上行为对**，两者验证缺一不可。
 
-### 9.1 线上跑的是哪一版代码（可追溯）
+### 9.1 线上跑的是哪一版代码（已用 blob 哈希钉死）
 
-Worker 是用 `scripts/deploy-keepalive-worker.mjs` 从仓库文件整份上传的，因此线上版本
-= 某个提交时的文件内容。回溯：
+Worker 是用 `scripts/deploy-keepalive-worker.mjs` 从仓库文件整份上传的，因此线上内容
+应当等于某个提交时的文件。**2026-09-22 实测确认了这一条，且是逐字节级别的**：
 
 ```bash
-git log --oneline --follow -- scripts/keepalive-worker.mjs
-git show ed9bcf4:scripts/keepalive-worker.mjs | grep -nE "WARM_WINDOW|WARM_ALL_DAY|getUTCHours"
+# 用已登录的浏览器会话取回线上脚本原文（不需要 token，方法见 9.5），存成 deployed.mjs
+sha256sum deployed.mjs repo中该版本.mjs        # 或用 git 的对象哈希比对
+git hash-object deployed.mjs                    # → da0c0f7fd58f2cf7d0bfbcc47b3fd9a54523363c
+git rev-parse df6eaa1:scripts/keepalive-worker.mjs   # → 同一个 blob
 ```
 
-| 项 | 结论 |
+| 项 | 实测结论 |
 |---|---|
-| 部署发生在 `ed9bcf4`（晚于「收窄窗口至 07:00–24:00」与「加 25s 超时」两个提交） | ✅ 窗口与超时都已包含在线上版本里 |
-| 该版本的常量 | `START=7` / `END=24` / `WARM_ALL_DAY=false`，且用 `(getUTCHours()+8)%24` 换算 CST |
-| 与当前 HEAD 的差异 | 仅「把默认参数与 export 补上」，判定逻辑与常量**逐字相同** → 已测的等价于线上的 |
+| 线上脚本内容 | **6891 字节，sha256 与仓库 `df6eaa1` 的 blob 完全一致 —— 逐字节相同** |
+| 部署时间 | Cloudflare 侧 `modified_on = 2026-09-22T13:38:19Z`（CST 21:38），与 `df6eaa1`（21:39 提交）吻合 |
+| 线上版本的常量 | `START=7` / `END=24` / `WARM_ALL_DAY=false`，`(getUTCHours()+8)%24` 换算 CST，探测超时 25s |
+| 与当前 HEAD 的差异 | **只有注释、export、默认参数**（`git diff df6eaa1 HEAD` 可见），判定逻辑与常量逐字相同 |
+| 线上已注册的 Cron Trigger | **`*/5 * * * *`**（`created_on 13:34:37Z`、`modified_on 13:38:19Z`） |
 
-> ⚠️ 这条链的前提是「线上是从仓库上传的」。若有人直接在 Cloudflare Dashboard 手改过脚本，
-> 只能靠 9.4 的线上实测或 CF API 拉取线上脚本比对来发现。
+> ✅ 由此可判定：**「有人直接在 Dashboard 手改过脚本」这个假设被排除**（哈希对得上，
+> 手改必然改变内容）。因此 9.2 的单测、9.4 的线上行为，对应的就是线上那一份代码。
+>
+> 之所以**没有重新部署到 HEAD**：差异仅为注释与 export，指纹与行为完全一致，
+> 为一个无行为差异的改动重传一次生产 Worker 不划算。若要字节级对齐，
+> `deploy-keepalive-worker.mjs` 一条命令即可（需 `Workers Scripts → Edit` 权限）。
 
 ### 9.2 代码层：找出并补上了「闸门无覆盖」的洞
 
@@ -453,7 +461,7 @@ curl -s -x http://127.0.0.1:7890 https://render-keepalive.1181264839.workers.dev
 ```bash
 # 走 API：token 只需 Account → Workers Scripts → Read
 CF_API_TOKEN=xxx node scripts/check-deployed-worker.mjs
-# 离线兜底：与从 Dashboard 导出的脚本文件比对（也可用于评审线上原文）
+# 离线：文件可以是纯脚本，也可以是 CF 下载端点的**原始 multipart 响应**（会先剥包装）
 node scripts/check-deployed-worker.mjs --source-file ./deployed-worker.mjs
 ```
 
@@ -461,19 +469,51 @@ node scripts/check-deployed-worker.mjs --source-file ./deployed-worker.mjs
 单元测试证明「仓库里的代码对」，`verify-window.mjs` 证明「线上行为对」，但两者都可能
 在「脚本被手改、而改动恰好不影响当前时刻」时给出假绿灯。
 
-> 比对逻辑（`extractFingerprint` / `diffFingerprints`）是纯函数，已由
-> `scripts/check-deployed-worker.test.mjs` 离线测过 —— 含**「线上实际部署版本（ed9bcf4）
-> 与仓库指纹一致」**这条断言、以及「窗口放宽 / 闸门被摘掉 / 常量改成运行期取值」三类漂移
-> 必须被报出来的反向测试。
-> ⚠️ 只有「拉取线上原文」那一步依赖 CF API 与 token，**未经实机验证**（本机没有 token），
-> 已在脚本注释里标注；`--source-file` 是不依赖 API 的可靠路径。
+> 比对逻辑（`extractFingerprint` / `diffFingerprints` / `extractModuleSource`）是纯函数，
+> 已由 `scripts/check-deployed-worker.test.mjs` **10 条**离线测过 —— 含
+> **「线上实际部署版本与仓库指纹一致」**、三类漂移必须被报出来，以及 4 条 multipart 剥壳。
 
-### 9.6 已知的验证盲区
+#### 不需要 token 的取数路径（实测可行）
 
-- **本机出网要挑代理**：直连 `workers.dev` 超时、WorkBuddy 托管代理对该域名 CONNECT 502，
-  **系统代理 `127.0.0.1:7890` 才通**。注意 Node 的 `fetch` **不读** `HTTP_PROXY/HTTPS_PROXY`
-  环境变量，所以脚本里的 Worker 探测本机会失败，改用上面的 `curl -x` 命令。
-- **仍未闭合的一项**：线上**已注册的 Cron Trigger** 与**线上脚本原文**只能通过 Cloudflare API
-  或 Dashboard 查看，需要一个只读 token（`Account → Workers Scripts → Read`）。
-  工具已经就位（9.5），拿到 token 后一条命令即可钉死；在那之前，「定时确实登记着」这一点
-  由 9.4 的冷热对照间接支撑（窗内持续热、窗外应冷）。
+`Account → Workers Scripts → Read` 这种只读 token 其实可以不开：**用已登录的浏览器会话，
+在 dash 页面内直接调同一套 API**（凭 Cookie 鉴权）。实测步骤：
+
+1. 起一个带调试端口的 Edge，打开 `https://dash.cloudflare.com/`（若是 GitHub/邮箱 SSO，
+   需要本人过一下登录）；
+2. 在页面上下文里发请求，`credentials: 'include'` 即可：
+
+```js
+// 账号 ID
+fetch('/api/v4/accounts', { credentials: 'include' }).then(r => r.json())
+// 已注册定时（这就是「定时到底登记了没有」的答案）
+fetch('/api/v4/accounts/<ACCOUNT_ID>/workers/scripts/render-keepalive/schedules', { credentials: 'include' }).then(r => r.json())
+// 线上脚本原文 —— ⚠️ 返回的是 multipart/form-data，需剥掉包装才是脚本正文
+fetch('/api/v4/accounts/<ACCOUNT_ID>/workers/scripts/render-keepalive/content/v2', { credentials: 'include' }).then(r => r.text())
+```
+
+   剥包装可以直接交给脚本：把响应原文存成文件，`--source-file` 会识别并剥掉
+   （这就是 `extractModuleSource()`，已按真实响应校验）。
+3. 想留档的话把剥出的正文存成 `.mjs`，再和 `git cat-file blob <版本>:scripts/keepalive-worker.mjs`
+   做逐字节比对（9.1 就是这么做的）。
+
+> ⚠️ 从页面里取大字符串时注意：**别用会做换行转换的方式落盘**（Python 文本模式
+> `read_text()/write_text()` 会把 CRLF 归一化），否则逐字节比对会失真 —— 用二进制读写。
+
+### 9.6 验证状态（哪些已闭合、哪些靠什么兜）
+
+| 项 | 状态 |
+|---|---|
+| 仓库代码正确（判定 + 闸门 + 额度守卫） | ✅ 21 条单测（11 + 10）+ 一致性检查，已进 CI 门禁 |
+| 线上脚本内容 == 仓库 | ✅ **blob 哈希逐字节相同**（9.1） |
+| 线上已注册的 Cron Trigger | ✅ 实测为 `*/5 * * * *`（9.1） |
+| 线上窗内行为 | ✅ Worker 自述 `ok:true, ms:304`；后端热态 1.07s（9.4） |
+| 线上窗外行为 | ⏳ 已排 03:10 实测（期望 Worker 返回 `skipped`、后端冷态） |
+| 窗内会按时恢复 | ⏳ 已排 09:05 实测（期望不 skip、后端热态） |
+
+**已知局限**：
+
+- 「本机出网要挑代理」：直连 `workers.dev` 超时、WorkBuddy 托管代理对该域名 CONNECT 502，
+  **系统代理 `127.0.0.1:7890` 才通**。且 Node 的 `fetch` **不读** `HTTP_PROXY/HTTPS_PROXY`，
+  脚本里的 Worker 探测在本机会失败，改用 `curl -x`。
+- `check-deployed-worker.mjs` 里**带 Bearer 的那段 HTTP 调用本身**仍未实机跑过（没有 token）；
+  但返回体形状已按真实响应验证（9.5），且 `--source-file` 是它的等价替代路径。
