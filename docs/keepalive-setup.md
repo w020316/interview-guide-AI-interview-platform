@@ -438,7 +438,8 @@ VERIFY_FORCE_CST_HOUR=3 node scripts/verify-window.mjs   # 测试用：白天也
 |---|---|---|
 | CST 22:xx（窗内） | 热态 | ✅ HTTP 200，**1.07s** |
 | CST 23:05（窗内） | 热态 + Worker 应探测 | ✅ Worker 自述 `{"cron":"*/5 * * * *","ok":true,"status":200,"ms":304}` |
-| CST 03:1x（窗外） | 冷态（休眠）+ Worker 应返回 `skipped` | ⏳ 由**云端**工作流每夜自动取证，见 9.7 |
+| CST 00:02（窗外） | Worker 应返回 `skipped` | ✅ Worker 自述 `"workerSkipped":"yes"`，**未探测后端**（零成本）→ `pass: true` |
+| CST 03:1x（窗外） | 同上，且兜底工作流不得在窗外发请求 | ⏳ 云端每夜自动取证，见 9.7 |
 
 **Worker 自述是最直接的线上证据，而且零额度成本**（窗外它直接返回、根本不碰后端）：
 
@@ -513,8 +514,8 @@ fetch('/api/v4/accounts/<ACCOUNT_ID>/workers/scripts/render-keepalive/content/v2
 | 线上脚本内容 == 仓库 | ✅ **blob 哈希逐字节相同**（9.1） |
 | 线上已注册的 Cron Trigger | ✅ 实测为 `*/5 * * * *`（9.1） |
 | 线上窗内行为 | ✅ Worker 自述 `ok:true, ms:304`；后端热态 1.07s（9.4） |
-| 线上窗外行为 | ⏳ 云端工作流每夜 03:10 自动取证（不依赖本机开机，见 9.7） |
-| 窗内会按时恢复 | ⏳ 云端工作流每晨 09:05 自动取证（同上） |
+| 线上窗外行为 | ✅ 已实测：CST 00:02 云端派发，Worker 自述 `skipped`、零成本未探测后端（9.4）；每夜 03:10 仍会自动取证（9.7） |
+| 窗内会按时恢复 | ✅ 已实测：CST 22–23 点 Worker 正常探测、后端热态（9.4）；每晨 09:05 仍会自动取证（9.7） |
 
 **已知局限**：
 
