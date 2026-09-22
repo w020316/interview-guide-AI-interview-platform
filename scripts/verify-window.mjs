@@ -85,7 +85,13 @@ if (shouldBeWarm) {
 console.log(`\n${verdict.text}`)
 
 // 顺带取一次 Worker 自己的判定：它在窗外会直接返回 skipped 且不碰后端（零额度成本），
-// 是「线上窗内判定」最直接的证据。本机网络可能到不了 workers.dev，取不到就跳过。
+// 是「线上窗内判定」最直接的证据。
+//
+// ⚠️ Node 的 fetch **不读 HTTP_PROXY/HTTPS_PROXY 环境变量**，所以本机若需要代理才能出网，
+//    这一步会失败（不影响上面的后端侧判定）。此时用 curl 手动取一次即可，例如：
+//      curl -x http://127.0.0.1:7890 https://render-keepalive.1181264839.workers.dev/
+//    窗外期望：{"cron":"*/5 * * * *","skipped":true,"reason":"outside warm window","cstHour":3}
+//    窗内期望：{"cron":"*/5 * * * *","ok":true,"status":200,"ms":...}
 try {
   const r = await fetch(WORKER_URL, { signal: AbortSignal.timeout(15000) })
   const body = (await r.text()).slice(0, 200)
@@ -97,7 +103,11 @@ try {
     /* 非 JSON 就只打印原文 */
   }
 } catch (e) {
-  console.log(`Worker 自述：取不到（${e?.name || e}）—— 本机到 workers.dev 的网络不通，可换网络或用浏览器打开 ${WORKER_URL}`)
+  console.log(
+    `Worker 自述：取不到（${e?.name || e}）—— Node 的 fetch 不走环境变量里的代理。` +
+      `\n  改用 curl 取（本机经 127.0.0.1:7890 可达）：` +
+      `\n    curl -s -x http://127.0.0.1:7890 ${WORKER_URL}`
+  )
 }
 
 if (!verdict.pass) {

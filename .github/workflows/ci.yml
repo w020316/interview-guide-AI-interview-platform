@@ -90,3 +90,29 @@ jobs:
         env:
           VITE_API_BASE_URL: https://ci-placeholder.example.com
         run: npm run build
+
+  keepalive-guard:
+    # 保活时间窗是「写错就会撑爆 Render 免费层额度、并暂停所有免费服务」的关键配置，
+    # 而它有两处实现（Cloudflare Worker 的 JS 与 keepalive.yml 的 bash 守卫）。
+    # 这里把「一致性 + 闸门行为 + 额度守卫」做成门禁：任何一处漂移都在 push 时被拦住，
+    # 不依赖人记得手动跑脚本。
+    name: Keepalive Window Guard (保活时间窗)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: 窗口一致性（Worker JS ↔ Actions YAML）
+        run: node scripts/check-window-consistency.mjs
+
+      - name: 时间窗单元测试（判定函数 + 闸门行为 + 额度守卫）
+        run: node --test scripts/keepalive-worker.test.mjs
+
+      - name: 线上↔仓库 指纹比对逻辑（离线测试）
+        run: node --test scripts/check-deployed-worker.test.mjs

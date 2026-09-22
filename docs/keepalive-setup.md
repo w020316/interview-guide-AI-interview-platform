@@ -106,8 +106,9 @@ $env:CF_API_TOKEN="你的token"; node scripts/deploy-keepalive-worker.mjs
 测试分两层，**第二层才是真正的闸门**：
 
 ```bash
-node --test scripts/keepalive-worker.test.mjs      # 11 条：判定函数 + 闸门行为 + 额度守卫
-node scripts/check-window-consistency.mjs          # 窗口在 JS 与 Actions YAML 两处必须一致
+node --test scripts/keepalive-worker.test.mjs       # 11 条：判定函数 + 闸门行为 + 额度守卫
+node --test scripts/check-deployed-worker.test.mjs  # 6 条：线上↔仓库 指纹比对逻辑
+node scripts/check-window-consistency.mjs           # 窗口在 JS 与 Actions YAML 两处必须一致
 ```
 
 | 层 | 覆盖 | 能抓住什么 |
@@ -426,16 +427,53 @@ node scripts/verify-window.mjs          # 按当前时刻自动判定「应该�
 | 时点 | 期望 | 实测 |
 |---|---|---|
 | CST 22:xx（窗内） | 热态 | ✅ HTTP 200，**1.07s** |
-| CST 03:xx（窗外） | 冷态（休眠） | ⏳ 见下 |
+| CST 23:05（窗内） | 热态 + Worker 应探测 | ✅ Worker 自述 `{"cron":"*/5 * * * *","ok":true,"status":200,"ms":304}` |
+| CST 03:1x（窗外） | 冷态（休眠）+ Worker 应返回 `skipped` | ⏳ 见下 |
 
-> ⚠️ 本脚本会真的唤醒一次后端（约 0.25 instance hours），所以**只在窗外跑一次**即可。
+**Worker 自述是最直接的线上证据，而且零额度成本**（窗外它直接返回、根本不碰后端）：
+
+```bash
+# 本机经系统代理可达 workers.dev（直连与 WorkBuddy 托管代理都不通，见 9.5）
+curl -s -x http://127.0.0.1:7890 https://render-keepalive.1181264839.workers.dev/
+# 窗内期望 → {"cron":"*/5 * * * *","ok":true,"status":200,"ms":...}
+# 窗外期望 → {"cron":"*/5 * * * *","skipped":true,"reason":"outside warm window","cstHour":3}
+```
+
+> ⚠️ `verify-window.mjs` 会真的唤醒一次后端（约 0.25 instance hours），所以**只在窗外跑一次**即可。
 > 凌晨那次必须等兜底工作流的时间窗守卫**先上线**再做，否则它会随机把后端弄热，
 > 让「窗外应该冷」的结论不成立（这正是 9.3 那个漏的第二个代价）。
 
-### 9.5 已知的验证盲区
+### 9.5 核对线上脚本与已注册定时
 
-- **本机到 `workers.dev` 网络不通**（代理 CONNECT 502、直连超时），所以无法直接读
-  Worker 对外的自述响应；`verify-window.mjs` 会尝试并在失败时明确说明，不影响后端侧判定。
-- 若要看 Cloudflare 侧的**注册定时**与**线上脚本内容**，需一个
-  `Account → Workers Scripts → Read` 的 API Token：
-  `GET /accounts/{id}/workers/scripts/render-keepalive/schedules` 与同路径的脚本内容。
+`scripts/check-deployed-worker.mjs` 拉取**线上脚本原文**与**已注册的 Cron Trigger**，抽出关键
+指纹（窗口起止 / 开关 / 定时 / 探测端点 / 超时 / 后端地址）与仓库逐项比对，并检查**闸门顺序**
+（`if (!inWarmWindow(...))` 必须在所有 `await fetch(` 之前 —— 顺序反了等于没有时间窗，
+而常量看起来完全正常）。
+
+```bash
+# 走 API：token 只需 Account → Workers Scripts → Read
+CF_API_TOKEN=xxx node scripts/check-deployed-worker.mjs
+# 离线兜底：与从 Dashboard 导出的脚本文件比对（也可用于评审线上原文）
+node scripts/check-deployed-worker.mjs --source-file ./deployed-worker.mjs
+```
+
+覆盖这个第三种盲区：**线上脚本内容本身和仓库不一样**（例如有人直接在 Dashboard 手改）。
+单元测试证明「仓库里的代码对」，`verify-window.mjs` 证明「线上行为对」，但两者都可能
+在「脚本被手改、而改动恰好不影响当前时刻」时给出假绿灯。
+
+> 比对逻辑（`extractFingerprint` / `diffFingerprints`）是纯函数，已由
+> `scripts/check-deployed-worker.test.mjs` 离线测过 —— 含**「线上实际部署版本（ed9bcf4）
+> 与仓库指纹一致」**这条断言、以及「窗口放宽 / 闸门被摘掉 / 常量改成运行期取值」三类漂移
+> 必须被报出来的反向测试。
+> ⚠️ 只有「拉取线上原文」那一步依赖 CF API 与 token，**未经实机验证**（本机没有 token），
+> 已在脚本注释里标注；`--source-file` 是不依赖 API 的可靠路径。
+
+### 9.6 已知的验证盲区
+
+- **本机出网要挑代理**：直连 `workers.dev` 超时、WorkBuddy 托管代理对该域名 CONNECT 502，
+  **系统代理 `127.0.0.1:7890` 才通**。注意 Node 的 `fetch` **不读** `HTTP_PROXY/HTTPS_PROXY`
+  环境变量，所以脚本里的 Worker 探测本机会失败，改用上面的 `curl -x` 命令。
+- **仍未闭合的一项**：线上**已注册的 Cron Trigger** 与**线上脚本原文**只能通过 Cloudflare API
+  或 Dashboard 查看，需要一个只读 token（`Account → Workers Scripts → Read`）。
+  工具已经就位（9.5），拿到 token 后一条命令即可钉死；在那之前，「定时确实登记着」这一点
+  由 9.4 的冷热对照间接支撑（窗内持续热、窗外应冷）。
