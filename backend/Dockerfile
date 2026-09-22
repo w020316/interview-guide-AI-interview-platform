@@ -31,8 +31,16 @@ COPY --from=builder /build/target/interview-guide.jar app.jar
 # 暴露端口（Render 会注入 PORT 环境变量）
 EXPOSE 8080
 
-# JVM 参数（小内存优化；Metaspace 必须 ≥128m，否则 Spring Boot+AI+Security 栈类加载失败）
-ENV JAVA_OPTS="-Xmx220m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0"
+# JVM 参数（适配 Render 免费层：512MB 内存 + 极低 CPU 配额）
+#
+# ⚠️ 运行时真正生效的是 Render 上的 JAVA_OPTS 环境变量（见 render.yaml 第 8 节），
+#    这里的 ENV 只是「没配环境变量时的默认值」。改参数请**两处同步**。
+#
+# -XX:TieredStopAtLevel=1（2026-09-22 新增）：JIT 只用 C1、不创建 C2 编译线程。
+#   免费层 CPU 被严重限制，冷启动实测 209~488s（中位 ~256s），耗时几乎全在
+#   JVM 启动 + Spring 上下文刷新；省下 C2 编译线程的 CPU 争抢能实打实加速启动。
+#   Metaspace 必须 ≥128m，否则 Spring Boot + AI + Security 栈类加载失败。
+ENV JAVA_OPTS="-Xmx220m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport -XX:TieredStopAtLevel=1"
 ENV SPRING_PROFILES_ACTIVE=prod
 
 # 启动命令（显式指定 prod profile，避免环境变量未生效）

@@ -144,10 +144,27 @@ services:
       - key: app.rag.dimension-migrate-force
         value: "false"
 
-      # ══ 8. JVM 内存（适配 Render 免费层 512MB）══════════════════════
-      # Metaspace 必须 ≥128m，否则 Spring Boot + AI + Security 栈类加载失败
+      # ══ 8. JVM 参数（适配 Render 免费层 512MB / 极低 CPU 配额）═══════
+      # Metaspace 必须 ≥128m，否则 Spring Boot + AI + Security 栈类加载失败。
+      #
+      # 2026-09-22 新增 -XX:TieredStopAtLevel=1：
+      #   免费层实例 CPU 被严重限制，冷启动实测 **209~488s（中位约 256s）**，
+      #   而热态响应只需 6~8s —— 说明耗时几乎全在「JVM 启动 + Spring 上下文刷新」
+      #   这一段纯 CPU 工作上（已确认启动期没有阻塞式外部调用：唯一的
+      #   @PostConstruct 外部依赖 UserBanRegistry 读 Redis 在 prod 已被排除自动装配，
+      #   会直接短路返回）。
+      #   TieredStopAtLevel=1 让 JIT 只用到 C1，并**完全不创建 C2 编译线程** ——
+      #   CPU 被限制时，省下的编译线程争抢就是实打实的启动加速。
+      #   代价是长时间高负载计算会慢一些；本项目是 DB/AI 网络 IO 型，几乎无影响。
+      #
+      # 同时移除 -XX:MaxRAMPercentage=50.0：它与 -Xmx220m 同时出现属于**死配置**
+      #   （显式 -Xmx 优先，MaxRAMPercentage 只在未设 -Xmx 时用于推算默认堆上限），
+      #   留着只会让后人误以为堆上限是 256m。
+      #
+      # 改完如何验证：等下一次保活工作流被触发（GitHub 限流，约 3~6 小时一次），
+      #   用 scripts/coldstart-report.mjs 读它的运行时长，即可看到冷启动的变化趋势。
       - key: JAVA_OPTS
-        value: "-Xmx220m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0"
+        value: "-Xmx220m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseContainerSupport -XX:TieredStopAtLevel=1"
 
 # ══════════════════════════════════════════════════════════════════
 # 自托管 Embedding 服务（免费方案，v1.34.1）
