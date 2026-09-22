@@ -4,9 +4,18 @@
 > 而此前前端只等 150s，所以「点登录 → 干等 → 失败」是必然结果。前端容错已放宽到 8 分钟
 > （见 `frontend/src/utils/backendWake.ts`），但**真正的解法是别让它休眠**。
 >
-> 配置保活有两条路，任选其一（都不花钱）：
-> - **二、Cloudflare Worker + Cron Trigger** —— 与本项目的数据库解耦，最稳，推荐
-> - **三、Supabase pg_cron** —— 本项目已在用 Supabase，**不需要任何新账号、不用分享 token**，最省事
+> ✅ **保活已于 2026-09-22 部署并验证**（Cloudflare Worker 方案）：
+>
+> | 项 | 值 |
+> |---|---|
+> | Worker | `render-keepalive` → https://render-keepalive.1181264839.workers.dev |
+> | 定时 | `*/5 * * * *`（每 5 分钟，已通过 Cloudflare API 确认登记） |
+> | 时间窗 | 北京时间 07:00–24:00（见第二节「额度限制」） |
+> | 实测 | 后端休眠时返回 `{"ok":false,"booting":true,...}`；启动完成后返回 `{"ok":true,"status":200,"ms":187}` |
+>
+> 以下两条路仍然保留作为参考（换账号/迁移时用），当前生效的是 Cloudflare Worker。
+> - **二、Cloudflare Worker + Cron Trigger**
+> - **三、Supabase pg_cron**（本项目已在用 Supabase，不需要新账号）
 
 ## 一、问题是怎么定位的
 

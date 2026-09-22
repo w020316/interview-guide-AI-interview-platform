@@ -21,3 +21,8 @@ frontend/.env.local
 .env
 .env.local
 *.key
+
+# playwright-cli 浏览器自动化产物（快照/日志，不入库）
+.playwright-cli/
+gh.yaml
+verify.yaml
