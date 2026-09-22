@@ -95,14 +95,34 @@ export default {
   },
 }
 
-/** 当前是否处于保活时间窗内（北京时间） */
-function inWarmWindow(now) {
-  if (WARM_ALL_DAY) return true
+/**
+ * 当前是否处于保活时间窗内（北京时间）。
+ *
+ * 参数可覆盖，纯粹为了**可测**（见 scripts/keepalive-worker.test.mjs）——
+ * Worker 里始终用模块常量调用。这段逻辑一旦写错会非常危险：
+ * 若恒返回 true，后端会 7×24 常驻 ≈730h/月，**可能撑爆 750h 额度并导致
+ * Render 暂停所有免费服务**，所以必须有测试兜住。
+ */
+export function inWarmWindow(
+  now,
+  start = WARM_WINDOW_START_HOUR,
+  end = WARM_WINDOW_END_HOUR,
+  allDay = WARM_ALL_DAY
+) {
+  if (allDay) return true
   const cstHour = (now.getUTCHours() + 8) % 24
-  const { start, end } = { start: WARM_WINDOW_START_HOUR, end: WARM_WINDOW_END_HOUR }
+  // end > 24 表示跨天（如 start=7、end=25 即 07:00 → 次日 01:00）
   if (end > 24) return cstHour >= start || cstHour < end - 24
   return cstHour >= start && cstHour < end
 }
+
+/** 每天保活多少小时（供测试做额度守卫；跨天窗口也正确） */
+export function warmHoursPerDay(start = WARM_WINDOW_START_HOUR, end = WARM_WINDOW_END_HOUR) {
+  return end > 24 ? 24 - start + (end - 24) : end - start
+}
+
+/** 供测试断言用：当前生效的定时表达式 */
+export const ACTIVE_CRON = CRON_EXPRESSION
 
 /**
  * 执行一次保活。

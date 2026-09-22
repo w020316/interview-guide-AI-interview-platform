@@ -98,6 +98,20 @@ $env:CF_API_TOKEN="你的token"; node scripts/deploy-keepalive-worker.mjs
    ```
    看到 `ok: true` 即表示保活链路通了。
 
+### 改窗口前先跑测试
+
+时间窗过滤逻辑写在 Worker 的 JS 里，**写错的代价是整个站点被暂停**
+（恒返回 true → 后端 7×24 常驻 ≈730h/月 → 撑爆 750h → Render 暂停所有免费服务）。
+所以有 6 条单元测试兜着，其中一条是**额度守卫**（每日保活小时数必须 ≤ 20）：
+
+```bash
+node --test scripts/keepalive-worker.test.mjs
+```
+
+覆盖：全天 24 小时判定、窗口边界（06:59/07:00/23:59/00:00）、跨天窗口（07:00→次日01:00）、
+`WARM_ALL_DAY` 开关、额度守卫、以及「定时间隔必须小于 Render 的 15 分钟休眠阈值」。
+**调整 `WARM_WINDOW_*` 或 `CRON_EXPRESSION` 后务必重跑。**
+
 ### ⚠️ 必须知道的额度限制（决定保活窗口怎么设）
 
 Render 免费层每个 workspace **每月共 750 instance hours**，**用超了会把所有免费服务
