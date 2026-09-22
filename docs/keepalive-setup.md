@@ -173,6 +173,29 @@ select cron.unschedule('render-backend-keepalive');
 > 余约 233h 留给 embedding 服务（≈930 次按需唤醒/月），日常使用足够。
 > 想覆盖到凌晨就把表达式改成 `*/5 23,0-16 * * *`（次日 01:00，≈540h/月）；
 > 想 7×24 就改成 `*/5 * * * *`，但余量只剩约 20h，**风险很高**。
+
+### 📊 用真实用量验证过（2026-09-22）
+
+不是纸上推算 —— 已查 Render 账单页与 Worker 指标，实测数据如下：
+
+| 项 | 实测值 | 说明 |
+|---|---|---|
+| 本月已用实例小时 | **113.85 / 750**（9/1–9/22，≈5.3h/天） | 此前**无保活**，纯按需唤醒 |
+| 启用保活后推算 | 主后端 17h/天 + embedding ≈1.3h/天 ≈ **18.3h/天 ≈ 557h/月** | **余量约 193h/月** |
+| 9 月全月预计 | ≈270h | 远低于 750h |
+| Worker 触发 | Triggers = 1；24h 内 **Invocations 14、Errors 0**、CPU 959µs | 定时确实在工作 |
+| 后端保活效果 | 43 分钟无人工访问仍 **1.0–2.7s** 响应 | 若休眠需 ≈4 分钟 |
+
+**结论：额度安全，日常使用不受影响。**
+
+> 🔍 复核配置时的一个坑：读 Render 设置页的**表单字段值必须用可访问性快照**
+> （`playwright-cli snapshot`），**不能用 `document.body.innerText`** ——
+> `innerText` 不含 `<input>` 的 value，会让人误判成「路径没配上」。
+> 实测 `document.body.innerText.includes('embedding-service/**')` 返回 `false`，
+> 而同一页面快照显示 `textbox: embedding-service/**`。
+>
+> 已核实两个服务的构建过滤**都已生效**：主后端 `backend/**`、embedding `embedding-service/**`，
+> 且都是 `autoDeployTrigger = On Commit`。
 >
 > ⚠️ 一个前提：Supabase 免费项目**连续 7 天无活动会被暂停**，暂停后 cron 也随之停止。
 > 本项目数据库在日常使用中会持续产生活动，正常不会触发；但若长期无人使用，
