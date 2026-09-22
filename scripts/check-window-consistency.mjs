@@ -4,17 +4,20 @@
  * 运行：node scripts/check-window-consistency.mjs
  *
  * ── 为什么需要它 ─────────────────────────────────────────────────────
- * 窗口策略现在有**两处实现**，且都在「写错就会撑爆 Render 免费额度」的关键路径上：
+ * 窗口策略有**三处实现**，且都在「写错就会撑爆 Render 免费额度」的关键路径上：
  *
- *   ① Cloudflare Worker（主力）  scripts/keepalive-worker.mjs  → inWarmWindow()
- *   ② GitHub Actions 兜底        .github/workflows/keepalive.yml → 时间窗守卫步骤
+ *   ① Cloudflare Worker（主力）  scripts/keepalive-worker.mjs          → inWarmWindow()
+ *   ② GitHub Actions 兜底        .github/workflows/keepalive.yml       → 时间窗守卫步骤
+ *   ③ GitHub Actions 云端观测    .github/workflows/keepalive-observe.yml → 期望判定（CST_H >= 7）
  *
- * 两处一旦漂移（比如只改了 ① 把窗口收窄，② 仍是 7×24），额度会按**较宽的那一处**
+ * 三处一旦漂移（比如只改了 ① 把窗口收窄，② 仍是 7×24），额度会按**较宽的那一处**
  * 消耗：免费层 750 instance hours/月，7×24 常驻就要 ≈730h，**超额会暂停所有免费服务**。
- * 这类漂移不会让任何测试变红 —— 两边各自的测试都只盯着自己那份文件。
+ * 这类漂移不会让任何测试变红 —— 各自文件里的测试都只盯着自己那份。
+ * ③ 漂移的后果不同但同样隐蔽：观测的期望与真实窗口不符，会**持续误报**（假失败/假通过）。
  *
- * 本脚本把两者放一起比，并检回「守卫必须是第一步、后续步骤必须被它挡住」这个顺序约束。
- * ⚠️ 改窗口时：改完两处（或只改 Worker 并同步兜底）后，**必须重跑本脚本 + 单元测试**。
+ * 本脚本把三者放一起比，并额外检查顺序约束（守卫必须是第一步、后续步骤必须被它挡住）
+ * 与观测的两个 cron 槽（必须一个窗外、一个窗内，否则「窗外应冷」那一支永远测不到）。
+ * ⚠️ 改窗口时：三处都要同步，然后**必须重跑本脚本 + 单元测试**。
  */
 
 import { readFile } from 'node:fs/promises'
@@ -71,10 +74,59 @@ check(
   '守卫缺少「按窗外处理」的失败分支（解析失败时必须失败到「跳过」，而不是「照跑」）'
 )
 
+// ④ 云端观测工作流（keepalive-observe.yml）—— 这是窗口策略的**第三处**实现
+const OBSERVE = join(HERE, '..', '.github', 'workflows', 'keepalive-observe.yml')
+const observeYml = await readFile(OBSERVE, 'utf8')
+
+const obsStart = observeYml.match(/CST_H\s*>=\s*(\d+)/)
+check(obsStart, '云端观测工作流里找不到期望判定式（CST_H >= X）')
+if (obsStart) {
+  const start = Number(obsStart[1])
+  if (WARM_WINDOW_END_HOUR === 24) {
+    check(
+      start === WARM_WINDOW_START_HOUR,
+      `云端观测的期望与 Worker 窗口不一致：观测从 ${start} 点起算「窗内」，` +
+        `而 Worker 窗口是 ${WARM_WINDOW_START_HOUR}:00–${WARM_WINDOW_END_HOUR}:00`
+    )
+    notes.push(`云端观测（keepalive-observe.yml）与 Worker 窗口一致：窗内自 ${start} 点起算`)
+  } else {
+    check(
+      false,
+      `Worker 窗口不再以 24:00 结束（end=${WARM_WINDOW_END_HOUR}），但 keepalive-observe.yml ` +
+        `用的是「CST_H >= 起始小时」这种单边判定 —— 请同步改成双边判定`
+    )
+  }
+}
+
+// 两个 cron 槽必须一个落在窗外、一个落在窗内（打错字会导致「永远只观测窗内」这种静默失效）
+const crons = [...observeYml.matchAll(/cron:\s*'([^']+)'/g)].map((m) => m[1])
+check(crons.length >= 2, `云端观测应有至少两个 cron 槽（窗外 + 窗内各一），实际 ${crons.length} 个`)
+const cstHourOf = (cron) => {
+  const [min, hour] = cron.split(/\s+/)
+  if (!/^\d+$/.test(hour)) return null
+  return (Number(hour) + 8) % 24
+}
+const obsHours = crons.map(cstHourOf)
+if (obsHours.every((h) => h !== null)) {
+  check(
+    obsHours.some((h) => h < WARM_WINDOW_START_HOUR),
+    `云端观测的 cron 槽没有一个落在窗外（CST 小时：${obsHours.join(', ')}，窗口起点 ${WARM_WINDOW_START_HOUR}）` +
+      `—— 那样就永远达不到「窗外应冷」这一支`
+  )
+  check(
+    obsHours.some((h) => h >= WARM_WINDOW_START_HOUR),
+    `云端观测的 cron 槽没有一个落在窗内（CST 小时：${obsHours.join(', ')}）`
+  )
+  notes.push(`云端观测 cron 槽 → CST ${obsHours.map((h) => `${String(h).padStart(2, '0')} 点`).join('、')}（${crons.join(' / ')}）`)
+}
+
 if (problems.length > 0) {
   console.error('❌ 时间窗一致性检查未通过：\n')
   for (const p of problems) console.error(`  · ${p}`)
-  console.error('\n两处实现见：scripts/keepalive-worker.mjs 与 .github/workflows/keepalive.yml')
+  console.error(
+    '\n窗口策略的几处实现见：scripts/keepalive-worker.mjs、.github/workflows/keepalive.yml、' +
+      '.github/workflows/keepalive-observe.yml'
+  )
   process.exit(1)
 }
 
