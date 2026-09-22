@@ -436,7 +436,7 @@ node scripts/verify-window.mjs          # 按当前时刻自动判定「应该�
 |---|---|---|
 | CST 22:xx（窗内） | 热态 | ✅ HTTP 200，**1.07s** |
 | CST 23:05（窗内） | 热态 + Worker 应探测 | ✅ Worker 自述 `{"cron":"*/5 * * * *","ok":true,"status":200,"ms":304}` |
-| CST 03:1x（窗外） | 冷态（休眠）+ Worker 应返回 `skipped` | ⏳ 见下 |
+| CST 03:1x（窗外） | 冷态（休眠）+ Worker 应返回 `skipped` | ⏳ 由**云端**工作流每夜自动取证，见 9.7 |
 
 **Worker 自述是最直接的线上证据，而且零额度成本**（窗外它直接返回、根本不碰后端）：
 
@@ -447,7 +447,7 @@ curl -s -x http://127.0.0.1:7890 https://render-keepalive.1181264839.workers.dev
 # 窗外期望 → {"cron":"*/5 * * * *","skipped":true,"reason":"outside warm window","cstHour":3}
 ```
 
-> ⚠️ `verify-window.mjs` 会真的唤醒一次后端（约 0.25 instance hours），所以**只在窗外跑一次**即可。
+> ⚠️ `verify-window.mjs` 会真的唤醒一次后端（约 0.25 instance hours），所以**别反复跑**。
 > 凌晨那次必须等兜底工作流的时间窗守卫**先上线**再做，否则它会随机把后端弄热，
 > 让「窗外应该冷」的结论不成立（这正是 9.3 那个漏的第二个代价）。
 
@@ -507,8 +507,8 @@ fetch('/api/v4/accounts/<ACCOUNT_ID>/workers/scripts/render-keepalive/content/v2
 | 线上脚本内容 == 仓库 | ✅ **blob 哈希逐字节相同**（9.1） |
 | 线上已注册的 Cron Trigger | ✅ 实测为 `*/5 * * * *`（9.1） |
 | 线上窗内行为 | ✅ Worker 自述 `ok:true, ms:304`；后端热态 1.07s（9.4） |
-| 线上窗外行为 | ⏳ 已排 03:10 实测（期望 Worker 返回 `skipped`、后端冷态） |
-| 窗内会按时恢复 | ⏳ 已排 09:05 实测（期望不 skip、后端热态） |
+| 线上窗外行为 | ⏳ 云端工作流每夜 03:10 自动取证（不依赖本机开机，见 9.7） |
+| 窗内会按时恢复 | ⏳ 云端工作流每晨 09:05 自动取证（同上） |
 
 **已知局限**：
 
@@ -517,3 +517,28 @@ fetch('/api/v4/accounts/<ACCOUNT_ID>/workers/scripts/render-keepalive/content/v2
   脚本里的 Worker 探测在本机会失败，改用 `curl -x`。
 - `check-deployed-worker.mjs` 里**带 Bearer 的那段 HTTP 调用本身**仍未实机跑过（没有 token）；
   但返回体形状已按真实响应验证（9.5），且 `--source-file` 是它的等价替代路径。
+
+### 9.7 夜间观测放在云端（本机夜间关机）
+
+**约束**：要验证「窗外确实没被保活」必须在凌晨取数，而**开发机夜间是关机的**。
+任何跑在本机的定时任务在那种情况下要么不执行、要么开机后延迟触发 —— 后者更糟：
+它会在错误的时间点上套用错误的期望，既可能假失败也可能假通过。
+
+**解法**：`.github/workflows/keepalive-observe.yml`，跑在 GitHub 托管 runner 上。
+
+| 项 | 说明 |
+|---|---|
+| 触发 | `19:10 UTC`（=03:10 CST，期望窗外）+ `01:05 UTC`（=09:05 CST，期望窗内）；也支持手动 `workflow_dispatch` |
+| 期望来源 | **按运行时的真实 CST 小时判定**，而不是按哪个 cron 触发 —— GitHub 的 schedule 是「尽力而为」调度、实测会晚数小时（见 `keepalive.yml` 头部），跑晚了就自动改测另一支，不产生假失败 |
+| 观测项 | ① Worker 自述是否 `skipped` ② 后端冷/热（热 1~8s vs 冷启动 209~488s）③ 兜底工作流此刻的运行记录 |
+| 断言 | 窗外：Worker 必须 `skipped`、后端必须非热态；窗内：Worker 必须探测、后端必须热态。不符即 `::error::` + 作业失败 |
+| 留档 | 结果写入 run 摘要（permanent）并上传 artifact（保留 90 天） |
+| 成本 | 窗外那次会真的唤醒一次实例 ≈ 0.25 instance hours/次 ≈ **7.5h/月**（占 233h 余量的 3%）—— 刻意取舍，换来每夜一份独立证据 |
+
+> 🔬 这套断言本身也验过（否则就是「检查器坏了还给绿灯」）：
+> - 期望映射用 `date` 桩逐小时扫描 → **24/24 正确**（CST 07:00–23:59 为 inside）；
+> - 脚本体实跑走通「窗内」支；
+> - **并且抓到过一个真缺陷**：最初把「Worker 请求超时/无响应」也当成 `skipped=no`，
+>   于是窗内支照样判 ✅ —— 输入缺失被误读成通过。现在区分「拿到响应」与「没拿到」，
+>   拿不到就 `::error::` 并置失败，另外「窗外冷得异常快（<3s 就失败）」也会被判为
+>   网络故障而非休眠。

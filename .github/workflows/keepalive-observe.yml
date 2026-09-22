@@ -1,0 +1,172 @@
+name: Keepalive Window Observation
+
+# 保活时间窗的**云端**观测（GitHub 托管 runner 执行）。
+#
+# ── 为什么必须放云端 ─────────────────────────────────────────────────
+# 保活窗口是北京时间 07:00–24:00，要验证「窗外确实没被保活」就得在凌晨取数，
+# 而**开发机夜间是关机的**。任何跑在本机的定时任务在那种情况下要么不执行、
+# 要么在开机后延迟触发 —— 后者更糟：它会在错误的时间点上套用错误的期望，
+# 产生假失败或假通过。所以观测必须独立于本机存活。
+#
+# ── 两个 cron 槽（UTC）─────────────────────────────────────────────
+#   19:10 UTC = 03:10 CST  → 预期「窗外」：Worker 应返回 skipped，后端应为冷态
+#   01:05 UTC = 09:05 CST  → 预期「窗内」：Worker 应探测，后端应为热态
+#
+# ⚠️ GitHub 的 schedule 是「尽力而为」调度，实测可能晚数小时（见 keepalive.yml 头部）。
+#    因此本工作流**按运行时的真实 CST 小时决定期望**，而不是按哪个 cron 触发 ——
+#    跑晚了就自动改测另一支，不会产生假失败，数据始终对应真实时刻。
+#
+# ⚠️ 成本（刻意取舍）：窗外那次探测会用超时打断冷启动，但**请求已经触发实例拉起**，
+#    约 0.25 instance hours/次 ≈ 7.5h/月，占留给 embedding 的约 233h 余量的 3%。
+#    换来的是每夜一次「窗外确实没被保活」的独立证据（不只看 Worker 的自述）。
+
+on:
+  schedule:
+    - cron: '10 19 * * *' # 03:10 CST
+    - cron: '5 1 * * *' # 09:05 CST
+  workflow_dispatch:
+    inputs:
+      expect_override:
+        description: '覆盖期望（auto/outside/inside）—— 仅用于测试断言本身是否有效'
+        required: false
+        default: auto
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  observe:
+    name: Observe window behavior
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: 观测并断言时间窗行为
+        env:
+          WORKER_URL: https://render-keepalive.1181264839.workers.dev
+          BACKEND: https://interview-guide-backend.onrender.com
+          HOT_MS: '15000'
+          EXPECT_OVERRIDE: ${{ inputs.expect_override || 'auto' }}
+        run: |
+          set -uo pipefail
+
+          # ── 期望：由**运行时**的真实 CST 小时决定（不依赖哪个 cron 触发，见文件头）
+          UTC_H=$(date -u +%H)
+          CST_H=$(( (10#$UTC_H + 8) % 24 ))
+          if (( CST_H >= 7 )); then AUTO_EXPECT=inside; else AUTO_EXPECT=outside; fi
+          EXPECT="$AUTO_EXPECT"
+          if [[ "$EXPECT_OVERRIDE" != "auto" ]]; then EXPECT="$EXPECT_OVERRIDE"; fi
+          echo "运行时刻 UTC ${UTC_H} 点 → CST ${CST_H} 点；自动期望=$AUTO_EXPECT，采用=$EXPECT"
+
+          FAIL=0
+          {
+            echo "## 保活时间窗观测"
+            echo ""
+            echo "| 项 | 值 |"
+            echo "|---|---|"
+            echo "| 运行时刻 | $(date -u +%FT%TZ)（北京时间 ${CST_H} 点） |"
+            echo "| 期望状态 | **${EXPECT}**（窗口为北京时间 07:00–24:00） |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # ── 1) Worker 自述：窗外应 skipped（零成本，它根本不会碰后端）
+          WORKER_BODY=$(curl -sS -m 30 "$WORKER_URL" 2>&1 || echo '__CURL_FAILED__')
+          echo "Worker 自述：$WORKER_BODY"
+          # ⚠️ 必须区分「真的答了 skipped=no」和「压根没拿到响应」——
+          #    否则一次超时/网络故障会被当成「窗内正常探测」，给出假通过。
+          WORKER_OK=yes
+          if printf '%s' "$WORKER_BODY" | grep -q '"skipped"'; then
+            SKIPPED=yes
+          elif printf '%s' "$WORKER_BODY" | grep -qE '"ok"|"status"'; then
+            SKIPPED=no
+          else
+            WORKER_OK=no
+            SKIPPED=unknown
+          fi
+          echo "  → 拿到响应=$WORKER_OK, skipped=$SKIPPED"
+          {
+            echo ""
+            echo "**Worker 自述**（拿到响应=$WORKER_OK，skipped=$SKIPPED）"
+            echo '```json'
+            printf '%s\n' "$WORKER_BODY" | head -20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # ── 2) 后端冷热：热态约 1~8s，冷启动 209~488s
+          START_MS=$(date +%s%3N)
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 40 "$BACKEND/api/health" 2>/dev/null || echo 000)
+          MS=$(( $(date +%s%3N) - START_MS ))
+          if (( MS < HOT_MS )) && [[ "$CODE" == 2* ]]; then TEMP=hot; else TEMP=cold; fi
+          echo "后端：HTTP $CODE，耗时 ${MS}ms → $TEMP"
+          {
+            echo ""
+            echo "**后端探测**：HTTP ${CODE}，耗时 ${MS}ms → **${TEMP}**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # ── 3) 兜底工作流此刻是否也在唤醒后端（它有同一套时间窗守卫）
+          if command -v gh >/dev/null 2>&1; then
+            GH_TOKEN="${{ github.token }}" gh api \
+              "repos/${{ github.repository }}/actions/workflows/keepalive.yml/runs?per_page=5" \
+              --jq '.workflow_runs[] | "\(.created_at) \(.event) \(.conclusion)"' \
+              > /tmp/fallback.txt 2>/dev/null || echo "(查询失败)" > /tmp/fallback.txt
+            echo "兜底工作流最近运行："; cat /tmp/fallback.txt
+          fi
+
+          # ── 4) 断言
+          {
+            echo ""
+            echo "### 断言结果"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # 先立规矩：拿不到 Worker 响应就一律不算数（否则超时会被误读成「窗内正常」）
+          if [[ "$WORKER_OK" != yes ]]; then
+            echo "::error::拿不到线上 Worker 的响应 —— 本次观测无效，不能据此判断时间窗。原始响应：${WORKER_BODY:0:200}"
+            FAIL=1
+          fi
+          # 窗外若「冷」得异常快（<3s 就失败），更像是网络/DNS 问题而非实例休眠，别当成通过
+          if [[ "$EXPECT" == "outside" ]] && [[ "$TEMP" == cold ]] && (( MS < 3000 )); then
+            echo "::error::窗外探测 ${MS}ms 就失败（HTTP $CODE）—— 太快了，像是网络故障而不是实例休眠，本次不算通过"
+            FAIL=1
+          fi
+
+          if [[ "$EXPECT" == "outside" ]]; then
+            if [[ "$WORKER_OK" == yes ]] && [[ "$SKIPPED" != yes ]]; then
+              echo "::error::窗外但 Worker 没有跳过（skipped=$SKIPPED）—— 时间窗过滤可能失效，后端会 7×24 常驻并撑爆额度"
+              FAIL=1
+            fi
+            if [[ "$TEMP" == hot ]]; then
+              echo "::warning::窗外后端却是热态（${MS}ms）—— 说明有别的唤醒源（真实访问/部署/兜底工作流），需排查"
+              FAIL=1
+            fi
+          else
+            if [[ "$WORKER_OK" == yes ]] && [[ "$SKIPPED" != no ]]; then
+              echo "::error::窗内但 Worker 报告 skipped —— 时间窗判定反了"
+              FAIL=1
+            fi
+            if [[ "$TEMP" != hot ]]; then
+              echo "::error::窗内后端却是冷态（HTTP $CODE / ${MS}ms）—— 保活的定时可能没在跑（Cron Trigger 是否还在？）"
+              FAIL=1
+            fi
+          fi
+          if (( FAIL == 0 )); then
+            echo "✅ 符合预期（CST ${CST_H} 点 / ${EXPECT}）" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ 与预期不符（CST ${CST_H} 点 / ${EXPECT}）—— 见上方 ::error:: 注解" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+          printf '{"at":"%s","cstHour":%d,"expect":"%s","workerOk":"%s","workerSkipped":"%s","backendHttp":"%s","backendMs":%d,"backendTemp":"%s","pass":%s}\n' \
+            "$(date -u +%FT%TZ)" "$CST_H" "$EXPECT" "$WORKER_OK" "$SKIPPED" "$CODE" "$MS" "$TEMP" \
+            "$( (( FAIL == 0 )) && echo true || echo false )" > observation.json
+          cat observation.json
+          exit $FAIL
+
+      - name: 留档观测结果
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: keepalive-window-observation-${{ github.run_id }}
+          path: observation.json
+          retention-days: 90
