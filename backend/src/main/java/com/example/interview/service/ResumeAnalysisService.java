@@ -17,8 +17,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -209,7 +211,7 @@ public class ResumeAnalysisService {
         // 用虚拟线程异步执行，避免 embedding 不可用时阻塞主请求
         Thread.startVirtualThread(() -> {
             try {
-                String docId = "resume-" + resumeId.replaceAll("[^a-zA-Z0-9-_]", "-");
+                String docId = deriveDocId(resumeId);
                 // 覆盖旧版本文档：同 id 先删后加（不存在时 delete 为无害空操作）
                 try {
                     ragSearchService.removeFromVectorStore(List.of(docId));
@@ -227,6 +229,27 @@ public class ResumeAnalysisService {
                 log.warn("简历向量化失败：{}", e.getMessage());
             }
         });
+    }
+
+    /**
+     * 由 resumeId 派生向量库文档 ID。
+     *
+     * <p><b>为什么必须是标准 UUID（P1-03，2026-09-23）</b>：pgvector 的 {@code id} 列类型是
+     * {@code uuid}，长度上限 36。此前直接把 Redis 缓存键当 ID 用：
+     * {@code "resume-" + cacheKey}，而
+     * {@code cacheKey = "resume:analysis:"(16) + userId + ":"(1) + sha256Short(32)} ≈ 51 字符，
+     * 加前缀后约 <b>58 字符</b> → 写入即报
+     * {@code 向量化入库失败：UUID string too large}，
+     * 简历永远进不了向量库（RAG 检索因此少了简历这一路召回），
+     * 而异常在虚拟线程里被 catch 成一条 WARN，用户与运维都只看到
+     * 「知识库暂时不可用」，完全定位不到原因。
+     *
+     * <p>改用 {@link UUID#nameUUIDFromBytes} 派生：结果恒为 36 字符的合法 UUID，
+     * 且同一 resumeId 始终得到同一 ID，保留「重复分析同一简历时先删后加、覆盖而非累积」的原语义。
+     * 这与 {@code AutoKnowledgeService.deterministicId}、{@code KnowledgeSeedInitializer} 的既有做法一致。
+     */
+    static String deriveDocId(String resumeId) {
+        return UUID.nameUUIDFromBytes(("resume|" + resumeId).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     /**

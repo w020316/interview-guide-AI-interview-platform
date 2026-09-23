@@ -151,6 +151,14 @@ export interface SpeechRecorderOptions {
   onFinalText?: (text: string) => void
   onMetrics?: (metrics: SpeechMetrics) => void
   onError?: (msg: string) => void
+  /**
+   * 识别结束（含静音自动结束）时回调，P2-28。
+   *
+   * <p>调用方必须用它复位「录音中」的 UI 状态：识别器内部状态与 UI 状态是两套变量，
+   * 若只在 onstart/onerror 里同步 UI，onend 这条最常走的正常结束路径就会漏掉，
+   * 表现为按钮永久停在「语音识别中…」且点击无效。
+   */
+  onEnd?: () => void
   lang?: string
 }
 
@@ -201,9 +209,16 @@ export function createSpeechRecorder(opts: SpeechRecorderOptions = {}) {
       opts.onFinalText?.(correctTechTerms(finalized))
     }
     recognition.onend = () => {
-      if (!recording) return
-      recording = false
-      opts.onMetrics?.(computeSpeechMetrics(chunks, correctTechTerms(finalized)))
+      // P2-28（2026-09-23）：onend 是识别「正常结束」的唯一信号——Chrome 的 Web Speech API
+      // 即使 continuous=true，也会在静音数秒后自行触发 onend。
+      // 此前这里只重置了内部状态、没有通知调用方，导致 UI 的「语音识别中…」永不复位：
+      // 按钮一直带 loading，而 BaseButton 在 loading 时静默忽略点击 → 按钮彻底不可用。
+      // 现在无论 recording 是否为真都通知一次，保证调用方总能复位 UI。
+      if (recording) {
+        recording = false
+        opts.onMetrics?.(computeSpeechMetrics(chunks, correctTechTerms(finalized)))
+      }
+      opts.onEnd?.()
     }
     recognition.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {

@@ -73,6 +73,10 @@ class SecurityConfigTest {
     @MockBean
     private com.example.interview.service.RagHealthTracker ragHealthTracker;
 
+    /** v1.40.0：深度体检新增 storage 区块，构造依赖此 Bean */
+    @MockBean
+    private com.example.interview.service.SupabaseStorageService supabaseStorageService;
+
     /** 测试专用受保护端点（不在 permitAll 列表，需认证） */
     @RestController
     @RequestMapping("/api/test-secure")

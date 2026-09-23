@@ -50,6 +50,20 @@ public class AuthController {
     private final ConcurrentHashMap<String, LoginFailInfo> loginFailMap = new ConcurrentHashMap<>();
 
     /**
+     * 登录失败计数：账号（小写用户名）→ 失败次数（P1-02，2026-09-23）。
+     *
+     * <p><b>为什么必须补这一维</b>：原实现只按 IP 计数，而 IP 是攻击者可自由轮换的资源
+     * ——2026-09-23 生产实测：对同一账号连续输错密码，返回的「还可尝试 N 次」在
+     * 4→3→4→3 之间交替（每次请求落到不同边缘节点、被当成不同 IP），
+     * 5 次锁定形同虚设，可以无限重试同一个账号。
+     * 账号维度不随 IP 变化，才能真正保护账号本身。
+     *
+     * <p>代价：存在「用已知用户名故意触发锁定」的 DoS 面。因此沿用同样的
+     * 5 分钟短锁定窗口，把影响限制在「临时不可登录」而非「永久封禁」。
+     */
+    private final ConcurrentHashMap<String, LoginFailInfo> accountFailMap = new ConcurrentHashMap<>();
+
+    /**
      * 注册限流（P2-04）：按 IP 默认 5 次/小时滑动窗口，防脚本批量注册垃圾账号与
      * 「用户名/邮箱已存在」回显驱动的批量枚举。
      * 限流拦截器整体豁免 /api/auth/**，注册需在此处单独限流。
@@ -67,6 +81,9 @@ public class AuthController {
     /** 最大失败次数（超过则锁定） */
     private static final int MAX_FAIL_COUNT = 5;
 
+    /** 账号维度最大失败次数（P1-02：不随 IP 轮换而重置，见 accountFailMap 注释） */
+    private static final int MAX_FAIL_COUNT_PER_ACCOUNT = 5;
+
     /** 锁定时长（5 分钟） */
     private static final long LOCK_DURATION_MS = 5 * 60 * 1000L;
 
@@ -76,13 +93,44 @@ public class AuthController {
         volatile long lastFailTime = 0;
     }
 
+    /**
+     * 判断某个失败计数桶是否处于锁定期；锁定已过期则顺手移除该桶。
+     *
+     * @return 处于锁定中返回剩余分钟数（>0），未锁定返回 0
+     */
+    private long lockedRemainingMinutes(ConcurrentHashMap<String, LoginFailInfo> map, String key, int threshold) {
+        LoginFailInfo info = map.get(key);
+        if (info == null || info.count.get() < threshold) {
+            return 0;
+        }
+        long elapsed = System.currentTimeMillis() - info.lastFailTime;
+        if (elapsed < LOCK_DURATION_MS) {
+            return (LOCK_DURATION_MS - elapsed) / 60000 + 1;
+        }
+        map.remove(key);
+        return 0;
+    }
+
+    /** 记录一次失败；返回该桶当前的失败次数 */
+    private int recordFail(ConcurrentHashMap<String, LoginFailInfo> map, String key) {
+        LoginFailInfo info = map.computeIfAbsent(key, k -> new LoginFailInfo());
+        int count = info.count.incrementAndGet();
+        info.lastFailTime = System.currentTimeMillis();
+        return count;
+    }
+
     /** 定期清理过期的登录失败计数，防止内存泄漏 */
     private void cleanupExpiredLoginFails() {
         long now = System.currentTimeMillis();
-        loginFailMap.entrySet().removeIf(entry -> {
+        cleanupMap(loginFailMap, MAX_FAIL_COUNT, now);
+        cleanupMap(accountFailMap, MAX_FAIL_COUNT_PER_ACCOUNT, now);
+    }
+
+    private void cleanupMap(ConcurrentHashMap<String, LoginFailInfo> map, int threshold, long now) {
+        map.entrySet().removeIf(entry -> {
             LoginFailInfo info = entry.getValue();
             // 锁定过期或 30 分钟无失败则清理
-            return info.count.get() >= MAX_FAIL_COUNT
+            return info.count.get() >= threshold
                     ? (now - info.lastFailTime) > LOCK_DURATION_MS
                     : (now - info.lastFailTime) > 30 * 60 * 1000L;
         });
@@ -188,29 +236,29 @@ public class AuthController {
         cleanupExpiredLoginFails();
 
         String clientIp = resolveClientIp(request);
+        // P1-02：账号维度计数用小写归一化键，避免攻击者靠改变大小写绕过
+        String accountKey = username.trim().toLowerCase(java.util.Locale.ROOT);
 
-        // 检查是否被锁定
-        LoginFailInfo failInfo = loginFailMap.get(clientIp);
-        if (failInfo != null && failInfo.count.get() >= MAX_FAIL_COUNT) {
-            long elapsed = System.currentTimeMillis() - failInfo.lastFailTime;
-            if (elapsed < LOCK_DURATION_MS) {
-                long remainingMin = (LOCK_DURATION_MS - elapsed) / 60000 + 1;
-                return Result.error(429, "登录失败次数过多，请 " + remainingMin + " 分钟后再试");
-            } else {
-                // 锁定过期，重置计数
-                loginFailMap.remove(clientIp);
-            }
+        // 检查是否被锁定：IP 与账号任一维度命中即拒绝。
+        // 账号维度是轮换 IP 无法绕过的兜底——这正是原实现的缺口。
+        long ipLockedMin = lockedRemainingMinutes(loginFailMap, clientIp, MAX_FAIL_COUNT);
+        if (ipLockedMin > 0) {
+            return Result.error(429, "登录失败次数过多，请 " + ipLockedMin + " 分钟后再试");
+        }
+        long accountLockedMin = lockedRemainingMinutes(accountFailMap, accountKey, MAX_FAIL_COUNT_PER_ACCOUNT);
+        if (accountLockedMin > 0) {
+            return Result.error(429, "该账号登录失败次数过多，请 " + accountLockedMin + " 分钟后再试");
         }
 
         UserEntity user = userRepository.findByUsername(username)
                 .orElse(null);
         if (user == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
-            // 记录失败次数
-            LoginFailInfo info = loginFailMap.computeIfAbsent(clientIp, k -> new LoginFailInfo());
-            int failCount = info.count.incrementAndGet();
-            info.lastFailTime = System.currentTimeMillis();
+            // 两个维度同时记录：IP 维度挡同一来源的批量尝试，账号维度挡跨 IP 的定向爆破
+            int ipFails = recordFail(loginFailMap, clientIp);
+            int accountFails = recordFail(accountFailMap, accountKey);
 
-            int remaining = MAX_FAIL_COUNT - failCount;
+            // 以「更接近锁定的那一维」为准，保证提示的剩余次数与实际一致
+            int remaining = Math.min(MAX_FAIL_COUNT - ipFails, MAX_FAIL_COUNT_PER_ACCOUNT - accountFails);
             if (remaining > 0) {
                 return Result.error(401, "用户名或密码错误，还可尝试 " + remaining + " 次");
             } else {
@@ -218,8 +266,9 @@ public class AuthController {
             }
         }
 
-        // 登录成功，清除失败计数
+        // 登录成功，清除两个维度的失败计数，避免残留计数影响后续正常登录
         loginFailMap.remove(clientIp);
+        accountFailMap.remove(accountKey);
 
         // v1.31.4 管理后台：被禁用的用户不允许登录
         if (userBanRegistry.isBanned(user.getId())) {

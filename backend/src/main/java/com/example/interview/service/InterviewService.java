@@ -245,11 +245,14 @@ public class InterviewService {
                     .append("2. 评分须结合【参考答案】要点逐项核对，杜绝凭印象给分；分数与评语必须一致\n")
                     .append("3. strengths/weaknesses/improvements 必须对应具体内容，避免空泛套话；improvements 给出可落地的改进动作\n")
                     .append("4. 表达能力维度重点考察「经得起追问」：回答里有没有空话废话（如堆砌「负责/参与」类空动词、\n")
-                    .append("   与结论无关的铺垫）、有没有贬低他人/夸大编造等风险表达，有则如实扣分并指出原句\n\n")
+                    .append("   与结论无关的铺垫）、有没有贬低他人/夸大编造等风险表达，有则如实扣分。\n")
+                    .append("   需要引用用户原话时，一律用书名号《》包裹（例如：回答中的《我们负责了相关模块》属于空泛表述），\n")
+                    .append("   严禁使用英文双引号 —— 它会破坏 JSON 结构，导致整段评分无法解析\n\n")
                     .append("【输出要求（务必严格遵守）】\n")
                     .append("1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记\n")
                     .append("2. 所有字符串必须使用 ASCII 双引号 \"，禁止使用单引号 ' 或中文引号\n")
-                    .append("3. 不要在字符串值中使用引号，如需引用请用书名号《》\n")
+                    .append("3. 字符串值内部禁止出现英文双引号 \" 与单引号 '：引用用户原话请用书名号《》包裹，\n")
+                    .append("   这是硬性要求，违反会导致整段评分无法解析\n")
                     .append("4. 不要输出任何注释、解释、前后缀文字\n")
                     .append("5. 输出格式：\n")
                     .append("{\"overallScore\":75,\"completeness\":70,\"accuracy\":80,\"expression\":75,\"strengths\":[\"优点1\"],\"weaknesses\":[\"不足1\"],\"improvements\":[\"建议1\"]}")
@@ -266,7 +269,12 @@ public class InterviewService {
                 throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
 
-            return JsonRepairUtil.repairAndLog(response, "interview-evaluate");
+            return validateOrRetry(response, "interview-evaluate", () ->
+                    com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                            chatClient.prompt()
+                                    .user(prompt)
+                                    .call()
+                                    .content()));
         } finally {
             evaluateCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
@@ -294,11 +302,13 @@ public class InterviewService {
                     .append("【评分注意事项】\n")
                     .append("1. 若图片与回答无关或无法解读，需在 improvements 中如实指出\n")
                     .append("2. 评分须结合【参考答案】要点逐项核对，杜绝凭印象给分；分数与评语必须一致\n")
-                    .append("3. 若附图是代码，请检查代码正确性并针对性点评\n\n")
+                    .append("3. 若附图是代码，请检查代码正确性并针对性点评\n")
+                    .append("4. 需要引用用户原话时，一律用书名号《》包裹，严禁使用英文双引号（会破坏 JSON 结构）\n\n")
                     .append("【输出要求（务必严格遵守）】\n")
                     .append("1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记\n")
                     .append("2. 所有字符串必须使用 ASCII 双引号 \"，禁止使用单引号 ' 或中文引号\n")
-                    .append("3. 不要在字符串值中使用引号，如需引用请用书名号《》\n")
+                    .append("3. 字符串值内部禁止出现英文双引号 \" 与单引号 '：引用用户原话请用书名号《》包裹，\n")
+                    .append("   这是硬性要求，违反会导致整段评分无法解析\n")
                     .append("4. 不要输出任何注释、解释、前后缀文字\n")
                     .append("5. 输出格式：\n")
                     .append("{\"overallScore\":75,\"completeness\":70,\"accuracy\":80,\"expression\":75,\"strengths\":[\"优点1\"],\"weaknesses\":[\"不足1\"],\"improvements\":[\"建议1\"]}")
@@ -316,16 +326,128 @@ public class InterviewService {
                 throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
 
-            return JsonRepairUtil.repairAndLog(response, "interview-evaluate-image");
+            return validateOrRetry(response, "interview-evaluate-image", () ->
+                    com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                            chatClient.prompt()
+                                    .user((userSpec) -> userSpec.text(prompt).media(media))
+                                    .call()
+                                    .content()));
         } finally {
             evaluateCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
     }
 
+    /** 评分 JSON 校验用（字段少、结构固定，独立实例足够，避免与全局 ObjectMapper 配置耦合） */
+    private static final com.fasterxml.jackson.databind.ObjectMapper EVAL_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** 评分结果必须具备的数值字段 */
+    private static final String[] EVAL_NUMERIC_FIELDS =
+            {"overallScore", "completeness", "accuracy", "expression"};
+
+    /**
+     * 校验 AI 评分结果是否为「可用的」JSON —— 既要能解析，也要四个分数字段齐全且为数值。
+     *
+     * <p>P1-17：评分提示词里「指出原句」（诱导引用）与「禁止在字符串值内使用引号」自相矛盾，
+     * 模型为引用原话加 ASCII 双引号，直接击穿 JSON，实测复现率约 1/3。
+     * 而接口此前无论解析成功与否都以 {@code 200 + code=200} 下发，
+     * 前端 {@code safeParse(data, {})} 拿到 {@code {}} 后照常渲染评分面板，
+     * 四个维度全显示「-」、无改进建议、也没有任何错误提示 —— 用户完全不知道自己被评了 0 分还是没评。
+     */
+    private boolean isValidEvaluation(String json) {
+        if (!JsonRepairUtil.isValid(json)) {
+            return false;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = EVAL_MAPPER.readTree(json);
+            for (String field : EVAL_NUMERIC_FIELDS) {
+                com.fasterxml.jackson.databind.JsonNode v = node.get(field);
+                if (v == null || !v.isNumber()) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 输出前校验：破损 JSON 先重试一次，仍不合格则抛出明确错误。
+     *
+     * <p>取舍说明：重试会多消耗一次 AI 调用（免费档 10 RPM），但只在解析失败时发生；
+     * 提示词矛盾修好后失败率应大幅下降，重试仅作兜底。
+     * 相比「把脏数据当成功下发、前端静默渲染出空面板」，多一次调用的代价是值得的。
+     *
+     * @param retryCall 重试时重新发起 AI 调用的动作（需自行包裹并发闸门）
+     */
+    private String validateOrRetry(String raw, String context, java.util.function.Supplier<String> retryCall) {
+        String repaired = JsonRepairUtil.repairAndLog(raw, context);
+        if (isValidEvaluation(repaired)) {
+            return normalizeOverallScore(repaired);
+        }
+        log.warn("{} 输出非法 JSON（已尝试修复），重试一次。原文前 200 字：{}",
+                context, TextUtil.truncate(raw, 200));
+
+        String retryRaw;
+        try {
+            retryRaw = retryCall.get();
+        } catch (Exception e) {
+            log.warn("{} 重试调用失败：{}", context, e.getMessage());
+            throw new com.example.interview.common.BusinessException("AI 评分结果格式异常，请重试");
+        }
+        String retryRepaired = JsonRepairUtil.repairAndLog(retryRaw, context + "-retry");
+        if (isValidEvaluation(retryRepaired)) {
+            return normalizeOverallScore(retryRepaired);
+        }
+        log.error("{} 重试后仍非法，放弃本次评分。原文前 200 字：{}",
+                context, TextUtil.truncate(retryRaw, 200));
+        throw new com.example.interview.common.BusinessException("AI 评分结果格式异常，请稍后重试");
+    }
+
+    /** 提示词声明的三维权重：完整性 30% / 准确性 40% / 表达能力 30% */
+    private static final double W_COMPLETENESS = 0.3;
+    private static final double W_ACCURACY = 0.4;
+    private static final double W_EXPRESSION = 0.3;
+
+    /**
+     * 用三维加权结果覆盖模型自由生成的 overallScore，保证四维自洽（P2-19）。
+     *
+     * <p><b>为什么必须由服务端算</b>：评分提示词声明了「完整性 30% / 准确性 40% / 表达能力 30%」，
+     * 但 overallScore 一直由模型独立生成、与三维无关。实测偏差方向与幅度都不可预测：
+     * 正常作答时仅差 -0.5（四舍五入），低分场景偏高 3~4 分，
+     * 最极端一次返回「综合 70 / 完整性 15 / 准确性 8 / 表达力 95」——
+     * 加权应为 36.2，综合分却高 33.8 分，等级判定从「待加强」跳到「良好」。
+     * 更糟的是该矛盾会被印进<b>对外分享的成绩海报</b>（头条「70 良好」与两根红条并排），
+     * 属于用户可自行复算、一眼看穿的不一致。
+     *
+     * <p>归一化失败（结构异常）时返回原值，不让本项优化影响主流程。
+     */
+    private String normalizeOverallScore(String json) {
+        try {
+            com.fasterxml.jackson.databind.node.ObjectNode node =
+                    (com.fasterxml.jackson.databind.node.ObjectNode) EVAL_MAPPER.readTree(json);
+            double weighted = node.get("completeness").asDouble() * W_COMPLETENESS
+                    + node.get("accuracy").asDouble() * W_ACCURACY
+                    + node.get("expression").asDouble() * W_EXPRESSION;
+            int normalized = (int) Math.round(weighted);
+            int original = node.get("overallScore").asInt();
+            if (original != normalized) {
+                log.debug("评分综合分归一化：模型给出 {} → 按 30/40/30 加权得 {}（完整性 {} 准确性 {} 表达力 {}）",
+                        original, normalized, node.get("completeness").asInt(),
+                        node.get("accuracy").asInt(), node.get("expression").asInt());
+            }
+            node.put("overallScore", normalized);
+            return EVAL_MAPPER.writeValueAsString(node);
+        } catch (Exception e) {
+            log.warn("评分综合分归一化失败，保留模型原值：{}", e.getMessage());
+            return json;
+        }
+    }
+
     /** 依据图片 URL 后缀推断 MIME 类型，未知默认 image/png */
-    private MimeType detectMimeType(String imageUrl) {
-        String lower = imageUrl.toLowerCase();
+    private MimeType detectMimeType(String imageUrl) {        String lower = imageUrl.toLowerCase();
         if (lower.endsWith(".jpeg") || lower.endsWith(".jpg")) {
             return MimeType.valueOf("image/jpeg");
         }

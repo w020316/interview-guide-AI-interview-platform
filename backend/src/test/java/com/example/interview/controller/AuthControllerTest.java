@@ -330,6 +330,51 @@ class AuthControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(401));
         }
+
+        /**
+         * P1-02（2026-09-23）回归：原实现只按 IP 计数，而 IP 是攻击者可轮换的资源。
+         * 生产实测——对同一账号连续输错密码，返回的「还可尝试 N 次」在 4→3→4→3 之间交替
+         * （每次请求落到不同边缘节点被当成不同 IP），5 次锁定形同虚设，可无限重试同一账号。
+         * 本用例让每次请求都来自不同 IP，验证账号维度仍能触发锁定。
+         *
+         * <p>用独立用户名 lockout-probe 隔离，避免污染其它用例的计数（controller 是单例，计数是实例状态）。
+         */
+        @Test
+        @DisplayName("同一账号跨 IP 连续失败仍会锁定（P1-02：轮换 IP 无法绕过）")
+        void login_accountLockout_notBypassableByRotatingIp() throws Exception {
+            String username = "lockout-probe";
+            when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "username", username, "password", "wrong"));
+
+            // 前 4 次：每次换一个客户端 IP，仍在计数范围内 → 401
+            for (int i = 0; i < 4; i++) {
+                final int n = i;
+                mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .with(req -> { req.setRemoteAddr("203.0.113." + (n + 1)); return req; })
+                                .content(body))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.code").value(401));
+            }
+
+            // 第 5 次：账号维度达到阈值 → 429（若只按 IP 计数，这里会是该 IP 的第 1 次失败、返回 401）
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .with(req -> { req.setRemoteAddr("203.0.113.5"); return req; })
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(429));
+
+            // 第 6 次：换一个全新 IP，此时走「预检已锁定」分支，且明确指出来自账号维度
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .with(req -> { req.setRemoteAddr("203.0.113.200"); return req; })
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(429))
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("该账号")));
+        }
     }
 
     @Nested

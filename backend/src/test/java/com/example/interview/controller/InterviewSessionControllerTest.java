@@ -348,6 +348,46 @@ class InterviewSessionControllerTest {
         }
 
         @Test
+        @DisplayName("AI 真实返回体（keyPoints 为字符串数组）能正常保存，不再 400 —— P0-01 回归")
+        void saveQuestions_withKeyPointsArray_returns200() throws Exception {
+            // 背景：AI 出题返回的每题带 keyPoints: string[]，
+            // 而本端点原签名是 List<Map<String,String>> → Jackson 反序列化失败 → 400
+            // 「请求体格式错误，请检查 JSON 语法」，整批题目落不了库，
+            // 连带历史/错题本/趋势全空。此用例锁定该修复。
+            InterviewSessionEntity s = InterviewSessionEntity.builder()
+                    .id(1L).sessionId("s1").userId(USER_ID).build();
+            when(sessionService.getBySessionId("s1")).thenReturn(s);
+            when(sessionService.saveQuestions(any(String.class), any(), any()))
+                    .thenAnswer(inv -> inv.getArgument(1));
+
+            String body = objectMapper.writeValueAsString(List.of(
+                    Map.of("question", "缓存一致性怎么保证？",
+                            "category", "项目深挖",
+                            "difficulty", "MEDIUM",
+                            "keyPoints", List.of("Cache-Aside", "延迟双删"),
+                            "referenceAnswer", "Cache-Aside")));
+
+            mockMvc.perform(post("/api/session/s1/questions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data[0].question").value("缓存一致性怎么保证？"));
+
+            // keyPoints 需被归一化为文本存库（实体列是 String，AI 给的是数组）
+            org.mockito.ArgumentCaptor<List<InterviewQuestionEntity>> captor =
+                    org.mockito.ArgumentCaptor.forClass(List.class);
+            org.mockito.Mockito.verify(sessionService).saveQuestions(any(String.class), captor.capture(), any());
+            InterviewQuestionEntity savedEntity = captor.getValue().get(0);
+            org.assertj.core.api.Assertions.assertThat(savedEntity.getKeyPoints())
+                    .as("keyPoints 数组应被序列化为 JSON 文本，而不是丢失或抛异常")
+                    .contains("Cache-Aside")
+                    .contains("延迟双删");
+            org.assertj.core.api.Assertions.assertThat(savedEntity.getReferenceAnswer())
+                    .isEqualTo("Cache-Aside");
+        }
+
+        @Test
         @DisplayName("他人会话返回 403（IDOR 防御）")
         void saveQuestions_otherUserSession_returns403() throws Exception {
             InterviewSessionEntity s = InterviewSessionEntity.builder()

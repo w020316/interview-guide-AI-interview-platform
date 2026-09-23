@@ -91,4 +91,58 @@ class ClientIpUtilTest {
         assertThat(ClientIpUtil.isTrustedProxy("203.0.113.1")).isFalse();
         assertThat(ClientIpUtil.isTrustedProxy(null)).isFalse();
     }
+
+    /**
+     * P1-02（2026-09-23）：平台边缘节点的 remoteAddr 是公网 IP，不属于默认信任的私网段，
+     * 导致 XFF 永不生效、客户端真实 IP 解析失败，按 IP 的注册限流与登录锁定形同虚设
+     * （生产实测：注册限流连测 9 次都不触发）。
+     * 这里验证「可配置额外受信代理前缀」能把该能力恢复，同时默认保持保守。
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("可配置的额外受信代理前缀（P1-02）")
+    class ExtraTrustedPrefixes {
+
+        @org.junit.jupiter.api.AfterEach
+        void reset() {
+            // 静态状态必须复位，避免污染同套件内的其它用例
+            ClientIpUtil.setExtraTrustedPrefixes(null);
+        }
+
+        @Test
+        @DisplayName("未配置时保持保守：公网代理直连仍忽略 XFF（复现解析失效现象）")
+        void notConfigured_publicProxyIgnored() {
+            ClientIpUtil.setExtraTrustedPrefixes("");
+
+            assertThat(resolve("203.0.113.9", "198.51.100.7")).isEqualTo("203.0.113.9");
+            assertThat(ClientIpUtil.isTrustedProxy("203.0.113.9")).isFalse();
+        }
+
+        @Test
+        @DisplayName("配置平台代理段后 XFF 生效，解析出真实客户端 IP")
+        void configured_publicProxyTrusted() {
+            ClientIpUtil.setExtraTrustedPrefixes("203.0.113.");
+
+            assertThat(ClientIpUtil.isTrustedProxy("203.0.113.9")).isTrue();
+            assertThat(resolve("203.0.113.9", "198.51.100.7")).isEqualTo("198.51.100.7");
+        }
+
+        @Test
+        @DisplayName("多个前缀（逗号分隔、含空白）都能正确解析")
+        void configured_multiplePrefixesWithSpaces() {
+            ClientIpUtil.setExtraTrustedPrefixes(" 203.0.113. , 198.51.100. ");
+
+            assertThat(ClientIpUtil.extraTrustedPrefixes()).hasSize(2);
+            assertThat(ClientIpUtil.isTrustedProxy("203.0.113.9")).isTrue();
+            assertThat(ClientIpUtil.isTrustedProxy("198.51.100.7")).isTrue();
+        }
+
+        @Test
+        @DisplayName("配置平台代理后仍从右端取第一个非受信条目，客户端伪造的最左条目被跳过")
+        void configured_clientForgedLeftEntryIgnored() {
+            ClientIpUtil.setExtraTrustedPrefixes("203.0.113.");
+
+            // 客户端伪造 1.2.3.4 放在最左，平台在右侧追加真实 IP → 必须取真实 IP
+            assertThat(resolve("203.0.113.9", "1.2.3.4, 198.51.100.7")).isEqualTo("198.51.100.7");
+        }
+    }
 }

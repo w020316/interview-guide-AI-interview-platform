@@ -35,6 +35,7 @@ public class HealthController {
     private final RedisTemplate<String, Object> redisTemplate;
     private final RagSearchService ragSearchService;
     private final RagHealthTracker ragHealthTracker;
+    private final com.example.interview.service.SupabaseStorageService supabaseStorageService;
 
     /**
      * 版本号与构建日期来自配置（v1.39.0 修复）。
@@ -52,6 +53,7 @@ public class HealthController {
 
     public HealthController(JdbcTemplate jdbcTemplate, RedisTemplate<String, Object> redisTemplate,
                             RagSearchService ragSearchService, RagHealthTracker ragHealthTracker,
+                            com.example.interview.service.SupabaseStorageService supabaseStorageService,
                             @org.springframework.beans.factory.annotation.Value("${app.info.version:unknown}")
                             String appVersion,
                             @org.springframework.beans.factory.annotation.Value("${app.info.build-date:}")
@@ -60,6 +62,7 @@ public class HealthController {
         this.redisTemplate = redisTemplate;
         this.ragSearchService = ragSearchService;
         this.ragHealthTracker = ragHealthTracker;
+        this.supabaseStorageService = supabaseStorageService;
         this.appVersion = appVersion;
         this.buildDate = buildDate;
     }
@@ -117,17 +120,37 @@ public class HealthController {
             rag.put("status", "UNKNOWN");
         }
 
-        // 核心依赖（DB/Redis）决定 status；RAG 属可选子系统，只计入 degraded 列表，
-        // 避免知识库故障被误判为「整个服务不可用」
+        // 文件存储（Supabase Storage）——v1.40.0 增补：
+        // 作答附图上传此前 100% 失败（合法 PNG 也返回 500），但体检恒报全绿，
+        // 从外部完全无法判断「是没配、配错、bucket 不存在还是被 RLS 拒绝」。
+        // 现把配置状态与最近一次上传失败原因一并暴露，使该故障无需登录平台即可自诊断。
+        Map<String, Object> storage = supabaseStorageService == null
+                ? null
+                : supabaseStorageService.healthSnapshot();
+        if (storage == null || !storage.containsKey("status")) {
+            storage = new LinkedHashMap<>();
+            storage.put("status", "UNKNOWN");
+        }
+
+        // 核心依赖（DB/Redis）决定 status；RAG 与 storage 属可选子系统，只计入 degraded 列表，
+        // 避免单个可选功能故障被误判为「整个服务不可用」
         data.put("status", "UP");
         data.put("uptimeSec", ManagementFactory.getRuntimeMXBean().getUptime() / 1000);
         data.put("database", databaseStatus());
         data.put("redis", redisStatus());
         data.put("jvm", jvmStatus());
         data.put("rag", rag);
+        data.put("storage", storage);
 
+        List<String> degraded = new java.util.ArrayList<>();
         if (!"UP".equals(rag.get("status")) && !"UNKNOWN".equals(rag.get("status"))) {
-            data.put("degraded", List.of("rag"));
+            degraded.add("rag");
+        }
+        if ("DOWN".equals(storage.get("status"))) {
+            degraded.add("storage");
+        }
+        if (!degraded.isEmpty()) {
+            data.put("degraded", degraded);
         }
         return Result.success(data);
     }

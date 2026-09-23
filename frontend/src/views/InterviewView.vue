@@ -222,12 +222,16 @@
     <!-- Step 3: 面试复盘报告弹窗（Lollipop 式结构化复盘） -->
     <Teleport to="body">
       <Transition name="report-fade">
-        <div v-if="reportOpen && answeredCount" class="report-mask" @click.self="closeReportGoSetup">
+        <!-- P2-29：遮罩不再关闭报告。
+             复盘报告是一次面试的核心产出物，而 reportOpen 全仓只有 finishSession 一处置真、
+             resetSession 又已清空 questions/sessionId —— 一旦误点遮罩就永久失去查看入口，
+             用户只能重做一场面试。关闭动作收敛到右上角 ✕ 与底部两个明确按钮。 -->
+        <div v-if="reportOpen && answeredCount" class="report-mask">
           <div class="report-modal" role="dialog" aria-modal="true" aria-label="面试复盘报告">
             <div class="report-head">
               <div>
                 <h3 class="report-title">模拟面试复盘报告</h3>
-                <p class="report-sub"><span class="report-star" aria-hidden="true">★</span> 基于本次 {{ answeredCount }} 道作答的结构化总结 · 灵感参考 AI 面试工具</p>
+                <p class="report-sub"><span class="report-star" aria-hidden="true">★</span> {{ reportScopeText }} · 灵感参考 AI 面试工具</p>
               </div>
               <button class="report-close" aria-label="关闭" @click="closeReportGoSetup">✕</button>
             </div>
@@ -355,6 +359,12 @@ interface Question {
   category: string
   difficulty: string
   referenceAnswer?: string
+  /**
+   * 后端返回字段：已持久化的用户回答与评分（P2-26 用于统计会话累计作答量）。
+   * 此前接口未声明这两个字段，导致「从历史恢复时该会话已有几题作答」这一信息在前端不可见。
+   */
+  userAnswer?: string | null
+  evaluationScore?: number | null
 }
 
 interface EvalResult {
@@ -483,7 +493,14 @@ onMounted(() => {
 async function resumeSession(targetId: string) {
   loading.value = true
   try {
-    const qs = (await api.get(`/api/session/${targetId}/questions`, { timeout: AI_TIMEOUT })) as unknown as Question[]
+    // P3-27：同时取会话元信息回填岗位描述。此前只取题目数组（该接口不含 jobDescription），
+    // 于是 jobDesc 保持空串，复盘报告副题 / 导出 PDF 页眉 / 分享卡片主标题与文件名
+    // 四处都会显示「未指定岗位」。
+    const [qs, meta] = await Promise.all([
+      api.get(`/api/session/${targetId}/questions`, { timeout: AI_TIMEOUT }) as unknown as Question[],
+      (api.get(`/api/session/${targetId}`, { timeout: AI_TIMEOUT }) as unknown as Promise<{ jobDescription?: string }>)
+        .catch(() => null)
+    ])
     if (!Array.isArray(qs) || qs.length === 0) {
       ElMessage.warning('该会话暂无题目')
       router.replace('/interview')
@@ -492,6 +509,13 @@ async function resumeSession(targetId: string) {
     sessionId.value = targetId
     questions.value = qs
     qIndex.value = 0
+    if (meta?.jobDescription) {
+      jobDesc.value = meta.jobDescription
+    }
+    // P2-26：记录该会话「此前已作答」的题数。复盘报告的 sessionEvals 是页面级状态，
+    // 只统计本次新作答，若不把会话累计数一并展示，报告会显得「丢了题」
+    //（实测：服务端 4 题、其中 2 题早有得分，报告却写「基于本次 1 道作答」）。
+    historyAnsweredCount.value = qs.filter((q) => typeof q.evaluationScore === 'number').length
     ElMessage.success(`已载入 ${qs.length} 道题，开始面试！`)
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '载入面试失败'))
@@ -520,6 +544,14 @@ interface SessionEval {
   improvements: string[]
 }
 const sessionEvals = ref<SessionEval[]>([])
+/** P1-18：题目缺 id 导致答案无法上报时，每次会话只提示一次，避免逐题刷屏 */
+const persistWarned = ref(false)
+/**
+ * P2-26：从历史会话恢复时，该会话「此前已作答」的题数。
+ * sessionEvals 是页面级状态，只统计本次新作答；不复用服务端既有得分的前提下，
+ * 至少在报告抬头如实体现会话累计量，避免出现「服务端 4 题、报告说 1 题」的割裂。
+ */
+const historyAnsweredCount = ref(0)
 const reportOpen = ref(false)
 
 // ── 复盘报告进阶：多轮成绩对比 ──
@@ -554,6 +586,22 @@ const streamHtml = computed(() => renderMarkdown(streamContent.value || '等待�
 
 // ── 复盘报告计算属性 ──
 const answeredCount = computed(() => sessionEvals.value.length)
+
+/**
+ * P2-26：报告覆盖范围说明。
+ *
+ * <p>复盘报告的数据源是页面级的 sessionEvals，只包含「本次页面内」的作答。
+ * 从「面试历史」继续面试时，该会话此前已作答的题目（得分只存在于服务端）不会进入报告，
+ * 于是出现「服务端有 4 题、其中 2 题早有得分，报告却写『基于本次 1 道作答』」的割裂。
+ * 在补齐服务端回填之前，这里如实标注会话累计量，让用户知道报告覆盖的到底是什么范围。
+ */
+const reportScopeText = computed(() => {
+  const history = historyAnsweredCount.value
+  if (history > 0) {
+    return `基于本次新作答 ${answeredCount.value} 题（该会话累计已作答 ${history + answeredCount.value} 题）的结构化总结`
+  }
+  return `基于本次 ${answeredCount.value} 道作答的结构化总结`
+})
 /** 各维度平均分 */
 const reportAverages = computed(() => {
   const list = sessionEvals.value
@@ -665,13 +713,27 @@ function ensureSpeechRec() {
         userAnswer.value = (userAnswer.value.trim() ? userAnswer.value.trim() + '\n' : '') + text.trim()
       },
       onMetrics: (metrics) => {
-        speechFeedback.value =
-          `语速 ${metrics.rateVerdict}（${metrics.ratePerMin} 字/分）· 时长 ${metrics.durationSec.toFixed(0)}s` +
-          (metrics.pauseCount ? ` · 停顿 ${metrics.pauseCount} 次` : '')
+        // P3-30：无有效语音时不显示语速判定——此前会拼出自相矛盾的「语速 适中（0 字/分）· 时长 0s」
+        //（rateVerdict 在 durationSec===0 时兜底为「适中」，与 0 字/分并列展示）。
+        // 同时优先使用 speech.ts 里按场景写好的 feedback（该字段此前从未被读取，指引文案被白白浪费）。
+        if (metrics.charCount === 0 || metrics.durationSec === 0) {
+          speechFeedback.value = metrics.feedback
+        } else {
+          speechFeedback.value =
+            `语速 ${metrics.rateVerdict}（${metrics.ratePerMin} 字/分）· 时长 ${metrics.durationSec.toFixed(0)}s` +
+            (metrics.pauseCount ? ` · 停顿 ${metrics.pauseCount} 次` : '')
+        }
       },
       onError: (msg) => {
         speechRecording.value = false
         ElMessage.error(msg)
+      },
+      onEnd: () => {
+        // P2-28：识别正常结束（含静音自动结束）时复位按钮状态。
+        // 此前只有 onError 会复位，onend 路径漏掉 → speechRecording 永久为 true，
+        // 按钮带 loading 显示「语音识别中… 再点一下结束」，
+        // 而 BaseButton 在 loading 时静默 return 点击处理器 → 按钮彻底不可用，只能刷新页面。
+        speechRecording.value = false
       },
     })
   }
@@ -776,6 +838,10 @@ async function startInterview() {
       }
     } catch (persistErr) {
       console.warn('题目持久化失败，历史回顾将不可用：', persistErr)
+      // P1-18：持久化失败此前只写 console.warn，用户拿到一份「看起来完整」的面试，
+      // 却没有任何数据落库（历史/错题本/趋势全空），且毫不知情。
+      // 这里显式提示，让失败可见——「不阻断流程」不等于「可以不告诉用户」。
+      ElMessage.warning('题目保存失败：本次作答将不会记入面试历史与错题本')
     }
 
     // 4. 题目成功后设置状态，切换到面试页
@@ -917,6 +983,9 @@ async function submitAnswer() {
     const data = await api.post('/api/interview/evaluate', {
       question: currentQ.value.question,
       userAnswer: userAnswer.value,
+      // P2-24：此前漏传参考答案，后端 getOrDefault("referenceAnswer","") 恒为空串，
+      // 导致提示词里「评分须结合【参考答案】要点逐项核对」完全落空、评分退化为凭模型印象。
+      referenceAnswer: currentQ.value.referenceAnswer || undefined,
       imageUrl: imageUrl.value || undefined
     }) as unknown as string
     evalResult.value = safeParse<EvalResult>(data, {})
@@ -947,7 +1016,14 @@ async function submitAnswer() {
         })
       } catch (persistErr) {
         console.warn('答案持久化失败，历史回顾将缺失本次记录：', persistErr)
+        ElMessage.warning('本次回答保存失败，不会记入面试历史与错题本')
       }
+    } else if (!persistWarned.value) {
+      // P1-18：题目没有 id（通常源于出题入库失败）时，此前是「静默什么都不做」——
+      // 用户答完整场面试，服务端一条记录都没有，界面上也毫无提示。
+      // 这里在首次命中时明确告知，避免「看起来正常、实际全丢」。
+      persistWarned.value = true
+      ElMessage.warning('该题未成功入库，本次回答不会记入面试历史与错题本')
     }
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '评估失败'))
@@ -1063,9 +1139,18 @@ function resetSession() {
   userAnswer.value = ''
   evalResult.value = null
   streamContent.value = ''
+  persistWarned.value = false
+  historyAnsweredCount.value = 0
 }
 
-/** 关闭报告并回到面试准备页（报告内容仍保留在本次会话内，可再次打开直到离开页面） */
+/**
+ * 关闭报告并回到面试准备页。
+ *
+ * <p>注意：关闭后<b>没有</b>重新打开的入口——reportOpen 只在 finishSession 中置真，
+ * 且同一函数内已调用 resetSession 清空 questions/sessionId。
+ * 因此遮罩点击不再触发本函数（P2-29），关闭动作只保留右上角 ✕ 与底部两个明确按钮，
+ * 避免一次误点造成不可逆的入口丢失。
+ */
 function closeReportGoSetup() {
   reportOpen.value = false
 }

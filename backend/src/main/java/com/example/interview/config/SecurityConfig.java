@@ -46,6 +46,25 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins}")
     private String corsAllowedOrigins;
 
+    /**
+     * 额外受信代理的 IP 前缀（逗号分隔，P1-02）。
+     *
+     * <p>在 Render 等平台上，应用看到的 remoteAddr 是边缘节点的<b>公网 IP</b>，
+     * 不属于 {@link com.example.interview.util.ClientIpUtil} 默认信任的私网段，
+     * 导致 X-Forwarded-For 永不生效、客户端真实 IP 解析失败，
+     * 按 IP 的注册限流与登录锁定随之失效（2026-09-23 生产实测）。
+     *
+     * <p>默认留空 = 保持「仅信任私网代理」的保守策略，不会因本次改动放宽信任边界。
+     * 需要修复时，在部署环境把平台代理的公网段填入该配置即可。
+     */
+    @Value("${app.security.trusted-proxy-prefixes:}")
+    private String trustedProxyPrefixes;
+
+    @jakarta.annotation.PostConstruct
+    void configureClientIpTrust() {
+        com.example.interview.util.ClientIpUtil.setExtraTrustedPrefixes(trustedProxyPrefixes);
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http

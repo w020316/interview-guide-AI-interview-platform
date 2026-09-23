@@ -242,7 +242,13 @@ public class InterviewController {
             return Result.success(result);
         } catch (Exception e) {
             log.error("作答附图上传失败", e);
-            return Result.error(500, "图片上传失败，请稍后重试");
+            // 区分「未配置」与「上游失败」：前者是部署问题，给出可执行的指引而不是「请稍后重试」；
+            // 上游的具体原因（状态码 / 响应体）写入 lastError 并暴露在 /api/health/detail 的 storage 区块，
+            // 避免修复者只能靠猜——此前真实原因只存在于日志里，从外部完全不可观测。
+            if (!supabaseStorageService.isConfigured()) {
+                return Result.error(503, "图片存储服务未配置，请联系管理员");
+            }
+            return Result.error(502, "图片上传失败，请稍后重试");
         }
     }
 

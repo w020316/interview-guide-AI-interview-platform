@@ -50,14 +50,76 @@ public class SupabaseStorageService {
      * <p>此前 application-prod.yml 中 {@code app.supabase.url/service-key} 无默认值，
      * SUPABASE_URL 未注入会导致占位符解析失败、整个应用无法启动。补齐默认后，
      * 这里显式告警，避免"上传功能静默失效、没人知道为什么"。
+     *
+     * <p><b>2026-09-23 修正</b>：原检测字符串只覆盖了 {@code placeholder.supabase.co} / {@code placeholder} 前缀，
+     * 而 {@code application.yml}（base profile）与 {@code application-local.yml} 的默认值是
+     * {@code your-project.supabase.co} / {@code your-service-key} —— 只要运行在非 prod profile 下，
+     * 这条告警就<b>永远不会触发</b>，「上传静默失效」的初衷落空。
+     * 现统一收敛到 {@link #isConfigured()}，把 placeholder / your-project / your- 前缀与空值一并覆盖。
      */
     @jakarta.annotation.PostConstruct
     void warnIfPlaceholder() {
-        if (supabaseUrl == null || supabaseUrl.contains("placeholder.supabase.co")
-                || serviceKey == null || serviceKey.startsWith("placeholder")) {
-            log.warn("Supabase Storage 未正确配置（url={}）：简历文件上传/签名 URL 将不可用，"
-                    + "但登录与其余功能不受影响。请在部署环境注入 SUPABASE_URL / SUPABASE_SERVICE_KEY。", supabaseUrl);
+        if (!isConfigured()) {
+            log.warn("Supabase Storage 未正确配置（url={}）：简历文件与作答附图上传、签名 URL 将不可用，"
+                    + "但登录与其余功能不受影响。请在部署环境注入 SUPABASE_URL / SUPABASE_SERVICE_KEY。"
+                    + "可通过 GET /api/health/detail 的 storage 区块随时确认配置状态。", supabaseUrl);
         }
+    }
+
+    /**
+     * 存储配置是否可用（非空且非占位值）。
+     *
+     * <p>供启动告警、上传前置校验与 {@code /api/health/detail} 共用同一判定，
+     * 避免「告警说没问题、上传却失败」这类判定口径分裂。
+     */
+    public boolean isConfigured() {
+        String url = supabaseUrl == null ? "" : supabaseUrl.trim();
+        String key = serviceKey == null ? "" : serviceKey.trim();
+        if (url.isEmpty() || key.isEmpty()) {
+            return false;
+        }
+        String lowerUrl = url.toLowerCase();
+        String lowerKey = key.toLowerCase();
+        return !(lowerUrl.contains("placeholder")
+                || lowerUrl.contains("your-project")
+                || lowerKey.startsWith("placeholder")
+                || lowerKey.startsWith("your-"));
+    }
+
+    /**
+     * 最近一次上传失败的原始原因（含上游状态码与响应体摘要），供健康检查自诊断。
+     *
+     * <p>此前上传失败的真实原因（上游 4xx/5xx 的响应体、DNS 解析失败等）只落在
+     * {@code log.error("作答附图上传失败", e)} 里，而接口只回一句「请稍后重试」——
+     * 从外部完全无法区分「没配」「配错」「bucket 不存在」「被 RLS 拒绝」。
+     */
+    private volatile String lastError;
+
+    /** 最近一次上传失败原因；从未失败则为 null */
+    public String getLastError() {
+        return lastError;
+    }
+
+    /** 健康检查用快照：只暴露配置状态与桶名，绝不回显 service key */
+    public java.util.Map<String, Object> healthSnapshot() {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        boolean ok = isConfigured();
+        m.put("status", ok ? "UP" : "DOWN");
+        m.put("configured", ok);
+        m.put("bucket", bucket);
+        if (lastError != null) {
+            m.put("lastError", lastError);
+        }
+        return m;
+    }
+
+    /** 截断上游响应体，避免把整页 HTML 灌进日志与健康检查响应 */
+    private static String brief(String body) {
+        if (body == null) {
+            return "(空响应体)";
+        }
+        String s = body.replaceAll("\\s+", " ").trim();
+        return s.length() > 300 ? s.substring(0, 300) + "…" : s;
     }
 
     /**
@@ -68,6 +130,12 @@ public class SupabaseStorageService {
      * @return 公开 URL
      */
     public String upload(MultipartFile file, String fileName) throws IOException {
+        // 未配置时快速失败并给出可区分的错误，而不是发起一次注定 DNS 失败的请求后
+        // 把原因吞成一句「请稍后重试」
+        if (!isConfigured()) {
+            lastError = "Supabase Storage 未配置（app.supabase.url / service-key 仍为占位值或为空）";
+            throw new IllegalStateException(lastError);
+        }
         // 文件名清洗：只保留字母、数字、点、下划线、连字符，防止路径穿越
         String safeName = fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
         // Supabase Storage REST API: PUT /storage/v1/object/<bucket>/<path>
@@ -85,16 +153,28 @@ public class SupabaseStorageService {
                 new ByteArrayResource(file.getBytes()), headers
         );
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                uploadUrl, HttpMethod.PUT, entity, String.class
-        );
-
-        if (!response.getStatusCode().is2xxSuccessful()) {
-            log.error("Supabase 文件上传失败：status={}, body={}",
-                    response.getStatusCode(), response.getBody());
-            throw new RuntimeException("Supabase 文件上传失败：" + response.getBody());
+        ResponseEntity<String> response;
+        try {
+            response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, entity, String.class);
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            // RestTemplate 默认对 4xx/5xx 直接抛异常，走到这里才是常态；
+            // 原实现把「非 2xx」判断写在 exchange 之后，是一段永远执行不到的死代码，
+            // 真实状态码与响应体（bucket 不存在 / key 无效 / 被 RLS 拒绝 等）就此丢失
+            lastError = "上游返回 " + e.getStatusCode() + "：" + brief(e.getResponseBodyAsString());
+            throw new IllegalStateException("Supabase 文件上传失败：" + lastError, e);
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // 域名解析失败 / 连接超时 / TLS 失败 —— 多为配置指向了不存在的域名
+            lastError = "无法连接存储服务（" + uploadUrl.replaceAll("(https?://[^/]+).*", "$1")
+                    + "）：" + e.getMessage();
+            throw new IllegalStateException(lastError, e);
         }
 
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            lastError = "上游返回 " + response.getStatusCode() + "：" + brief(response.getBody());
+            throw new IllegalStateException("Supabase 文件上传失败：" + lastError);
+        }
+
+        lastError = null;
         // 拼接公开访问 URL
         return supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + safeName;
     }

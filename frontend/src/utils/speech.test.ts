@@ -133,6 +133,44 @@ describe('speech - createSpeechRecorder / isSpeechSupported', () => {
     expect(rec.stop).toHaveBeenCalledTimes(1)
   })
 
+  /**
+   * P2-28（2026-09-23）回归：onend 是识别「正常结束」的唯一信号
+   * ——Chrome 的 Web Speech API 即使 continuous=true，也会在静音数秒后自行触发 onend。
+   * 此前 onend 只重置了内部 recording、没有通知调用方，导致 UI 的「语音识别中…」永不复位：
+   * 按钮带 loading，而 BaseButton 在 loading 时静默忽略点击 → 按钮彻底不可用，只能刷新页面。
+   */
+  it('识别自然结束（onend）时回调 onEnd，供调用方复位「录音中」UI（P2-28）', () => {
+    const rec = mockRecognition()
+    let endCalls = 0
+    const r = createSpeechRecorder({ onEnd: () => (endCalls += 1) })
+
+    expect(r.start()).toBe(true)
+    rec.onstart && rec.onstart()
+    expect(r.isRecording()).toBe(true)
+
+    // 静音自动结束：正常路径，不是异常分支
+    rec.onend && rec.onend()
+    expect(endCalls).toBe(1)
+    expect(r.isRecording()).toBe(false)
+
+    // 即便已经不在录音状态，onend 仍要通知一次——保证调用方「总能复位」，不会因状态判断遗漏而卡死
+    rec.onend && rec.onend()
+    expect(endCalls).toBe(2)
+  })
+
+  it('cancel 主动终止后 onend 同样回调 onEnd（P2-28：UI 必须能复位）', () => {
+    const rec = mockRecognition()
+    let endCalls = 0
+    const r = createSpeechRecorder({ onEnd: () => (endCalls += 1) })
+
+    r.start()
+    rec.onstart && rec.onstart()
+    r.cancel()
+    rec.onend && rec.onend()
+
+    expect(endCalls).toBe(1)
+  })
+
   it('onerror 不同错误码给出对应提示', () => {
     const rec = mockRecognition()
     const errs: string[] = []

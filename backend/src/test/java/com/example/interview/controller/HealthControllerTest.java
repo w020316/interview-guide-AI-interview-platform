@@ -54,6 +54,10 @@ class HealthControllerTest {
     @MockBean
     private com.example.interview.service.RagHealthTracker ragHealthTracker;
 
+    /** v1.40.0：深度体检新增 storage 区块（作答附图上传 100% 失败却体检全绿），构造依赖此 Bean */
+    @MockBean
+    private com.example.interview.service.SupabaseStorageService supabaseStorageService;
+
     /**
      * v1.39.0：注入同一个配置项用于断言。
      *
@@ -152,6 +156,73 @@ class HealthControllerTest {
                 .andExpect(jsonPath("$.data.database.status").value("UP"))
                 .andExpect(jsonPath("$.data.redis.status").value("DOWN"));
     }
+
+    // ───────── 文件存储子系统状态暴露（v1.40.0）─────────
+    // 背景：2026-09-23 实测——作答附图上传对合法 PNG 也 100% 返回 500，
+    // 而 /api/health/detail 只有 database/redis/rag 三段，完全没有 storage。
+    // 结果是从外部无法区分「没配 / 配错 / bucket 不存在 / 被 RLS 拒绝」，
+    // 只能看到接口回一句「图片上传失败，请稍后重试」。现补上该区块。
+
+    @Test
+    @DisplayName("GET /api/health/detail 存储未配置时 storage.status=DOWN 且计入 degraded")
+    void health_storageNotConfigured_isReportedAndDegraded() throws Exception {
+        when(jdbcTemplate.queryForObject(any(String.class), any(Class.class))).thenReturn(1L);
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn("PONG");
+        when(supabaseStorageService.healthSnapshot()).thenReturn(java.util.Map.of(
+                "status", "DOWN", "configured", false, "bucket", "resumes"));
+
+        mockMvc.perform(get("/api/health/detail"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("UP"))
+                .andExpect(jsonPath("$.data.storage.status").value("DOWN"))
+                .andExpect(jsonPath("$.data.storage.configured").value(false))
+                .andExpect(jsonPath("$.data.degraded").isArray())
+                .andExpect(jsonPath("$.data.degraded[?(@=='storage')]").exists());
+    }
+
+    @Test
+    @DisplayName("GET /api/health/detail 存储正常时 storage.status=UP 且不计入 degraded")
+    void health_storageUp_notDegraded() throws Exception {
+        when(jdbcTemplate.queryForObject(any(String.class), any(Class.class))).thenReturn(1L);
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn("PONG");
+        when(supabaseStorageService.healthSnapshot()).thenReturn(java.util.Map.of(
+                "status", "UP", "configured", true, "bucket", "resumes"));
+
+        mockMvc.perform(get("/api/health/detail"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.storage.status").value("UP"))
+                .andExpect(jsonPath("$.data.storage.configured").value(true))
+                // 全绿时不应出现 degraded 字段
+                .andExpect(jsonPath("$.data.degraded").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /api/health/detail 存储曾上传失败时暴露 lastError（供外部自诊断）")
+    void health_storageLastError_isExposed() throws Exception {
+        when(jdbcTemplate.queryForObject(any(String.class), any(Class.class))).thenReturn(1L);
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn("PONG");
+        when(supabaseStorageService.healthSnapshot()).thenReturn(java.util.Map.of(
+                "status", "UP", "configured", true, "bucket", "resumes",
+                "lastError", "上游返回 400：{\"statusCode\":\"404\",\"error\":\"Bucket not found\"}"));
+
+        mockMvc.perform(get("/api/health/detail"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.storage.lastError").value(
+                        org.hamcrest.Matchers.containsString("Bucket not found")));
+    }
+
+    @Test
+    @DisplayName("GET /api/health/detail 存储 Bean 缺位时不产出无 status 的空区块")
+    void health_storageBeanMissing_reportsUnknown() throws Exception {
+        when(jdbcTemplate.queryForObject(any(String.class), any(Class.class))).thenReturn(1L);
+        when(redisTemplate.execute(any(RedisCallback.class))).thenReturn("PONG");
+        when(supabaseStorageService.healthSnapshot()).thenReturn(null);
+
+        mockMvc.perform(get("/api/health/detail"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.storage.status").value("UNKNOWN"));
+    }
+
 
     // ───────── RAG 子系统状态暴露（v1.34.1）─────────
     // 背景：2026-09-21 生产实测——Embedding 失效导致知识库完全不可用（导入返回 503、向量库 0 条），

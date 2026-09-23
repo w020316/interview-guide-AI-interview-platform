@@ -17,6 +17,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.*;
@@ -342,5 +343,35 @@ class ResumeAnalysisServiceTest {
         // 两次都是正常未命中 → 两次都调用 AI；兜底缓存不得介入（避免引入双写不一致）
         verify(chatClient, times(2)).prompt();
         verify(cacheHitCounter, never()).increment();
+    }
+
+    /**
+     * P1-03（2026-09-23）回归：简历向量化的文档 ID 必须是合法的 36 字符 UUID。
+     *
+     * <p>此前直接把 Redis 缓存键当前缀拼接：
+     * {@code "resume-" + cacheKey}，而
+     * {@code cacheKey = "resume:analysis:"(16) + userId + ":"(1) + sha256Short(32)} ≈ 51 字符，
+     * 加前缀后约 58 字符 —— pgvector 的 {@code id} 列是 {@code uuid}（上限 36），
+     * 写入即报 {@code 向量化入库失败：UUID string too large}，简历永远进不了向量库。
+     */
+    @Test
+    @DisplayName("deriveDocId: 任意长度的 resumeId 都派生出 36 字符合法 UUID，且同输入稳定")
+    void deriveDocId_alwaysProducesValidUuid() {
+        // 用真实形态的缓存键：前缀 16 + userId 2 + ":" 1 + 32 位短哈希 = 51 字符
+        String realWorldKey = "resume:analysis:70:" + "a".repeat(32);
+        assertThat(realWorldKey).hasSize(51);
+
+        String id = ResumeAnalysisService.deriveDocId(realWorldKey);
+        assertThat(id).hasSize(36);
+        assertThat(id).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+        // 必须能被 UUID.fromString 解析（等价于 PostgreSQL uuid 列能接受）
+        assertThat(UUID.fromString(id).toString()).isEqualTo(id);
+
+        // 确定性：同一 resumeId 必须得到同一 ID，否则「先删后加覆盖」会退化为无界累积
+        assertThat(ResumeAnalysisService.deriveDocId(realWorldKey)).isEqualTo(id);
+        assertThat(ResumeAnalysisService.deriveDocId(realWorldKey + "x")).isNotEqualTo(id);
+
+        // 极端长度也不越界
+        assertThat(ResumeAnalysisService.deriveDocId("x".repeat(500))).hasSize(36);
     }
 }
