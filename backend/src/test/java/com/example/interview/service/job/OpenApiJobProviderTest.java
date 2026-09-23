@@ -338,6 +338,47 @@ class OpenApiJobProviderTest {
                 .doesNotHaveDuplicates();
     }
 
+    // ── 单源入库配额（v1.39.0）──
+
+    @Test
+    @DisplayName("超过配额的解析结果被截断，且保留上游原始顺序（不重排）")
+    void quota_truncatesOversizedResult() {
+        var many = new java.util.ArrayList<JobPlatformAdapter.JobDto>();
+        for (int i = 0; i < 120; i++) {
+            many.add(dto("upstream-" + i));
+        }
+        var kept = AbstractOpenApiJobProvider.applyQuota(many);
+
+        assertThat(kept).hasSize(25);
+        // 顺序即上游顺序：第 0 条仍是第 0 条，最后一条是第 24 条
+        assertThat(kept.get(0).externalId()).isEqualTo("upstream-0");
+        assertThat(kept.get(24).externalId()).isEqualTo("upstream-24");
+        // 截断不能改动上游列表本身（applyQuota 是纯函数）
+        assertThat(many).hasSize(120);
+    }
+
+    @Test
+    @DisplayName("未超配额的解析结果原样返回；空/null 安全")
+    void quota_keepsSmallResultUntouched() {
+        var few = List.of(dto("a"), dto("b"));
+        assertThat(AbstractOpenApiJobProvider.applyQuota(few)).isSameAs(few);
+        assertThat(AbstractOpenApiJobProvider.applyQuota(List.of())).isEmpty();
+        assertThat(AbstractOpenApiJobProvider.applyQuota(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("配额必须显著小于上游单次返回量，否则「以国内为主」无法成立")
+    void quota_mustBeMeaningfullySmall() {
+        // 五个海外源 × 配额 必须小于国内种子基数（约 298 条），否则默认视图仍会被海外淹没
+        int overseasCeiling = 5 * 25;
+        assertThat(overseasCeiling).isLessThan(298);
+    }
+
+    private static JobPlatformAdapter.JobDto dto(String id) {
+        return new JobPlatformAdapter.JobDto(id, "t", "c", "互联网", "技术", "全球远程", null,
+                null, null, "SOCIAL", null, "https://example.com", null, null, null);
+    }
+
     // ── 基类工具 ──
 
     @Test

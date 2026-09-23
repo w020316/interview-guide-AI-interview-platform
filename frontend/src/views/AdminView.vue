@@ -708,7 +708,7 @@ onMounted(() => {
 
 .admin-header h1 {
   margin: 0 0 6px;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 600;
   color: var(--c-text);

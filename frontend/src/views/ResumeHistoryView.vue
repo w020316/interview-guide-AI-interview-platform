@@ -465,7 +465,7 @@ const summaryText = computed(() => {
 .page-header h1 {
   font-size: 28px;
   font-weight: 700;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   color: var(--c-text);
   margin: 0 0 6px;
   letter-spacing: -0.5px;
@@ -617,7 +617,7 @@ const summaryText = computed(() => {
   border-radius: 999px;
   white-space: nowrap;
 }
-.cmp-arrow.up { color: #10b981; background: rgba(16, 185, 129, 0.1); }
+.cmp-arrow.up { color: var(--c-success); background: var(--c-success-light); }
 .cmp-arrow.down { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
 .cmp-arrow.flat { color: var(--c-text-tertiary); background: var(--c-surface); }
 .cmp-dims {
@@ -651,7 +651,7 @@ const summaryText = computed(() => {
   font-weight: 700;
   text-align: right;
 }
-.cmp-diff.b { color: #10b981; }
+.cmp-diff.b { color: var(--c-success); }
 .cmp-diff.a { color: #ef4444; }
 .cmp-diff.tie { color: var(--c-text-tertiary); }
 .cmp-empty {
@@ -862,7 +862,7 @@ const summaryText = computed(() => {
 .modal-header h3 {
   font-size: 18px;
   font-weight: 600;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   margin: 0;
   color: var(--c-text);
 }
@@ -1043,7 +1043,7 @@ const summaryText = computed(() => {
 .detail-card h4 {
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   margin: 0 0 10px;
 }
 

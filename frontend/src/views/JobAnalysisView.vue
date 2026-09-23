@@ -419,7 +419,7 @@ function gapStatusClass(status: string): string {
   color: var(--c-text);
   margin: 0 0 6px;
   letter-spacing: -0.5px;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
 }
 
 .page-header p {
@@ -684,7 +684,7 @@ function gapStatusClass(status: string): string {
   font-weight: 600;
   color: var(--c-text);
   margin: 0 0 8px;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
 }
 
 .result-summary p {
@@ -763,7 +763,7 @@ function gapStatusClass(status: string): string {
   font-weight: 600;
   color: var(--c-text);
   margin: 0 0 14px;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
 }
 
 .block-tips {

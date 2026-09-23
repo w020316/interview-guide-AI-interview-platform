@@ -41,11 +41,13 @@
           </li>
         </ul>
 
-        <!-- 装饰统计 -->
+        <!-- 产品事实（非装饰）：
+             v1.39.0 去掉 "100% 免费使用" —— 这是典型的「假精确数字」，
+             「100%」不承载任何信息量（要么全免费要么不免费），改成直白的「免费」。 -->
         <div class="aside-stats">
           <div class="aside-stat">
-            <div class="aside-stat-num">100%</div>
-            <div class="aside-stat-label">免费使用</div>
+            <div class="aside-stat-num">免费</div>
+            <div class="aside-stat-label">全部功能开放</div>
           </div>
           <div class="aside-stat">
             <div class="aside-stat-num">∞</div>
@@ -111,12 +113,15 @@
               </button>
             </div>
           </div>
+          <!-- v1.39.0：此处原有一个「还没账号？立即注册」链接，
+               与卡片底部 auth-foot 的入口、以及顶部导航的「免费注册」构成
+               同一意图的三处入口（taste-skill 的 DUPLICATE CTA INTENT 反模式）。
+               表单选项行只保留「记住用户名」，注册入口收敛为底部一处。 -->
           <div class="field-row">
             <label class="remember-me">
               <input type="checkbox" v-model="rememberMe" />
               <span>记住用户名</span>
             </label>
-            <button type="button" class="link-btn" @click="activeTab = 'register'">还没账号？立即注册</button>
           </div>
           <!-- 冷启动提示：由共享唤醒器状态驱动，展示实时进度 -->
           <div v-if="coldStartHint" class="cold-start-hint" role="status" aria-live="polite">
@@ -480,7 +485,7 @@ async function handleRegister() {
 
 /* aside-title：衬线字体，编辑风 */
 .aside-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 40px;
   font-weight: 700;
   line-height: 1.2;
@@ -600,7 +605,7 @@ async function handleRegister() {
 }
 
 .card-header h2 {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 700;
   color: var(--c-text);

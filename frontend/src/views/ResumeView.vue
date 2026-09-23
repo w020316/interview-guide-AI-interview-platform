@@ -40,13 +40,19 @@
           <div class="extract-head">
             <p class="extract-title">从其他软件提取简历</p>
             <p class="extract-sub">
-              点对应入口直达取件，导出 PDF / 复制文本后回到本页
+              点对应入口直达取件，导出 PDF / 复制文本后回到本页；没自动跳转就用卡片下方的网页版
             </p>
           </div>
 
           <div class="extract-grid">
             <div v-for="s in EXTRACT_SOURCES" :key="s.key" class="extract-card">
-              <button class="ex-main" type="button" :title="`前往 ${s.name}（${s.hint}）`" @click="openExtractSource(s)">
+              <button
+                class="ex-main"
+                type="button"
+                :class="{ launching: launchingKey === s.key }"
+                :title="`前往 ${s.name}（${s.hint}）`"
+                @click="openExtractSource(s)"
+              >
                 <span class="ex-ico" :style="{ background: s.bg, color: s.color }">{{ s.glyph }}</span>
                 <span class="ex-body">
                   <b>{{ s.name }}</b>
@@ -57,14 +63,17 @@
                     stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
-              <!-- 唤起 App 失败时的兜底入口（用户手势触发，不会被浏览器拦截） -->
+              <!-- 网页版入口**常驻**（v1.39.0）：浏览器无法检测 App 是否安装，
+                   一旦判定失误而兜底入口又只在「失败」时才出现，用户就彻底卡住。
+                   常驻后任何一次误判都只是「多了一个入口」，不会变成死路。
+                   唤起未交棒成功的那张卡片会高亮，引导用户走这条路。 -->
               <a
-                v-if="failedKey === s.key"
                 class="ex-fallback"
+                :class="{ prominent: failedKey === s.key }"
                 :href="s.webUrl"
                 target="_blank"
                 rel="noopener"
-              >未唤起 App？打开网页版 →</a>
+              >{{ failedKey === s.key ? '未自动跳转？点此打开网页版 →' : '打开网页版 →' }}</a>
             </div>
           </div>
 
@@ -308,6 +317,13 @@ import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
 import { getScoreColor, getScoreGradient } from '../utils/score'
 import { JOB_SUGGESTIONS } from '../utils/jobOptions'
+import {
+  createHandoffWatcher,
+  detectInAppBrowser,
+  inAppBrowserHint,
+  launchFallbackHint,
+  HANDOFF_WINDOW_MS,
+} from '../utils/appLaunch'
 import renderMarkdown from '../utils/markdown'
 import { BaseInput, BaseTextarea } from '../components'
 
@@ -408,8 +424,15 @@ const EXTRACT_SOURCES: ExtractSource[] = [
 
 const nativeFileInput = ref<HTMLInputElement | null>(null)
 const isMobile = ref(false)
-/** 唤起 App 失败的软件 key：命中后在该卡片内展开「打开网页版」兜底入口 */
+/** 唤起中的软件 key（按钮态反馈，避免用户以为点击没生效而重复点） */
+const launchingKey = ref('')
+/** 唤起未交棒成功、需要用户走网页版兜底的软件 key */
 const failedKey = ref('')
+/**
+ * 宿主 WebView 标识（微信 / 钉钉 / 支付宝 / 微博 / QQ）。
+ * 这些宿主会拦截 App scheme，按普通移动端处理必然误报「未检测到 App」。
+ */
+const inAppHost = ref('')
 
 /** 终端判定：移动端优先唤起 App，桌面端直达网页版 */
 function detectMobile(): boolean {
@@ -433,32 +456,55 @@ function onNativeFile(e: Event) {
 /**
  * 打开取件入口。
  *
- * - 移动端且配置了 scheme：直接跳 scheme 唤起 App，并在 1.6s 后检查页面是否被切到后台；
- *   若仍可见说明「未安装 App / 唤起被拦截」，展开该卡片的网页版兜底链接
- *   （兜底必须是 <a> 由用户手势触发，setTimeout 里 window.open 会被浏览器拦截）。
- * - 其他情况：新标签打开网页版。
+ * v1.39.0 重写判定逻辑（此前移动端大面积误报「未检测到 App」）：
+ *
+ * - **桌面端 / 未配置 scheme**：直接新标签打开网页版。
+ * - **应用内浏览器（微信/钉钉/支付宝/微博/QQ）**：宿主会拦截 scheme，
+ *   直接打开网页版并说明原因 —— 不再走「跳一下再判失败」那条必然误报的路径。
+ * - **普通移动端浏览器**：跳 scheme，然后由 {@link createHandoffWatcher} 监听
+ *   visibilitychange / pagehide / blur 三个信号判断是否交棒成功。
+ *   只有「全程没有任何切走信号」时才提示兜底，且文案不再断言用户没装 App。
  *
  * 注意：scheme 跳转必须由用户手势同步发起，因此本函数不做任何 await。
  */
 function openExtractSource(s: ExtractSource) {
   failedKey.value = ''
-  if (isMobile.value && s.scheme) {
-    window.location.href = s.scheme
-    const startedAt = Date.now()
-    window.setTimeout(() => {
-      const stillVisible = typeof document === 'undefined' || document.visibilityState === 'visible'
-      if (stillVisible && Date.now() - startedAt < 3200) {
-        failedKey.value = s.key
-        ElMessage.info(`未检测到「${s.name}」App，可点下方「打开网页版」，或直接选择本机文件`)
-      }
-    }, 1600)
+
+  if (!isMobile.value || !s.scheme) {
+    window.open(s.webUrl, '_blank', 'noopener')
     return
   }
-  window.open(s.webUrl, '_blank', 'noopener')
+
+  // 宿主 WebView：scheme 会被拦截，页面永远 visible，按原逻辑必然误报
+  if (inAppHost.value) {
+    failedKey.value = s.key
+    ElMessage.info(inAppBrowserHint(s.name, inAppHost.value))
+    window.open(s.webUrl, '_blank', 'noopener')
+    return
+  }
+
+  launchingKey.value = s.key
+  const watcher = createHandoffWatcher()
+  try {
+    window.location.href = s.scheme
+  } catch {
+    // 个别 WebView 直接对未知 scheme 抛错，交给下面的兜底提示处理
+  }
+
+  window.setTimeout(() => {
+    const handedOff = watcher.handedOff
+    watcher.dispose()
+    launchingKey.value = ''
+    // 已交棒：App 已顶到前台，用户切回来时不该看到任何「失败」提示
+    if (handedOff) return
+    failedKey.value = s.key
+    ElMessage.info(launchFallbackHint(s.name))
+  }, HANDOFF_WINDOW_MS)
 }
 
 onMounted(() => {
   isMobile.value = detectMobile()
+  inAppHost.value = detectInAppBrowser()
 })
 
 // 优化简历相关状态
@@ -761,7 +807,7 @@ function formatDate() {
 .page-header h1 {
   font-size: 28px;
   font-weight: 700;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   color: var(--c-text);
   margin: 0 0 6px;
   letter-spacing: -0.5px;
@@ -953,6 +999,22 @@ function formatDate() {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+/* 按下时轻微下沉，模拟物理按键（此前完全没有按下反馈） */
+.ex-main:active {
+  transform: scale(0.985);
+}
+
+/* 唤起中：左侧图标轻微呼吸，避免用户以为点击没生效而反复点 */
+.ex-main.launching .ex-ico {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.ex-main.launching .ex-enter {
+  opacity: 1;
+  color: var(--brand-primary);
 }
 
 .ex-ico {
@@ -1005,20 +1067,34 @@ function formatDate() {
   transform: translate(1px, -1px);
 }
 
-/* 唤起 App 失败后的网页版兜底入口 */
+/* 网页版入口（常驻，见模板注释）：
+   默认是安静的次级文本链接，不抢主按钮的注意力；
+   唤起未交棒成功的那一张升级为实色徽标，把用户直接引到这条路上。 */
 .ex-fallback {
   display: block;
-  margin: 0 12px 10px;
+  margin: 0 12px 8px;
+  padding: 3px 0 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--c-text-tertiary);
+  text-decoration: none;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.ex-fallback:hover {
+  color: var(--brand-primary);
+}
+
+.ex-fallback.prominent {
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 600;
   color: var(--brand-primary);
   background: var(--brand-primary-50);
   border-radius: var(--radius-sm);
-  text-decoration: none;
 }
 
-.ex-fallback:hover {
+.ex-fallback.prominent:hover {
   background: var(--brand-primary-100);
 }
 
@@ -1276,10 +1352,10 @@ function formatDate() {
   padding: 12px 16px;
   margin-bottom: 20px;
   font-size: 13px;
-  color: #92400e;
-  background: #fef3c7;
+  color: var(--c-warning);
+  background: var(--c-warning-light);
   border-radius: var(--radius-md);
-  border: 1px solid #fde68a;
+  border: 1px solid var(--c-warning);
 }
 
 .warning-icon {
@@ -1353,7 +1429,7 @@ function formatDate() {
 .score-meta h3 {
   font-size: 18px;
   font-weight: 600;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   color: var(--c-text);
   margin: 0 0 4px;
 }
@@ -1411,7 +1487,7 @@ function formatDate() {
 .block-title {
   font-size: 16px;
   font-weight: 600;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   color: var(--c-text);
   margin: 0 0 16px;
 }
@@ -1520,7 +1596,7 @@ function formatDate() {
 .card-head h4 {
   font-size: 15px;
   font-weight: 600;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   color: var(--c-text);
   margin: 0;
 }
@@ -1642,7 +1718,7 @@ function formatDate() {
 .optimize-title {
   font-size: 18px;
   font-weight: 600;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   color: var(--c-text);
   margin: 0 0 6px;
 }

@@ -87,9 +87,23 @@
   --space-2xl: 64px;
   --space-3xl: 96px;
 
-  /* ── 字体：衬线标题 + 无衬线正文，编辑风 ── */
+  /* ── 字体 ──
+   * v1.39.0 排版重构：把「衬线」从全局默认降级为**仅展示级**使用。
+   *
+   * 原因（真机审计）：`--font-serif` 的 CJK 首选 Source Han Serif SC / Songti SC
+   * 只在 Apple 设备存在，Windows 回退到 SimSun（宋体）、多数 Android 回退到默认衬线。
+   * 宋体在 15~18px 的卡片标题上笔画发虚、观感陈旧 —— 全站有 24 处小号标题在用衬线。
+   * 现在拆成三个角色：
+   *   --font-display  衬线，只给 ≥24px 的页面级展示标题（编辑气质在此处才成立）
+   *   --font-title    无衬线标题字族，靠字重 + 负字距建立层级，跨平台一致
+   *   --font-sans     正文/界面
+   */
   --font-serif: "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong",
     "Georgia", "Times New Roman", serif;
+  --font-display: var(--font-serif);
+  --font-title: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
     sans-serif;
@@ -229,12 +243,14 @@ a:hover {
   animation: fadeIn 0.25s ease-out both;
 }
 
-/* ── 文字工具类：去除渐变文字，改用强调色 ── */
+/* ── 文字工具类：去除渐变文字，改用强调色 ──
+   展示级文字（登录页大标题），保留衬线并收紧字距 */
 .text-gradient,
 .text-gradient-static {
   color: var(--brand-primary);
-  font-family: var(--font-serif);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 /* ── v4：强调文字（琥珀金，斩获感） ── */
@@ -304,6 +320,35 @@ a:hover {
   cursor: not-allowed;
 }
 
+/* ── v1.39.0 交互态补全 ──
+ * 审计发现：全站大量可点元素只有 hover 态、没有按下反馈，
+ * 移动端上「点了没反应」的体感主要来自这里（移动端没有 hover，只有 touch）。
+ * 这里给出全局默认的按下位移，各组件仍可用更高优先级覆盖。
+ */
+.btn-base:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* 通用可点元素：按下时的物理反馈。
+ * 用 scale 而非位移，避免在 flex 行内产生 1px 抖动；元素若已有 :active 规则
+ * （如取件卡片的 scale(0.985)）会因优先级更高而覆盖这里，不会冲突。 */
+button:not(:disabled):active,
+[role='button']:not([aria-disabled='true']):active {
+  transform: scale(0.98);
+}
+
+/* 平滑锚点滚动（redesign 审计项：锚点跳转此前是瞬移） */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 数字对齐：任何展示数据的地方默认等宽数字，避免逐位跳动导致列不对齐 */
+table,
+.num-display,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── 减少动画偏好 ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -323,10 +368,31 @@ button:focus:not(:focus-visible) {
   outline: none;
 }
 
-/* ── 标题字体：衬线，编辑风 ── */
-h1, h2, h3, .serif {
-  font-family: var(--font-serif);
+/* ── 标题字体（v1.39.0 分级）──
+ * h1 保留衬线：页面级展示标题，字号 ≥24px，衬线的权威/编辑气质在这一层成立。
+ * h2/h3 改用无衬线标题字族：它们在卡片/面板里普遍只有 15~20px，
+ *   衬线在 Windows/Android 会回退成宋体，小字号下发虚且陈旧。
+ * 层级改由「字重 + 负字距 + 颜色」建立，而不是靠字体族切换。
+ */
+h1 {
+  font-family: var(--font-display);
   letter-spacing: -0.01em;
+}
+
+h2, h3 {
+  font-family: var(--font-title);
+  font-weight: 700;
+  letter-spacing: -0.012em;
+}
+
+/* 长标题防孤字（浏览器不支持时自动忽略，无副作用） */
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+/* 正文段落的孤字/溢出处理，仅对真正的段落生效，不影响短标签 */
+p {
+  text-wrap: pretty;
 }
 
 /* ══════════════════════════════════════════════════════════

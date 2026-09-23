@@ -1579,7 +1579,7 @@ onUnmounted(() => {
 
 .tag-success {
   background: rgba(16, 185, 129, 0.1);
-  color: #059669;
+  color: var(--c-success);
 }
 
 .tag-warning {

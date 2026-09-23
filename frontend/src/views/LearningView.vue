@@ -154,7 +154,7 @@ onMounted(async () => {
 .module-card.trend .module-icon { background: var(--c-success-light); color: var(--c-success); }
 
 .module-body { flex: 1; min-width: 0; }
-.module-body h2 { font-family: var(--font-serif); font-size: 17px; font-weight: 600; color: var(--c-text); margin: 0 0 4px; }
+.module-body h2 { font-family: var(--font-title); font-size: 17px; font-weight: 600; color: var(--c-text); margin: 0 0 4px; }
 .module-body p { font-size: 12px; color: var(--c-text-tertiary); margin: 0; }
 
 .module-stat { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }

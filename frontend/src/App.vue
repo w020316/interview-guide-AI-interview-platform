@@ -531,7 +531,7 @@ function logout() {
 
 /* 品牌标题：衬线字体，编辑风 */
 .brand-text {
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   font-size: 16px;
   font-weight: 600;
   color: var(--c-text);
@@ -1057,7 +1057,7 @@ function logout() {
 }
 
 .footer-brand span:last-child {
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   font-size: 14px;
   font-weight: 600;
   color: var(--c-text);

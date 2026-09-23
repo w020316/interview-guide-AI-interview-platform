@@ -195,7 +195,7 @@ onMounted(() => {
 }
 
 .head-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   font-size: 17px;
   font-weight: 600;
   color: var(--c-text);

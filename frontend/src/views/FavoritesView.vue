@@ -234,7 +234,7 @@ function fmtDate(dt?: string) {
 .fav-head { padding: 16px 20px; cursor: pointer; transition: background var(--transition-fast); }
 .fav-head:hover { background: var(--c-bg-alt); }
 .fav-head:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: -2px; }
-.fav-title { font-family: var(--font-serif); font-size: 15px; font-weight: 600; color: var(--c-text); margin-bottom: 8px; line-height: 1.5; }
+.fav-title { font-family: var(--font-title); font-size: 15px; font-weight: 600; color: var(--c-text); margin-bottom: 8px; line-height: 1.5; }
 .fav-tags { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .fav-body { padding: 0 20px 14px; border-top: 1px dashed var(--c-border); padding-top: 14px; display: flex; flex-direction: column; gap: 12px; }

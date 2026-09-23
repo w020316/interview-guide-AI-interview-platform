@@ -327,7 +327,7 @@ onMounted(async () => {
 
 .dim-list { display: flex; flex-direction: column; gap: 16px; }
 .dim-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-.dim-cat { font-family: var(--font-serif); font-size: 14px; font-weight: 600; color: var(--c-text); }
+.dim-cat { font-family: var(--font-title); font-size: 14px; font-weight: 600; color: var(--c-text); }
 .dim-score { font-size: 13px; color: var(--c-text-secondary); }
 .dim-score .num-display { font-size: 15px; }
 .dim-count { font-size: 12px; color: var(--c-text-tertiary); }

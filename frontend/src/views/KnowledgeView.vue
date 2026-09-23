@@ -471,7 +471,7 @@ function formatTime(t?: string) {
   color: var(--c-text);
   margin: 0 0 6px;
   letter-spacing: -0.5px;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
 }
 
 .page-header p {
@@ -672,7 +672,7 @@ function formatTime(t?: string) {
   font-weight: 600;
   margin: 0;
   color: var(--c-text);
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
 }
 
 .answer-body {
@@ -842,7 +842,7 @@ function formatTime(t?: string) {
   margin: 0 0 14px;
   line-height: 1.5;
   letter-spacing: -0.2px;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
 }
 
 .wrong-body {
@@ -973,7 +973,7 @@ function formatTime(t?: string) {
   margin: 0 0 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--c-border-light);
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
 }
 
 .group-row {

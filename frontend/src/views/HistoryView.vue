@@ -313,7 +313,7 @@ function statusText(status: string) {
 }
 
 .session-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   font-size: 15px;
   font-weight: 600;
   color: var(--c-text);
@@ -353,12 +353,12 @@ function statusText(status: string) {
 
 .status-success {
   background: rgba(16, 185, 129, 0.1);
-  color: #059669;
+  color: var(--c-success);
 }
 
 .status-info {
   background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
+  color: var(--c-info);
 }
 
 .status-error {

@@ -5,8 +5,7 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <div class="hero-badge fade-in-up">
-            <span class="badge-dot"></span>
-            <span>AI 驱动 · 智能面试准备平台</span>
+            <span>AI 驱动的面试准备平台</span>
           </div>
           <h1 class="hero-title fade-in-up" style="animation-delay: 80ms">
             让每一次面试<br />
@@ -39,8 +38,8 @@
             </div>
             <div class="stat-divider"></div>
             <div class="stat">
-              <div class="stat-num num-display">100<span class="stat-unit">%</span></div>
-              <div class="stat-label">岗位匹配分析</div>
+              <div class="stat-num num-display">6</div>
+              <div class="stat-label">求职工具</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat">
@@ -53,41 +52,48 @@
         <!-- 视觉锚点：准备度评分卡 -->
         <div class="hero-visual fade-in-up" style="animation-delay: 200ms" aria-hidden="true">
           <div class="ring"></div>
-          <div class="visual-card">
-            <div class="visual-head">
-              <span class="visual-title">本轮准备度</span>
-              <span class="visual-ready">
-                <span class="ready-dot"></span>已就绪
-              </span>
-            </div>
-            <div class="visual-score">
-              <div class="score-big num-display">86</div>
-              <div class="score-meta">综合评估 · 击败 78% 求职者</div>
-            </div>
-            <div class="visual-rows">
-              <div class="v-row">
-                <span class="v-label">技术匹配</span>
-                <div class="v-bar"><i class="v-fill" style="--w: 92%"></i></div>
-                <span class="v-val num-display">92</span>
+          <!-- v1.39.0 修复：浮动标签此前相对 .hero-visual（整列宽）定位，
+               而卡片只有 300px 且居中，导致 900~1250px 视口下 chip-a 直接压住
+               卡片左上角的「本轮准备度」标题（真机截图确认）。
+               现在包一层与卡片等宽的 .visual-stage，标签改为相对**卡片**定位，
+               任何视口宽度下都只会挂在卡片外侧。 -->
+          <div class="visual-stage">
+            <div class="visual-card">
+              <div class="visual-head">
+                <span class="visual-title">本轮准备度</span>
+                <span class="visual-ready">
+                  <span class="ready-dot"></span>已就绪
+                </span>
               </div>
-              <div class="v-row">
-                <span class="v-label">表述清晰</span>
-                <div class="v-bar"><i class="v-fill" style="--w: 88%"></i></div>
-                <span class="v-val num-display">88</span>
+              <div class="visual-score">
+                <div class="score-big num-display">86</div>
+                <div class="score-meta">综合评估 · 击败 78% 求职者</div>
               </div>
-              <div class="v-row">
-                <span class="v-label">项目含金</span>
-                <div class="v-bar"><i class="v-fill" style="--w: 78%"></i></div>
-                <span class="v-val num-display">78</span>
+              <div class="visual-rows">
+                <div class="v-row">
+                  <span class="v-label">技术匹配</span>
+                  <div class="v-bar"><i class="v-fill" style="--w: 92%"></i></div>
+                  <span class="v-val num-display">92</span>
+                </div>
+                <div class="v-row">
+                  <span class="v-label">表述清晰</span>
+                  <div class="v-bar"><i class="v-fill" style="--w: 88%"></i></div>
+                  <span class="v-val num-display">88</span>
+                </div>
+                <div class="v-row">
+                  <span class="v-label">项目含金</span>
+                  <div class="v-bar"><i class="v-fill" style="--w: 78%"></i></div>
+                  <span class="v-val num-display">78</span>
+                </div>
+              </div>
+              <div class="visual-cta">
+                <span class="visual-star">★</span>
+                <span>双向奔赴的岗位在等你</span>
               </div>
             </div>
-            <div class="visual-cta">
-              <span class="visual-star">★</span>
-              <span>双向奔赴的岗位在等你</span>
-            </div>
+            <div class="visual-chip chip-a">面试题 <b>已就绪</b></div>
+            <div class="visual-chip chip-b">复盘 <b>有报告</b></div>
           </div>
-          <div class="visual-chip chip-a">面试题 <b>已就绪</b></div>
-          <div class="visual-chip chip-b">复盘 <b>有报告</b></div>
         </div>
       </div>
     </section>
@@ -240,12 +246,9 @@ const steps = [
   margin-bottom: 22px;
 }
 
-.badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--brand-primary);
-}
+/* v1.39.0：移除装饰性状态圆点（badge-dot）。
+   它不表达任何真实状态，属于 taste-skill 明确列为「AI Tell」的装饰性 status dot，
+   徽标本身已足够传达信息。 */
 
 .hero-title {
   font-size: clamp(34px, 5vw, 52px);
@@ -369,10 +372,16 @@ const steps = [
   box-shadow: 0 4px 10px rgba(180, 83, 9, 0.4);
 }
 
+/* 与卡片等宽的定位容器：让浮动标签相对「卡片」而不是「整列」定位（v1.39.0 修复遮挡） */
+.visual-stage {
+  position: relative;
+  width: 300px;
+}
+
 .visual-card {
   position: relative;
   z-index: 1;
-  width: 300px;
+  width: 100%;
   padding: 22px 22px 18px;
   background: var(--c-surface);
   border: 1px solid var(--c-border);
@@ -388,7 +397,7 @@ const steps = [
 }
 
 .visual-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   font-size: 15px;
   font-weight: 600;
   color: var(--c-text);
@@ -512,15 +521,17 @@ const steps = [
   font-weight: 600;
 }
 
+/* 浮动标签挂在卡片外侧：负偏移保证不侵入卡片内容区（此前是 top/left 百分比，
+   在窄列下会直接压住卡片标题） */
 .chip-a {
-  top: 12%;
-  left: 4%;
+  top: -14px;
+  left: -36px;
   animation: fadeInUp 0.5s var(--transition-bounce) both 0.5s;
 }
 
 .chip-b {
-  bottom: 14%;
-  right: 2%;
+  bottom: 30px;
+  right: -44px;
   animation: fadeInUp 0.5s var(--transition-bounce) both 0.7s;
 }
 
@@ -724,7 +735,8 @@ const steps = [
   .features, .steps {
     grid-template-columns: 1fr;
   }
-  /* I4：移动端演示卡浮动小标遮挡标题，改为隐藏（桌面端保留） */
+  /* 移动端隐藏浮动小标：卡片仅 260px，标签外挂会在 320px 视口溢出。
+     （遮挡问题已由 .visual-stage 从结构上修掉，这里只是窄屏空间取舍） */
   .visual-chip {
     display: none;
   }
@@ -755,9 +767,10 @@ const steps = [
     height: 240px;
   }
   .visual-card {
+    width: 100%;
+  }
+  .visual-stage {
     width: 260px;
   }
-  .chip-a { left: 0; }
-  .chip-b { right: 0; }
 }
 </style>

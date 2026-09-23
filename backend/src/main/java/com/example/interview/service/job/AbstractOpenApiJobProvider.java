@@ -97,6 +97,19 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
         return OPEN_API_REFRESH_INTERVAL_MS;
     }
 
+    /**
+     * 单个海外源每轮最多入库的岗位数（v1.39.0）。
+     *
+     * <p><b>为什么需要上限</b>：这些公开 API 单次返回 50~100+ 条，五个源合计
+     * 一轮可灌入 400 余条英文海外岗位，而国内种子数据总量约 130 条。
+     * 结果是招聘广场被海外远程岗位淹没，与「国内校招 / 社招」的产品定位相反。
+     *
+     * <p><b>取值 25 的取舍</b>：五个源 × 25 = 最多 125 条，足以让「海外远程」分栏
+     * 保持可用（不是空栏，也不至于只有零星几条）；同时国内岗位在任何默认视图里
+     * 都占多数。低于 15 会让该分栏看起来像坏了，高于 40 则失去配额的意义。
+     */
+    protected static final int MAX_ITEMS_PER_REFRESH = 25;
+
     /** 该数据源的 JSON 接口地址 */
     protected abstract String endpoint();
 
@@ -111,6 +124,9 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
      * 管理后台也就无从告警。现在抛出带原因的异常，由 {@code JobAgentService} 统一捕获，
      * 在那里能同时拿到平台名与耗时并登记健康状态；失败隔离仍然成立——
      * 调度层对每个源单独 try/catch，一个源失败不影响其他源。
+     *
+     * <p><b>v1.39.0 增加入库配额</b>：解析结果按 {@link #MAX_ITEMS_PER_REFRESH} 截断，
+     * 见该常量注释。截断发生在入库之前，因此不会把上游全量数据写进库。
      */
     @Override
     public List<JobDto> fetch() {
@@ -131,11 +147,24 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
             throw new IllegalStateException("拉取失败：上游返回空响应体");
         }
         try {
-            return parse(objectMapper.readTree(body));
+            return applyQuota(parse(objectMapper.readTree(body)));
         } catch (Exception e) {
             log.warn("公开数据源 {} 数据解析失败：{}", platform(), e.getMessage());
             throw new IllegalStateException("数据解析失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 按单源配额截断解析结果（纯函数，便于单测）。
+     *
+     * <p>截断发生在入库之前，因此上游的全量数据不会被写进库。
+     * 保留上游返回顺序（通常是按发布时间/相关度），不额外排序——
+     * 排序会引入「为什么这批是这个」的隐性规则，不如原样截断可解释。
+     */
+    static List<JobDto> applyQuota(List<JobDto> parsed) {
+        if (parsed == null || parsed.isEmpty()) return List.of();
+        if (parsed.size() <= MAX_ITEMS_PER_REFRESH) return parsed;
+        return new ArrayList<>(parsed.subList(0, MAX_ITEMS_PER_REFRESH));
     }
 
     // ────────────────────────── 字段工具 ──────────────────────────

@@ -95,6 +95,29 @@ class SeedJobProviderTest {
     }
 
     @Test
+    @DisplayName("社招精选：数据量达标、字段完整、externalId 唯一、列长与枚举合法")
+    void domesticSocialSeed_isConsistent() {
+        assertSeedConsistent(new SeedDomesticSocialJobProvider(), "社招精选", 45);
+    }
+
+    @Test
+    @DisplayName("社招精选：以社招为主，覆盖互联网/金融/制造/医疗/教育/消费/物流/建筑/能源/职能/设计")
+    void domesticSocialSeed_coversDomesticSectors() {
+        var jobs = new SeedDomesticSocialJobProvider().fetch();
+        assertThat(jobs).extracting(JobPlatformAdapter.JobDto::industry)
+                .contains("互联网", "金融", "制造", "医疗", "教育", "消费", "物流",
+                        "建筑", "能源", "职能", "设计");
+        // 这是本数据源存在的理由：补上此前严重不足的社招基数
+        assertThat(jobs).extracting(JobPlatformAdapter.JobDto::recruitType).contains("SOCIAL");
+        long social = jobs.stream().filter(j -> "SOCIAL".equals(j.recruitType())).count();
+        assertThat(social).isGreaterThanOrEqualTo(Math.round(jobs.size() * 0.7));
+        // 城市必须落在中国境内主要城市（不能混入海外岗位，否则会稀释国内分栏）
+        assertThat(jobs).extracting(JobPlatformAdapter.JobDto::location)
+                .allSatisfy(loc -> assertThat(loc).doesNotContainIgnoringCase("remote")
+                        .doesNotContain("全球"));
+    }
+
+    @Test
     @DisplayName("全部种子源之间 externalId 不冲突（撞 key 会让岗位互相覆盖）")
     void seedProviders_doNotShareExternalIds() {
         var all = new java.util.ArrayList<JobPlatformAdapter.JobDto>();
@@ -102,6 +125,7 @@ class SeedJobProviderTest {
         all.addAll(new SeedServiceJobProvider().fetch());
         all.addAll(new SeedAutumn2027JobProvider().fetch());
         all.addAll(new SeedPartTimeJobProvider().fetch());
+        all.addAll(new SeedDomesticSocialJobProvider().fetch());
         // 同一 platform 内唯一 + 跨 platform 也不复用 ID（便于人工排查与迁移）
         assertThat(all).extracting(JobPlatformAdapter.JobDto::externalId).doesNotHaveDuplicates();
     }
@@ -113,7 +137,8 @@ class SeedJobProviderTest {
                 new SeedIndustryJobProvider(),
                 new SeedServiceJobProvider(),
                 new SeedAutumn2027JobProvider(),
-                new SeedPartTimeJobProvider()))
+                new SeedPartTimeJobProvider(),
+                new SeedDomesticSocialJobProvider()))
                 .extracting(JobPlatformAdapter::platform)
                 .doesNotHaveDuplicates();
     }

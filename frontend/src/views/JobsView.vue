@@ -90,7 +90,7 @@
           @click="pickSource('')"
         >全部</button>
         <button
-          v-for="s in meta.sources"
+          v-for="s in visibleSources"
           :key="s"
           class="source-chip"
           :class="{ active: source === s, overseas: isOverseasSource(s) }"
@@ -292,12 +292,14 @@ interface JobsMeta {
 }
 
 /**
- * 招聘广场分栏（v1.38.0：新增「兼职」与「海外远程」）
+ * 招聘广场分栏（v1.39.0：调整为「国内为主」的信息架构）
  *
  * - 前六项按 recruitType 精确筛选；其中 `OVERSEAS` 是**虚拟值**，
  *   前端会转成 `overseas=true` 查询参数，库里并不存在这个 recruit_type。
- * - 具体招聘类型分栏会额外带上「仅国内」，避免海外英文岗位稀释国内岗位列表；
- *   「全部」不加地域限制。
+ * - **所有国内分栏（含「全部」）都带 overseas=false**：海外岗位只在「海外远程」
+ *   分栏出现。此前「全部」不加地域限制，而海外公开 API 单轮可入库数百条英文岗位，
+ *   把国内岗位彻底淹没，与「国内校招/社招」的产品定位相反。
+ * - 「海外远程」排在末尾，作为独立入口存在但不占据默认视线。
  */
 const recruitTabs = [
   { value: 'AUTUMN', label: '秋招精选' },
@@ -305,10 +307,10 @@ const recruitTabs = [
   { value: 'SOCIAL', label: '社招' },
   { value: 'INTERN', label: '实习' },
   { value: 'PART_TIME', label: '兼职' },
-  { value: 'OVERSEAS', label: '海外远程' },
   { value: 'TARGETED', label: '定向专项' },
   { value: 'FAVORITE', label: '我的收藏' },
-  { value: '', label: '全部' },
+  { value: '', label: '全部国内' },
+  { value: 'OVERSEAS', label: '海外远程' },
 ]
 
 /** 收藏岗位快照（后端 /api/jobs/favorite 返回） */
@@ -487,9 +489,9 @@ async function fetchJobs() {
   loading.value = true
   loadError.value = false
   try {
-    // v1.38.0：「海外远程」是虚拟分栏，转成 overseas=true；
-    // 其余具体类型分栏带 overseas=false 只看国内，避免海外英文岗位稀释结果；
-    // 「全部」不加地域限制（用户可按来源 chips 自行收窄）。
+    // v1.39.0：海外岗位只在「海外远程」分栏出现。
+    // 「海外远程」→ overseas=true；其余分栏（含「全部国内」）→ overseas=false。
+    // 默认视图（秋招精选）与「全部国内」都只出国内岗位，海外英文岗位不再稀释列表。
     const isOverseasTab = recruitType.value === 'OVERSEAS'
     const res = await api.get('/api/jobs', {
       params: {
@@ -498,7 +500,7 @@ async function fetchJobs() {
         jobType: jobType.value || undefined,
         location: location.value || undefined,
         recruitType: isOverseasTab ? undefined : (recruitType.value || undefined),
-        overseas: isOverseasTab ? true : (recruitType.value ? false : undefined),
+        overseas: isOverseasTab,
         source: source.value || undefined,
         degree: degree.value || undefined,
         experience: experience.value || undefined,
@@ -555,6 +557,19 @@ function isOverseasSource(s: string): boolean {
 }
 
 /**
+ * 当前分栏下应当展示的来源 chips（v1.39.0）。
+ *
+ * 国内分栏隐藏海外源、海外分栏隐藏国内源。否则会出现死路：国内分栏已经带
+ * `overseas=false`，此时点一个海外来源 chip 必然一条都筛不出来，
+ * 用户只会认为「这个数据源没数据」。
+ */
+const visibleSources = computed(() => {
+  const all = meta.value.sources || []
+  const wantOverseas = recruitType.value === 'OVERSEAS'
+  return all.filter((s) => isOverseasSource(s) === wantOverseas)
+})
+
+/**
  * 分栏角标数量。
  *
  * 收藏看收藏数、「海外远程」看后端给的海外岗位数（虚拟分栏在 recruitCounts 里没有对应项），
@@ -580,6 +595,11 @@ function pickSource(s: string) {
 
 function switchTab(value: string) {
   recruitType.value = value
+  // 跨「国内 ↔ 海外」分栏时清掉来源筛选：原来的来源在新分栏里已被隐藏，
+  // 留着会让请求带上一个查不到数据的 source 参数（表现为「空列表但没有任何提示」）
+  if (source.value && isOverseasSource(source.value) !== (value === 'OVERSEAS')) {
+    source.value = ''
+  }
   if (value === 'FAVORITE') {
     loadFavorites()
   } else {
@@ -685,16 +705,19 @@ onMounted(() => {
   opacity: 0.8;
 }
 
-/* ── 收藏截止提醒横幅（v1.23.3）── */
+/* ── 收藏截止提醒横幅（v1.23.3）──
+ * v1.39.0：配色改用语义令牌。此前写死 #fef2f2 / #991b1b / #dc2626，
+ * 在暗色主题下会变成「浅粉底 + 深红字」贴在深色页面上，与整页主题冲突
+ * （违反设计系统「Page Theme Lock」：同一页面不允许出现反色区块）。 */
 .ddl-banner {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
   margin-bottom: 16px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 12px;
+  background: var(--c-danger-light);
+  border: 1px solid var(--c-danger);
+  border-radius: var(--radius-lg);
   flex-wrap: wrap;
 }
 .ddl-banner-icon {
@@ -705,23 +728,23 @@ onMounted(() => {
   flex: 1;
   min-width: 200px;
   font-size: 13px;
-  color: #991b1b;
+  color: var(--c-danger);
   line-height: 1.5;
 }
 .ddl-banner-action {
   padding: 6px 14px;
   border: none;
-  border-radius: 8px;
-  background: #dc2626;
+  border-radius: var(--radius-md);
+  background: var(--c-danger);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.2s;
+  transition: filter var(--transition-fast);
 }
 .ddl-banner-action:hover {
-  background: #b91c1c;
+  filter: brightness(0.92);
 }
 
 /* ── 岗位收藏按钮（v1.23.3）── */
@@ -739,14 +762,14 @@ onMounted(() => {
   transition: all 0.2s;
 }
 .fav-btn:hover {
-  color: #e11d48;
-  border-color: #fda4af;
-  background: #fff1f2;
+  color: var(--c-danger);
+  border-color: var(--c-danger);
+  background: var(--c-danger-light);
 }
 .fav-btn.active {
-  color: #e11d48;
-  border-color: #fda4af;
-  background: #fff1f2;
+  color: var(--c-danger);
+  border-color: var(--c-danger);
+  background: var(--c-danger-light);
 }
 
 .filter-card {
@@ -908,7 +931,7 @@ onMounted(() => {
 }
 
 .job-salary {
-  color: #16a34a;
+  color: var(--c-success);
   font-weight: 600;
   font-size: 15px;
   white-space: nowrap;
@@ -1095,7 +1118,7 @@ onMounted(() => {
 
 .detail-sub {
   margin-top: 6px;
-  color: #16a34a;
+  color: var(--c-success);
   font-weight: 600;
 }
 

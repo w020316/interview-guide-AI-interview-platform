@@ -121,7 +121,7 @@ withDefaults(defineProps<Props>(), {
 }
 .base-card__title {
   margin: 0;
-  font-family: var(--font-serif);
+  font-family: var(--font-title);
   font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--c-text);

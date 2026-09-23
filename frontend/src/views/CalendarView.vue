@@ -341,7 +341,7 @@ onMounted(load)
 /* 月历卡片 */
 .cal-card { background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); padding: 18px 20px 20px; box-shadow: var(--shadow-sm); }
 .cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.cal-title { font-family: var(--font-serif); font-size: 18px; font-weight: 600; color: var(--c-text); flex: 1; text-align: center; }
+.cal-title { font-family: var(--font-title); font-size: 18px; font-weight: 600; color: var(--c-text); flex: 1; text-align: center; }
 .cal-nav { width: 32px; height: 32px; border-radius: var(--radius-md); border: 1px solid var(--c-border); background: transparent; color: var(--c-text-secondary); font-size: 18px; line-height: 1; cursor: pointer; transition: all var(--transition-fast); }
 .cal-nav:hover { color: var(--brand-primary); border-color: var(--brand-primary); background: var(--brand-primary-light); }
 .cal-today { margin-left: auto; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--brand-primary); background: var(--brand-primary-light); border: 1px solid var(--brand-primary-200); border-radius: 999px; cursor: pointer; transition: all var(--transition-fast); }
@@ -377,7 +377,7 @@ onMounted(load)
 .dot-已取消 { background: var(--c-danger); }
 .event-main { flex: 1; min-width: 0; }
 .event-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.event-title { font-family: var(--font-serif); font-size: 15px; font-weight: 600; color: var(--c-text); }
+.event-title { font-family: var(--font-title); font-size: 15px; font-weight: 600; color: var(--c-text); }
 .event-time { font-size: 13px; color: var(--c-info); margin-top: 4px; }
 .event-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--c-text-tertiary); margin-top: 4px; }
 .meta-item { display: inline-flex; align-items: center; gap: 3px; }
@@ -393,7 +393,7 @@ onMounted(load)
 /* 弹窗 */
 .modal-mask { position: fixed; inset: 0; z-index: var(--z-modal); background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal { width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; background: var(--c-surface); border-radius: var(--radius-lg); padding: 26px; box-shadow: var(--shadow-md); }
-.modal-title { font-family: var(--font-serif); font-size: 20px; font-weight: 600; color: var(--c-text); margin: 0 0 18px; }
+.modal-title { font-family: var(--font-title); font-size: 20px; font-weight: 600; color: var(--c-text); margin: 0 0 18px; }
 .event-form { display: flex; flex-direction: column; gap: 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 13px; font-weight: 500; color: var(--c-text-secondary); }

@@ -198,7 +198,7 @@ function difficultyText(d: string) {
 .book-head { display: flex; gap: 14px; align-items: flex-start; }
 .book-index { flex-shrink: 0; width: 26px; height: 26px; background: var(--c-danger-light); color: var(--c-danger); border-radius: 50%; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .book-content { flex: 1; min-width: 0; }
-.book-question { font-family: var(--font-serif); font-size: 15px; font-weight: 600; color: var(--c-text); line-height: 1.5; margin-bottom: 8px; }
+.book-question { font-family: var(--font-title); font-size: 15px; font-weight: 600; color: var(--c-text); line-height: 1.5; margin-bottom: 8px; }
 .book-tags { display: flex; gap: 8px; flex-wrap: wrap; }
 .book-meta { margin: 10px 0 0 40px; font-size: 12px; color: var(--c-text-tertiary); }
 .book-body { margin: 12px 0 0 40px; display: flex; flex-direction: column; gap: 12px; border-top: 1px dashed var(--c-border); padding-top: 12px; }
