@@ -50,7 +50,11 @@ class AdminServiceTest {
     private final UserBanRegistry userBanRegistry = new UserBanRegistry();
 
     private AdminService newService(SimpleMeterRegistry registry) {
-        return new AdminService(jobPostingRepository, userRepository, jobAgentService, userBanRegistry, registry);
+        AdminService service = new AdminService(jobPostingRepository, userRepository, jobAgentService,
+                userBanRegistry, registry);
+        // @Value 注入的字段在纯单测中不会被容器填充，显式设置以覆盖 P2-07 的「最后一个管理员」保护
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "adminUsernames", "小吴同学");
+        return service;
     }
 
     // ── 数据总览 ──
@@ -303,21 +307,56 @@ class AdminServiceTest {
     @Test
     @DisplayName("ban/unban: 存在校验通过后写注册表；用户不存在或 id 为 null 抛异常")
     void banAndUnbanUser() {
-        when(userRepository.existsById(1L)).thenReturn(true);
-        when(userRepository.existsById(2L)).thenReturn(false);
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(
+                UserEntity.builder().id(1L).username("普通用户").build()));
+        when(userRepository.findById(2L)).thenReturn(java.util.Optional.empty());
 
         AdminService service = newService(new SimpleMeterRegistry());
-        service.banUser(1L);
+        service.banUser(1L, 99L);
         assertThat(userBanRegistry.isBanned(1L)).isTrue();
         service.unbanUser(1L);
         assertThat(userBanRegistry.isBanned(1L)).isFalse();
 
-        assertThatThrownBy(() -> service.banUser(2L))
+        assertThatThrownBy(() -> service.banUser(2L, 99L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("用户不存在");
         assertThatThrownBy(() -> service.unbanUser(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("用户不存在");
+    }
+
+    @Test
+    @DisplayName("P2-07: 不能禁用自己，也不能禁用最后一个可用管理员（误禁将永久锁死管理后台）")
+    void banUser_selfAndLastAdminGuarded() {
+        when(userRepository.findById(7L)).thenReturn(java.util.Optional.of(
+                UserEntity.builder().id(7L).username("小吴同学").build()));
+        when(userRepository.findById(8L)).thenReturn(java.util.Optional.of(
+                UserEntity.builder().id(8L).username("小张同学").build()));
+
+        AdminService service = newService(new SimpleMeterRegistry());
+
+        // ① 禁用自己 → 拒绝（请求者 id 与目标 id 相同）
+        assertThatThrownBy(() -> service.banUser(7L, 7L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("不能禁用当前登录的管理员账号");
+        assertThat(userBanRegistry.isBanned(7L)).isFalse();
+
+        // ② 名单内只剩一个可用管理员（id=7）→ 任何请求者都禁不掉，避免管理后台永久锁死
+        when(userRepository.findAll()).thenReturn(List.of(
+                UserEntity.builder().id(7L).username("小吴同学").build()));
+        assertThatThrownBy(() -> service.banUser(7L, 99L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("最后一个管理员");
+        assertThat(userBanRegistry.isBanned(7L)).isFalse();
+
+        // ③ 名单内有第二个可用管理员时放行（保护不应变成「管理员永远禁不掉」）
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                service, "adminUsernames", "小吴同学,小张同学");
+        when(userRepository.findAll()).thenReturn(List.of(
+                UserEntity.builder().id(7L).username("小吴同学").build(),
+                UserEntity.builder().id(8L).username("小张同学").build()));
+        service.banUser(8L, 99L);
+        assertThat(userBanRegistry.isBanned(8L)).isTrue();
     }
 
     // ── 系统指标 ──

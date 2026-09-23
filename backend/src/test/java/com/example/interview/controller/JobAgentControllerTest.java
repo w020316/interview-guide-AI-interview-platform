@@ -146,6 +146,46 @@ class JobAgentControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/jobs: 含注入特征的关键词在入口即被拒（P2-04）")
+    void list_rejectsInjectionKeyword() throws Exception {
+        // 线上形状：' OR 1=1 被 Render 边缘 WAF 以 403 + HTML 拦截页拒绝，且响应**不带 CORS 头**，
+        // 浏览器只能上报 net::ERR_FAILED —— 前端拿不到任何可解释信息，曾据此误报「后端冷启动」。
+        // 现改为在应用入口显式拒绝并说明原因，请求根本不会打到网关。
+        mockMvc.perform(get("/api/jobs").param("keyword", "' OR 1=1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("不支持的字符")));
+
+        verify(jobAgentService, never()).search(any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("GET /api/jobs: 超长关键词被拒（避免超长查询串触发网关规则）")
+    void list_rejectsTooLongKeyword() throws Exception {
+        mockMvc.perform(get("/api/jobs").param("keyword", "a".repeat(51)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("过长")));
+    }
+
+    @Test
+    @DisplayName("GET /api/jobs: C++ / C# / node.js 等真实技术关键词不被白名单误伤")
+    void list_allowsCommonTechSymbols() throws Exception {
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        for (String kw : List.of("C++", "C#", "node.js", "Java/Python", "前端 开发", "Vue3.0")) {
+            mockMvc.perform(get("/api/jobs").param("keyword", kw))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+        }
+    }
+
+    @Test
     @DisplayName("GET /api/jobs/{id}: 岗位存在返回 200")
     void detail_found_returns200() throws Exception {
         JobPostingEntity job = JobPostingEntity.builder()
@@ -172,7 +212,7 @@ class JobAgentControllerTest {
     @Test
     @DisplayName("GET /api/jobs/meta: 返回筛选面板元数据")
     void meta_returnsAggregates() throws Exception {
-        when(jobAgentService.meta()).thenReturn(Map.of(
+        when(jobAgentService.meta(any())).thenReturn(Map.of(
                 "industries", List.of("互联网", "金融"),
                 "recruitCounts", Map.of("AUTUMN", 5)));
 
@@ -181,6 +221,18 @@ class JobAgentControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.industries.length()").value(2))
                 .andExpect(jsonPath("$.data.recruitCounts.AUTUMN").value(5));
+    }
+
+    @Test
+    @DisplayName("GET /api/jobs/meta: overseas 透传到服务层（P2-08 分栏计数口径）")
+    void meta_passesOverseasFlag() throws Exception {
+        when(jobAgentService.meta(any())).thenReturn(Map.of("recruitCounts", Map.of()));
+
+        mockMvc.perform(get("/api/jobs/meta").param("overseas", "false"))
+                .andExpect(status().isOk());
+
+        // 「全部国内」分栏必须传 false；漏传会让 chips 退回全局数字（P2-08 的原始缺陷）
+        verify(jobAgentService).meta(eq(Boolean.FALSE));
     }
 
     @Test

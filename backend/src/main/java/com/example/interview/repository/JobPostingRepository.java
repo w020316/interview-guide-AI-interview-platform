@@ -60,6 +60,20 @@ public interface JobPostingRepository extends JpaRepository<JobPostingEntity, Lo
     List<Object[]> countByRecruitType();
 
     /**
+     * 各招聘类型数量统计（**仅限指定来源**，P2-08）。
+     * 用于「海外远程」分栏：计数须与该分栏的实际结果一致。
+     */
+    @Query("SELECT j.recruitType, COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.recruitType IS NOT NULL AND j.platform IN :platforms GROUP BY j.recruitType")
+    List<Object[]> countByRecruitTypeInPlatforms(@Param("platforms") Collection<String> platforms);
+
+    /**
+     * 各招聘类型数量统计（**排除指定来源**，P2-08）。
+     * 用于「全部国内」等国内分栏。调用方须保证 platforms 非空（JPQL 的 NOT IN 空集合无效）。
+     */
+    @Query("SELECT j.recruitType, COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.recruitType IS NOT NULL AND j.platform NOT IN :platforms GROUP BY j.recruitType")
+    List<Object[]> countByRecruitTypeNotInPlatforms(@Param("platforms") Collection<String> platforms);
+
+    /**
      * 指定来源集合的有效岗位数（v1.38.0，「海外远程」分栏 Tab 角标）。
      *
      * <p>来源清单由适配器声明，因此这里用 IN 查询而不是给 platform 打布尔列——

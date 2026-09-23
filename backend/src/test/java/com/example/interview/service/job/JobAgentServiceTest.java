@@ -97,30 +97,37 @@ class JobAgentServiceTest {
         private final boolean enabled;
         private final RuntimeException boom;
         private final Runnable onFetch;
+        private final boolean overseas;
 
         FakeAdapter(String platform, List<JobDto> jobs) {
-            this(platform, jobs, true, null, null);
+            this(platform, jobs, true, null, null, false);
         }
 
         FakeAdapter(String platform, List<JobDto> jobs, boolean enabled) {
-            this(platform, jobs, enabled, null, null);
+            this(platform, jobs, enabled, null, null, false);
         }
 
         FakeAdapter(String platform, List<JobDto> jobs, RuntimeException boom) {
-            this(platform, jobs, true, boom, null);
+            this(platform, jobs, true, boom, null, false);
         }
 
         FakeAdapter(String platform, List<JobDto> jobs, Runnable onFetch) {
-            this(platform, jobs, true, null, onFetch);
+            this(platform, jobs, true, null, onFetch, false);
         }
 
         private FakeAdapter(String platform, List<JobDto> jobs, boolean enabled,
-                            RuntimeException boom, Runnable onFetch) {
+                            RuntimeException boom, Runnable onFetch, boolean overseas) {
             this.platform = platform;
             this.jobs = jobs;
             this.enabled = enabled;
             this.boom = boom;
             this.onFetch = onFetch;
+            this.overseas = overseas;
+        }
+
+        /** 声明为海外源的适配器（P2-08：分栏计数口径需要至少一个海外源才有意义） */
+        static FakeAdapter overseas(String platform, List<JobDto> jobs) {
+            return new FakeAdapter(platform, jobs, true, null, null, true);
         }
 
         @Override
@@ -131,6 +138,11 @@ class JobAgentServiceTest {
         @Override
         public boolean isEnabled() {
             return enabled;
+        }
+
+        @Override
+        public boolean overseas() {
+            return overseas;
         }
 
         @Override
@@ -496,7 +508,8 @@ class JobAgentServiceTest {
                 .industry("金融").jobType("金融").recruitType("SOCIAL")
                 .degree("硕士").experience("1-3年").active(true).build());
 
-        Map<String, Object> meta = newH2Service(List.of()).meta();
+        // overseas=null 表示不分栏（维持全局口径）
+        Map<String, Object> meta = newH2Service(List.of()).meta(null);
 
         assertThat((List<String>) meta.get("industries")).containsExactlyInAnyOrder("互联网", "金融");
         assertThat((List<String>) meta.get("jobTypes")).containsExactlyInAnyOrder("技术", "金融");
@@ -523,6 +536,39 @@ class JobAgentServiceTest {
                 httpAdapter, classifyService, healthRegistry, jpaTxManager);
 
         assertThat(service.overseasPlatforms()).containsExactly("RemoteOK 全球远程");
+    }
+
+    @Test
+    @DisplayName("P2-08: meta 的招聘类型计数按 overseas 分栏过滤，不再返回全局数字")
+    @SuppressWarnings("unchecked")
+    void meta_recruitCountsRespectOverseasSplit() {
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("s1").title("国内社招").companyName("A")
+                .recruitType("SOCIAL").active(true).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("s2").title("国内秋招").companyName("B")
+                .recruitType("AUTUMN").active(true).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("RemoteOK 全球远程").externalId("s3").title("海外社招").companyName("C")
+                .recruitType("SOCIAL").active(true).build());
+
+        JobAgentService service = new JobAgentService(jpaRepository, List.of(
+                new FakeAdapter("内置精选", List.of()),
+                FakeAdapter.overseas("RemoteOK 全球远程", List.of())),
+                httpAdapter, classifyService, healthRegistry, jpaTxManager);
+
+        // 全局口径（overseas=null）：与历史行为一致
+        Map<String, Long> all = (Map<String, Long>) service.meta(null).get("recruitCounts");
+        assertThat(all).containsEntry("SOCIAL", 2L).containsEntry("AUTUMN", 1L);
+
+        // 国内分栏（overseas=false）：海外源被排除 —— 这正是 P2-08 的修复点
+        // （线上表现：分栏内实有 71 条社招，chips 却显示全局的 1883）
+        Map<String, Long> domestic = (Map<String, Long>) service.meta(false).get("recruitCounts");
+        assertThat(domestic).containsEntry("SOCIAL", 1L).containsEntry("AUTUMN", 1L);
+
+        // 海外分栏（overseas=true）：只剩海外源
+        Map<String, Long> overseas = (Map<String, Long>) service.meta(true).get("recruitCounts");
+        assertThat(overseas).containsEntry("SOCIAL", 1L).doesNotContainKey("AUTUMN");
     }
 
     @Test

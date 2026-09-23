@@ -8,6 +8,7 @@ import com.example.interview.service.job.JobAgentService;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -15,12 +16,15 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 管理后台服务（v1.31.4 建立，v1.37.0 扩展数据源视图与趋势统计）
@@ -41,6 +45,13 @@ public class AdminService {
 
     /** 总览趋势窗口（天） */
     private static final int TREND_DAYS = 7;
+
+    /**
+     * 管理员名单（与 {@code JwtUtil} 同一配置项 app.admin-usernames）——
+     * 仅用于 P2-07 的「最后一个管理员」保护，不参与鉴权（鉴权仍走 JWT 的 role claim）。
+     */
+    @Value("${app.admin-usernames:}")
+    private String adminUsernames;
 
     private final JobPostingRepository jobPostingRepository;
     private final UserRepository userRepository;
@@ -329,11 +340,33 @@ public class AdminService {
     public record UserView(Long id, String username, String email, LocalDateTime createdAt, boolean banned) {
     }
 
-    /** 禁用用户（进程内，重启失效） */
-    public void banUser(Long id) {
-        requireUser(id);
+    /**
+     * 禁用用户。
+     *
+     * <p><b>封禁是持久化的</b>：{@link UserBanRegistry} 自 v1.33.0 起写穿 Redis，
+     * 重启时经 loadFromRedis 恢复 —— 前端文案不得再称「重启自动恢复」（P2-06）。
+     *
+     * <p><b>P2-07 加固</b>：封禁是「不可逆且没有解封入口」的操作 —— 被禁用户在
+     * JwtAuthFilter 阶段即被拒绝、登录也返回 403，而管理员名单
+     * （app.admin-usernames）默认只配置了一个账号。一旦误禁自己或最后一个管理员，
+     * 管理后台将永久无法访问，只能改 Redis / 环境变量人工恢复。故在此拦截两种情形。
+     *
+     * @param id            目标用户 ID
+     * @param currentUserId 当前登录管理员 ID（用于「不能禁用自己」判定）；为 null 时跳过该校验
+     */
+    public void banUser(Long id, Long currentUserId) {
+        UserEntity target = requireUser(id);
+
+        if (currentUserId != null && currentUserId.equals(id)) {
+            throw new IllegalArgumentException("不能禁用当前登录的管理员账号");
+        }
+
+        if (isConfiguredAdmin(target.getUsername()) && countAvailableAdmins() <= 1) {
+            throw new IllegalArgumentException("系统需保留至少一个可用管理员，无法禁用最后一个管理员账号");
+        }
+
         userBanRegistry.ban(id);
-        log.info("管理员禁用用户 id={}", id);
+        log.info("管理员禁用用户 id={} username={}", id, target.getUsername());
     }
 
     /** 解禁用户 */
@@ -343,10 +376,44 @@ public class AdminService {
         log.info("管理员解禁用户 id={}", id);
     }
 
-    private void requireUser(Long id) {
-        if (id == null || !userRepository.existsById(id)) {
+    /** 校验用户存在并返回实体（封禁前需要 username 判定目标是否为管理员） */
+    private UserEntity requireUser(Long id) {
+        if (id == null) {
             throw new IllegalArgumentException("用户不存在");
         }
+        return userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+    }
+
+    /** 用户名是否在配置的管理员名单内（大小写不敏感） */
+    private boolean isConfiguredAdmin(String username) {
+        if (username == null) return false;
+        return configuredAdminNames().contains(username.toLowerCase(Locale.ROOT));
+    }
+
+    /** 解析 app.admin-usernames（逗号分隔，小写归一化） */
+    private Set<String> configuredAdminNames() {
+        if (adminUsernames == null || adminUsernames.isBlank()) return Set.of();
+        return Arrays.stream(adminUsernames.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> s.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 统计「名单内且当前未被禁用」的管理员数量。
+     *
+     * 仅在目标命中管理员名单时才被调用（封禁本身是低频管理操作），
+     * 因此直接全表扫描换取实现简单 —— 不为一次性判定新增仓储查询。
+     */
+    private long countAvailableAdmins() {
+        Set<String> names = configuredAdminNames();
+        if (names.isEmpty()) return 0;
+        return userRepository.findAll().stream()
+                .filter(u -> u.getUsername() != null && names.contains(u.getUsername().toLowerCase(Locale.ROOT)))
+                .filter(u -> !userBanRegistry.isBanned(u.getId()))
+                .count();
     }
 
     // ── 系统指标 ──

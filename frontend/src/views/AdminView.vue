@@ -213,7 +213,7 @@
       <div class="toolbar">
         <input v-model="userKeyword" class="search-input" placeholder="搜索用户名 / 邮箱" @keyup.enter="searchUsers" />
         <button class="ghost-btn" @click="searchUsers">搜索</button>
-        <span class="tip">禁用为进程内生效（重启自动恢复），用于临时封禁</span>
+        <span class="tip">禁用会持久保存（重启后仍生效），用于长期封禁</span>
       </div>
       <div class="table-wrap">
         <table class="data-table" v-loading="usersLoading">
@@ -228,7 +228,9 @@
               <td class="mono">{{ fmtDate(u.createdAt) }}</td>
               <td><span :class="u.banned ? 'badge-off' : 'badge-ok'">{{ u.banned ? '已禁用' : '正常' }}</span></td>
               <td class="ops">
-                <button class="mini-btn" :class="{ danger: !u.banned }" @click="toggleBan(u)">{{ u.banned ? '解禁' : '禁用' }}</button>
+                <!-- P2-07：当前登录账号不给「禁用」入口——误点会立刻把自己锁在外面 -->
+                <span v-if="isSelf(u)" class="tip" title="不能禁用当前登录的管理员账号">当前账号</span>
+                <button v-else class="mini-btn" :class="{ danger: !u.banned }" @click="toggleBan(u)">{{ u.banned ? '解禁' : '禁用' }}</button>
               </td>
             </tr>
             <tr v-if="!users.length"><td colspan="6" class="empty-cell">暂无用户</td></tr>
@@ -281,6 +283,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
+import { authState } from '../auth'
 
 /**
  * 管理后台（v1.37.0 视觉与信息架构重构）
@@ -653,10 +656,38 @@ function searchUsers() {
   fetchUsers()
 }
 
+/** 是否为当前登录账号（用于隐藏「禁用」入口，P2-07） */
+function isSelf(u: UserRow): boolean {
+  return !!authState.username && authState.username === u.username
+}
+
 async function toggleBan(u: UserRow) {
+  // 解禁是恢复性操作，直接执行
+  if (u.banned) {
+    try {
+      await api.post(`/api/admin/users/${u.id}/unban`)
+      ElMessage.success('已解禁')
+      fetchUsers()
+    } catch (e) {
+      ElMessage.error(getErrMessage(e, '操作失败'))
+    }
+    return
+  }
+
+  // 禁用是不可逆操作：被禁账号立即无法登录与调用接口，且界面没有解封入口（P2-07）
   try {
-    await api.post(`/api/admin/users/${u.id}/${u.banned ? 'unban' : 'ban'}`)
-    ElMessage.success(u.banned ? '已解禁' : '已禁用（进程内生效，重启后恢复）')
+    await ElMessageBox.confirm(
+      `确认禁用「${u.username}」？禁用会持久保存（重启后仍生效），该账号将立即无法登录和使用。`,
+      '确认禁用',
+      { type: 'warning', confirmButtonText: '确认禁用', cancelButtonText: '取消' },
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  try {
+    await api.post(`/api/admin/users/${u.id}/ban`)
+    ElMessage.success('已禁用（已持久保存，重启后仍生效）')
     fetchUsers()
   } catch (e) {
     ElMessage.error(getErrMessage(e, '操作失败'))

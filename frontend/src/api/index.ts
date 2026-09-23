@@ -99,10 +99,16 @@ function isAiConfig(cfg: (InternalAxiosRequestConfig & { url?: string }) | undef
 /**
  * 判定错误是否属于「后端冷启动 / 未就绪」信号。
  *
- * 覆盖三类真实观测到的现象（Render 免费层）：
- * 1. 无响应体（连接被中断 / DNS 未就绪）→ 裸 Network Error
- * 2. 本地超时（后端仍在启动，连接被长时间挂起）→ ECONNABORTED
- * 3. 边缘节点返回 502/503/504 且响应体不是后端业务 JSON（后端进程尚未监听）
+ * **只认明确的连接层信号**（Render 免费层实测）：
+ * 1. 本地超时（后端仍在启动，连接被长时间挂起）→ ECONNABORTED
+ * 2. 边缘节点返回 502/503/504 且响应体不是后端业务 JSON（后端进程尚未监听）
+ * 3. 收到 HTML 响应（网关错误页 / SPA fallback）——拿到的不是后端业务响应
+ *
+ * **刻意排除「裸 Network Error」**（P2-04）：浏览器只报 net::ERR_FAILED / Network Error 时，
+ * 前端**无法**区分「后端没起来」「请求被安全网关拦截（响应无 CORS 头）」「真实断网」。
+ * 此前把它当作冷启动，导致 `' OR 1=1` 被 Render 边缘 WAF 以 403 拦截（HTML 页、无 CORS 头）时
+ * 提示「后端服务唤醒超时（冷启动约需 1-2 分钟）」——与事实完全不符——并静默重放一次请求。
+ * 现改由 isNetworkLayerFailure() 走中性文案，且**不重放**。
  *
  * 注意：后端业务 503（如「AI 服务暂时不可用」）走在 HTTP 200 + body.code 通道，
  * 在响应拦截器 fulfilled 分支就已被转成普通 Error，不会进入本判定，因此不会误判。
@@ -130,10 +136,32 @@ export function isColdStartError(e: unknown): boolean {
   }
 
   if (err.code === 'ECONNABORTED') return true
-  if (err.message === 'Network Error') return true
 
   const msg = typeof err.message === 'string' ? err.message : ''
-  return msg.includes('冷启动') || msg.includes('后端服务未响应') || msg.includes('网络连接失败')
+  return msg.includes('冷启动') || msg.includes('后端服务未响应')
+}
+
+/**
+ * 判定是否属于「网络层失败」：请求已发出，但浏览器拿不到任何 HTTP 响应
+ * （无 status、无 body，只有 axios 的裸 Network Error）。
+ *
+ * 浏览器侧**无法区分**以下三种来源，因此本判定只用于「换一句不臆测的文案」：
+ * - 真实断网 / DNS / TLS 失败
+ * - 跨域请求被安全网关拦截（如 Render 边缘 WAF 返回 403 但**不带 CORS 头**，
+ *   浏览器只能上报 net::ERR_FAILED，见 UX 报告 P2-04）
+ * - 请求被浏览器扩展 / 代理拦截
+ *
+ * 与冷启动的区别：后端未就绪时至少会给出 502/503/504 或本地超时这类明确信号，
+ * 因此网络层失败**不触发冷启动文案**，也**不触发自动重放**。
+ */
+export function isNetworkLayerFailure(e: unknown): boolean {
+  const err = e as { response?: { status?: number }; message?: string; code?: string }
+  if (!err) return false
+  // 拿到过 HTTP 响应就不是网络层失败（交给 status 分支判定）
+  if (err.response?.status !== undefined) return false
+  if (err.code === 'ECONNABORTED') return false
+  const msg = typeof err.message === 'string' ? err.message : ''
+  return msg.includes('Network Error')
 }
 
 /**
@@ -214,12 +242,33 @@ api.interceptors.response.use(
     const url = cfg?.url || ''
     const method = String(cfg?.method || 'get').toLowerCase()
 
-    // 401 和 403 都视为认证失效（Spring Security 未配置 AuthenticationEntryPoint 时默认返回 403）
-    if (error.response?.status === 401 || error.response?.status === 403) {
+    // 401 与 403 语义不同，必须分开处理（P2-05）：
+    // - 401 未认证 / 令牌失效 → 清 token 跳登录。
+    //   后端 SecurityConfig 已配置 AuthenticationEntryPoint，未认证时返回
+    //   401 + JSON（{"code":401,"message":"登录已过期或未登录，请重新登录"}），
+    //   不再依赖「未配置时 Spring 默认返回 403」的旧假设。
+    // - 403 已登录但无权访问 → **保留会话**，仅提示，绝不静默清 token 把人弹走。
+    //   此前两者同等处理：一旦出现带 CORS 头的 403（网关策略调整、同源反向代理、
+    //   或后端权限 403 直连同源路径），用户会被静默登出并丢失当前操作上下文。
+    if (error.response?.status === 401) {
       // 登录页不跳转（避免循环），其他页面清除 auth 并跳登录
       if (window.location.pathname !== '/login') {
         clearAuth()
         window.location.href = '/login?redirect=' + encodeURIComponent(currentRelativeUrl())
+      }
+      return Promise.reject(error)
+    }
+
+    if (error.response?.status === 403) {
+      const body = error.response.data as { code?: number; message?: string } | undefined
+      const isBusinessJson =
+        body != null && typeof body === 'object' && typeof body.code !== 'undefined'
+      if (isBusinessJson) {
+        // 后端业务 403（如 /api/admin/** 返回「无权访问该资源」）：保留会话，透传后端文案
+        error.message = body.message || '无权访问该资源'
+      } else {
+        // 无业务体的 403：通常是应用之外的安全网关拦截页（HTML），给出可操作说明
+        error.message = '请求被安全策略拦截，请修改输入内容后重试'
       }
       return Promise.reject(error)
     }
@@ -271,11 +320,15 @@ api.interceptors.response.use(
       // 这类无法理解的英文错误（且不触发任何重试），现统一转为可读、可操作的文案
       if (isAiConfig(cfg)) {
         error.message = 'AI 服务暂时不可用（后端可能正在冷启动），请等待 30-60s 后重试'
-      } else if (error.response) {
-        error.message = '后端服务未响应，可能正在冷启动，请等待 30-60s 后重试'
       } else {
-        error.message = '网络连接失败，请检查网络后重试（后端服务可能正在冷启动）'
+        error.message = '后端服务未响应，可能正在冷启动，请等待 30-60s 后重试'
       }
+    } else if (isNetworkLayerFailure(error)) {
+      // 网络层失败（拿不到任何 HTTP 响应）：可能是断网，也可能是请求被安全网关拦截
+      // （跨域 403 不带 CORS 头时浏览器只能上报 net::ERR_FAILED）。前端**无法区分**，
+      // 因此不再臆测为「后端冷启动」——那正是 P2-04 记录的误导性文案。
+      error.message =
+        '请求未收到响应：请检查网络后重试；若输入包含特殊符号（如引号、分号），可能是被安全策略拦截，请先修改输入'
     }
 
     return Promise.reject(error)

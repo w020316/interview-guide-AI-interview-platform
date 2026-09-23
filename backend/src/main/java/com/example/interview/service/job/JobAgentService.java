@@ -367,8 +367,14 @@ public class JobAgentService {
     private static org.springframework.data.jpa.domain.Specification<JobPostingEntity> emptySpec() {
         return (root, query, cb) -> cb.conjunction();
     }
-    /** 筛选面板元数据：行业/职位类型/学历/经验/来源/各招聘类型数量/最近更新时间 */
-    public Map<String, Object> meta() {
+    /**
+     * 筛选面板元数据：行业/职位类型/学历/经验/来源/各招聘类型数量/最近更新时间。
+     *
+     * @param overseas 分栏口径（P2-08）：true 仅统计海外源、false 仅统计国内源、null 不限。
+     *                 此前 recruitCounts 恒为全局聚合，导致「全部国内」分栏下显示「社招 1883」
+     *                 而该分栏实际只有 71 条——用户点进去会怀疑数据丢了或分页失效。
+     */
+    public Map<String, Object> meta(Boolean overseas) {
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("industries", repository.findDistinctIndustries());
         meta.put("jobTypes", repository.findDistinctJobTypes());
@@ -376,17 +382,27 @@ public class JobAgentService {
         meta.put("degrees", repository.findDistinctDegrees());
         meta.put("experiences", repository.findDistinctExperiences());
 
+        // 各招聘类型计数：与当前分栏口径保持一致（P2-08）
+        List<String> overseasSources = overseasPlatforms();
+        List<Object[]> rows;
+        if (overseas == null || overseasSources.isEmpty()) {
+            // 不分栏，或系统未声明任何海外源（此时分栏过滤无意义）→ 维持全局口径
+            rows = repository.countByRecruitType();
+        } else if (overseas) {
+            rows = repository.countByRecruitTypeInPlatforms(overseasSources);
+        } else {
+            rows = repository.countByRecruitTypeNotInPlatforms(overseasSources);
+        }
         Map<String, Long> recruitCounts = new LinkedHashMap<>();
-        for (Object[] row : repository.countByRecruitType()) {
+        for (Object[] row : rows) {
             recruitCounts.put(String.valueOf(row[0]), (Long) row[1]);
         }
         meta.put("recruitCounts", recruitCounts);
 
         // v1.38.0：海外/远程分栏元数据——前端据此渲染「海外远程」Tab 与角标，
         // 也用于在来源 chips 上区分海外源
-        List<String> overseas = overseasPlatforms();
-        meta.put("overseasSources", overseas);
-        meta.put("overseasCount", overseas.isEmpty() ? 0L : repository.countActiveByPlatformIn(overseas));
+        meta.put("overseasSources", overseasSources);
+        meta.put("overseasCount", overseasSources.isEmpty() ? 0L : repository.countActiveByPlatformIn(overseasSources));
 
         LocalDateTime last = repository.findLastUpdatedAt();
         meta.put("lastUpdatedAt", last == null ? null : last.toString());

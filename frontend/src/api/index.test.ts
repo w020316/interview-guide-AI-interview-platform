@@ -14,7 +14,7 @@ vi.mock('../utils/backendWake', () => ({
   ensureAwake: () => ensureAwakeMock(),
 }))
 
-import api, { getErrMessage, AUTH_TIMEOUT, AI_TIMEOUT, DEFAULT_TIMEOUT, apiBaseUrl, isColdStartError } from './index'
+import api, { getErrMessage, AUTH_TIMEOUT, AI_TIMEOUT, DEFAULT_TIMEOUT, apiBaseUrl, isColdStartError, isNetworkLayerFailure } from './index'
 
 /** 构造一个未过期的合法 JWT（3 段式，payload 含未来 exp） */
 function validToken(): string {
@@ -151,12 +151,27 @@ describe('api/index 响应拦截器（rejected）', () => {
     expect((window.location as any).href).toContain('/login?redirect=')
   })
 
-  it('403 同样按认证失效处理', async () => {
+  it('403 不再清 token（P2-05：授权失败 ≠ 认证失效，保留当前会话上下文）', async () => {
     localStorage.setItem('token', validToken())
     await mockLocation('/profile')
-    const err: any = { config: { url: '/api/p' }, response: { status: 403, data: {} } }
-    await expect(resRejected(err)).rejects.toBe(err)
-    expect(localStorage.getItem('token')).toBeNull()
+    const err: any = {
+      config: { url: '/api/admin/users' },
+      response: { status: 403, data: { code: 403, message: '无权访问该资源' } },
+    }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: '无权访问该资源' })
+    expect(localStorage.getItem('token')).not.toBeNull()
+    expect((window.location as any).href).toBe('')
+  })
+
+  it('403 且响应体非业务 JSON（网关拦截页）时提示被安全策略拦截', async () => {
+    localStorage.setItem('token', validToken())
+    await mockLocation('/jobs')
+    const err: any = {
+      config: { url: '/api/jobs', method: 'get' },
+      response: { status: 403, data: '<html><title>Blocked</title></html>', headers: {} },
+    }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('安全策略拦截') })
+    expect(localStorage.getItem('token')).not.toBeNull()
   })
 
   it('登录页遇到 401 不跳转', async () => {
@@ -200,17 +215,27 @@ describe('api/index 响应拦截器（rejected）', () => {
     await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('后端服务未响应') })
   })
 
-  it('纯 Network Error 提示网络连接失败（非幂等请求不重放）', async () => {
+  it('纯 Network Error 给出中性文案（不再误报后端冷启动，P2-04）', async () => {
     const err: any = { config: { url: '/api/y', method: 'post' }, message: 'Network Error' }
-    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('网络连接失败') })
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('请求未收到响应') })
   })
 
-  it('GET 请求 Network Error 触发唤醒（冷启动恢复路径）', async () => {
+  it('GET 请求 Network Error 不再触发唤醒重放（P2-04：无法区分断网 / 网关拦截 / 后端未就绪）', async () => {
     const cfg: any = { url: '/api/favorites/list', method: 'get', __retried: undefined }
     const err: any = { config: cfg, response: undefined, message: 'Network Error' }
-    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('唤醒超时') })
-    expect(cfg.__retried).toBe(true)
-    expect(ensureAwakeMock).toHaveBeenCalledTimes(1)
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('请求未收到响应') })
+    expect(cfg.__retried).toBeUndefined()
+    expect(ensureAwakeMock).not.toHaveBeenCalled()
+  })
+
+  it('搜索被 WAF 拦截（无 CORS 头的 403 → 浏览器只报 Network Error）不重放、不误报冷启动（P2-04 回归）', async () => {
+    // 复现线上形状：curl 同一 URL 得到 HTTP 403 + <title>Blocked</title>，
+    // 但因响应缺 CORS 头，浏览器侧只剩 net::ERR_FAILED / Network Error。
+    const cfg: any = { url: '/api/jobs', method: 'get', params: { keyword: "' OR 1=1" }, __retried: undefined }
+    const err: any = { config: cfg, response: undefined, message: 'Network Error' }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('请求未收到响应') })
+    expect(cfg.__retried).toBeUndefined()
+    expect(ensureAwakeMock).not.toHaveBeenCalled()
   })
 
   it('GET 请求本地超时（ECONNABORTED）同样尝试唤醒重放（幂等，可安全重放）', async () => {
@@ -220,11 +245,11 @@ describe('api/index 响应拦截器（rejected）', () => {
     expect(cfg.__retried).toBe(true)
   })
 
-  it('后端唤醒成功后将原请求重放一次并返回结果', async () => {
+  it('后端唤醒成功后将原请求重放一次并返回结果（由明确的未就绪信号触发）', async () => {
     ensureAwakeMock.mockResolvedValue(true)
     const replay = vi.spyOn(api, 'request').mockResolvedValue('ok' as never)
     const cfg: any = { url: '/api/stats/dashboard', method: 'get', __retried: undefined }
-    const err: any = { config: cfg, response: undefined, message: 'Network Error' }
+    const err: any = { code: 'ECONNABORTED', config: cfg, message: '' }
     await expect(resRejected(err)).resolves.toBe('ok')
     expect(replay).toHaveBeenCalledTimes(1)
     expect(cfg.__retried).toBe(true)
@@ -232,28 +257,42 @@ describe('api/index 响应拦截器（rejected）', () => {
 
   it('已经重放过一次的请求不再重放，避免无限循环', async () => {
     const cfg: any = { url: '/api/favorites/list', method: 'get', __retried: true }
-    const err: any = { config: cfg, response: undefined, message: 'Network Error' }
-    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('网络连接失败') })
+    const err: any = { code: 'ECONNABORTED', config: cfg, message: '' }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('请求超时') })
     expect(ensureAwakeMock).not.toHaveBeenCalled()
   })
 
-  it('AI 生成类 POST 永不自动重放（防双份推理与重复入库）', async () => {
+  it('AI 生成类 POST 即使命中冷启动信号也不自动重放（防双份推理与重复入库）', async () => {
     const cfg: any = { url: '/api/interview/questions', method: 'post', __retried: undefined }
-    const err: any = { config: cfg, message: 'Network Error' }
+    const err: any = {
+      config: cfg,
+      response: { status: 502, data: '<html>Bad Gateway</html>', headers: {} },
+      message: 'Request failed with status code 502',
+    }
     await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('AI 服务暂时不可用') })
     expect(cfg.__retried).toBeUndefined()
+    expect(ensureAwakeMock).not.toHaveBeenCalled()
   })
 
   it('非 AI 的 POST 同样不重放（防重复写入，如收藏切换/提交答案）', async () => {
     const cfg: any = { url: '/api/favorite/toggle', method: 'post', __retried: undefined }
-    const err: any = { config: cfg, message: 'Network Error' }
-    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('网络连接失败') })
+    const err: any = {
+      config: cfg,
+      response: { status: 502, data: 'Bad Gateway', headers: {} },
+      message: 'Request failed with status code 502',
+    }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: expect.stringContaining('后端服务未响应') })
     expect(cfg.__retried).toBeUndefined()
+    expect(ensureAwakeMock).not.toHaveBeenCalled()
   })
 
   it('清单外的 AI POST（如 /api/job/analyze）也不重放', async () => {
     const cfg: any = { url: '/api/job/analyze', method: 'post', __retried: undefined }
-    const err: any = { config: cfg, message: 'Network Error' }
+    const err: any = {
+      config: cfg,
+      response: { status: 502, data: 'Bad Gateway', headers: {} },
+      message: 'Request failed with status code 502',
+    }
     await expect(resRejected(err)).rejects.toBeTruthy()
     expect(cfg.__retried).toBeUndefined()
   })
@@ -281,8 +320,11 @@ describe('api/index 响应拦截器（rejected）', () => {
 })
 
 describe('api/index isColdStartError', () => {
-  it('无响应的 Network Error 判定为冷启动信号', () => {
-    expect(isColdStartError({ message: 'Network Error' })).toBe(true)
+  it('无响应的 Network Error **不**判定为冷启动信号（P2-04 回归）', () => {
+    // 原断言是 true —— 正是「把缺陷锁进测试」：`' OR 1=1` 被 Render 边缘 WAF 以 403 拦截
+    // （HTML 页且不带 CORS 头）时，浏览器只能上报 Network Error，前端据此误判为冷启动，
+    // 提示「后端服务唤醒超时（冷启动约需 1-2 分钟）」并静默重放一次。
+    expect(isColdStartError({ message: 'Network Error' })).toBe(false)
   })
   it('ECONNABORTED 判定为冷启动信号', () => {
     expect(isColdStartError({ code: 'ECONNABORTED' })).toBe(true)
@@ -295,6 +337,18 @@ describe('api/index isColdStartError', () => {
   })
   it('普通 400 业务错误不算冷启动', () => {
     expect(isColdStartError({ response: { status: 400, data: { code: 400, message: '用户名已存在' } } })).toBe(false)
+  })
+})
+
+describe('api/index isNetworkLayerFailure', () => {
+  it('裸 Network Error（无任何 HTTP 响应）判定为网络层失败', () => {
+    expect(isNetworkLayerFailure({ message: 'Network Error' })).toBe(true)
+  })
+  it('拿得到 HTTP 响应时不算网络层失败（交由 status 分支判定）', () => {
+    expect(isNetworkLayerFailure({ response: { status: 502 }, message: 'Bad Gateway' })).toBe(false)
+  })
+  it('本地超时不算网络层失败（属后端未就绪信号，会走冷启动文案）', () => {
+    expect(isNetworkLayerFailure({ code: 'ECONNABORTED', message: 'timeout of 0ms exceeded' })).toBe(false)
   })
 })
 

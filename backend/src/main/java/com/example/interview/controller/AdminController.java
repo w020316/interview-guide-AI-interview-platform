@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -107,7 +109,8 @@ public class AdminController {
     @Operation(summary = "禁用用户")
     @PostMapping("/users/{id}/ban")
     public Result<Void> banUser(@PathVariable Long id) {
-        adminService.banUser(id);
+        // P2-07：传入当前管理员 ID，供服务端拦截「禁用自己 / 禁用最后一个管理员」
+        adminService.banUser(id, currentUserId());
         return Result.success(null);
     }
 
@@ -122,5 +125,16 @@ public class AdminController {
     @GetMapping("/metrics")
     public Result<Map<String, Object>> metrics() {
         return Result.success(adminService.metrics());
+    }
+
+    /** 当前登录用户 ID（JWT subject，由 JwtAuthFilter 写入 principal）；解析失败返回 null */
+    private Long currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getPrincipal() == null) return null;
+        try {
+            return Long.valueOf(auth.getPrincipal().toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

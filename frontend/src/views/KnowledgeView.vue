@@ -58,7 +58,7 @@
 
       <!-- 等待进度（v1.34.1 UX P2-4）：RAG 问答实测约 12s，给出实时秒数与预期区间 -->
       <div v-if="loading" class="loading-hint">
-        正在检索知识库并生成回答… 已等待 {{ askElapsedSec }}s（通常 5–15 秒，首次调用可能更久）
+        正在检索知识库并生成回答… 已等待 {{ askElapsedSec }}s（通常 5–15 秒；知识库空闲后首次检索需唤醒，约 20–30 秒）
       </div>
 
       <div v-if="answer" class="answer-card fade-in-up">

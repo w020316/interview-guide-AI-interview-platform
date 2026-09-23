@@ -164,6 +164,18 @@
             <BaseButton v-if="qIndex < questions.length - 1" variant="ghost" @click="nextQuestion">跳过本题</BaseButton>
             <BaseButton v-if="qIndex === questions.length - 1" variant="success" @click="finishSession">结束面试</BaseButton>
           </div>
+
+          <!-- 评分等待反馈（P2-21）：让用户看得出是在评估，而不是卡死了 -->
+          <div v-if="evalLoading" class="eval-waiting" role="status" aria-live="polite">
+            <span class="eval-waiting-dot" aria-hidden="true"></span>
+            <span class="eval-waiting-text">
+              {{ evalLongWait ? 'AI 正在深度评估你的回答，请稍候…' : 'AI 正在评估你的回答…' }}
+            </span>
+            <span class="eval-waiting-elapsed">已用 {{ evalElapsed }}s</span>
+          </div>
+          <p v-if="evalLoading && evalLongWait" class="eval-waiting-hint">
+            评分通常需要 10–30 秒，偶尔会更久。请勿刷新页面，以免丢失当前答题进度。
+          </p>
         </div>
       </div>
 
@@ -436,6 +448,32 @@ const qIndex = ref(0)
 const userAnswer = ref('')
 const evalLoading = ref(false)
 const evalResult = ref<EvalResult | null>(null)
+
+// ── 评分等待反馈（P2-21）──
+/**
+ * 评分耗时实测 11s ~ 71s（同一题三次独立评分也有 1.4x 波动），而此前界面上只有
+ * 按钮 loading，用户无法区分「AI 正在评估」与「已经卡死」；长尾场景下用户会刷新页面，
+ * 反而丢失当前答题进度。这里给出已用时长与长等待文案。
+ */
+const evalElapsed = ref(0)
+let evalTimer: ReturnType<typeof setInterval> | null = null
+/** 超过该秒数后切换为「深度评估」文案 */
+const EVAL_LONG_WAIT_SEC = 15
+const evalLongWait = computed(() => evalElapsed.value >= EVAL_LONG_WAIT_SEC)
+
+function startEvalTimer() {
+  evalElapsed.value = 0
+  if (evalTimer) clearInterval(evalTimer)
+  evalTimer = setInterval(() => { evalElapsed.value++ }, 1000)
+}
+
+function stopEvalTimer() {
+  if (evalTimer) {
+    clearInterval(evalTimer)
+    evalTimer = null
+  }
+  evalElapsed.value = 0
+}
 const streaming = ref(false)
 const streamContent = ref('')
 const hintOpen = ref(false)
@@ -558,12 +596,30 @@ const reportOpen = ref(false)
 /** 历史各场综合得分（不含本轮，从 trend 过滤当前会话） */
 const historyScores = ref<number[]>([])
 const historyCompareLoaded = ref(false)
-/** 与历史对比结论 */
-const reportCompare = computed(() => compareWithHistory(reportAverages.value.overall, historyScores.value))
+/**
+ * P2-20：历史对比必须区分三种状态，此前三者被压成同一个「首次」——
+ * ① 真的没有历史会话；② 有历史会话但 trend 返回空（数据异常）；③ 加载失败。
+ * ②③ 都会让有历史的老用户看到与事实完全相反的「你是首次」。
+ */
+const compareFailed = ref(false)
+const hasPastSessions = ref(false)
 /** 下一轮目标分 */
 const nextTarget = computed(() => suggestNextTarget(reportAverages.value.overall))
+/** 与历史对比结论（含 P2-20 的三态修正） */
+const reportCompare = computed(() => {
+  const base = compareWithHistory(reportAverages.value.overall, historyScores.value)
+  if (compareFailed.value) {
+    return { ...base, hint: '历史成绩加载失败，本次未参与对比。可稍后重开报告重试。' }
+  }
+  if (base.status === 'unknown' && hasPastSessions.value) {
+    return { ...base, hint: '历史数据暂不可用（未能读取既有会话的成绩），本次未参与对比。' }
+  }
+  return base
+})
 /** 对比状态的中文标签 */
 const compareStatusLabel = computed(() => {
+  // P2-20：加载失败时不再谎称「首次」
+  if (compareFailed.value) return '数据异常'
   switch (reportCompare.value.status) {
     case 'improved': return '进步'
     case 'declined': return '待加强'
@@ -978,6 +1034,7 @@ async function submitAnswer() {
   if (!userAnswer.value.trim()) return ElMessage.warning('请输入回答')
   evalLoading.value = true
   evalResult.value = null
+  startEvalTimer()
   try {
     // 1. 评估回答（AI 返回评分 + 改进建议；可选携带附图 imageUrl 做多模态评估 v1.30.0）
     const data = await api.post('/api/interview/evaluate', {
@@ -1027,7 +1084,10 @@ async function submitAnswer() {
     }
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '评估失败'))
-  } finally { evalLoading.value = false }
+  } finally {
+    stopEvalTimer()
+    evalLoading.value = false
+  }
 }
 
 function nextQuestion() {
@@ -1087,14 +1147,28 @@ async function deepFollowUp() {
  */
 async function loadHistoryCompare(currentSessionId: string) {
   historyCompareLoaded.value = false
+  compareFailed.value = false
   try {
-    const trend = await api.get('/api/stats/trend', { params: { dimension: 'DAY' } }) as unknown as TrendPoint[]
-    historyScores.value = (trend || [])
+    const [trendRaw, sessionsRaw] = await Promise.all([
+      api.get('/api/stats/trend', { params: { dimension: 'DAY' } }),
+      // 其它已完成会话是否存在 —— 用于把「真首次」与「有历史但趋势为空」区分开（P2-20）。
+      // 该请求失败不应让整段对比失败，故单独 catch 成空数组。
+      api.get('/api/session/list').catch(() => []),
+    ])
+    const trend = (trendRaw || []) as unknown as TrendPoint[]
+    const sessions = (sessionsRaw || []) as unknown as Array<{ sessionId?: string; status?: string }>
+    historyScores.value = trend
       .filter((p) => p.sessionId !== currentSessionId)
       .map((p) => p.score ?? 0)
+    hasPastSessions.value = sessions.some(
+      (s) => s.sessionId !== currentSessionId && s.status === 'FINISHED',
+    )
   } catch (e: unknown) {
-    console.warn('历史成绩加载失败，跳过对比：', e)
+    // P2-20：不再把「加载失败」静默降级成「你是首次」——那会把异常伪装成事实
+    console.warn('历史成绩加载失败：', e)
+    compareFailed.value = true
     historyScores.value = []
+    hasPastSessions.value = false
   } finally {
     historyCompareLoaded.value = true
   }
@@ -1168,6 +1242,8 @@ onUnmounted(() => {
   if (speechRec?.isRecording()) speechRec.cancel()
   // 清理生成进度计时器
   stopGenProgress()
+  // 清理评分等待计时器（P2-21）
+  stopEvalTimer()
 })
 </script>
 
@@ -1876,6 +1952,48 @@ onUnmounted(() => {
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 4px;
+}
+
+/* ── 评分等待反馈（P2-21）──
+   评分耗时 11s~71s 波动大，此前界面上只有按钮 loading，
+   用户无法区分「AI 正在评估」与「已经卡死」。 */
+.eval-waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border-light);
+  font-size: 13px;
+  color: var(--c-text-secondary);
+}
+
+.eval-waiting-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  animation: eval-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes eval-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.eval-waiting-elapsed {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-tertiary);
+}
+
+.eval-waiting-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-text-tertiary);
 }
 
 /* ── 多模态附图（v1.30.0）── */

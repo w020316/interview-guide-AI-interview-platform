@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 招聘信息智能体接口
@@ -63,6 +64,35 @@ public class JobAgentController {
         return auth.getPrincipal().toString();
     }
 
+    /** 搜索关键词允许的字符：中文、英文、数字、空格与常见符号（P2-04） */
+    private static final Pattern KEYWORD_ALLOWED =
+            Pattern.compile("^[\\u4e00-\\u9fa5a-zA-Z0-9 +#._\\-/&·]*$");
+    private static final int KEYWORD_MAX_LENGTH = 50;
+
+    /**
+     * 搜索关键词白名单校验（P2-04），返回 null 表示通过。
+     *
+     * 背景：云端边缘安全网关（Render 边缘 WAF）对含 SQL 注入特征的查询串直接返回
+     * 403 + HTML 拦截页，且该响应**不带 CORS 头** → 浏览器只能上报 net::ERR_FAILED，
+     * 前端既拿不到 403 也拿不到响应体，曾据此误报「后端冷启动」并静默重放一次
+     * （见 UX 测试报告 P2-04）。
+     *
+     * 与其让请求被应用之外的网关拦下、给出误导性提示，不如在入口处显式拒绝并说明原因。
+     * 白名单覆盖 "C++" / "C#" / "node.js" / "Java/Python" / "前端 开发" 等真实搜索；
+     * 引号、分号、注释符、尖括号等注入特征则在到达网关之前就被挡下。
+     */
+    private String validateKeyword(String keyword) {
+        if (keyword == null || keyword.isBlank()) return null;
+        String trimmed = keyword.trim();
+        if (trimmed.length() > KEYWORD_MAX_LENGTH) {
+            return "搜索关键词过长（最多 " + KEYWORD_MAX_LENGTH + " 个字符），请缩短后重试";
+        }
+        if (!KEYWORD_ALLOWED.matcher(trimmed).matches()) {
+            return "搜索关键词包含不支持的字符，请仅使用中英文、数字与常见符号（+ # . - _ / &）";
+        }
+        return null;
+    }
+
     /**
      * 岗位列表（多条件筛选）
      * GET /api/jobs?keyword=java&industry=互联网&jobType=技术&location=深圳&recruitType=AUTUMN&source=内置精选&degree=本科及以上&experience=1-3 年&page=0&size=10
@@ -82,6 +112,11 @@ public class JobAgentController {
             @RequestParam(required = false) Boolean overseas,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "10") int size) {
+        // P2-04：先做关键词白名单校验，避免请求被边缘 WAF 拦下后前端拿不到任何可解释信息
+        String keywordError = validateKeyword(keyword);
+        if (keywordError != null) {
+            return Result.error(400, keywordError);
+        }
         Page<JobPostingEntity> result = jobAgentService.search(
                 keyword, industry, jobType, location, recruitType, source, degree, experience,
                 overseas, page, size);
@@ -113,8 +148,10 @@ public class JobAgentController {
      */
     @Operation(summary = "筛选面板元数据")
     @GetMapping("/meta")
-    public Result<Map<String, Object>> meta() {
-        return Result.success(jobAgentService.meta());
+    public Result<Map<String, Object>> meta(
+            // P2-08：分栏口径——「全部国内」传 false、「海外远程」传 true，缺省为全局
+            @RequestParam(required = false) Boolean overseas) {
+        return Result.success(jobAgentService.meta(overseas));
     }
 
     @Operation(summary = "简历匹配推荐（岗位吻合度打分）")

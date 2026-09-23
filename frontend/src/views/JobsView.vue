@@ -526,7 +526,12 @@ async function fetchJobs() {
 
 async function fetchMeta() {
   try {
-    const res = await api.get('/api/jobs/meta')
+    // P2-08：元数据里的「招聘类型」计数必须与当前分栏口径一致 ——
+    // 否则「全部国内」分栏会显示全局数字（分栏内实有 71 条社招，chips 却显示 1883，
+    // 用户点进去会怀疑数据丢了或分页失效）。
+    const res = await api.get('/api/jobs/meta', {
+      params: { overseas: recruitType.value === 'OVERSEAS' },
+    })
     meta.value = (res as unknown as JobsMeta) || {
       industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null,
       overseasSources: [], overseasCount: 0,
@@ -609,6 +614,8 @@ function switchTab(value: string) {
   } else {
     applyFilters()
   }
+  // P2-08：分栏变了，招聘类型计数要按新口径重新取（国内 ↔ 海外口径不同）
+  fetchMeta()
 }
 
 function goPage(p: number) {

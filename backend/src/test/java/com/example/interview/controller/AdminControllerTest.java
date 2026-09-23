@@ -193,7 +193,9 @@ class AdminControllerTest {
                         .post("/api/admin/users/7/unban"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
-        org.mockito.Mockito.verify(adminService).banUser(7L);
+        // P2-07：封禁需带当前管理员 ID（供服务端拦截「禁用自己 / 最后一个管理员」）
+        org.mockito.Mockito.verify(adminService).banUser(
+                org.mockito.ArgumentMatchers.eq(7L), org.mockito.ArgumentMatchers.any());
         org.mockito.Mockito.verify(adminService).unbanUser(7L);
     }
 

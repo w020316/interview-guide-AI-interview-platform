@@ -85,9 +85,28 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.40.0'
+export const CURRENT_VERSION = '1.41.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.41.0',
+    date: '2026-09-23',
+    title: '版本 1.41.0 · 数字更可信，等待更可懂',
+    items: [
+      { text: '招聘广场：「招聘类型」标签上的数字现在跟着分栏走——此前切到「全部国内」仍显示含海外岗位的全局数字（显示「社招 1883」，该分栏实际只有 71 条），点进去会让人以为数据丢了一大半', level: 'user' },
+      { text: '招聘广场：搜索词里含引号、分号等特殊符号时，不再弹出「后端服务正在冷启动」这种毫不相干的提示，而是直接说明该输入不被支持、请修改后重试', level: 'user' },
+      { text: '管理后台：禁用用户的提示与真实行为对齐了——禁用是持久保存的（服务重启后仍然生效），并在禁用前要求二次确认；此前文案写「重启自动恢复」，很容易被当成临时封禁来用', level: 'user' },
+      { text: '管理后台：现在不能禁用你自己的账号，也不能禁用最后一个管理员账号（此前一次误点会让管理后台永久进不去，只能手工改数据库恢复）', level: 'user' },
+      { text: '复盘报告：「与历史成绩对比」不再对老用户显示「首次」——只有确实没有任何历史记录才算首次；历史数据读取失败时会如实说明，而不是谎称你是新手', level: 'user' },
+      { text: '模拟面试：评分等待期间会显示已用时长，超过 15 秒提示「正在深度评估，请耐心等待」。AI 评分实测 11 秒到 1 分钟以上都有，此前只有按钮转圈，容易让人以为卡死而刷新页面、丢掉答题进度', level: 'user' },
+      { text: '知识库：同一个问题的重复检索会直接命中缓存，不再每次都等知识库唤醒（首次检索仍可能需要 20–30 秒，界面已明确说明）', level: 'user' },
+      { text: '招聘广场：/api/jobs/meta 支持 overseas 参数，按分栏返回 recruitCounts；入口处对搜索关键词做白名单与长度校验（≤50 字符，仅中英文、数字与常见符号），从源头避免请求打到边缘安全网关', level: 'tech' },
+      { text: '管理后台：AdminService.banUser 增加「不能禁用自己」「不能禁用最后一个可用管理员」两道服务端校验（按 app.admin-usernames 统计可用管理员数）', level: 'tech' },
+      { text: '知识库：RagSearchService 对 (userId, topK, query) 加 10 分钟 TTL 缓存（含空结果），检索失败不写缓存；知识导入时主动清缓存，避免新知识 10 分钟内检索不到', level: 'tech' },
+      { text: '复盘报告：历史对比区分「真首次 / 有会话但趋势为空 / 加载失败」三态，不再把数据异常降级成「首次」', level: 'tech' },
+      { text: '网络层：401 与 403 语义分离——只有 401 才清 token 跳登录，403 保留会话仅提示；裸 Network Error 不再被当作后端冷启动信号（既不误报文案，也不再静默重放一次请求）', level: 'tech' },
+    ],
+  },
   {
     version: '1.40.0',
     date: '2026-09-23',

@@ -119,6 +119,57 @@ class RagSearchServiceTest {
     }
 
     @Test
+    @DisplayName("P2-09: 相同 query 的重复检索命中缓存，不再唤醒 embedding（vectorStore 只调用一次）")
+    void search_repeatedQueryHitsCache() {
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+
+        service.search("Java 并发", 5, USER_ID);
+        service.search("Java 并发", 5, USER_ID);
+
+        // embedding 跑在独立免费实例上、空闲即挂起，首次检索实测 25.66s ——
+        // 重复检索必须走缓存，否则每次都要付一次冷启动等待
+        verify(vectorStore, times(1)).similaritySearch(any(SearchRequest.class));
+    }
+
+    @Test
+    @DisplayName("P2-09: 缓存按 (userId, topK, query) 分键——可见集合与结果数不同，不可串用")
+    void search_cacheKeyedByUserTopKAndQuery() {
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+
+        service.search("Java 并发", 5, USER_ID);
+        service.search("Java 并发", 5, "other-user"); // 不同用户（可见文档集合不同）
+        service.search("Java 并发", 10, USER_ID);     // 不同 topK
+        service.search("Java 线程", 5, USER_ID);      // 不同 query
+
+        verify(vectorStore, times(4)).similaritySearch(any(SearchRequest.class));
+    }
+
+    @Test
+    @DisplayName("P2-09: clearSearchCache 后强制重新检索（知识库变更路径必须清缓存）")
+    void search_clearCacheForcesRequery() {
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+
+        service.search("Java 并发", 5, USER_ID);
+        service.clearSearchCache();
+        service.search("Java 并发", 5, USER_ID);
+
+        verify(vectorStore, times(2)).similaritySearch(any(SearchRequest.class));
+    }
+
+    @Test
+    @DisplayName("P2-09: 检索失败不写缓存——异常态（embedding 未就绪）不得被固化 10 分钟")
+    void search_failureIsNotCached() {
+        when(vectorStore.similaritySearch(any(SearchRequest.class)))
+                .thenThrow(new IllegalStateException("embedding 未就绪"));
+
+        assertThat(service.search("Java 并发", 5, USER_ID)).isEqualTo("[]");
+        assertThat(service.search("Java 并发", 5, USER_ID)).isEqualTo("[]");
+
+        // 两次都应真正尝试检索：若把失败结果缓存住，恢复后 10 分钟内都会返回空
+        verify(vectorStore, times(2)).similaritySearch(any(SearchRequest.class));
+    }
+
+    @Test
     @DisplayName("search: topK 超过 50 应夹紧为 50，并按 userId+shared 过滤")
     void search_topKClampedTo50_andUsesUserFilter() {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());

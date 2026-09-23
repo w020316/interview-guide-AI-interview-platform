@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.util.LocalPromptCache;
 import com.example.interview.util.PromptSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
@@ -120,6 +121,22 @@ public class RagSearchService {
     /** 已入库文档计数（与内存向量库同生命周期） */
     private final java.util.concurrent.atomic.AtomicInteger storedDocs = new java.util.concurrent.atomic.AtomicInteger(0);
 
+    /**
+     * 检索结果短 TTL 缓存（P2-09）。
+     *
+     * <p>背景：embedding 跑在**独立部署的 Render 免费实例**上，空闲即被挂起，
+     * 首次请求要等它冷启动 —— 实测线上单次语义检索 25.66s（同期其他接口 0.9~2.4s）。
+     * 检索结果是确定性的（同一 query + topK + 同一用户可见集合 → 同一结果），
+     * 因此对 (userId, topK, query) 做 10 分钟缓存：重复检索直接命中，不再唤醒 embedding。
+     *
+     * <p>权衡：知识库写入后最长存在 10 分钟陈旧窗口，故导入/删除路径会主动
+     * {@link #clearSearchCache()}。{@link #answerWithRag} 含 AI 生成、非确定性，不参与缓存。
+     */
+    private final LocalPromptCache searchCache = new LocalPromptCache(200);
+
+    /** 检索结果缓存有效期（毫秒） */
+    private static final long SEARCH_CACHE_TTL_MS = 10 * 60 * 1000L;
+
     /** 单批去重检查次数上限：每次检查 = 1 次 embedding 调用，批量大时限流保护（超出部分直接导入） */
     private static final int DEDUP_CHECK_LIMIT = 50;
 
@@ -161,6 +178,13 @@ public class RagSearchService {
         }
         int safeK = Math.max(1, Math.min(topK, 50));
 
+        // P2-09：命中缓存直接返回，避免为一次重复检索唤醒休眠中的 embedding 实例
+        String cacheKey = userId + "|" + safeK + "|" + query.trim();
+        String cached = searchCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
         try {
             // 过滤条件：userId = 当前用户 OR shared = true
             FilterExpressionBuilder b = new FilterExpressionBuilder();
@@ -175,6 +199,9 @@ public class RagSearchService {
             List<Document> docs = vectorStore.similaritySearch(reqBuilder.build());
 
             if (docs == null || docs.isEmpty()) {
+                // 空结果同样是确定性结论，必须缓存：否则查一个知识库未覆盖的词，
+                // 每次都要把休眠中的 embedding 实例重新唤醒（P2-09 的代价场景）
+                searchCache.put(cacheKey, "[]", SEARCH_CACHE_TTL_MS);
                 return "[]";
             }
 
@@ -199,11 +226,21 @@ public class RagSearchService {
                 }
                 result.add(item);
             }
-            return objectMapper.writeValueAsString(result);
+            String json = objectMapper.writeValueAsString(result);
+            searchCache.put(cacheKey, json, SEARCH_CACHE_TTL_MS);
+            return json;
         } catch (Exception e) {
+            // 检索失败不写缓存：异常态（如 embedding 尚未就绪）不应被固化 10 分钟
             log.warn("RAG 检索失败 query='{}'：{}", query, e.getMessage());
             return "[]";
         }
+    }
+
+    /**
+     * 清空检索缓存（P2-09）：知识库内容变更后调用，消除 10 分钟陈旧窗口。
+     */
+    public void clearSearchCache() {
+        searchCache.clear();
     }
 
     /**
@@ -393,6 +430,8 @@ public class RagSearchService {
         if (documents == null || documents.isEmpty()) {
             return 0;
         }
+        // P2-09：知识库内容即将变化，清掉检索缓存，避免新导入的知识 10 分钟内检索不到
+        clearSearchCache();
         try {
             FilterExpressionBuilder b = new FilterExpressionBuilder();
             List<Document> docs = new ArrayList<>();
