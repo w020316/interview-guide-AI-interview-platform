@@ -320,6 +320,7 @@ import { JOB_SUGGESTIONS } from '../utils/jobOptions'
 import {
   createHandoffWatcher,
   detectInAppBrowser,
+  detectMobile,
   inAppBrowserHint,
   launchFallbackHint,
   HANDOFF_WINDOW_MS,
@@ -433,12 +434,6 @@ const failedKey = ref('')
  * 这些宿主会拦截 App scheme，按普通移动端处理必然误报「未检测到 App」。
  */
 const inAppHost = ref('')
-
-/** 终端判定：移动端优先唤起 App，桌面端直达网页版 */
-function detectMobile(): boolean {
-  if (typeof navigator === 'undefined') return false
-  return /Android|iPhone|iPad|iPod|HarmonyOS|Mobile|Windows Phone/i.test(navigator.userAgent)
-}
 
 /** 触发原生文件选择（桌面打开文件管理器；iOS/Android 打开「文件」App，可进 iCloud / 云盘取件） */
 function triggerFilePicker() {
