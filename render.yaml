@@ -56,34 +56,40 @@ services:
         sync: false
       - key: AI_ZHIPU_BASE_URL
         value: https://open.bigmodel.cn/api/paas/v4
+      # ⚠️ 2026-09-23 校正：glm-4.5-flash 已于 2026-01-30 下线，请求会被智谱侧**静默路由**
+      #   到 glm-4.7-flash（不报错，于是配置错误被长期掩盖）。改为显式模型名，
+      #   避免「配置里写的」与「实际跑的」不是同一个模型。
       - key: AI_ZHIPU_CHAT_MODEL
-        value: glm-4.5-flash
+        value: glm-4.7-flash
       # 兜底 2：智谱 glm-4-flash —— 末位保险
       - key: AI_ZHIPU_FALLBACK_MODEL
         value: glm-4-flash
 
-      # ══ 2. Embedding（云端必须用远程 API）══════════════════════════
-      # 阿里云百炼 text-embedding-v4：
-      #   免费额度 100 万 Token / 开通后 90 天；中文效果第一梯队；OpenAI 兼容
+      # ══ 2. Embedding（自托管，零成本）══════════════════════════════
+      # 2026-09-23 注释校正：原注释描述的是**已弃用**的阿里云百炼方案，与实际配置不符；
+      #   其中「维度必须设 1024」这类强约束警告会把后续维护者直接带沟里。
       #
-      # ⚠️⚠️ 维度必须设 1024，不能设 1536 —— 这是本轮排查发现的隐藏约束：
-      #   AiConfig 构造 embedding 选项时**没有把 dimensions 传给 API**
-      #   （OpenAiEmbeddingOptions.builder().model(...).build()，缺 .dimensions(...)），
-      #   因此 AI_EMBEDDING_DIMENSIONS **只影响 pgvector 建表**，
-      #   实际返回的向量维度由**模型默认值**决定。
-      #   百炼 text-embedding-v4 默认输出 1024 维 → 故此处必须填 1024，
-      #   否则会出现「表是 1536 列、写入 1024 维向量」的维度不匹配错误。
+      # 当前实际：本仓库 embedding-service/ 自托管 fastembed(ONNX) + BAAI/bge-small-zh-v1.5
+      #   · 维度 **512**（不是 1024），AI_EMBEDDING_DIMENSIONS 必须与之一致
+      #   · 与本地开发环境同一模型 → RAG_AUTO_SUPPLEMENT_MAX_DISTANCE=0.45 的标定仍然有效
+      #   · 免费、无限额度；代价是该服务同样跑在 Render 免费层，空闲 15 分钟休眠、
+      #     冷启动约 24s。**它不在保活窗口内**（成本取舍见 docs/keepalive-setup.md）
       #
-      # ⚠️ 首次切换 embedding 供应商后，需清空 pgvector 旧表（向量空间不通用）：
-      #   在 Supabase SQL Editor 执行：DROP TABLE IF EXISTS vector_store;
-      #   重启后 Spring AI 会按 initialize-schema 自动重建。
-      #
-      # ⚠️ Key 与地域强绑定：北京地域的 Key 不能用于新加坡端点。
-      #   开通：https://bailian.console.aliyun.com/ → 实名 → 模型广场取 Key
+      # ⚠️ 换任何 embedding 供应商都适用的通用约束：
+      #   1) AI_EMBEDDING_DIMENSIONS **只影响 pgvector 建表** —— AiConfig 构造 embedding 选项时
+      #      没有把 dimensions 传给 API，实际返回维度由**模型默认值**决定。填错会得到
+      #      「表是 N 列、写入 M 维向量」的维度不匹配错误。
+      #   2) 首次切换 embedding 供应商/模型后，需清空 pgvector 旧表（向量空间不通用）：
+      #      在 Supabase SQL Editor 执行 DROP TABLE IF EXISTS vector_store; 重启后自动重建。
+      #   3) 检索阈值 RAG_AUTO_SUPPLEMENT_MAX_DISTANCE 必须按新模型重新标定。
       - key: AI_EMBEDDING_BASE_URL
         value: https://interview-guide-embedding.onrender.com
+      # ⚠️ 2026-09-23 安全修复：此处原为明文 value，随**公开仓库**泄露，
+      #   实测外部可直接调用该 embedding 服务（不带令牌 401 / 带泄露令牌 200）。
+      #   现改为 sync: false —— 值在 Render 面板维护，务必与 embedding 服务的
+      #   EMBED_AUTH_TOKEN **保持一致**（后者同样已改为面板维护）。
       - key: AI_EMBEDDING_API_KEY
-        value: wb-embed-2026
+        sync: false
       - key: AI_EMBEDDING_MODEL
         value: BAAI/bge-small-zh-v1.5
       - key: AI_EMBEDDING_DIMENSIONS
@@ -190,5 +196,12 @@ services:
       - key: EMBED_CACHE
         value: /app/models
       # 轻量防滥用令牌（后端 AI_EMBEDDING_API_KEY 需填同名值）
+      # ⚠️ 2026-09-23 安全修复：此处原为明文 value，随公开仓库泄露。改为 sync: false，在面板维护。
+      # 服务端支持**逗号分隔多令牌**（见 embedding-service/server.py），可用于零中断轮换：
+      #   ① 面板填「新,旧」→ 本服务重启（两者都可用）
+      #   ② 面板把后端 AI_EMBEDDING_API_KEY 改为「新」→ 后端重启
+      #   ③ 面板把本服务改回「新」→ 完成轮换，旧令牌彻底失效
+      # 另：服务端已改为 fail-closed（未配置令牌时拒绝所有请求，而非静默开放），
+      #   因此**不要**把本变量删空——删空会导致知识库彻底不可用。
       - key: EMBED_AUTH_TOKEN
-        value: wb-embed-2026
+        sync: false

@@ -26,8 +26,43 @@ PORT = int(os.environ.get("PORT") or os.environ.get("EMBED_PORT") or "8001")
 MODEL_NAME = os.environ.get("EMBED_MODEL", "BAAI/bge-small-zh-v1.5")
 # 模型在构建期已烘焙到 /app/models，运行期直接离线加载
 CACHE_DIR = os.environ.get("EMBED_CACHE", "/app/models")
-# 可选：用共享令牌做最简单的鉴权（为空则不校验）。Render 环境变量里配置同名 key。
-AUTH_TOKEN = os.environ.get("EMBED_AUTH_TOKEN", "")
+
+# ── 鉴权（2026-09-23 加固）──────────────────────────────────────────────
+# 支持**逗号分隔的多个令牌**，用于零中断轮换：
+#   ① 先让本服务同时接受「新,旧」两个令牌 → 重启
+#   ② 再把主后端的 AI_EMBEDDING_API_KEY 换成新令牌 → 重启
+#   ③ 最后移除旧令牌
+# 这样任何时刻都有可用令牌，轮换期间不会出现 401。
+#
+# ⚠️ 语义已改为 **fail-closed**：EMBED_AUTH_TOKEN 未配置或解析为空时**拒绝所有请求**，
+#    而不是像旧实现那样「不校验、对公网完全开放」。
+#    原因：旧实现下「误删环境变量」= 服务裸奔（比配置泄露更危险），
+#    而本服务只需要被自家后端调用，配置缺失时应该明确失败而不是静默开放。
+#    本地开发若要免鉴权，显式设置 EMBED_ALLOW_NO_AUTH=true（见 README）。
+def parse_tokens(raw):
+    """把 EMBED_AUTH_TOKEN 解析为令牌列表（支持逗号分隔多令牌，用于零中断轮换）。"""
+    return [t.strip() for t in (raw or "").split(",") if t.strip()]
+
+
+def is_authorized(auth_header, tokens, allow_no_auth=False):
+    """鉴权判定（纯函数，便于单测）。
+
+    **fail-closed 语义**：tokens 为空时拒绝，除非显式 allow_no_auth（仅本地调试用）。
+    旧实现是「为空则不校验」，意味着误删环境变量会让服务对公网完全开放。
+    """
+    if not tokens:
+        return allow_no_auth
+    return auth_header in ("Bearer " + t for t in tokens)
+
+
+AUTH_TOKENS = parse_tokens(os.environ.get("EMBED_AUTH_TOKEN", ""))
+ALLOW_NO_AUTH = os.environ.get("EMBED_ALLOW_NO_AUTH", "").lower() in ("1", "true", "yes")
+
+if not AUTH_TOKENS and not ALLOW_NO_AUTH:
+    print("[警告] EMBED_AUTH_TOKEN 未配置：本服务将拒绝所有 /v1/embeddings 请求。"
+          "如需本地免鉴权调试，请设置 EMBED_ALLOW_NO_AUTH=true", flush=True)
+elif len(AUTH_TOKENS) > 1:
+    print(f"[信息] 已启用多令牌模式（{len(AUTH_TOKENS)} 个），支持轮换过渡期", flush=True)
 
 _model = None
 _dim = None
@@ -68,10 +103,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _authorized(self):
-        if not AUTH_TOKEN:
-            return True
-        auth = self.headers.get("Authorization") or ""
-        return auth == f"Bearer {AUTH_TOKEN}"
+        return is_authorized(self.headers.get("Authorization") or "", AUTH_TOKENS, ALLOW_NO_AUTH)
 
     def do_GET(self):
         if self.path.startswith("/health"):

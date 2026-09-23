@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 系统预置共享知识库播种器
@@ -67,6 +70,21 @@ public class KnowledgeSeedInitializer implements ApplicationRunner {
 
     /** 进程内只播种一次（应用生命周期内不会重复） */
     private volatile boolean seeded = false;
+
+    /**
+     * 播种失败后的退避重试间隔（分钟）—— 见 {@link #scheduleSeedRetry(int)}。
+     * 逐级放大以覆盖 Embedding 免费实例的冷启动窗口（实测约 24s，但排队时可能更久）；
+     * 用尽后停止重试，等待应用下次重启。
+     */
+    private static final int[] SEED_RETRY_DELAYS_MIN = {1, 5, 15, 60};
+
+    /** 播种重试调度器：单线程 + 守护线程，不阻塞应用启动与退出 */
+    private final ScheduledExecutorService seedRetryScheduler =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "rag-seed-retry");
+                t.setDaemon(true);
+                return t;
+            });
 
     @Autowired
     public KnowledgeSeedInitializer(RagSearchService ragSearchService) {
@@ -266,43 +284,90 @@ public class KnowledgeSeedInitializer implements ApplicationRunner {
             return;
         }
         try {
-            String[][] all = allSeeds();
-            List<Document> docs = new ArrayList<>(all.length);
-            for (String[] item : all) {
-                String category = item[0];
-                String title = item[1];
-                String content = item[2];
-                // 标题拼进正文：检索时用户提问通常带术语（如「HashMap」「增值税」），
-                // 标题含关键词能显著提高向量命中率；category 也一并写入便于过滤与展示
-                String text = "【" + category + "】" + title + "\n" + content;
-                docs.add(Document.builder()
-                        // 确定性 ID（category+title 派生）：向量库持久化后，
-                        // 重复播种会覆盖同 ID 文档而非新增，天然幂等 ——
-                        // 这是「扩充预置知识后重启不产生重复条目」的关键。
-                        .id(deterministicId(category, title))
-                        .text(text)
-                        .metadata(Map.of(
-                                "category", category,
-                                "title", title,
-                                META_SHARED, "true",
-                                "type", "knowledge",
-                                "source", "system-seed"))
-                        .build());
-            }
-            int stored = ragSearchService.addToVectorStore(docs);
-            seeded = true;
-            log.info("共享知识库播种完成：{} 条预置知识已写入向量库"
-                            + "（IT 基础 {} 条 + 全行业 {} 条；shared=true，全部用户可检索）",
-                    stored, SEED_KNOWLEDGE.length, all.length - SEED_KNOWLEDGE.length);
-            markSeed(RagHealthTracker.SeedStatus.SUCCESS,
-                    stored + " 条预置知识已入库（IT 基础 " + SEED_KNOWLEDGE.length
-                            + " + 全行业 " + (all.length - SEED_KNOWLEDGE.length) + "）");
+            doSeed();
         } catch (Exception e) {
             // 播种失败不阻断启动：embedding 未配置时知识库为空，但登录/面试等核心功能不受影响
-            log.warn("共享知识库播种失败（已忽略，RAG 检索将为空，请检查 Embedding 配置）：{}", e.getMessage());
+            log.warn("共享知识库播种失败（将按退避重试，请检查 Embedding 配置）：{}", e.getMessage());
             // v1.34.1：把失败写入健康跟踪——否则「知识库不可用」在外部完全不可见
             markSeed(RagHealthTracker.SeedStatus.FAILED, "播种失败：" + e.getMessage());
+            // v1.42.0（P1-A）：不再「失败即永久降级」，改为退避重试，见 scheduleSeedRetry
+            scheduleSeedRetry(0);
         }
+    }
+
+    /** 实际播种逻辑（首次与退避重试共用） */
+    private void doSeed() {
+        String[][] all = allSeeds();
+        List<Document> docs = new ArrayList<>(all.length);
+        for (String[] item : all) {
+            String category = item[0];
+            String title = item[1];
+            String content = item[2];
+            // 标题拼进正文：检索时用户提问通常带术语（如「HashMap」「增值税」），
+            // 标题含关键词能显著提高向量命中率；category 也一并写入便于过滤与展示
+            String text = "【" + category + "】" + title + "\n" + content;
+            docs.add(Document.builder()
+                    // 确定性 ID（category+title 派生）：向量库持久化后，
+                    // 重复播种会覆盖同 ID 文档而非新增，天然幂等 ——
+                    // 这是「扩充预置知识后重启不产生重复条目」的关键。
+                    .id(deterministicId(category, title))
+                    .text(text)
+                    .metadata(Map.of(
+                            "category", category,
+                            "title", title,
+                            META_SHARED, "true",
+                            "type", "knowledge",
+                            "source", "system-seed"))
+                    .build());
+        }
+        int stored = ragSearchService.addToVectorStore(docs);
+        seeded = true;
+        log.info("共享知识库播种完成：{} 条预置知识已写入向量库"
+                        + "（IT 基础 {} 条 + 全行业 {} 条；shared=true，全部用户可检索）",
+                stored, SEED_KNOWLEDGE.length, all.length - SEED_KNOWLEDGE.length);
+        markSeed(RagHealthTracker.SeedStatus.SUCCESS,
+                stored + " 条预置知识已入库（IT 基础 " + SEED_KNOWLEDGE.length
+                        + " + 全行业 " + (all.length - SEED_KNOWLEDGE.length) + "）");
+    }
+
+    /**
+     * 播种失败后的退避重试（P1-A 修复）。
+     *
+     * <p><b>要解决的问题</b>：Embedding 跑在独立的 Render 免费实例上，空闲即休眠。
+     * 若后端启动时恰好赶上它冷启动，首次播种会拿到 502；而此前失败后**不再重试**，
+     * 同时 {@code /api/knowledge/status} 的 {@code available} 又只依据这份历史快照，
+     * 于是一次**时序性失败**被永久固化成「知识库不可用」。
+     *
+     * <p>线上实测正是如此：{@code seedStatus=FAILED}，但 Embedding {@code /health} 返回 ok、
+     * 知识导入与检索都正常 —— 用户却被持续告知功能不可用，运维也会被引向「检查配置」的
+     * 错误方向（配置其实没问题）。
+     *
+     * <p>重试间隔 1 / 5 / 15 / 60 分钟，用尽后停止（不做无限重试，避免长期占用额度）；
+     * 应用下次重启会重新从第一次开始。播种本身是幂等的（确定性 ID 覆盖写），
+     * 因此重复执行不会产生重复知识。
+     *
+     * @param round 已完成的轮次（0 表示首次播种失败后安排的第 1 次重试）
+     */
+    private void scheduleSeedRetry(int round) {
+        if (round >= SEED_RETRY_DELAYS_MIN.length) {
+            log.warn("共享知识库播种重试已用尽（共 {} 次），将在应用下次重启时再试",
+                    SEED_RETRY_DELAYS_MIN.length);
+            return;
+        }
+        long delayMinutes = SEED_RETRY_DELAYS_MIN[round];
+        seedRetryScheduler.schedule(() -> {
+            if (seeded) {
+                return;
+            }
+            log.info("重试共享知识库播种（第 {} 次，距上次失败约 {} 分钟）", round + 1, delayMinutes);
+            try {
+                doSeed();
+            } catch (Exception e) {
+                log.warn("共享知识库播种重试失败：{}", e.getMessage());
+                markSeed(RagHealthTracker.SeedStatus.FAILED, "播种失败：" + e.getMessage());
+                scheduleSeedRetry(round + 1);
+            }
+        }, delayMinutes, TimeUnit.MINUTES);
     }
 
     /** 写入播种状态（跟踪器可能为空：切片单测直接构造本类时未注入） */

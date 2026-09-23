@@ -82,7 +82,7 @@
         <!-- 招聘类型分布 -->
         <div class="chart-card">
           <h3>招聘类型分布</h3>
-          <p v-if="!recruitDist.length" class="chart-empty">暂无数据</p>
+          <p v-if="!recruitDistList.length" class="chart-empty">暂无数据</p>
           <div v-else class="donut-wrap">
             <div class="donut" :style="donutStyle">
               <div class="donut-hole">

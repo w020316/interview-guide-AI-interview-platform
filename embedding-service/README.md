@@ -29,10 +29,36 @@
 
 ```
 AI_EMBEDDING_BASE_URL=https://interview-guide-embedding.onrender.com
-AI_EMBEDDING_API_KEY=local-embedding
+AI_EMBEDDING_API_KEY=<与下表的 EMBED_AUTH_TOKEN 保持一致>   ← 面板维护，不进仓库
 AI_EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5
 AI_EMBEDDING_DIMENSIONS=512
 ```
+
+### 鉴权与令牌轮换（2026-09-23 加固）
+
+两个服务共用同一个共享令牌：
+
+| 服务 | 变量 | 说明 |
+|---|---|---|
+| `interview-guide-embedding` | `EMBED_AUTH_TOKEN` | 本服务的入站令牌，**支持逗号分隔多值** |
+| `interview-guide-backend` | `AI_EMBEDDING_API_KEY` | 调用本服务时带出的令牌，**单值** |
+
+**语义要点**：
+
+- `EMBED_AUTH_TOKEN` **未配置时拒绝所有请求**（fail-closed）。
+  旧实现是「为空则不校验」，意味着**误删环境变量会让服务对公网完全开放** —— 比配置泄露更危险，故已改正。
+  本地调试如需免鉴权，显式设置 `EMBED_ALLOW_NO_AUTH=true`。
+- 两个变量都必须在 **Render 面板**维护（`render.yaml` 中为 `sync: false`），**不要写进版本库**。
+  起因：二者原先以明文 `value:` 写在 `render.yaml` 里，而仓库是公开的，实测外部可直接调用该服务。
+
+**零中断轮换步骤**（任一步骤都不会出现 401）：
+
+1. 面板把本服务的 `EMBED_AUTH_TOKEN` 改为 `新令牌,旧令牌` → 本服务重启（两者都被接受）
+2. 面板把后端的 `AI_EMBEDDING_API_KEY` 改为 `新令牌` → 后端重启
+3. 面板把本服务的 `EMBED_AUTH_TOKEN` 改回 `新令牌` → 旧令牌彻底失效
+
+> 第 1 步依赖服务端的**多令牌支持**，因此轮换前必须已部署含该支持的版本。
+> 若跳过第 1 步直接替换令牌，两个服务之间会存在一段 401 窗口（表现为知识库检索/导入失败）。
 
 ## 维度变更注意（重要）
 
