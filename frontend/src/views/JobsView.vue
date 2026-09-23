@@ -253,6 +253,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
+import { validateJobKeyword } from '../utils/jobKeyword'
 
 /**
  * 招聘信息广场
@@ -490,6 +491,14 @@ function showDetail(job: JobPosting) {
 }
 
 async function fetchJobs() {
+  // P2-04：关键词校验必须发生在**发请求之前**——含注入特征的查询串会在到达应用之前
+  // 就被 Render 边缘 WAF 拦掉（返回不带 CORS 头的 403），后端入口校验根本没机会执行。
+  // 放在这里（而非只放在回车事件上）是为了覆盖「改了输入框后直接点分页/切分栏」的路径。
+  const keywordError = validateJobKeyword(keyword.value)
+  if (keywordError) {
+    ElMessage.warning(keywordError)
+    return
+  }
   loading.value = true
   loadError.value = false
   try {

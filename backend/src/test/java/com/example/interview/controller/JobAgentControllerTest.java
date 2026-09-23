@@ -146,16 +146,22 @@ class JobAgentControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/jobs: 含注入特征的关键词在入口即被拒（P2-04）")
+    @DisplayName("GET /api/jobs: 字符不合规的关键词在应用入口被拒（P2-04）")
     void list_rejectsInjectionKeyword() throws Exception {
-        // 线上形状：' OR 1=1 被 Render 边缘 WAF 以 403 + HTML 拦截页拒绝，且响应**不带 CORS 头**，
-        // 浏览器只能上报 net::ERR_FAILED —— 前端拿不到任何可解释信息，曾据此误报「后端冷启动」。
-        // 现改为在应用入口显式拒绝并说明原因，请求根本不会打到网关。
-        mockMvc.perform(get("/api/jobs").param("keyword", "' OR 1=1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value(
-                        org.hamcrest.Matchers.containsString("不支持的字符")));
+        // ⚠️ 范围说明（2026-09-23 线上复验修正）：本用例只证明**应用层**白名单生效。
+        // 线上 `keyword=' OR 1=1` 会在到达应用之前就被 Render 边缘 WAF 拦掉（返回不带 CORS 头的
+        // 403 页面），应用层校验根本没有机会执行 —— 那类输入改由**前端在发请求前**拦截
+        //（frontend/src/utils/jobKeyword.ts）。
+        //
+        // 因此这里用「能穿过网关、但字符不在白名单内」的形状（分号 / 百分号 / 尖括号）验证应用层行为，
+        // 避免把「MockMvc 里通过了」误读成「线上也受保护」。
+        for (String kw : List.of("a;b", "100%", "a<b")) {
+            mockMvc.perform(get("/api/jobs").param("keyword", kw))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value(
+                            org.hamcrest.Matchers.containsString("不支持的字符")));
+        }
 
         verify(jobAgentService, never()).search(any(), any(), any(), any(), any(), any(), any(),
                 any(), any(), anyInt(), anyInt());

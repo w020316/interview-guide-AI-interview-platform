@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.41.0'
+export const CURRENT_VERSION = '1.41.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.41.1',
+    date: '2026-09-23',
+    title: '版本 1.41.1 · 搜索框更早拦住不合规输入',
+    items: [
+      { text: '招聘广场：搜索词里含引号、分号等特殊符号时，现在会在请求发出之前直接提示「仅支持中英文、数字与常见符号」，不用再等请求被安全网关拦掉、看到一个看不懂的网络错误', level: 'user' },
+      { text: '运维可观测：线上复验发现边缘安全网关在应用之前就拦掉了这类查询串，后端入口校验对它们永远不会执行；因此把校验前移到前端（规则与后端一致），后端那道保留用于拦截能到达应用的非法字符（如分号、百分号）', level: 'tech' },
+    ],
+  },
   {
     version: '1.41.0',
     date: '2026-09-23',

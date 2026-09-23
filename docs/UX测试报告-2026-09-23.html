@@ -1069,7 +1069,7 @@ Embedding 走自托管 <code>BAAI/bge-small-zh-v1.5</code>（512 维）。以下
   <tr><td>P1-02（IP 解析）</td><td>新增 <code>app.security.trusted-proxy-prefixes</code> 配置，供反向代理部署下恢复真实客户端 IP 解析（默认留空，不放宽原有信任边界）</td><td><span class="warn">需部署侧填入平台代理网段</span></td></tr>
 
   <tr><td colspan="3"><b>第二批（v1.41.0，2026-09-23 夜）：按「先修完 8 项 P2」的顺序实施</b></td></tr>
-  <tr><td>P2-04</td><td>搜索关键词在入口即按白名单拒绝（≤50 字符，仅中英文/数字与常见符号），请求不再打到边缘 WAF；前端区分「HTTP 403 业务拒绝」与「无任何响应的网络层失败」，不再误报「后端冷启动」，也不再静默重放一次</td><td><span class="ok">代码已修 + 回归测试</span></td></tr>
+  <tr><td>P2-04</td><td>前端在<b>请求发出前</b>校验关键词（白名单 + 长度），不再误报「后端冷启动」也不再静默重放；后端入口校验保留（拦截能到达应用的非法字符）。<br><b>线上复验修正</b>：边缘 WAF 在应用之前就拦掉了这类查询串，后端校验对它们不会执行 —— 见 9.3</td><td><span class="warn">前端拦截已补；后端校验对该类 payload 不执行</span></td></tr>
   <tr><td>P2-05</td><td>拦截器把 401 与 403 分开处理：仅 401 清 token 跳登录，403 保留会话并透传后端文案</td><td><span class="ok">代码已修 + 回归测试</span></td></tr>
   <tr><td>P2-06</td><td>管理后台禁用文案与 Redis 持久化实现对齐（「进程内生效，重启自动恢复」→「持久保存，重启后仍生效」）</td><td><span class="ok">代码已修</span></td></tr>
   <tr><td>P2-07</td><td>服务端拦截「禁用自己」与「禁用最后一个可用管理员」；前端对自己所在行隐藏禁用按钮、禁用他人前二次确认</td><td><span class="ok">代码已修 + 回归测试</span></td></tr>
@@ -1079,6 +1079,11 @@ Embedding 走自托管 <code>BAAI/bge-small-zh-v1.5</code>（512 维）。以下
   <tr><td>P2-21</td><td>评分等待期显示已用时长，超过 15 秒提示「正在深度评估，请耐心等待」，避免用户误判卡死而刷新丢进度</td><td><span class="ok">代码已修</span></td></tr>
 </table>
 
+<h3>9.3 线上复验与一处修正（v1.41.1）</h3>
+<p>v1.40.0 与 v1.41.0 推送后做了线上复验，<b>用的是「新代码引入的确定性行为」而不是版本号接口</b>——版本号只能证明「构建换了」，不能证明「行为对了」。</p>
+<p>复验手段与结论：前端入口 JS 哈希由 <code>2IO0ERm3</code> → <code>Cj-LsASn</code> → <code>Db0coIqQ</code>，并在包内检索到新增文案（「请求未收到响应」「请求被安全策略拦截」「AI 正在深度评估」「历史数据暂不可用」）→ 前端已上线且行为已生效；后端 <code>/api/info</code> 的 version 由 1.40.0 轮询到 1.41.0 → 已部署。</p>
+<p><b>P2-04 复验发现的真问题</b>：带合法 JWT 请求 <code>GET /api/jobs?keyword=' OR 1=1</code> 仍返回 Render 边缘 WAF 的 403 页面（含 Request ID），说明<b>请求在到达应用之前就被拦掉了</b>，因此「在后端入口做关键词白名单」对这类 payload <b>永远不会执行</b>。这正是「不把『代码已改』写成『线上已好』」的价值所在：单元测试全绿、CI 全绿、版本号也对，但被测行为在真实链路上根本没有机会发生。</p>
+<p><b>修正（v1.41.1）</b>：把关键词校验前移到<b>请求发出之前</b>（前端 <code>utils/jobKeyword.ts</code>，规则与后端保持一致），不合法就地提示、不发请求；后端那道保留，用于拦截「能到达应用、但字符不合规」的输入（如 <code>;</code>、<code>%</code>）。</p>
 <p class="note"><b>仍需部署侧动作（代码已就绪，但不动配置就不会生效）</b>：</p>
 <ul>
   <li><b>P1-25 的最终修复</b>：需在部署环境注入 <code>SUPABASE_URL</code> / <code>SUPABASE_SERVICE_KEY</code>
