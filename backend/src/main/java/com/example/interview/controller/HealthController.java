@@ -36,25 +36,53 @@ public class HealthController {
     private final RagSearchService ragSearchService;
     private final RagHealthTracker ragHealthTracker;
 
+    /**
+     * 版本号与构建日期来自配置（v1.39.0 修复）。
+     *
+     * <p><b>修的是什么</b>：此前 {@code /api/info} 把 version 写死成 {@code "1.0.0"}，
+     * 而 {@code application.yml} 里 {@code app.info.version} 的注释明确写着
+     * 「版本号与前端 changelog.ts 保持同步，修改时两处一起更新」——
+     * 也就是说这个约定在**公开接口上一直没生效**，任何靠它判断线上版本的人
+     * （包括运维、以及排查「线上到底跑的哪个版本」的人）都会拿到错误答案。
+     * {@code /actuator/info} 走的是 {@link com.example.interview.config.AppInfoContributor}，
+     * 那里读的才是配置，于是同一个应用的两个端点报出两个版本号。
+     */
+    private final String appVersion;
+    private final String buildDate;
+
     public HealthController(JdbcTemplate jdbcTemplate, RedisTemplate<String, Object> redisTemplate,
-                            RagSearchService ragSearchService, RagHealthTracker ragHealthTracker) {
+                            RagSearchService ragSearchService, RagHealthTracker ragHealthTracker,
+                            @org.springframework.beans.factory.annotation.Value("${app.info.version:unknown}")
+                            String appVersion,
+                            @org.springframework.beans.factory.annotation.Value("${app.info.build-date:}")
+                            String buildDate) {
         this.jdbcTemplate = jdbcTemplate;
         this.redisTemplate = redisTemplate;
         this.ragSearchService = ragSearchService;
         this.ragHealthTracker = ragHealthTracker;
+        this.appVersion = appVersion;
+        this.buildDate = buildDate;
     }
 
     /**
      * 系统信息（轻量，供前端/保活 ping）
+     *
+     * <p>注意：本接口是**匿名可访问**的保活探测端点，因此只暴露版本与构建日期这类
+     * 无敏感性的元数据，不含任何环境、依赖地址或 JVM 细节。
      */
     @GetMapping("/info")
     public Result<Map<String, String>> info() {
-        return Result.success(Map.of(
-                "name", "AI 智能面试辅助平台",
-                "version", "1.0.0",
-                "description", "基于 Spring Boot 3.3 + Spring AI 1.0 + Java 21",
-                "docs", "/api/docs"
-        ));
+        // 用 LinkedHashMap 而不是 Map.of：Map.of 的迭代顺序是未定义的，
+        // 而这是给人和脚本读的接口，字段顺序稳定才好比对
+        Map<String, String> data = new LinkedHashMap<>();
+        data.put("name", "AI 智能面试辅助平台");
+        data.put("version", appVersion);
+        data.put("description", "基于 Spring Boot 3.3 + Spring AI 1.0 + Java 21");
+        data.put("docs", "/api/docs");
+        if (buildDate != null && !buildDate.isBlank()) {
+            data.put("buildDate", buildDate);
+        }
+        return Result.success(data);
     }
 
     /**

@@ -128,7 +128,7 @@
 | `npx vue-tsc --noEmit` | 0 错误 |
 | `npx vitest run` | **313 passed / 27 files**（含 appLaunch 17 条 + designGuards 5 条） |
 | `npx vite build` | 通过（沙箱下需 `--outDir` 换目录，见备注） |
-| 后端 `mvn test` | **882 tests，0 failures，BUILD SUCCESS** |
+| 后端 `mvn test` | **883 tests，0 failures，BUILD SUCCESS** |
 | `node scripts/check-window-consistency.mjs` | ✅ 时间窗一致性通过 |
 | `node --test scripts/keepalive-worker.test.mjs` | ✅ 11/11 |
 | 真实浏览器 | Edge + playwright-cli，本地 dev server 截图确认 Hero 遮挡已消除、登录页入口已收敛、控制台 0 error |

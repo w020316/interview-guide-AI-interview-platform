@@ -107,7 +107,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       { text: '前端：新增 utils/appLaunch.ts，用 visibilitychange / pagehide / blur 三信号判断 App 是否交棒成功（原实现只看 visibilityState，在 iOS 系统确认框、部分 Android ROM 与宿主 WebView 下必然误报），配套 17 条单元测试', level: 'tech' },
       { text: '后端：公开招聘 API 增加单源单轮入库配额 25 条，避免五个海外源一次灌入数百条英文岗位淹没国内岗位', level: 'tech' },
       { text: '后端：新增 SeedDomesticSocialJobProvider 种子数据源（社招精选），并同步更新种子数据一致性测试', level: 'tech' },
-      { text: '验证：后端 882 个用例全过（BUILD SUCCESS）、前端 308 个用例全过、类型检查 0 错误、生产构建通过', level: 'tech' },
+      { text: '后端：修复 /api/info 的版本号写死为 1.0.0、不读配置的问题——此前它与 /actuator/info 报出两个不同版本号，与「版本号需和 changelog.ts 同步」的约定相悖；配套用例原先断言的正是那个写死值，等于把 bug 一起锁进了测试', level: 'tech' },
+      { text: '验证：后端 883 个用例全过（BUILD SUCCESS）、前端 313 个用例全过、类型检查 0 错误、生产构建通过', level: 'tech' },
     ]
   },
   {

@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -53,6 +54,18 @@ class HealthControllerTest {
     @MockBean
     private com.example.interview.service.RagHealthTracker ragHealthTracker;
 
+    /**
+     * v1.39.0：注入同一个配置项用于断言。
+     *
+     * <p>**为什么要这样写**：原用例断言的是字面量 {@code "1.0.0"}，
+     * 而生产代码当时也正好把 version 写死成 {@code "1.0.0"} ——
+     * 于是「version 应该来自配置」这个约定被破坏时测试**依然是绿的**，
+     * 测试等于把 bug 一起锁进去了（这是「断言了错误的期望」的典型）。
+     * 现在断言「响应值 == 配置值」，配置改了测试跟着走，写死才会被抓出来。
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.info.version:}")
+    private String configuredVersion;
+
     @Test
     @DisplayName("GET /api/info 返回 200 + 系统信息")
     void info_returnsSystemInfo() throws Exception {
@@ -61,8 +74,23 @@ class HealthControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("success"))
                 .andExpect(jsonPath("$.data.name").value("AI 智能面试辅助平台"))
-                .andExpect(jsonPath("$.data.version").value("1.0.0"))
+                .andExpect(jsonPath("$.data.version").value(configuredVersion))
                 .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    @DisplayName("GET /api/info 的 version 来自配置，不再写死 1.0.0（v1.39.0 修复）")
+    void info_versionComesFromConfigNotHardcoded() throws Exception {
+        // 配置里确实有版本号，而不是空/占位
+        assertThat(configuredVersion).isNotBlank();
+        assertThat(configuredVersion).matches("\\d+\\.\\d+\\.\\d+");
+
+        mockMvc.perform(get("/api/info"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(configuredVersion));
+
+        // 显式钉住「不是那个历史硬编码值」——避免有人图省事把它写回去
+        assertThat(configuredVersion).isNotEqualTo("1.0.0");
     }
 
     @Test

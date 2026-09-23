@@ -154,8 +154,11 @@ app:
   info:
     # 应用元数据，暴露到 /actuator/info 端点
     # 版本号与前端 changelog.ts 保持同步，修改时两处一起更新
+    # ⚠️ v1.39.0：/api/info 此前把 version 写死成 "1.0.0"，没读这里的值，
+    #    导致「与前端同步」这个约定在公开接口上一直没生效（两个端点报两个版本号）。
+    #    现已改为读本配置；改版本时除了这里与 changelog.ts，无需再动代码。
     name: ${APP_INFO_NAME:interview-guide}
-    version: ${APP_INFO_VERSION:1.23.0}
+    version: ${APP_INFO_VERSION:1.39.0}
     description: ${APP_INFO_DESCRIPTION:AI 智能面试辅助平台后端}
     # 构建日期，CI 注入；未配置时 fallback 为当天
     build-date: ${APP_INFO_BUILD_DATE:}
