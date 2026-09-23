@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.42.0'
+export const CURRENT_VERSION = '1.42.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.42.1',
+    date: '2026-09-23',
+    title: '版本 1.42.1 · 管理后台图例补全',
+    items: [
+      { text: '管理后台：数据总览「招聘类型分布」的图例里，有一个类型显示的是原始英文标识（PART_TIME）而不是中文；现已补为「兼职」，与招聘广场的口径一致', level: 'user' },
+      { text: '前端：把招聘类型的中文标签抽到独立模块并导出取值清单，新增单测断言「后端所有取值都有中文标签」——这类漏配此前只会表现为界面上冒出一串英文，没有任何测试会拦下来', level: 'tech' },
+    ],
+  },
   {
     version: '1.42.0',
     date: '2026-09-23',

@@ -284,6 +284,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { authState } from '../auth'
+import { recruitTypeLabel } from '../utils/recruitType'
 
 /**
  * 管理后台（v1.37.0 视觉与信息架构重构）
@@ -409,8 +410,8 @@ const usersLoading = ref(false)
 
 const metrics = ref<Metrics | null>(null)
 
-const recruitTypeLabel = (t: string | null) =>
-  ({ AUTUMN: '秋招', SPRING: '春招', SOCIAL: '社招', INTERN: '实习', TARGETED: '定向' } as Record<string, string>)[t || ''] || t || '—'
+// recruitTypeLabel 已抽到 utils/recruitType.ts（原先内联在这里，漏配了 PART_TIME，
+// 导致「招聘类型分布」图例里出现原始英文枚举）。抽出去之后有单测守着完整性。
 
 const AI_LABELS: Record<string, string> = {
   resume: '简历分析',
