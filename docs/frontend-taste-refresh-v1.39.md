@@ -101,16 +101,45 @@
 
 ---
 
-## 四、验证
+## 四、防回退门禁
+
+上面两类问题（写死色、小号衬线）**极易在后续迭代里被写回来**——新增一个状态标签、
+复制一段旧样式就会复发。所以固化成测试门禁：`frontend/src/designGuards.test.ts`（5 条）。
+
+| 守卫 | 规则 |
+|---|---|
+| 写死浅色背景 | `background: #fff*` / `#f**` / `rgba(255,255,255,*)` 一律失败（除非在允许清单里） |
+| 写死深色文字 | `color: #0**` / `#1**` / `#2**` / `black` 一律失败 |
+| 小号衬线标题 | `font-family: var(--font-serif)` 且同规则 `font-size < 24px` 失败 |
+| 扫描范围自检 | 断言扫描到 >20 个文件且含 `App.vue`，避免路径写错导致守卫**静默失效** |
+| 令牌存在性 | 断言 `--font-display` / `--font-title` 已定义 |
+
+**允许清单**（每条都写明理由，没有理由的不许进）：白色 CTA 按钮、登录页深色插画区的
+玻璃拟态叠层、暗色 `::selection` 前景色、简历报告导出用的独立 HTML 模板字符串。
+
+> **门禁必须验证「会失败」**：注入 `.probe { background:#fef3c7; color:#1c1917 }` 与
+> `font-family:var(--font-serif); font-size:15px` 后，3 条断言如期失败；
+> 删除探针后 5 条全过。没验证过失败路径的守卫等于没有守卫。
+
+## 五、验证
 
 | 项 | 结果 |
 |---|---|
 | `npx vue-tsc --noEmit` | 0 错误 |
-| `npx vitest run` | **308 passed**（含新增 `appLaunch.test.ts` 17 条） |
+| `npx vitest run` | **313 passed / 27 files**（含 appLaunch 17 条 + designGuards 5 条） |
 | `npx vite build` | 通过（沙箱下需 `--outDir` 换目录，见备注） |
-| 后端 `mvn test` | 见交付说明 |
+| 后端 `mvn test` | **882 tests，0 failures，BUILD SUCCESS** |
+| `node scripts/check-window-consistency.mjs` | ✅ 时间窗一致性通过 |
+| `node --test scripts/keepalive-worker.test.mjs` | ✅ 11/11 |
 | 真实浏览器 | Edge + playwright-cli，本地 dev server 截图确认 Hero 遮挡已消除、登录页入口已收敛、控制台 0 error |
+| 线上生效 | 推送后入口 chunk 已含「求职工具」、JobsView chunk 已含「全部国内」 |
 
 > **备注（构建环境）**：本机沙箱会拦截 `vite build` 清空 `dist/` 的删除操作
 > （报错栈落在 `node-safe-delete-shim`）。这是沙箱限制不是代码问题，
 > 用 `npx vite build --outDir dist-verify --emptyOutDir=false` 可正常验证。
+
+## 六、应用内更新日志
+
+本项目约定「每次发布新增 `frontend/src/changelog.ts` 条目」，且有测试断言
+`CHANGELOG[0].version === CURRENT_VERSION` 且最新版本必须有**用户可见**（`level: 'user'`）条目。
+本轮已补 v1.39.0 条目（6 条 user + 5 条 tech），`CURRENT_VERSION` 同步升到 `1.39.0`。

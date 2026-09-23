@@ -85,9 +85,31 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.38.1'
+export const CURRENT_VERSION = '1.39.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.39.0',
+    date: '2026-09-23',
+    title: '版本 1.39.0 · 招聘广场国内岗位更多了',
+    items: [
+      { text: '招聘广场：新增「社招精选」数据源，补上 47 个国内社招岗位，覆盖互联网、金融、制造与新能源、医药、教育、消费零售、物流、建筑能源、职能、设计传媒等方向，已工作几年想跳槽的用户不再只能看到校招岗', level: 'user' },
+      { text: '招聘广场：默认列表改为「全部国内」，海外远程岗位只在「海外远程」分栏出现——此前海外岗位数量远多于国内，一打开广场满屏都是英文职位', level: 'user' },
+      { text: '招聘广场：数据来源筛选会跟着分栏走，不会再出现「点了某个来源一条都筛不出来」的情况', level: 'user' },
+      { text: '简历分析：修复手机上已安装对应软件却提示「未检测到 App」、导致无法跳转的问题——此前只要系统弹一次确认框就会被误判为没装；现在每张卡片下方都常驻「打开网页版」入口，任何情况下都有路可走', level: 'user' },
+      { text: '简历分析：在微信、钉钉等内置浏览器里打开时会直接说明原因并给出网页版入口，不再假装「唤起失败」', level: 'user' },
+      { text: '首页：修复「本轮准备度」演示卡片的浮动标签压住标题文字的问题', level: 'user' },
+      { text: '登录页：注册入口此前在同一页出现了三次，现在收敛为一处；「100% 免费使用」改为直白的「免费 · 全部功能开放」', level: 'user' },
+      { text: '全站观感：卡片与小标题不再使用衬线字体（此前在 Windows 与多数安卓设备上会退化成宋体，小字号下发虚、显旧），标题层级改由字重与字距建立；数字与得分统一等宽显示，列表更整齐', level: 'user' },
+      { text: '全站观感：修复暗色主题下部分区块仍是浅底深字、像贴了块补丁的问题（收藏按钮、截止提醒横幅、能力分层标签、解析告警等）', level: 'user' },
+      { text: '全站观感：补齐按钮的按下反馈与锚点平滑滚动，点起来更有实感', level: 'user' },
+      { text: '前端：字体拆为展示级衬线 / 界面级无衬线 / 等宽数字三级，批量迁移 36 处内联字体声明；新增 text-wrap: balance 防标题孤字、tabular-nums 数字对齐', level: 'tech' },
+      { text: '前端：新增 utils/appLaunch.ts，用 visibilitychange / pagehide / blur 三信号判断 App 是否交棒成功（原实现只看 visibilityState，在 iOS 系统确认框、部分 Android ROM 与宿主 WebView 下必然误报），配套 17 条单元测试', level: 'tech' },
+      { text: '后端：公开招聘 API 增加单源单轮入库配额 25 条，避免五个海外源一次灌入数百条英文岗位淹没国内岗位', level: 'tech' },
+      { text: '后端：新增 SeedDomesticSocialJobProvider 种子数据源（社招精选），并同步更新种子数据一致性测试', level: 'tech' },
+      { text: '验证：后端 882 个用例全过（BUILD SUCCESS）、前端 308 个用例全过、类型检查 0 错误、生产构建通过', level: 'tech' },
+    ]
+  },
   {
     version: '1.38.1',
     date: '2026-09-22',
