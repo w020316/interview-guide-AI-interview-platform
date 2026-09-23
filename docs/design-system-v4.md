@@ -1,7 +1,7 @@
 # AI 面试助手 · 设计系统 v4
 
 > 方向「沉着冲刺 Calm Momentum」：以求职者的**准备感与拿下 offer 的信心**为情感核心。
-> 反"AI 生成化"的关键：**不对称编辑式构图 + 衬线大字标题 + 墨绿×琥珀金双主色 + 分数卡数据态 mono 数字 + 克制的动效编排**。
+> 反"AI 生成化"的关键：**不对称编辑式构图 + 展示级衬线大字标题（≥24px 才用，见 2.1）+ 墨绿×琥珀金双主色 + 分数卡数据态 mono 数字 + 克制的动效编排**。
 
 ---
 
@@ -38,12 +38,27 @@
 
 ## 2. 排版
 
-### 2.1 字族
-| 角色 | 字族 |
-|---|---|
-| 展示/标题 | `Source Han Serif SC`（衬线，权威、编辑气质） |
-| 正文/界面 | 系统无衬线 `PingFang SC / Microsoft YaHei` |
-| **数字/得分** | `JetBrains Mono`（等宽，制造"评分面板"数据质感） |
+### 2.1 字族（v1.39.0 分级修订）
+
+**⚠️ v1.39.0 变更**：原策略是「标题一律衬线」。真机审计发现该策略在非 Apple 设备上会退化：
+`--font-serif` 的 CJK 首选 `Source Han Serif SC` / `Songti SC` **只在 Apple 设备存在**，
+Windows 回退 `SimSun`（宋体）、多数 Android 回退默认衬线。全站有 **24 处 14~18px 的
+卡片/列表/弹窗标题**在用衬线，小字号宋体笔画发虚、观感陈旧。
+
+现改为**三级字族**，层级由「字重 + 负字距 + 颜色」建立，而不是靠字体族切换：
+
+| 角色 | 令牌 | 值 | 使用范围 |
+|---|---|---|---|
+| **展示级** | `--font-display` | `Source Han Serif SC / Songti SC / serif`（= `--font-serif` 别名） | **仅 ≥24px 的页面级标题**：`h1`、登录页大标题、Hero 大字 |
+| **界面级标题** | `--font-title` | 系统无衬线（与 `--font-sans` 同栈） | 卡片 / 列表 / 弹窗 / 面板标题（`h2`、`h3` 及各类 `.xx-title`） |
+| **正文** | `--font-sans` | `PingFang SC / Microsoft YaHei / …` | 正文、表单、标签 |
+| **数字/得分** | `--font-mono` | `JetBrains Mono`（等宽 + `tabular-nums`） | 分数、统计、表格数据 |
+
+- **数字一律 mono，不要用衬线**（v1.39.0 前 `ApplicationView.stat-num`、`CareerView.advice-score` 误用衬线）。
+- 全局规则：`h1 → --font-display`，`h2, h3 → --font-title`（weight 700 + `letter-spacing:-0.012em`）。
+- `--font-serif` 保留为 `--font-display` 的别名，仅为兼容历史写法；**新代码请直接用 `--font-display`**。
+- **防回退门禁**：`frontend/src/designGuards.test.ts` 会在「`var(--font-serif)` 且同规则
+  `font-size < 24px`」时失败。要写小号衬线请先想清楚为什么。
 
 ### 2.2 字号阶梯（6 到 5xl）
 xs12 / sm13 / base15 / md16 / lg18 / xl20 / 2xl24 / 3xl30 / 4xl36 / 5xl44。Hero 标题用 `clamp(36,6vw,56)`。
@@ -51,7 +66,8 @@ xs12 / sm13 / base15 / md16 / lg18 / xl20 / 2xl24 / 3xl30 / 4xl36 / 5xl44。Hero
 ### 2.3 字重与行高
 - 标题 `font-weight:700-800`，`letter-spacing:-0.01em~-1.5px`。
 - 正文 `web 1.65`，`font-weight:400-500`。
-- **对比原则**：数字/分数一律 mono + 大号 + 琥珀金，与衬线标题形成强对比（记忆点）。
+- **对比原则**：数字/分数一律 mono + 大号 + 琥珀金，与标题形成强对比（记忆点）。
+- v1.39.0 增补：标题加 `text-wrap: balance`（防孤字），段落加 `text-wrap: pretty`。
 
 ---
 
@@ -64,7 +80,18 @@ xs12 / sm13 / base15 / md16 / lg18 / xl20 / 2xl24 / 3xl30 / 4xl36 / 5xl44。Hero
 
 ### 3.2 卡片 BaseCard
 - 变体 default / outlined / elevated / **feature（顶部品牌条 hover 延展）**。
-- v4：默认细描边 `--c-border`；hover 温和上浮 + 阴影升级；header 衬线标题 + 浅底。
+- v4：默认细描边 `--c-border`；hover 温和上浮 + 阴影升级；header 用 `--font-title`（无衬线标题字族，见 2.1）+ 浅底。
+
+### 3.3 配色纪律（v1.39.0 增补）
+
+- **禁止写死颜色 hex**：一律用语义令牌（`--c-danger` / `--c-danger-light` / `--c-success` /
+  `--c-info` / `--c-warning` / `--brand-primary-*` / `--c-text*`）。
+  写死的值不随 `[data-theme='dark']` 切换，暗色下会变成「浅底深字贴在深色页面上」。
+  v1.39.0 在 7 个文件里清出 11 处这类问题。
+- **单一强调色**：墨绿为主、琥珀金点缀（≤10% 面积）。不要出现蓝/绿/琥珀/紫四色并置。
+- **允许写死的例外**（都要写明理由）：深色品牌底上的白色 CTA、登录页深色插画区的
+  玻璃拟态叠层、暗色 `::selection` 前景色、简历报告导出用的独立 HTML 模板字符串。
+- **防回退门禁**：`frontend/src/designGuards.test.ts` 覆盖以上两条（写死浅底/深字、小号衬线）。
 
 ### 3.3 标签 BaseTag
 - 六语义变体 + sm/md/lg；浅底强色字；可 close。

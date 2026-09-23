@@ -46,9 +46,13 @@
           <option value="">全部职位类型</option>
           <option v-for="t in meta.jobTypes" :key="t" :value="t">{{ t }}</option>
         </select>
+        <!-- v1.39.0：这里也必须用 visibleSources。
+             真机走查发现只改了下面的来源 chips、漏了这个下拉 —— 国内分栏下
+             下拉里仍能选到「RemoteOK 全球远程」，选中后必然空列表且没有任何提示，
+             正是本轮要消除的那种死路。两个控件必须用同一个来源清单。 -->
         <select v-model="source" class="filter-input">
           <option value="">全部来源</option>
-          <option v-for="s in meta.sources" :key="s" :value="s">{{ s }}</option>
+          <option v-for="s in visibleSources" :key="s" :value="s">{{ s }}</option>
         </select>
         <select v-model="degree" class="filter-input">
           <option value="">学历不限</option>
