@@ -106,10 +106,10 @@ class AdminServiceTest {
         when(jobPostingRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(empty);
 
         AdminService service = newService(new SimpleMeterRegistry());
-        assertThat(service.listJobs(null, null, null, null, 0, 10).getTotalElements()).isZero();
-        assertThat(service.listJobs("  ", null, null, null, 0, 10).getTotalElements()).isZero();
+        assertThat(service.listJobs(null, null, null, null, null, 0, 10).getTotalElements()).isZero();
+        assertThat(service.listJobs("  ", null, null, null, null, 0, 10).getTotalElements()).isZero();
         // 通配符与负页码/超大 size 均被夹紧
-        service.listJobs("100%_\\", null, null, null, -5, 999);
+        service.listJobs("100%_\\", null, null, null, null, -5, 999);
         verify(jobPostingRepository, org.mockito.Mockito.times(3))
                 .findAll(any(Specification.class), any(Pageable.class));
         org.mockito.ArgumentCaptor<Pageable> cap = org.mockito.ArgumentCaptor.forClass(Pageable.class);
@@ -134,9 +134,27 @@ class AdminServiceTest {
                 .thenReturn(new PageImpl<>(List.of()));
 
         AdminService service = newService(new SimpleMeterRegistry());
-        assertThat(service.listJobs(null, "行业精选", "AUTUMN", Boolean.TRUE, 0, 10).getTotalElements()).isZero();
-        assertThat(service.listJobs("java", "行业精选", null, Boolean.FALSE, 2, 20).getTotalElements()).isZero();
+        assertThat(service.listJobs(null, "行业精选", "AUTUMN", Boolean.TRUE, null, 0, 10).getTotalElements()).isZero();
+        assertThat(service.listJobs("java", "行业精选", null, Boolean.FALSE, null, 2, 20).getTotalElements()).isZero();
         verify(jobPostingRepository, org.mockito.Mockito.times(2))
+                .findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("listJobs: overseas 范围过滤复用适配器声明的海外源清单（P3-D）")
+    void listJobs_overseasScopeFilter() {
+        when(jobPostingRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(jobAgentService.overseasPlatforms()).thenReturn(List.of("remoteok", "remotive"));
+
+        AdminService service = newService(new SimpleMeterRegistry());
+        service.listJobs(null, null, null, null, Boolean.FALSE, 0, 10); // 仅国内
+        service.listJobs(null, null, null, null, Boolean.TRUE, 0, 10);  // 仅海外
+        service.listJobs(null, null, null, null, null, 0, 10);          // 不限：不查海外源清单
+
+        // 只有显式传 overseas 时才需要海外源清单（null 不触发，避免无谓依赖）
+        verify(jobAgentService, org.mockito.Mockito.times(2)).overseasPlatforms();
+        verify(jobPostingRepository, org.mockito.Mockito.times(3))
                 .findAll(any(Specification.class), any(Pageable.class));
     }
 
@@ -369,6 +387,9 @@ class AdminServiceTest {
         registry.timer("ai.call.duration").record(java.time.Duration.ofMillis(120));
         registry.counter("cache.hit.count").increment(7.0);
         registry.counter("cache.miss.count").increment(2.0);
+        // P2-D：检索缓存指标（FunctionCounter，与生产侧 RagSearchService 的绑定方式一致）
+        io.micrometer.core.instrument.FunctionCounter.builder("rag.search.cache.hit", 11.0, v -> v).register(registry);
+        io.micrometer.core.instrument.FunctionCounter.builder("rag.search.cache.miss", 4.0, v -> v).register(registry);
         registry.gauge("sse.max.concurrent", 12.5);
         registry.gauge("sse.active.count", 4.0);
 
@@ -385,6 +406,13 @@ class AdminServiceTest {
         Map<String, Object> cache = (Map<String, Object>) metrics.get("cache");
         assertThat(cache.get("hits")).isEqualTo(7L);
         assertThat(cache.get("misses")).isEqualTo(2L);
+
+        // P2-D：检索缓存命中/未命中进入管理后台指标
+        @SuppressWarnings("unchecked")
+        Map<String, Object> searchCache = (Map<String, Object>) cache.get("searchCache");
+        assertThat(searchCache).isNotNull();
+        assertThat(searchCache.get("hits")).isEqualTo(11L);
+        assertThat(searchCache.get("misses")).isEqualTo(4L);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> sse = (Map<String, Object>) metrics.get("sse");
@@ -407,6 +435,14 @@ class AdminServiceTest {
         for (String type : List.of("resume", "question", "evaluate", "jobAnalysis", "rag")) {
             assertThat(aiCalls.get(type)).isEqualTo(0L);
         }
+
+        // P2-D：检索缓存计数器未注册时回退 0，且区块始终存在
+        @SuppressWarnings("unchecked")
+        Map<String, Object> cache = (Map<String, Object>) metrics.get("cache");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> searchCache = (Map<String, Object>) cache.get("searchCache");
+        assertThat(searchCache.get("hits")).isEqualTo(0L);
+        assertThat(searchCache.get("misses")).isEqualTo(0L);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> sse = (Map<String, Object>) metrics.get("sse");

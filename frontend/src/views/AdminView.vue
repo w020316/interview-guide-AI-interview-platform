@@ -161,6 +161,11 @@
     <section v-show="activeTab === 'jobs'" class="panel">
       <div class="toolbar">
         <input v-model="jobKeyword" class="search-input" placeholder="搜索标题 / 公司 / 标签" @keyup.enter="searchJobs" />
+        <select v-model="jobScope" class="select-input" @change="searchJobs">
+          <option value="domestic">国内岗位</option>
+          <option value="overseas">海外远程</option>
+          <option value="all">全部范围</option>
+        </select>
         <select v-model="jobSource" class="select-input" @change="searchJobs">
           <option value="">全部来源</option>
           <option v-for="s in sourceDist" :key="s.platform" :value="s.platform">{{ s.platform }}</option>
@@ -258,6 +263,9 @@
           <div class="metric-row"><span>命中</span><b>{{ metrics.cache.hits }}</b></div>
           <div class="metric-row"><span>未命中</span><b>{{ metrics.cache.misses }}</b></div>
           <div class="metric-row"><span>命中率</span><b>{{ cacheHitRate }}</b></div>
+          <div class="metric-row metric-sub"><span>RAG 检索缓存命中</span><b>{{ metrics.cache.searchCache?.hits ?? 0 }}</b></div>
+          <div class="metric-row metric-sub"><span>RAG 检索缓存未命中</span><b>{{ metrics.cache.searchCache?.misses ?? 0 }}</b></div>
+          <div class="metric-row metric-sub"><span>RAG 检索命中率</span><b>{{ searchCacheHitRate }}</b></div>
         </div>
         <div class="metric-block">
           <h3>SSE 流式连接</h3>
@@ -354,7 +362,7 @@ interface SourceRow {
 }
 interface Metrics {
   aiCalls: Record<string, number>
-  cache: { hits: number; misses: number }
+  cache: { hits: number; misses: number; searchCache?: { hits: number; misses: number } }
   sse: { maxConcurrent: number; activeCount: number }
   jvm: { usedMb: number; freeMb: number; totalMb: number; maxMb: number }
 }
@@ -399,6 +407,9 @@ const jobKeyword = ref('')
 const jobSource = ref('')
 const jobRecruitType = ref('')
 const jobActive = ref('')
+// P3-D：范围默认「国内」——海外源批量导入且按 id 倒序时首屏整屏是海外岗，
+// 运营会误以为国内数据缺失。默认收窄到国内，海外可一键切换，全部也保留。
+const jobScope = ref<'domestic' | 'overseas' | 'all'>('domestic')
 const jobsLoading = ref(false)
 
 const users = ref<UserRow[]>([])
@@ -442,6 +453,13 @@ const maxTrend = computed(() => Math.max(1, ...trend.value.map((d) => Math.max(d
 
 const cacheHitRate = computed(() => {
   const c = metrics.value?.cache
+  if (!c) return '—'
+  const total = c.hits + c.misses
+  return total === 0 ? '—' : `${Math.round((c.hits / total) * 100)}%`
+})
+
+const searchCacheHitRate = computed(() => {
+  const c = metrics.value?.cache?.searchCache
   if (!c) return '—'
   const total = c.hits + c.misses
   return total === 0 ? '—' : `${Math.round((c.hits / total) * 100)}%`
@@ -586,6 +604,8 @@ async function fetchJobs() {
     if (jobSource.value) params.set('source', jobSource.value)
     if (jobRecruitType.value) params.set('recruitType', jobRecruitType.value)
     if (jobActive.value) params.set('active', jobActive.value)
+    if (jobScope.value === 'domestic') params.set('overseas', 'false')
+    else if (jobScope.value === 'overseas') params.set('overseas', 'true')
     const data = (await api.get(`/api/admin/jobs?${params.toString()}`)) as unknown as { total: number; items: JobRow[] }
     jobsTotal.value = data.total
     jobs.value = data.items
@@ -606,6 +626,7 @@ function resetJobFilters() {
   jobSource.value = ''
   jobRecruitType.value = ''
   jobActive.value = ''
+  jobScope.value = 'domestic'
   searchJobs()
 }
 
@@ -1476,6 +1497,13 @@ onMounted(() => {
   padding: 5px 0;
   font-size: 13px;
   color: var(--c-text-secondary);
+}
+
+/* P2-D：检索缓存子行——与主缓存行视觉区隔（缩进 + 弱化） */
+.metric-row.metric-sub {
+  padding-left: 12px;
+  color: var(--c-text-tertiary);
+  font-size: 12.5px;
 }
 
 .metric-row b {

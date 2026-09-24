@@ -263,7 +263,7 @@ public class AdminService {
      * @param active      状态筛选：true 仅有效 / false 仅失效 / null 全部
      */
     public Page<JobPostingEntity> listJobs(String keyword, String source, String recruitType,
-                                           Boolean active, int page, int size) {
+                                           Boolean active, Boolean overseas, int page, int size) {
         var spec = (org.springframework.data.jpa.domain.Specification<JobPostingEntity>) (root, query, cb) -> cb.conjunction();
         if (keyword != null && !keyword.isBlank()) {
             String kw = keyword.trim().toLowerCase();
@@ -281,6 +281,19 @@ public class AdminService {
         }
         if (active != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("active"), active));
+        }
+        // P3-D：海外/国内范围过滤（口径与用户侧招聘广场一致——海外源由适配器 self-declare）。
+        // 默认 null=不限；管理端前端默认传 false（国内），否则按 id 倒序的首屏
+        // 会被最近批量导入的海外源整屏占据，看不到国内数据。
+        if (overseas != null) {
+            List<String> overseasNames = jobAgentService.overseasPlatforms();
+            if (!overseasNames.isEmpty()) {
+                if (overseas) {
+                    spec = spec.and((root, query, cb) -> root.get("platform").in(overseasNames));
+                } else {
+                    spec = spec.and((root, query, cb) -> cb.not(root.get("platform").in(overseasNames)));
+                }
+            }
         }
         // 默认按 id 倒序：新增的岗位排前面，便于运营快速确认「刚刷新的数据进来了」
         var pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50),
@@ -449,6 +462,14 @@ public class AdminService {
         var miss = meterRegistry.find("cache.miss.count").counter();
         summary.put("hits", hit == null ? 0L : (long) hit.count());
         summary.put("misses", miss == null ? 0L : (long) miss.count());
+        // P2-D：RAG 检索缓存（P2-09 引入）此前未接入 Micrometer，管理后台恒显示 0/0。
+        // 计数器由 RagSearchService 启动时以 FunctionCounter 绑定（rag.search.cache.*）。
+        Map<String, Object> searchCache = new LinkedHashMap<>();
+        var searchHit = meterRegistry.find("rag.search.cache.hit").functionCounter();
+        var searchMiss = meterRegistry.find("rag.search.cache.miss").functionCounter();
+        searchCache.put("hits", searchHit == null ? 0L : (long) searchHit.count());
+        searchCache.put("misses", searchMiss == null ? 0L : (long) searchMiss.count());
+        summary.put("searchCache", searchCache);
         return summary;
     }
 

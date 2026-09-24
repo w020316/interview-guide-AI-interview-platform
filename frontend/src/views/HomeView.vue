@@ -60,39 +60,41 @@
           <div class="visual-stage">
             <div class="visual-card">
               <div class="visual-head">
-                <span class="visual-title">本轮准备度</span>
+                <span class="visual-title">本轮准备度<span v-if="mode === 'demo'" class="demo-badge">示例</span></span>
                 <span class="visual-ready">
-                  <span class="ready-dot"></span>已就绪
+                  <span class="ready-dot"></span>{{ readyText }}
                 </span>
               </div>
               <div class="visual-score">
-                <div class="score-big num-display">86</div>
-                <div class="score-meta">综合评估 · 击败 78% 求职者</div>
+                <div class="score-big num-display">{{ displayScore }}</div>
+                <div class="score-meta">{{ scoreMeta }}</div>
               </div>
-              <div class="visual-rows">
+              <!-- P2-B：维度条只在「有真实数据」或「未登录示例卡」时渲染；
+                   已登录但零数据的用户看到 '—' 空态，不再展示虚构分数 -->
+              <div v-if="rowsVisible" class="visual-rows">
                 <div class="v-row">
                   <span class="v-label">技术匹配</span>
-                  <div class="v-bar"><i class="v-fill" style="--w: 92%"></i></div>
-                  <span class="v-val num-display">92</span>
+                  <div class="v-bar"><i class="v-fill" :style="{ '--w': dim.tech + '%' }"></i></div>
+                  <span class="v-val num-display">{{ dim.tech }}</span>
                 </div>
                 <div class="v-row">
                   <span class="v-label">表述清晰</span>
-                  <div class="v-bar"><i class="v-fill" style="--w: 88%"></i></div>
-                  <span class="v-val num-display">88</span>
+                  <div class="v-bar"><i class="v-fill" :style="{ '--w': dim.clarity + '%' }"></i></div>
+                  <span class="v-val num-display">{{ dim.clarity }}</span>
                 </div>
                 <div class="v-row">
                   <span class="v-label">项目含金</span>
-                  <div class="v-bar"><i class="v-fill" style="--w: 78%"></i></div>
-                  <span class="v-val num-display">78</span>
+                  <div class="v-bar"><i class="v-fill" :style="{ '--w': dim.project + '%' }"></i></div>
+                  <span class="v-val num-display">{{ dim.project }}</span>
                 </div>
               </div>
               <div class="visual-cta">
                 <span class="visual-star">★</span>
-                <span>双向奔赴的岗位在等你</span>
+                <span>{{ ctaText }}</span>
               </div>
             </div>
-            <div class="visual-chip chip-a">面试题 <b>已就绪</b></div>
-            <div class="visual-chip chip-b">复盘 <b>有报告</b></div>
+            <div class="visual-chip chip-a">面试题 <b>{{ questionChip }}</b></div>
+            <div class="visual-chip chip-b">复盘 <b>自动报告</b></div>
           </div>
         </div>
       </div>
@@ -163,8 +165,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { isLoggedIn } from '../auth'
+import api from '../api'
 import { BaseButton, BaseCard, BaseTag } from '../components'
 
 const router = useRouter()
@@ -177,6 +181,116 @@ function goTo(path: string) {
   }
   router.push(path)
 }
+
+/* ── P2-B：准备度卡片三态 ──────────────────────────────────────────────
+ * demo  : 未登录 / 已登录但数据获取失败 → 保留示例卡并标注「示例」
+ * real  : 已登录且有简历评估 → 大数字与维度条用真实数据
+ * empty : 已登录但还没有简历评估 → '—' 空态 + 引导文案，不展示虚构分数
+ * （缺陷背景：此前对所有访客硬编码 86/78%/92/88/78 与「面试题已就绪」，
+ *   对零数据用户是事实性错误。）
+ */
+interface HomeStats {
+  overallScore: number
+  dims: { tech: number; clarity: number; project: number } | null
+  sessionCount: number
+  /** true=有真实简历评估；false=已登录但还没有评估记录（空态） */
+  real: boolean
+}
+const realStats = ref<HomeStats | null>(null)
+
+const mode = computed<'real' | 'empty' | 'demo'>(() => {
+  if (realStats.value === null) return 'demo'
+  return realStats.value.real ? 'real' : 'empty'
+})
+
+const DEMO_DIMS = { tech: 92, clarity: 88, project: 78 }
+
+const dim = computed(() => {
+  if (mode.value === 'real' && realStats.value?.dims) return realStats.value.dims
+  return DEMO_DIMS
+})
+
+const rowsVisible = computed(() => mode.value === 'demo' || (mode.value === 'real' && !!realStats.value?.dims))
+
+const displayScore = computed(() => {
+  if (mode.value === 'real') return realStats.value?.overallScore ?? '—'
+  if (mode.value === 'empty') return '—'
+  return '86'
+})
+
+const readyText = computed(() =>
+  mode.value === 'real' ? '已就绪' : mode.value === 'empty' ? '未开始' : '示例')
+
+const scoreMeta = computed(() => {
+  if (mode.value === 'real') return '最新简历评估 · 真实数据'
+  if (mode.value === 'empty') return '完成简历分析后生成'
+  return '综合评估 · 击败 78% 求职者'
+})
+
+const ctaText = computed(() =>
+  mode.value === 'empty' ? '上传简历，开启真实评估' : '双向奔赴的岗位在等你')
+
+const questionChip = computed(() => {
+  if (mode.value === 'demo') return 'AI 生成'
+  return realStats.value && realStats.value.sessionCount > 0
+    ? `已练 ${realStats.value.sessionCount} 场`
+    : '待开启'
+})
+
+onMounted(async () => {
+  // 未登录不做真实数据请求：直接保留示例卡（带「示例」标注）
+  if (!isLoggedIn()) return
+  try {
+    const resumes = (await api.get('/api/resume/history')) as unknown as Array<{
+      overallScore?: number | null
+      analysisResult?: string
+    }>
+    const latest = (resumes || []).find((r) => r && r.overallScore != null)
+    if (!latest) {
+      realStats.value = { overallScore: 0, dims: null, sessionCount: 0, real: false }
+      return
+    }
+    // 维度分在 analysisResult 的 AI JSON 里，容错解析；解析不出则不渲染维度条
+    let dims: HomeStats['dims'] = null
+    if (latest.analysisResult) {
+      try {
+        const obj = JSON.parse(latest.analysisResult) as {
+          dimensions?: Array<{ name?: unknown; score?: unknown }>
+        }
+        const list = Array.isArray(obj.dimensions) ? obj.dimensions : []
+        const pick = (kw: string) => list.find((d) => String(d?.name ?? '').includes(kw))
+        const num = (d: { score?: unknown } | undefined) => {
+          const n = typeof d?.score === 'number' ? d.score : Number(d?.score)
+          return Number.isFinite(n as number) ? (n as number) : null
+        }
+        const tech = pick('技术')
+        const clarity = pick('表述')
+        const project = pick('项目')
+        const t = num(tech)
+        const c = num(clarity)
+        const p = num(project)
+        if (t != null && c != null && p != null) dims = { tech: t, clarity: c, project: p }
+      } catch {
+        // AI JSON 不可解析：维度条按不可用处理，不影响大数字的真实性
+      }
+    }
+    let sessionCount = 0
+    try {
+      const sessions = (await api.get('/api/session/list')) as unknown as unknown[]
+      sessionCount = Array.isArray(sessions) ? sessions.length : 0
+    } catch {
+      // 会话数取不到不影响主指标；chip 显示「待开启」也不构成事实错误
+    }
+    realStats.value = {
+      overallScore: Number(latest.overallScore),
+      dims,
+      sessionCount,
+      real: true,
+    }
+  } catch {
+    // 冷启动/网络失败：回退示例卡（带「示例」标注），不阻塞首屏
+  }
+})
 
 const features = [
   {
@@ -401,6 +515,21 @@ const steps = [
   font-size: 15px;
   font-weight: 600;
   color: var(--c-text);
+}
+
+/* P2-B：示例卡标注——未登录/数据不可用时明示这是演示数据，不是用户真实状态 */
+.demo-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-full);
+  vertical-align: 1px;
 }
 
 .visual-ready {

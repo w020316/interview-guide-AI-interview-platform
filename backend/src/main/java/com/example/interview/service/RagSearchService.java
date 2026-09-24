@@ -122,6 +122,38 @@ public class RagSearchService {
     private final java.util.concurrent.atomic.AtomicInteger storedDocs = new java.util.concurrent.atomic.AtomicInteger(0);
 
     /**
+     * Micrometer 注册表（P2-D）：把检索缓存命中率暴露给管理后台。
+     * 声明为 {@code required = false} 并在 {@link #bindSearchCacheMetrics()} 空值保护 ——
+     * 切片单测以 {@code @InjectMocks} 构造本类时不会注入，不应因此启动失败。
+     */
+    @Autowired(required = false)
+    private io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
+    /**
+     * 把检索缓存的命中/未命中注册为 FunctionCounter（P2-D）。
+     *
+     * <p>背景：P2-09 引入的 {@link #searchCache} 只在内部维护 hit/miss 计数，
+     * 管理后台「系统指标 → 缓存」读的是 {@code cache.hit.count}（AI 提示词缓存），
+     * 检索缓存永远显示 0/0，新优化无法被观测。这里用 FunctionCounter 绑定
+     * {@link LocalPromptCache#hitCount()} / {@link #missCount()}，Micrometer 读取时实时取值，
+     * 无需在热路径上手动 increment。
+     */
+    @jakarta.annotation.PostConstruct
+    void bindSearchCacheMetrics() {
+        if (meterRegistry == null) {
+            return;
+        }
+        io.micrometer.core.instrument.FunctionCounter
+                .builder("rag.search.cache.hit", searchCache, LocalPromptCache::hitCount)
+                .description("RAG 检索缓存命中次数")
+                .register(meterRegistry);
+        io.micrometer.core.instrument.FunctionCounter
+                .builder("rag.search.cache.miss", searchCache, LocalPromptCache::missCount)
+                .description("RAG 检索缓存未命中次数")
+                .register(meterRegistry);
+    }
+
+    /**
      * 检索结果短 TTL 缓存（P2-09）。
      *
      * <p>背景：embedding 跑在**独立部署的 Render 免费实例**上，空闲即被挂起，
@@ -153,6 +185,42 @@ public class RagSearchService {
         storedDocs.set(safe);
         log.info("向量库容量计数已同步为 {} 条（上限 {}）", safe, maxDocuments);
     }
+
+    /**
+     * 从持久化向量库回读真实条数并同步容量计数（P2-C）。
+     *
+     * <p><b>要解决的问题</b>：生产使用 pgvector（数据在应用重启后仍在），
+     * 而 {@link #storedDocs} 是进程内计数，重启归零。播种走确定性 ID **覆盖写**，
+     * {@link #addToVectorStore} 会把 69 条预置知识照常累加 —— 但用户导入的文档
+     * 不会重播，于是重启后「计数 69、库里 69+N」，N 全部漏计。
+     * 容量检查 {@code maxDocuments - storedDocs} 因此过度乐观，存在无界增长直至 OOM 的风险。
+     *
+     * <p><b>实现</b>：直接对 pgvector 表 {@code vector_store} 做 {@code count(*)}（与
+     * {@code VectorDimensionMigrator} 同一约定表名），拿真实行数覆盖计数。
+     * 本地 profile 用文件型向量库（无该表），查询失败时静默跳过 —— 那条路径
+     * 已由 {@code VectorStorePersistenceManager} 在 restore 后回填。
+     */
+    public void syncStoredCountFromVectorStore() {
+        if (jdbcTemplate == null) {
+            return;
+        }
+        try {
+            Long actual = jdbcTemplate.queryForObject("SELECT count(*) FROM vector_store", Long.class);
+            if (actual != null) {
+                syncStoredCount(actual.intValue());
+            }
+        } catch (Exception e) {
+            // H2 / 文件型向量库等无 vector_store 表的场景：保持既有计数路径不变
+            log.debug("向量库计数回读跳过（无 pgvector 表或查询失败）：{}", e.getMessage());
+        }
+    }
+
+    /**
+     * JdbcTemplate（P2-C）：仅在同步向量库真实条数时使用。
+     * {@code required = false} + 空值保护 —— 切片单测不会注入，也不应依赖它。
+     */
+    @Autowired(required = false)
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     /** 当前已入库文档数（供健康检查/管理接口展示） */
     public int storedCount() {

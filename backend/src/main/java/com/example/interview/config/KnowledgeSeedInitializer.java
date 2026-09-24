@@ -321,6 +321,10 @@ public class KnowledgeSeedInitializer implements ApplicationRunner {
                     .build());
         }
         int stored = ragSearchService.addToVectorStore(docs);
+        // P2-C：播种是确定性 ID 覆盖写，addToVectorStore 的累加会把「已存在的预置知识」
+        // 重复计入，而用户历史导入的文档却不在本次播种范围 —— 直接以 pgvector 真实行数
+        // 覆盖计数，重启后 documents 与库内事实一致（用户导入的 N 条不再漏计）。
+        ragSearchService.syncStoredCountFromVectorStore();
         seeded = true;
         log.info("共享知识库播种完成：{} 条预置知识已写入向量库"
                         + "（IT 基础 {} 条 + 全行业 {} 条；shared=true，全部用户可检索）",

@@ -442,5 +442,71 @@ class RagSearchServiceTest {
     private static org.springframework.ai.document.Document doc(String id) {
         return org.springframework.ai.document.Document.builder().id(id).text("t-" + id).build();
     }
+
+    // ─────────────────────────── P2-C：向量库计数回读 ───────────────────────────
+
+    @Test
+    @DisplayName("syncStoredCountFromVectorStore: 用 pgvector 真实行数覆盖进程内计数")
+    void syncFromVectorStore_overwritesCountWithDbTruth() {
+        org.springframework.jdbc.core.JdbcTemplate jdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        when(jdbc.queryForObject("SELECT count(*) FROM vector_store", Long.class)).thenReturn(137L);
+        ReflectionTestUtils.setField(service, "jdbcTemplate", jdbc);
+
+        service.syncStoredCountFromVectorStore();
+
+        assertThat(service.storedCount()).isEqualTo(137);
+    }
+
+    @Test
+    @DisplayName("syncStoredCountFromVectorStore: 查询失败（无 pgvector 表/H2）时保持计数不变")
+    void syncFromVectorStore_queryFailureKeepsCount() {
+        org.springframework.jdbc.core.JdbcTemplate jdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        when(jdbc.queryForObject("SELECT count(*) FROM vector_store", Long.class))
+                .thenThrow(new RuntimeException("table not found"));
+        ReflectionTestUtils.setField(service, "jdbcTemplate", jdbc);
+        service.syncStoredCount(5);
+
+        service.syncStoredCountFromVectorStore();
+
+        assertThat(service.storedCount()).as("回读失败不应破坏既有计数").isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("syncStoredCountFromVectorStore: jdbcTemplate 为 null（切片单测）时安全跳过")
+    void syncFromVectorStore_nullJdbcTemplateIsNoop() {
+        ReflectionTestUtils.setField(service, "jdbcTemplate", null);
+        service.syncStoredCount(9);
+
+        service.syncStoredCountFromVectorStore();
+
+        assertThat(service.storedCount()).isEqualTo(9);
+    }
+
+    // ─────────────────────────── P2-D：检索缓存指标绑定 ───────────────────────────
+
+    @Test
+    @DisplayName("bindSearchCacheMetrics: 未注入 MeterRegistry 时安全跳过（切片单测场景）")
+    void bindSearchCacheMetrics_nullRegistryIsNoop() {
+        ReflectionTestUtils.setField(service, "meterRegistry", null);
+        // 不抛异常即为通过：指标是旁路能力，不能让主流程依赖它
+        service.bindSearchCacheMetrics();
+    }
+
+    @Test
+    @DisplayName("bindSearchCacheMetrics: 注册后检索命中/未命中可从注册表读到真实值")
+    void bindSearchCacheMetrics_reportsRealHitMiss() {
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry registry =
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        ReflectionTestUtils.setField(service, "meterRegistry", registry);
+        service.bindSearchCacheMetrics();
+
+        service.search("第一次查询", 5, USER_ID);   // 未命中（vectorStore 返回空结果）
+        service.search("第一次查询", 5, USER_ID);   // 命中缓存
+
+        double misses = registry.get("rag.search.cache.miss").functionCounter().count();
+        double hits = registry.get("rag.search.cache.hit").functionCounter().count();
+        assertThat(misses).as("首次查询应记 1 次未命中").isEqualTo(1.0);
+        assertThat(hits).as("重复查询应记 1 次命中").isEqualTo(1.0);
+    }
 }
 

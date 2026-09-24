@@ -120,7 +120,7 @@ class AdminControllerTest {
         loginAsAdmin();
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .id(1L).title("Java 后端").companyName("某公司").active(false).build();
-        when(adminService.listJobs(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(),
+        when(adminService.listJobs(any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyInt()))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(job)));
 

@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.42.1'
+export const CURRENT_VERSION = '1.43.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.43.0',
+    date: '2026-09-24',
+    title: '版本 1.43.0 · 数字与状态回归真实',
+    items: [
+      { text: '首页：准备度演示卡不再对所有人展示同一套硬编码分数——未登录时明确标注「示例」；已登录用户展示自己最新一次简历评估的真实分数与维度（还没有评估记录则显示空态与引导，而不是虚构的「击败 78% 求职者」「面试题已就绪」）', level: 'user' },
+      { text: '管理后台：岗位列表默认收窄到「国内岗位」——此前海外远程源批量导入后按导入时间倒序，首屏整屏都是海外岗位，容易误以为国内数据丢失；可一键切换海外/全部', level: 'user' },
+      { text: '管理后台：系统指标的「缓存」区块新增 RAG 检索缓存的命中/未命中/命中率——该缓存此前只在内部计数，指标页永远显示 0/0，优化效果无法被观测', level: 'user' },
+      { text: '运维：修复「知识库文档数」重启漂移——文档计数是进程内累加值，重启后只回补预置知识的数量，用户导入的部分全部漏计，容量上限检查因此形同虚设；现改为启动及播种后直接以向量库真实行数校准', level: 'tech' },
+    ],
+  },
   {
     version: '1.42.1',
     date: '2026-09-23',

@@ -52,16 +52,17 @@ public class AdminController {
         return Result.success(adminService.sources());
     }
 
-    @Operation(summary = "岗位列表（含失效，可按来源/招聘类型/状态检索）")
+    @Operation(summary = "岗位列表（含失效，可按来源/招聘类型/状态/海内外范围检索）")
     @GetMapping("/jobs")
     public Result<Map<String, Object>> listJobs(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String recruitType,
             @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) Boolean overseas,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Page<JobPostingEntity> result = adminService.listJobs(keyword, source, recruitType, active, page, size);
+        Page<JobPostingEntity> result = adminService.listJobs(keyword, source, recruitType, active, overseas, page, size);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("total", result.getTotalElements());
         body.put("page", result.getNumber());
