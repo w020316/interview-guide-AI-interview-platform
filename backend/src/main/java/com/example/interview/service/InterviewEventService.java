@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.entity.InterviewEventEntity;
 import com.example.interview.repository.InterviewEventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,7 +74,7 @@ public class InterviewEventService {
     /** 查询本人拥有的日程（不存在或非本人抛参数异常） */
     private InterviewEventEntity getOwned(Long id, String userId) {
         InterviewEventEntity event = eventRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("日程不存在：" + id));
+                .orElseThrow(() -> new ResourceNotFoundException("日程不存在：" + id));
         if (!event.getUserId().equals(userId)) {
             throw new IllegalArgumentException("无权操作他人日程");
         }

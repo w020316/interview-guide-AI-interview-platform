@@ -254,6 +254,7 @@ import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
 import { validateJobKeyword } from '../utils/jobKeyword'
+import { toQueryRecruitType } from '../utils/recruitType'
 
 /**
  * 招聘信息广场
@@ -505,6 +506,8 @@ async function fetchJobs() {
     // v1.39.0：海外岗位只在「海外远程」分栏出现。
     // 「海外远程」→ overseas=true；其余分栏（含「全部国内」）→ overseas=false。
     // 默认视图（秋招精选）与「全部国内」都只出国内岗位，海外英文岗位不再稀释列表。
+    // v1.44.0（P3-03）：recruitType 的归一化抽到 toQueryRecruitType（虚拟值 FAVORITE/OVERSEAS/空串
+    // 一律不外泄），避免「刷新/分页按钮移到 filter-card 之外」时发出 recruitType=FAVORITE 被后端判 400。
     const isOverseasTab = recruitType.value === 'OVERSEAS'
     const res = await api.get('/api/jobs', {
       params: {
@@ -512,7 +515,7 @@ async function fetchJobs() {
         industry: industry.value || undefined,
         jobType: jobType.value || undefined,
         location: location.value || undefined,
-        recruitType: isOverseasTab ? undefined : (recruitType.value || undefined),
+        recruitType: toQueryRecruitType(recruitType.value),
         overseas: isOverseasTab,
         source: source.value || undefined,
         degree: degree.value || undefined,

@@ -135,6 +135,24 @@ class AdminControllerTest {
     }
 
     @Test
+    @DisplayName("GET /jobs: 小写 recruitType 归一为规范 code 后再查询（收口①：放行就必须真能查到）")
+    void admin_listJobs_normalizesRecruitType() throws Exception {
+        loginAsAdmin();
+        when(adminService.listJobs(any(), any(), any(), any(), any(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        // 小写 spring 校验放行，但 admin 查询同为大小写敏感 cb.equal —— 必须归一为 "SPRING"
+        mockMvc.perform(get("/api/admin/jobs").param("recruitType", "spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.total").value(0));
+        org.mockito.Mockito.verify(adminService).listJobs(any(), any(),
+                org.mockito.ArgumentMatchers.eq("SPRING"), any(), any(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
     @DisplayName("POST /jobs/{id}/deactivate 与 /activate: 返回成功业务码")
     void admin_deactivateAndActivateJob() throws Exception {
         loginAsAdmin();
@@ -161,6 +179,49 @@ class AdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
         org.mockito.Mockito.verify(adminService).deleteJob(1L);
+    }
+
+    @Test
+    @DisplayName("操作不存在的岗位：404 且不套「请求参数错误」前缀（P3-01，此前误报 400）")
+    void admin_jobNotFound_returns404() throws Exception {
+        loginAsAdmin();
+        org.mockito.Mockito.doThrow(new com.example.interview.common.ResourceNotFoundException("岗位不存在"))
+                .when(adminService).deactivateJob(999L);
+        org.mockito.Mockito.doThrow(new com.example.interview.common.ResourceNotFoundException("岗位不存在"))
+                .when(adminService).activateJob(999L);
+        org.mockito.Mockito.doThrow(new com.example.interview.common.ResourceNotFoundException("岗位不存在"))
+                .when(adminService).deleteJob(999L);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/admin/jobs/999/deactivate"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("岗位不存在"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/admin/jobs/999/activate"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/admin/jobs/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
+    }
+
+    @Test
+    @DisplayName("操作不存在的用户：404（P3-01，此前误报 400）")
+    void admin_userNotFound_returns404() throws Exception {
+        loginAsAdmin();
+        org.mockito.Mockito.doThrow(new com.example.interview.common.ResourceNotFoundException("用户不存在"))
+                .when(adminService).banUser(org.mockito.ArgumentMatchers.eq(999L),
+                        org.mockito.ArgumentMatchers.any());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/admin/users/999/ban"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("用户不存在"));
     }
 
     @Test

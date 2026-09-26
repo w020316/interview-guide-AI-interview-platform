@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.entity.InterviewQuestionEntity;
 import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.repository.InterviewQuestionRepository;
@@ -67,7 +68,7 @@ public class InterviewSessionService {
      */
     public InterviewSessionEntity getBySessionId(String sessionId) {
         return sessionRepository.findBySessionId(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException("会话不存在：" + sessionId));
+                .orElseThrow(() -> new ResourceNotFoundException("会话不存在：" + sessionId));
     }
 
     /**
@@ -132,10 +133,10 @@ public class InterviewSessionService {
     @Transactional
     public InterviewQuestionEntity saveAnswer(Long questionId, String userAnswer, Integer evaluationScore, String currentUserId) {
         InterviewQuestionEntity question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new IllegalArgumentException("题目不存在：" + questionId));
+                .orElseThrow(() -> new ResourceNotFoundException("题目不存在：" + questionId));
         // 越权校验：题目所属会话必须归当前用户所有
         InterviewSessionEntity session = sessionRepository.findBySessionId(question.getSessionId())
-                .orElseThrow(() -> new IllegalArgumentException("会话不存在：" + question.getSessionId()));
+                .orElseThrow(() -> new ResourceNotFoundException("会话不存在：" + question.getSessionId()));
         if (!currentUserId.equals(session.getUserId())) {
             throw new IllegalArgumentException("无权操作他人题目");
         }

@@ -453,16 +453,18 @@ class ResumeControllerTest {
         }
 
         @Test
-        @DisplayName("getById 简历不存在返回 400（区分 404 与 403 语义）")
-        void getById_notFound_returns400() throws Exception {
-            // 简历不存在仍抛 IllegalArgumentException，映射为 400（与越权 403 区分）
+        @DisplayName("getById 简历不存在返回 404（P3-01：与契约文档和 /api/jobs/{id} 对齐）")
+        void getById_notFound_returns404() throws Exception {
+            // 2026-09-26 第三轮 P3-01：此前返回 400「请求参数错误：…」，
+            // 与 docs/api-error-contract.md（「404 资源不存在」）以及
+            // GET /api/jobs/{id}（返回 404）都不一致。现统一为 404，且不再套「请求参数错误」前缀。
             when(resumeService.getByIdAndUser(999L, USER_ID))
-                    .thenThrow(new IllegalArgumentException("简历不存在：999"));
+                    .thenThrow(new com.example.interview.common.ResourceNotFoundException("简历不存在：999"));
 
             mockMvc.perform(get("/api/resume/999"))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value(400))
-                    .andExpect(jsonPath("$.message").value("请求参数错误：简历不存在：999"));
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value(404))
+                    .andExpect(jsonPath("$.message").value("简历不存在：999"));
         }
     }
 }

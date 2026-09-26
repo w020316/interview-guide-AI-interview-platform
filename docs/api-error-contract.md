@@ -41,7 +41,8 @@
 |---|---|---|
 | `AuthenticationException` | 401 | 未认证或登录已过期 |
 | `AccessDeniedException` | 403 | 无权访问该资源 |
-| `IllegalArgumentException` | 400 | 参数非法（透出原始消息） |
+| `ResourceNotFoundException` | 404 | 资源不存在（v1.44.0 新增，如「会话不存在：xxx」） |
+| `IllegalArgumentException` | 400 | 参数非法（透出原始消息；**不含**资源不存在） |
 | `MethodArgumentNotValidException` | 400 | 字段校验失败 |
 | `MethodArgumentTypeMismatchException` | 400 | 参数类型不匹配 |
 | `MissingServletRequestParameterException` | 400 | 缺少必填参数：xxx |

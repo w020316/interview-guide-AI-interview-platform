@@ -292,7 +292,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { authState } from '../auth'
-import { recruitTypeLabel } from '../utils/recruitType'
+import { recruitTypeLabel, RECRUIT_TYPE_CODES, RECRUIT_TYPE_LABELS } from '../utils/recruitType'
 
 /**
  * 管理后台（v1.37.0 视觉与信息架构重构）
@@ -378,13 +378,10 @@ const TABS: { k: TabKey; l: string }[] = [
   { k: 'metrics', l: '系统指标' },
 ]
 
-const RECRUIT_TYPES = [
-  { v: 'AUTUMN', l: '秋招' },
-  { v: 'SPRING', l: '春招' },
-  { v: 'INTERN', l: '实习' },
-  { v: 'SOCIAL', l: '社招' },
-  { v: 'TARGETED', l: '定向专项' },
-]
+// P3-03（v1.44.0）：此前此处内联了一份 5 项的清单，漏了 PART_TIME，导致管理后台
+// 无法按「兼职」筛选。改为从 utils/recruitType 派生，让前端只有一份取值来源。
+// 结构保持 { v, l } 不变，模板无需改动。
+const RECRUIT_TYPES = RECRUIT_TYPE_CODES.map((v) => ({ v, l: RECRUIT_TYPE_LABELS[v] }))
 
 /** 环形图配色（按招聘类型顺序取用，深色模式同样可辨） */
 const DONUT_COLORS = ['#0f766e', '#c2410c', '#1d4ed8', '#b45309', '#7c3aed']

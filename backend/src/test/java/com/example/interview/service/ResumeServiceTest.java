@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.entity.ResumeEntity;
 import com.example.interview.repository.ResumeRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -71,11 +72,11 @@ class ResumeServiceTest {
     }
 
     @Test
-    @DisplayName("getByIdAndUser: 简历不存在时应抛异常")
+    @DisplayName("getByIdAndUser: 简历不存在时应抛 ResourceNotFoundException（P3-01：资源不存在=404）")
     void getByIdAndUser_notFound_shouldThrow() {
         when(resumeRepository.findById(99L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.getByIdAndUser(99L, "alice"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("简历不存在");
     }
 

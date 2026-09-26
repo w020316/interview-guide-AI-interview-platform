@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.entity.InterviewEventEntity;
 import com.example.interview.repository.InterviewEventRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -95,11 +96,11 @@ class InterviewEventServiceTest {
     }
 
     @Test
-    @DisplayName("update: 不存在的日程抛出异常")
+    @DisplayName("update: 不存在的日程抛 ResourceNotFoundException（P3-01：资源不存在=404）")
     void update_notFound_shouldThrow() {
         when(eventRepository.findById(99L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.update(99L, "u1", new InterviewEventEntity()))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("日程不存在");
     }
 

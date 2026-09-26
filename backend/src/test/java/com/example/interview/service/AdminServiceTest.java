@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.entity.JobPostingEntity;
 import com.example.interview.entity.UserEntity;
 import com.example.interview.repository.JobPostingRepository;
@@ -268,10 +269,10 @@ class AdminServiceTest {
         verify(jobPostingRepository, org.mockito.Mockito.times(2)).save(job);
 
         assertThatThrownBy(() -> service.deactivateJob(2L))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("岗位不存在");
         assertThatThrownBy(() -> service.activateJob(2L))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("岗位不存在");
     }
 
@@ -285,7 +286,7 @@ class AdminServiceTest {
         verify(jobPostingRepository).deleteById(1L);
 
         assertThatThrownBy(() -> newService(new SimpleMeterRegistry()).deleteJob(2L))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("岗位不存在");
         verify(jobPostingRepository, never()).deleteById(2L);
     }
@@ -323,7 +324,7 @@ class AdminServiceTest {
     }
 
     @Test
-    @DisplayName("ban/unban: 存在校验通过后写注册表；用户不存在或 id 为 null 抛异常")
+    @DisplayName("ban/unban: 存在校验通过后写注册表；用户不存在=[资源不存在]404，id 为 null=[参数缺失]400")
     void banAndUnbanUser() {
         when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(
                 UserEntity.builder().id(1L).username("普通用户").build()));
@@ -335,11 +336,13 @@ class AdminServiceTest {
         service.unbanUser(1L);
         assertThat(userBanRegistry.isBanned(1L)).isFalse();
 
+        // P3-01：findById 查不到 → 资源不存在（404）
         assertThatThrownBy(() -> service.banUser(2L, 99L))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("用户不存在");
+        // P3-01 例外：id 为 null 属「参数缺失」，语义仍是 400，不得被误升级为 404
         assertThatThrownBy(() -> service.unbanUser(null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("用户不存在");
     }
 

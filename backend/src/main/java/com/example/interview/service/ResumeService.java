@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.entity.ResumeEntity;
 import com.example.interview.repository.ResumeRepository;
 import com.example.interview.util.JsonRepairUtil;
@@ -85,15 +86,17 @@ public class ResumeService {
 
     /**
      * 通过简历 ID 获取详情（带越权校验）
-     * - 简历不存在：抛 IllegalArgumentException（GlobalExceptionHandler 映射为 400）
+     * - 简历不存在：抛 ResourceNotFoundException（GlobalExceptionHandler 映射为 404）
      * - 简历存在但非本人：抛 AccessDeniedException（GlobalExceptionHandler 映射为 403，语义更准确）
      *
      * v1.16 起：越权场景从 IllegalArgumentException 改为 AccessDeniedException，
      * 使 HTTP 状态码从 403 替代原 400，与 InterviewSessionController 的 IDOR 处理对齐
+     * v1.44.0（第三轮 P3-01）：「简历不存在」从 IllegalArgumentException（400）改为
+     * ResourceNotFoundException（404），与 docs/api-error-contract.md 及 GET /api/jobs/{id} 对齐
      */
     public ResumeEntity getByIdAndUser(Long id, String userId) {
         ResumeEntity resume = resumeRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("简历不存在：" + id));
+                .orElseThrow(() -> new ResourceNotFoundException("简历不存在：" + id));
         if (!userId.equals(resume.getUserId())) {
             throw new AccessDeniedException("无权访问该简历");
         }

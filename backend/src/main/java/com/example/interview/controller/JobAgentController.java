@@ -122,8 +122,21 @@ public class JobAgentController {
         if (sizeError != null) {
             return Result.error(400, sizeError);
         }
+        // P3-03（2026-09-26）：非法招聘类型此前静默返回 total=0，用户会以为「真的没有岗位」。
+        // 取值清单见 RecruitType（后端单一来源）；空值=「不限」，放行。
+        String recruitTypeError = com.example.interview.service.job.RecruitType.validationError(recruitType);
+        if (recruitTypeError != null) {
+            return Result.error(400, recruitTypeError);
+        }
+        // 收口①（v1.44.0）：校验是大小写不敏感放行（如 spring），但底层查询用 cb.equal 是
+        // 大小写敏感的——若不归一，spring 会被判「合法」却查不到（total=0），正是 P3-03 要
+        // 消灭的「静默空结果」。在此把合法取值归一为规范 code；空串/null 为「不限」，fromCode
+        // 返回 null → 原样透传，语义与既有行为完全一致。
+        com.example.interview.service.job.RecruitType rt =
+                com.example.interview.service.job.RecruitType.fromCode(recruitType);
+        String normalizedRecruitType = (rt == null) ? recruitType : rt.name();
         Page<JobPostingEntity> result = jobAgentService.search(
-                keyword, industry, jobType, location, recruitType, source, degree, experience,
+                keyword, industry, jobType, location, normalizedRecruitType, source, degree, experience,
                 overseas, page, size);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("total", result.getTotalElements());

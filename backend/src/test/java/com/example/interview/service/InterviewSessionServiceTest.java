@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.entity.InterviewQuestionEntity;
 import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.repository.InterviewSessionRepository;
@@ -64,11 +65,11 @@ class InterviewSessionServiceTest {
     }
 
     @Test
-    @DisplayName("getBySessionId: sessionId 不存在时抛 IllegalArgumentException")
+    @DisplayName("getBySessionId: sessionId 不存在时抛 ResourceNotFoundException（P3-01：资源不存在=404）")
     void getBySessionId_notFound_shouldThrow() {
         when(sessionRepository.findBySessionId("bad-id")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.getBySessionId("bad-id"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("会话不存在");
     }
 
@@ -132,11 +133,11 @@ class InterviewSessionServiceTest {
     }
 
     @Test
-    @DisplayName("saveQuestions: 会话不存在时抛 IllegalArgumentException")
+    @DisplayName("saveQuestions: 会话不存在时抛 ResourceNotFoundException（P3-01：走 getBySessionId，资源不存在=404）")
     void saveQuestions_sessionNotFound_shouldThrow() {
         when(sessionRepository.findBySessionId("bad-id")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.saveQuestions("bad-id", List.of(new InterviewQuestionEntity()), "user1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("会话不存在");
         verify(questionRepository, never()).saveAll(anyList());
     }
@@ -171,16 +172,16 @@ class InterviewSessionServiceTest {
     }
 
     @Test
-    @DisplayName("saveAnswer: 题目不存在时抛 IllegalArgumentException")
+    @DisplayName("saveAnswer: 题目不存在时抛 ResourceNotFoundException（P3-01：资源不存在=404）")
     void saveAnswer_questionNotFound_shouldThrow() {
         when(questionRepository.findById(99L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.saveAnswer(99L, "回答", 80, "user1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("题目不存在");
     }
 
     @Test
-    @DisplayName("saveAnswer: 题目所属会话不存在时抛 IllegalArgumentException")
+    @DisplayName("saveAnswer: 题目所属会话不存在时抛 ResourceNotFoundException（P3-01：资源不存在=404）")
     void saveAnswer_sessionNotFound_shouldThrow() {
         InterviewQuestionEntity q = InterviewQuestionEntity.builder()
                 .id(1L).sessionId("ghost-session").build();
@@ -188,7 +189,7 @@ class InterviewSessionServiceTest {
         when(sessionRepository.findBySessionId("ghost-session")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.saveAnswer(1L, "回答", 80, "user1"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("会话不存在");
     }
 

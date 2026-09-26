@@ -12,6 +12,25 @@ class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Test
+    @DisplayName("ResourceNotFoundException → code 404，且不套「请求参数错误」前缀（P3-01）")
+    void resourceNotFound_returns404() {
+        Result<Void> result = handler.handleResourceNotFound(
+                new com.example.interview.common.ResourceNotFoundException("会话不存在：abc"));
+
+        assertThat(result.code()).isEqualTo(404);
+        assertThat(result.message()).isEqualTo("会话不存在：abc");
+        // 关键：不能出现「请求参数错误」——那不是参数问题，是资源找不到
+        assertThat(result.message()).doesNotContain("请求参数错误");
+    }
+
+    @Test
+    @DisplayName("ResourceNotFoundException 是 IllegalArgumentException 的子类（兼容既有 isInstanceOf 断言）")
+    void resourceNotFoundIsIllegalArgument() {
+        assertThat(new com.example.interview.common.ResourceNotFoundException("x"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     @DisplayName("IllegalArgumentException → code 400")
     void illegalArgument_returns400() {
         Result<Void> result = handler.handleIllegalArgument(new IllegalArgumentException("bad param"));

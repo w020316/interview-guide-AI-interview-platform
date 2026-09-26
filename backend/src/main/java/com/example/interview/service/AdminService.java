@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.config.AiLatencyWindow;
 import com.example.interview.entity.JobPostingEntity;
 import com.example.interview.entity.UserEntity;
@@ -319,7 +320,8 @@ public class AdminService {
     public void deactivateJob(Long id) {
         JobPostingEntity job = jobPostingRepository.findById(id).orElse(null);
         if (job == null) {
-            throw new IllegalArgumentException("岗位不存在");
+            // P3-01：操作一个已不存在的岗位是「资源不存在」，应为 404 而非 400
+            throw new ResourceNotFoundException("岗位不存在");
         }
         job.setActive(false);
         jobPostingRepository.save(job);
@@ -329,7 +331,8 @@ public class AdminService {
     public void activateJob(Long id) {
         JobPostingEntity job = jobPostingRepository.findById(id).orElse(null);
         if (job == null) {
-            throw new IllegalArgumentException("岗位不存在");
+            // P3-01：同上，「查不到实体」应为 404
+            throw new ResourceNotFoundException("岗位不存在");
         }
         job.setActive(true);
         jobPostingRepository.save(job);
@@ -338,7 +341,8 @@ public class AdminService {
     /** 删除岗位 */
     public void deleteJob(Long id) {
         if (!jobPostingRepository.existsById(id)) {
-            throw new IllegalArgumentException("岗位不存在");
+            // P3-01：删除一个已不存在的岗位是「资源不存在」，应为 404
+            throw new ResourceNotFoundException("岗位不存在");
         }
         jobPostingRepository.deleteById(id);
     }
@@ -406,10 +410,14 @@ public class AdminService {
     /** 校验用户存在并返回实体（封禁前需要 username 判定目标是否为管理员） */
     private UserEntity requireUser(Long id) {
         if (id == null) {
+            // P3-01 例外：这里 id 来自 @PathVariable Long（Spring 已把非数字值拦成
+            // MethodArgumentTypeMismatchException → 400），走到这一步只可能是「参数缺失」，
+            // 属调用方 bug 而非「资源不存在」，故保持 400 语义不变。
             throw new IllegalArgumentException("用户不存在");
         }
+        // P3-01：findById 查不到是「资源不存在」，应为 404
         return userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+                .orElseThrow(() -> new ResourceNotFoundException("用户不存在"));
     }
 
     /** 用户名是否在配置的管理员名单内（大小写不敏感） */

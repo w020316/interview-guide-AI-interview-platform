@@ -27,6 +27,22 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /**
+     * 资源不存在 → 404（v1.44.0，第三轮 P3-01）。
+     *
+     * <p>此前「按 ID 查不到」也走下面的 {@link IllegalArgumentException} 分支被映射成 400，
+     * 与 {@code docs/api-error-contract.md}（「404 资源不存在」）以及
+     * {@code GET /api/jobs/{id}}（正确返回 404）都不一致。
+     *
+     * <p>Spring 按**最具体**的异常类型匹配处理器，所以本方法优先于下面的 400 分支生效；
+     * 其余 {@code IllegalArgumentException} 语义不变。
+     */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Result<Void> handleResourceNotFound(ResourceNotFoundException ex) {
+        return Result.error(404, ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleIllegalArgument(IllegalArgumentException ex) {

@@ -62,12 +62,22 @@ public class AdminController {
             @RequestParam(required = false) Boolean overseas,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-                // P3-04：size < 1 此前被静默钳成 1，返回条数与预期不符且无从察觉
+        // P3-03（2026-09-26）：非法招聘类型此前静默返回空列表
+        String recruitTypeError = com.example.interview.service.job.RecruitType.validationError(recruitType);
+        if (recruitTypeError != null) {
+            return Result.error(400, recruitTypeError);
+        }
+        // 收口①（v1.44.0）：校验大小写不敏感放行（如 spring），但底层 cb.equal 查询大小写敏感，
+        // 不归一会「判合法却查不到」。归一为规范 code；空串/null 为「不限」，原样透传。
+        com.example.interview.service.job.RecruitType rt =
+                com.example.interview.service.job.RecruitType.fromCode(recruitType);
+        String normalizedRecruitType = (rt == null) ? recruitType : rt.name();
+        // P3-04：size < 1 此前被静默钳成 1，返回条数与预期不符且无从察觉
         String sizeError = com.example.interview.util.PaginationSupport.validateSize(size);
         if (sizeError != null) {
             return Result.error(400, sizeError);
         }
-Page<JobPostingEntity> result = adminService.listJobs(keyword, source, recruitType, active, overseas, page, size);
+Page<JobPostingEntity> result = adminService.listJobs(keyword, source, normalizedRecruitType, active, overseas, page, size);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("total", result.getTotalElements());
         body.put("page", result.getNumber());
@@ -103,7 +113,7 @@ Page<JobPostingEntity> result = adminService.listJobs(keyword, source, recruitTy
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-                // P3-04：size < 1 此前被静默钳成 1，返回条数与预期不符且无从察觉
+        // P3-04：size < 1 此前被静默钳成 1，返回条数与预期不符且无从察觉
         String sizeError = com.example.interview.util.PaginationSupport.validateSize(size);
         if (sizeError != null) {
             return Result.error(400, sizeError);

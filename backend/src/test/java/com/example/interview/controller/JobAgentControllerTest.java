@@ -178,6 +178,68 @@ class JobAgentControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/jobs: 非法 recruitType 返回 400 并给出可选值（P3-03）")
+    void list_rejectsUnknownRecruitType() throws Exception {
+        mockMvc.perform(get("/api/jobs").param("recruitType", "ZZZ"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("招聘类型取值无效")))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("秋招(AUTUMN)")));
+    }
+
+    @Test
+    @DisplayName("GET /api/jobs: 合法 recruitType（含小写）与空值都放行")
+    void list_acceptsValidRecruitType() throws Exception {
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        for (String ok : new String[]{"AUTUMN", "spring", "PART_TIME", "", "  "}) {
+            mockMvc.perform(get("/api/jobs").param("recruitType", ok))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+        }
+    }
+
+    @Test
+    @DisplayName("GET /api/jobs: 小写 recruitType 归一为规范 code 后再查询（收口①：放行就必须真能查到）")
+    void list_normalizesRecruitTypeToCanonicalCode() throws Exception {
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        // 小写 spring 被校验放行，但底层 cb.equal 大小写敏感——必须归一为 "SPRING"，
+        // 否则会出现「校验说合法、查询却 total=0」的静默空结果（P3-03 的原始病症）。
+        mockMvc.perform(get("/api/jobs").param("recruitType", "spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+        verify(jobAgentService).search(any(), any(), any(), any(), eq("SPRING"), any(), any(),
+                any(), any(), anyInt(), anyInt());
+
+        // 空串表示「不限」，必须原样透传（不得被改成 null，避免动到既有语义）
+        org.mockito.Mockito.clearInvocations(jobAgentService);
+        mockMvc.perform(get("/api/jobs").param("recruitType", ""))
+                .andExpect(status().isOk());
+        verify(jobAgentService).search(any(), any(), any(), any(), eq(""), any(), any(),
+                any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("GET /api/jobs: 缺失 recruitType 时透传 null，语义为「不限」（不变式）")
+    void list_missingRecruitType_passesNull() throws Exception {
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/jobs"))
+                .andExpect(status().isOk());
+        verify(jobAgentService).search(any(), any(), any(), any(),
+                org.mockito.ArgumentMatchers.isNull(), any(), any(), any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
     @DisplayName("GET /api/jobs: size < 1 被显式拒绝（P3-04：此前静默钳成 1 条）")
     void list_rejectsNonPositiveSize() throws Exception {
         for (String bad : new String[]{"-5", "0"}) {
