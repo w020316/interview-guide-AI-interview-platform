@@ -98,12 +98,15 @@ class HealthControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/info 响应包含 description 与 docs 字段")
+    @DisplayName("GET /api/info 响应包含 description；不再对外宣称需要鉴权的 docs 地址（P3-05）")
     void info_containsDescriptionAndDocs() throws Exception {
         mockMvc.perform(get("/api/info"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.description").exists())
-                .andExpect(jsonPath("$.data.docs").value("/api/docs"));
+                .andExpect(jsonPath("$.data.version").exists())
+                // P3-05：/api/docs 需登录、且生产已关闭 springdoc，
+                // 匿名端点不应宣称一个打不开的地址
+                .andExpect(jsonPath("$.data.docs").doesNotExist());
     }
 
     @Test

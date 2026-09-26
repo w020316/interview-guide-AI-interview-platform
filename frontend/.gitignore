@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# 沙箱里无法清空 dist/，验证构建时改用 --outDir dist-verify；同样属于构建产物，不入库
+dist-verify/
 coverage/
 *.log
 .DS_Store

@@ -62,7 +62,12 @@ public class AdminController {
             @RequestParam(required = false) Boolean overseas,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Page<JobPostingEntity> result = adminService.listJobs(keyword, source, recruitType, active, overseas, page, size);
+                // P3-04：size < 1 此前被静默钳成 1，返回条数与预期不符且无从察觉
+        String sizeError = com.example.interview.util.PaginationSupport.validateSize(size);
+        if (sizeError != null) {
+            return Result.error(400, sizeError);
+        }
+Page<JobPostingEntity> result = adminService.listJobs(keyword, source, recruitType, active, overseas, page, size);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("total", result.getTotalElements());
         body.put("page", result.getNumber());
@@ -98,7 +103,12 @@ public class AdminController {
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Page<AdminService.UserView> result = adminService.listUsers(keyword, page, size);
+                // P3-04：size < 1 此前被静默钳成 1，返回条数与预期不符且无从察觉
+        String sizeError = com.example.interview.util.PaginationSupport.validateSize(size);
+        if (sizeError != null) {
+            return Result.error(400, sizeError);
+        }
+Page<AdminService.UserView> result = adminService.listUsers(keyword, page, size);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("total", result.getTotalElements());
         body.put("page", result.getNumber());

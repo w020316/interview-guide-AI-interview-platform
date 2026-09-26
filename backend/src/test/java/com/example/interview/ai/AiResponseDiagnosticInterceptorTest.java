@@ -27,7 +27,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *    `HttpRetryException: cannot retry due to server authentication, in streaming mode`，
  *    **不读也不留响应体**；
  * 3. 拦截器最初挂在 fallbackChatModel 的入参 builder 上，而节点用的是 clone()，
- *    而 clone() 不继承 requestInterceptors → 拦截器从未被调用。
+ *    当时判断是 clone() 不继承 requestInterceptors → 拦截器从未被调用。
+ *    ⚠️ **2026-09-26 更正（第三轮）**：该判断**无法复现** —— 本项目实际解析的
+ *    spring-web 6.1.21 上，{@code clone()} 会保留拦截器列表（用本地 HttpServer 实测，
+ *    见 {@code config/RestClientBuilderCloneExperiment}）。真实原因更可能是「挂在了
+ *    另一个 builder 实例上」（{@code RestClient.Builder} 是原型作用域，每次注入都是新实例）。
+ *    结论不变（**在每个真正被使用的 builder 上显式挂载**），但别再拿「clone 丢拦截器」
+ *    去推断其他问题，那会导致误诊。
  *
  * 本类覆盖：错误识别、正常体不误判、分级（配置类故障 vs 可自愈抖动）、
  * 以及「body 必须可被下游完整读取」这一核心不破坏性约束。

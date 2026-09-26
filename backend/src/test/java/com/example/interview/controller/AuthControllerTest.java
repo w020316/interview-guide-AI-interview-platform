@@ -76,7 +76,7 @@ class AuthControllerTest {
             when(jwtUtil.generateToken("1", "alice")).thenReturn("mock.jwt.token");
 
             String body = objectMapper.writeValueAsString(Map.of(
-                    "username", "alice", "password", "123456", "email", "a@b.com"));
+                    "username", "alice", "password", "StrongPw#2026", "email", "a@b.com"));
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -103,7 +103,7 @@ class AuthControllerTest {
         @DisplayName("用户名长度 < 2 返回 400")
         void register_shortUsername_returns400() throws Exception {
             String body = objectMapper.writeValueAsString(Map.of(
-                    "username", "a", "password", "123456"));
+                    "username", "a", "password", "StrongPw#2026"));
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -118,7 +118,7 @@ class AuthControllerTest {
         void register_longUsername_returns400() throws Exception {
             String longName = "a".repeat(33);
             String body = objectMapper.writeValueAsString(Map.of(
-                    "username", longName, "password", "123456"));
+                    "username", longName, "password", "StrongPw#2026"));
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +132,7 @@ class AuthControllerTest {
         @DisplayName("用户名含非法字符（空格）返回 400")
         void register_invalidUsernameChars_returns400() throws Exception {
             String body = objectMapper.writeValueAsString(Map.of(
-                    "username", "alice bob", "password", "123456"));
+                    "username", "alice bob", "password", "StrongPw#2026"));
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -154,7 +154,7 @@ class AuthControllerTest {
             when(jwtUtil.generateToken("2", "张三")).thenReturn("mock.jwt.token");
 
             String body = objectMapper.writeValueAsString(Map.of(
-                    "username", "张三", "password", "123456"));
+                    "username", "张三", "password", "StrongPw#2026"));
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -178,10 +178,55 @@ class AuthControllerTest {
         }
 
         @Test
+        @DisplayName("常见弱口令返回 400（P3-02：线上实测 12345678 曾被放行）")
+        void register_weakPassword_returns400() throws Exception {
+            for (String weak : new String[]{"12345678", "password", "11111111", "abcdefgh"}) {
+                String body = objectMapper.writeValueAsString(Map.of(
+                        "username", "alice", "password", weak));
+
+                mockMvc.perform(post("/api/auth/register")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.code").value(400));
+            }
+        }
+
+        @Test
+        @DisplayName("密码包含用户名返回 400（撞库最先试的组合）")
+        void register_passwordContainsUsername_returns400() throws Exception {
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "username", "alice", "password", "alice2026"));
+
+            mockMvc.perform(post("/api/auth/register")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("密码不能包含用户名"));
+        }
+
+        @Test
+        @DisplayName("登录路径不做弱口令校验（存量用户不能被挡在门外）")
+        void login_weakPasswordNotBlocked() throws Exception {
+            when(userRepository.findByUsername("alice")).thenReturn(java.util.Optional.empty());
+
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "username", "alice", "password", "123456"));
+
+            // 应走到「用户不存在」→ 401，而不是被密码策略拦成 400
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(401));
+        }
+
+        @Test
         @DisplayName("邮箱格式错误返回 400")
         void register_invalidEmail_returns400() throws Exception {
             String body = objectMapper.writeValueAsString(Map.of(
-                    "username", "alice", "password", "123456", "email", "not-an-email"));
+                    "username", "alice", "password", "StrongPw#2026", "email", "not-an-email"));
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -197,7 +242,7 @@ class AuthControllerTest {
             when(userRepository.existsByUsername("alice")).thenReturn(true);
 
             String body = objectMapper.writeValueAsString(Map.of(
-                    "username", "alice", "password", "123456"));
+                    "username", "alice", "password", "StrongPw#2026"));
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -214,7 +259,7 @@ class AuthControllerTest {
             when(userRepository.existsByEmail("a@b.com")).thenReturn(true);
 
             String body = objectMapper.writeValueAsString(Map.of(
-                    "username", "alice", "password", "123456", "email", "a@b.com"));
+                    "username", "alice", "password", "StrongPw#2026", "email", "a@b.com"));
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -230,7 +275,7 @@ class AuthControllerTest {
             when(jwtUtil.isAdminUsername("小吴同学")).thenReturn(true);
 
             String body = objectMapper.writeValueAsString(Map.of(
-                    "username", "小吴同学", "password", "123456"));
+                    "username", "小吴同学", "password", "StrongPw#2026"));
 
             mockMvc.perform(post("/api/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)

@@ -41,6 +41,7 @@
             <p class="extract-title">从其他软件提取简历</p>
             <p class="extract-sub">
               点对应入口直达取件，导出 PDF / 复制文本后回到本页；没自动跳转就用卡片下方的网页版
+              （微信文件传输助手的网页版只在电脑上可用）
             </p>
           </div>
 
@@ -55,7 +56,11 @@
               >
                 <span class="ex-ico" :style="{ background: s.bg, color: s.color }">{{ s.glyph }}</span>
                 <span class="ex-body">
-                  <b>{{ s.name }}</b>
+                  <b>
+                    {{ s.name }}
+                    <!-- 手机上打不开的网页版要提前说明，别等用户点进去才发现 -->
+                    <i v-if="isMobileBlockedWebEntry(s.webOnlyOnDesktop, isMobile)" class="ex-flag">网页版仅电脑可用</i>
+                  </b>
                   <em>{{ s.hint }}</em>
                 </span>
                 <svg class="ex-enter" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -66,14 +71,26 @@
               <!-- 网页版入口**常驻**（v1.39.0）：浏览器无法检测 App 是否安装，
                    一旦判定失误而兜底入口又只在「失败」时才出现，用户就彻底卡住。
                    常驻后任何一次误判都只是「多了一个入口」，不会变成死路。
-                   唤起未交棒成功的那张卡片会高亮，引导用户走这条路。 -->
+                   唤起未交棒成功的那张卡片会高亮，引导用户走这条路。
+
+                   v1.44.0：若该来源的网页版**只在电脑上可用**而当前是移动端，
+                   这里改成「复制链接」——同一个地址在手机上打开只会被它自己拒绝，
+                   继续当链接给出就是把用户送进死路。 -->
+              <button
+                v-if="isMobileBlockedWebEntry(s.webOnlyOnDesktop, isMobile)"
+                class="ex-fallback ex-fallback-btn"
+                :class="{ prominent: failedKey === s.key }"
+                type="button"
+                @click="copyWebUrl(s)"
+              >{{ COPY_LINK_LABEL }}</button>
               <a
+                v-else
                 class="ex-fallback"
                 :class="{ prominent: failedKey === s.key }"
                 :href="s.webUrl"
                 target="_blank"
                 rel="noopener"
-              >{{ failedKey === s.key ? '未自动跳转？点此打开网页版 →' : '打开网页版 →' }}</a>
+              >{{ fallbackLabel(s) }}</a>
             </div>
           </div>
 
@@ -318,10 +335,15 @@ import { repairAndCheck } from '../utils/jsonRepair'
 import { getScoreColor, getScoreGradient } from '../utils/score'
 import { JOB_SUGGESTIONS } from '../utils/jobOptions'
 import {
+  COPY_LINK_LABEL,
+  copyResultHint,
+  copyText,
   createHandoffWatcher,
+  desktopOnlyWebHint,
   detectInAppBrowser,
   detectMobile,
   inAppBrowserHint,
+  isMobileBlockedWebEntry,
   launchFallbackHint,
   HANDOFF_WINDOW_MS,
 } from '../utils/appLaunch'
@@ -385,6 +407,14 @@ interface ExtractSource {
   scheme?: string
   /** 桌面端（或唤起失败后）打开的网页地址 */
   webUrl: string
+  /**
+   * 该网页版**只在电脑浏览器可用**（v1.44.0）。
+   *
+   * 只有微信「文件传输助手」属于这一类：`filehelper.weixin.qq.com` 会主动拒绝
+   * 手机端访问并提示「可尝试使用电脑端其他浏览器访问」。把它当通用兜底，
+   * 等于在手机上给用户一条死路 —— 移动端必须改为「复制链接 + 本机文件」两条出路。
+   */
+  webOnlyOnDesktop?: boolean
 }
 
 const EXTRACT_SOURCES: ExtractSource[] = [
@@ -392,6 +422,9 @@ const EXTRACT_SOURCES: ExtractSource[] = [
     key: 'wechat', name: '微信', glyph: '微', bg: '#e8f7ec', color: '#07c160',
     hint: '文件传输助手 / 收藏', scheme: 'weixin://',
     webUrl: 'https://filehelper.weixin.qq.com/',
+    // 实测（真机截图）：手机浏览器打开该地址会被它自己拦下，只回一句
+    // 「暂无法使用微信文件传输助手网页版，可尝试使用电脑端其他浏览器访问」。
+    webOnlyOnDesktop: true,
   },
   {
     key: 'qq', name: 'QQ', glyph: 'Q', bg: '#e8f1ff', color: '#12b7f5',
@@ -453,6 +486,8 @@ function onNativeFile(e: Event) {
  *
  * v1.39.0 重写判定逻辑（此前移动端大面积误报「未检测到 App」）：
  *
+ * - **该来源网页版仅支持电脑（如微信文件传输助手）且当前是移动端**：
+ *   不打开死链，改为说明原因并引导「选择本机文件 / 复制链接到电脑」（v1.44.0）。
  * - **桌面端 / 未配置 scheme**：直接新标签打开网页版。
  * - **应用内浏览器（微信/钉钉/支付宝/微博/QQ）**：宿主会拦截 scheme，
  *   直接打开网页版并说明原因 —— 不再走「跳一下再判失败」那条必然误报的路径。
@@ -464,6 +499,14 @@ function onNativeFile(e: Event) {
  */
 function openExtractSource(s: ExtractSource) {
   failedKey.value = ''
+
+  // 手机上打不开的网页版：不打开，直接给出真的能走的路。
+  // 高亮该卡片，让下方那条常驻入口同步切换成「复制链接」。
+  if (isMobileBlockedWebEntry(s.webOnlyOnDesktop, isMobile.value)) {
+    failedKey.value = s.key
+    ElMessage.warning(desktopOnlyWebHint(s.name))
+    return
+  }
 
   if (!isMobile.value || !s.scheme) {
     window.open(s.webUrl, '_blank', 'noopener')
@@ -495,6 +538,24 @@ function openExtractSource(s: ExtractSource) {
     failedKey.value = s.key
     ElMessage.info(launchFallbackHint(s.name))
   }, HANDOFF_WINDOW_MS)
+}
+
+/**
+ * 卡片下方那条常驻入口的文案。
+ *
+ * 之所以要按分支取文案：应用内浏览器里**根本没有尝试跳转**（scheme 被宿主拦下），
+ * 此时写「未自动跳转？」是错的 —— 用户会以为自己漏了一步。
+ */
+function fallbackLabel(s: ExtractSource): string {
+  if (failedKey.value !== s.key) return '打开网页版 →'
+  return inAppHost.value ? '打开网页版入口 →' : '未自动跳转？点此打开网页版 →'
+}
+
+/** 复制网页版地址（手机上打不开时，这是真正能走通的那条路） */
+async function copyWebUrl(s: ExtractSource) {
+  const ok = await copyText(s.webUrl)
+  if (ok) ElMessage.success(copyResultHint(true))
+  else ElMessage.warning(copyResultHint(false))
 }
 
 onMounted(() => {
@@ -1037,6 +1098,25 @@ function formatDate() {
   font-weight: 600;
   line-height: 1.3;
   color: var(--c-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* 「网页版仅电脑可用」标记：提前告知能力边界，避免用户点进去才发现是死路。
+   用 warning 语义令牌而非写死颜色，深色主题下自动跟随。 */
+.ex-flag {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--c-warning);
+  background: var(--c-warning-light);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
 }
 
 .ex-body em {
@@ -1091,6 +1171,21 @@ function formatDate() {
 
 .ex-fallback.prominent:hover {
   background: var(--brand-primary-100);
+}
+
+/* 「复制链接」形态（v1.44.0）：手机上打不开的网页版，用复制代替打开。
+   视觉与 <a> 形态的 ex-fallback 保持一致，避免同一位置出现两种气质。 */
+.ex-fallback-btn {
+  width: calc(100% - 24px);
+  text-align: left;
+  font-family: var(--font-sans);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.ex-fallback-btn.prominent {
+  text-align: center;
 }
 
 .extract-actions {

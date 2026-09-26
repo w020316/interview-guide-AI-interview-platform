@@ -58,20 +58,30 @@ public class MetricsConfig {
                 .description("Redis 缓存未命中次数").register(registry);
     }
 
+    /**
+     * AI 调用耗时窗口（进程内自算百分位）。
+     *
+     * <p>2026-09-26（第三轮 P2-03）：线上 {@code ai.call.duration} 的客户端百分位长期恒为 0，
+     * 8 组对照实验证明「配置 / 注册表 / 取值方式 / Spring 装配」全部正确、根因未能在进程内复现
+     * （详见 {@link AiLatencyWindow} 类注释）。故改为自己算，行为可单测、可解释。
+     */
     @Bean
-    public Timer aiCallTimer(MeterRegistry registry) {
-        return Timer.builder("ai.call.duration")
+    public AiLatencyWindow aiLatencyWindow() {
+        return new AiLatencyWindow();
+    }
+
+    @Bean
+    public Timer aiCallTimer(MeterRegistry registry, AiLatencyWindow aiLatencyWindow) {
+        Timer registered = Timer.builder("ai.call.duration")
                 .description("AI 接口响应时间")
                 .publishPercentiles(0.5, 0.95, 0.99)
-                // ⚠️ 2026-09-23 修复 P3-A（P95 恒为 0）：
-                //   Micrometer 的客户端百分位依赖滑动窗口直方图，而直方图的**取值范围默认上限约 30 秒**；
-                //   本项目的 AI 调用耗时常态就在 20~70 秒（出题实测 42s、评分 8~31s、RAG 问答 31.8s），
-                //   超界样本会被直接丢弃 → 直方图内无有效样本 → percentile() 恒返回 0，
-                //   于是出现「totalCalls=3、avgMs=23515 但 p95Ms=0」这种自相矛盾的指标。
-                //   实测印证：触发一次 31.8s 的调用后**立即**查询，P95 仍为 0（排除窗口过期因素）。
-                //   显式抬高期望范围到 3 分钟（覆盖长尾），百分位才能落地。
+                // 保留这段配置：Prometheus 侧仍需要 SLO 边界与百分位直方图，
+                // 而且它本身是正确的（对照实验已验证），只是客户端 percentile() 在线上读不到值。
                 .minimumExpectedValue(java.time.Duration.ofMillis(100))
                 .maximumExpectedValue(java.time.Duration.ofMinutes(3))
                 .register(registry);
+        // 装饰：任何注入 Timer 的调用点 record 时，都会同时写进耗时窗口，
+        // 避免在 8 个埋点处各加一行、留下一堆可能被漏掉的位置。
+        return new LatencyAwareTimer(registered, aiLatencyWindow);
     }
 }

@@ -81,7 +81,10 @@ public class HealthController {
         data.put("name", "AI 智能面试辅助平台");
         data.put("version", appVersion);
         data.put("description", "基于 Spring Boot 3.3 + Spring AI 1.0 + Java 21");
-        data.put("docs", "/api/docs");
+        // P3-05（2026-09-26）：此处原返回 "docs":"/api/docs"，但该端点需要登录，
+        // 且生产环境已按安全策略关闭 springdoc（见 application-prod.yml「生产禁用
+        // Swagger/OpenAPI，避免接口结构被侦察」）—— 即对外宣称了一个**打不开的地址**。
+        // 匿名探测端点只应给出真实可用的信息，故移除该字段。
         if (buildDate != null && !buildDate.isBlank()) {
             data.put("buildDate", buildDate);
         }

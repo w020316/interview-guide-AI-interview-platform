@@ -52,7 +52,7 @@ class AuthRegisterRateLimitTest {
 
     private String body(String username) {
         try {
-            return objectMapper.writeValueAsString(Map.of("username", username, "password", "123456"));
+            return objectMapper.writeValueAsString(Map.of("username", username, "password", "StrongPw#2026"));
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new RuntimeException(e);
         }

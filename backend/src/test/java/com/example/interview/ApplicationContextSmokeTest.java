@@ -1,15 +1,19 @@
 package com.example.interview;
 
+import com.example.interview.config.AiLatencyWindow;
 import com.example.interview.entity.ResumeEntity;
 import com.example.interview.repository.ResumeRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -49,6 +53,9 @@ class ApplicationContextSmokeTest {
     @Autowired
     private ResumeRepository resumeRepository;
 
+    @Autowired
+    private ApplicationContext applicationContext;
+
     @Test
     void contextLoads() {
         // 仅需 Spring 上下文成功装配并启动即可，无需断言具体行为
@@ -70,5 +77,32 @@ class ApplicationContextSmokeTest {
         assertEquals("smoke-user", loaded.getUserId());
         assertTrue(loaded.getAnalysisResult().contains("\"tech\":80"),
                 "JSON 列应可原样读回（H2 json 列映射）");
+    }
+
+    /**
+     * AI 耗时窗口的**接线**回归（第三轮 P2-03）。
+     *
+     * <p>为什么放在冒烟测试里：单测只能验「装饰器自己工作正常」，验不了
+     * 「`MetricsConfig` 返回的确实是装饰后的 Timer」以及「注入方拿到的就是这个 Bean」。
+     * 一旦有人把 `aiCallTimer` 改回返回裸 Timer，P95 会**静默**退化为 0 —— 那正是这个缺陷
+     * 连续两轮复发的方式。这里用真实容器装配后的 Bean 走一遍「记录 → 读回」，
+     * 把接线锁死。
+     */
+    @Test
+    @DisplayName("AI 耗时窗口接线：注入的 Timer 记录后，AiLatencyWindow 必须读到（P2-03 回归防线）")
+    void aiLatencyWindowIsWiredToInjectedTimer() {
+        AiLatencyWindow window = applicationContext.getBean(AiLatencyWindow.class);
+        Timer timer = applicationContext.getBean("aiCallTimer", Timer.class);
+        window.reset();
+
+        timer.record(100, TimeUnit.MILLISECONDS);
+        timer.record(1000, TimeUnit.MILLISECONDS);
+        timer.record(10000, TimeUnit.MILLISECONDS);
+
+        assertEquals(3, window.size(), "注入的 Timer 必须把耗时写进同一个窗口 Bean");
+        assertNotNull(window.p95(), "P95 不能为 null");
+        // ★ 核心断言：P95 必须落在最大值上，不能是 0
+        assertEquals(10000.0, window.p95(), 0.001,
+                "P95 必须由自算窗口给出；若退化为 0，说明 Timer 装饰被去掉了");
     }
 }

@@ -2,6 +2,7 @@ package com.example.interview.config;
 
 import com.example.interview.ai.AiResponseDiagnosticInterceptor;
 import com.example.interview.ai.FallbackChatModel;
+import com.example.interview.ai.DisableThinkingInterceptor;
 import com.example.interview.ai.VersionPathRewriteInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,17 +75,32 @@ public class AiConfig {
      * P0-03 修复（2026-09-19 真机验证）：把诊断拦截器挂到 ChatModel 统一使用的
      * {@code RestClient.Builder} 上。
      *
-     * <p>为什么必须单独抽一个方法：{@code RestClient.Builder} 是**原型作用域**，
-     * Spring 每次注入都是新实例。此前只在 {@link #fallbackChatModel} 的入参 builder 上
-     * 挂了拦截器，而各节点实际使用的是 {@code restClientBuilder.clone()}——
-     * 实测证明 clone 不继承 {@code requestInterceptors}（Spring 6.1.21 的
-     * {@code DefaultRestClientBuilder#clone()} 只拷贝 messageConverters/requestFactory/
-     * defaultHeaders/uriBuilderFactory 等字段，不含拦截器列表），
-     * 因此拦截器**一次都没被调用过**，日志里那条「AI 上游返回异常响应」永远不出现。
+     * <p>为什么单独抽一个方法：{@code RestClient.Builder} 是**原型作用域**，
+     * Spring 每次注入都是新实例，因此「在哪个实例上挂拦截器」必须显式表达，
+     * 不能依赖「某个地方挂过、别处也能沾光」。
      *
-     * <p>改为在每个真正被使用的 builder 上显式挂载，彻底摆脱对 clone 语义的依赖。
-     * 下游 {@code OpenAiApi} 内部还会再 clone 一次，同样不继承拦截器——所以此处
-     * 必须在"最后一次 clone 之后"调用，调用点见各处使用处。
+     * <p><b>2026-09-26 更正（第三轮）</b>：此处原注释断言「clone() 不继承
+     * {@code requestInterceptors}（Spring 6.1.21 只拷贝 messageConverters/requestFactory 等，
+     * 不含拦截器列表），因此拦截器一次都没被调用过」。该结论**无法复现** ——
+     * 本项目实际解析的正是 spring-web **6.1.21**，用本地 HttpServer 实测（见
+     * {@code RestClientBuilderCloneExperiment}）：
+     *
+     * <ul>
+     *   <li>{@code builder.clone().build()} → 拦截器**照常执行**（clone 保留了拦截器列表）</li>
+     *   <li>{@code builder.clone().requestInterceptor(f).clone().build()} → f 照常执行
+     *       （即本方法的形状）</li>
+     *   <li>{@code clone()} 同时**保留 requestFactory**</li>
+     * </ul>
+     *
+     * <p>所以「拦截器从未被调用」的真实原因不是 clone，而更可能是当时把拦截器挂在了
+     * 另一个 builder 实例上（原型作用域下极易发生）。<b>当前写法仍然是对的、也是推荐的</b>
+     * —— 在每个真正被使用的 builder 上显式挂载，不依赖 clone 语义；
+     * 只是**别再把「clone 丢拦截器」当成事实去推断其他问题**，那会导致误诊。
+     *
+     * <p>另注：{@link #fallbackChatModel} 会在入参 builder 上先挂一次本拦截器，
+     * 而各节点又经本方法挂一次 —— 同一拦截器在节点 builder 上会出现两份。
+     * 影响仅是重复记录一次响应体快照（拦截器本身幂等），无功能影响；
+     * 保留现状是因为去重需要改动 AI 关键链路的装配顺序，收益不抵风险。
      */
     private static RestClient.Builder withDiagnostics(RestClient.Builder builder) {
         return builder.clone().requestInterceptor(DIAGNOSTIC_INTERCEPTOR);
@@ -157,10 +173,17 @@ public class AiConfig {
         // 导致「密钥失效」这类必须人工处理的配置故障在日志里毫无线索。
         // 拦截器在解析前抓一份响应体快照，命中 error 特征即记录原始内容。
         //
-        // 注意：此处只对入参 builder 生效；真正构造节点用的是 restClientBuilder.clone()，
-        // 而 clone() 不继承 requestInterceptors。因此下面每个实际使用的 builder 都会
-        // 再经 withDiagnostics(...) 显式挂载一次（详见该方法注释）。
-        restClientBuilder.requestInterceptor(DIAGNOSTIC_INTERCEPTOR);
+        // 2026-09-26（第三轮）移除这里的一次重复挂载。
+        //
+        // 原先在这里挂一次、各使用点又经 withDiagnostics(...) 挂一次。当时的理由是
+        // 「clone() 不继承 requestInterceptors」——该结论已被实测推翻（clone 会保留拦截器，
+        // 见 withDiagnostics 注释），因此这里那一次是**冗余**的：
+        // 下游三个使用点（降级链节点 / spring-ai 兜底模型 / embedding 模型）**全部**走
+        // withDiagnostics(...)，没有一个直接用入参 builder。
+        //
+        // 后果实测：上游返回 401 时，同一请求被诊断拦截器记录**两次**（日志重复一条、
+        // 响应体快照多做一次），排查时会误以为发生了两次故障。
+        // 移除后由 AiChainRequestWiringTest 断言「恰好 1 次」锁死。
         // 流式调用（SSE）：classpath 无 Reactor Netty，WebClient 默认走 JDK HttpClient，
         // 此处配置连接超时；流式整体时长由 SseEmitter 超时与客户端兜底约束
         webClientBuilder.clientConnector(new JdkClientHttpConnector(HttpClient.newBuilder()
@@ -180,6 +203,13 @@ public class AiConfig {
             // P0-05：非 v1 版本段的厂商（如智谱 /api/paas/v4）需剥掉 Spring AI 多拼的 /v1
             if (needsV1Stripping(nodeBaseUrl)) {
                 nodeBuilder.requestInterceptor(new VersionPathRewriteInterceptor());
+            }
+            // 2026-09-26（第三轮 P1-02）：厂商默认开启思考模式时 content 会为空
+            //（实测 glm-4.7-flash：content=0、reasoning_content=358、finish_reason=length），
+            // 而 FallbackChatModel 会把空正文判为该节点不可用 → **兜底节点每次都被静默跳过**。
+            // 由配置显式声明关闭，避免「配了兜底却等于没配」。
+            if (Boolean.TRUE.equals(p.getThinkingDisabled())) {
+                nodeBuilder.requestInterceptor(new DisableThinkingInterceptor());
             }
             OpenAiApi api = OpenAiApi.builder()
                     .baseUrl(nodeBaseUrl)

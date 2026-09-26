@@ -117,6 +117,11 @@ public class JobAgentController {
         if (keywordError != null) {
             return Result.error(400, keywordError);
         }
+        // P3-04（2026-09-26）：size < 1 此前被静默钳成 1，返回条数与预期不符且无从察觉
+        String sizeError = com.example.interview.util.PaginationSupport.validateSize(size);
+        if (sizeError != null) {
+            return Result.error(400, sizeError);
+        }
         Page<JobPostingEntity> result = jobAgentService.search(
                 keyword, industry, jobType, location, recruitType, source, degree, experience,
                 overseas, page, size);

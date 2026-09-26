@@ -73,8 +73,8 @@ public class SupabaseStorageService {
      * 避免「告警说没问题、上传却失败」这类判定口径分裂。
      */
     public boolean isConfigured() {
-        String url = supabaseUrl == null ? "" : supabaseUrl.trim();
-        String key = serviceKey == null ? "" : serviceKey.trim();
+        String url = baseUrl();
+        String key = serviceKey();
         if (url.isEmpty() || key.isEmpty()) {
             return false;
         }
@@ -87,6 +87,37 @@ public class SupabaseStorageService {
     }
 
     /**
+     * 规范化后的存储基地址：去掉首尾空白，并去掉结尾多余的 `/`。
+     *
+     * <p><b>为什么必须清洗（2026-09-26 线上实测踩到）</b>：`SUPABASE_URL` 由部署面板
+     * 手工粘贴，很容易带上**尾随换行或空格**。此前 {@link #isConfigured()} 做了 trim
+     * 于是判定为「已配置」，而 {@link #upload} 用的是**原始字段值**，拼出的地址是
+     * `https://xxx.supabase.co%0A/storage/v1/object/...` —— 主机名里混进换行，
+     * PUT 直接 DNS 失败，作答附图 100% 失败；而健康检查只看 {@code isConfigured()}
+     * 的静态字符串判定，一直显示 `storage: UP`，从外部完全看不出问题。
+     *
+     * <p>结论：**判定与使用必须用同一个规范化值**，否则「配置检查通过」与
+     * 「请求能不能发出去」就是两件事。
+     */
+    private String baseUrl() {
+        String u = supabaseUrl == null ? "" : supabaseUrl.trim();
+        while (u.endsWith("/")) {
+            u = u.substring(0, u.length() - 1);
+        }
+        return u;
+    }
+
+    /**
+     * 规范化后的 service key。
+     *
+     * <p>换行/空格留在 key 里不只是「拼错地址」：它会被塞进 `Authorization` 头，
+     * 而 HTTP 头不允许包含换行，轻则认证失败重则直接抛异常。
+     */
+    private String serviceKey() {
+        return serviceKey == null ? "" : serviceKey.trim();
+    }
+
+    /**
      * 最近一次上传失败的原始原因（含上游状态码与响应体摘要），供健康检查自诊断。
      *
      * <p>此前上传失败的真实原因（上游 4xx/5xx 的响应体、DNS 解析失败等）只落在
@@ -94,6 +125,34 @@ public class SupabaseStorageService {
      * 从外部完全无法区分「没配」「配错」「bucket 不存在」「被 RLS 拒绝」。
      */
     private volatile String lastError;
+
+    /**
+     * 最近一次失败的**类型**（2026-09-26 第三轮 P3-07）。
+     *
+     * <p>为什么光有 {@link #lastError} 不够：控制器此前只能按「配没配」二分，
+     * 于是「已配置但配置有误」（如地址末尾多一个换行导致 DNS 必失败）也回一句
+     * 「图片上传失败，请稍后重试」——而重试**永远不会成功**，用户会反复重试。
+     *
+     * <p>把类型显式化后，调用方可以对「配置类」故障给出可执行的指引（联系管理员），
+     * 只对「上游临时故障」才引导重试。
+     */
+    public enum FailureKind {
+        /** 从未失败 */
+        NONE,
+        /** 未配置（占位值或为空）—— 部署问题 */
+        NOT_CONFIGURED,
+        /** 已配置但连不上（DNS / 连接 / TLS 失败）—— 多为配置写错，重试无用 */
+        CONFIG_INVALID,
+        /** 上游返回错误（4xx/5xx）—— 可能是临时故障，也可能是 key/bucket 权限问题 */
+        UPSTREAM
+    }
+
+    private volatile FailureKind lastFailureKind = FailureKind.NONE;
+
+    /** 最近一次失败的类型；从未失败则为 {@link FailureKind#NONE} */
+    public FailureKind getLastFailureKind() {
+        return lastFailureKind;
+    }
 
     /** 最近一次上传失败原因；从未失败则为 null */
     public String getLastError() {
@@ -104,11 +163,23 @@ public class SupabaseStorageService {
     public java.util.Map<String, Object> healthSnapshot() {
         java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
         boolean ok = isConfigured();
-        m.put("status", ok ? "UP" : "DOWN");
+        // v1.44.0：状态必须同时反映「配置是否可用」与「最近一次真实调用是否成功」。
+        // 此前只看静态字符串判定 —— 于是出现过「storage: UP 但作答附图 100% 失败」的假绿，
+        // 运维照健康检查判断会得出「存储没问题」的错误结论（与 P1-A 知识库误报同一模式）。
+        String status;
+        if (!ok) {
+            status = "DOWN";
+        } else if (lastError != null) {
+            status = "DEGRADED";
+        } else {
+            status = "UP";
+        }
+        m.put("status", status);
         m.put("configured", ok);
         m.put("bucket", bucket);
         if (lastError != null) {
             m.put("lastError", lastError);
+            m.put("lastFailureKind", lastFailureKind.name());
         }
         return m;
     }
@@ -134,15 +205,17 @@ public class SupabaseStorageService {
         // 把原因吞成一句「请稍后重试」
         if (!isConfigured()) {
             lastError = "Supabase Storage 未配置（app.supabase.url / service-key 仍为占位值或为空）";
+            lastFailureKind = FailureKind.NOT_CONFIGURED;
             throw new IllegalStateException(lastError);
         }
         // 文件名清洗：只保留字母、数字、点、下划线、连字符，防止路径穿越
         String safeName = fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
         // Supabase Storage REST API: PUT /storage/v1/object/<bucket>/<path>
-        String uploadUrl = supabaseUrl + "/storage/v1/object/" + bucket + "/" + safeName;
+        // 必须用 baseUrl()（已 trim 掉尾随换行/空格），否则会拼出含 %0A 的主机名
+        String uploadUrl = baseUrl() + "/storage/v1/object/" + bucket + "/" + safeName;
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + serviceKey);
+        headers.set("Authorization", "Bearer " + serviceKey());
         headers.setContentType(MediaType.parseMediaType(
                 file.getContentType() != null ? file.getContentType() : "application/octet-stream"
         ));
@@ -161,22 +234,26 @@ public class SupabaseStorageService {
             // 原实现把「非 2xx」判断写在 exchange 之后，是一段永远执行不到的死代码，
             // 真实状态码与响应体（bucket 不存在 / key 无效 / 被 RLS 拒绝 等）就此丢失
             lastError = "上游返回 " + e.getStatusCode() + "：" + brief(e.getResponseBodyAsString());
+            lastFailureKind = FailureKind.UPSTREAM;
             throw new IllegalStateException("Supabase 文件上传失败：" + lastError, e);
         } catch (org.springframework.web.client.ResourceAccessException e) {
             // 域名解析失败 / 连接超时 / TLS 失败 —— 多为配置指向了不存在的域名
             lastError = "无法连接存储服务（" + uploadUrl.replaceAll("(https?://[^/]+).*", "$1")
                     + "）：" + e.getMessage();
+            lastFailureKind = FailureKind.CONFIG_INVALID;
             throw new IllegalStateException(lastError, e);
         }
 
         if (!response.getStatusCode().is2xxSuccessful()) {
             lastError = "上游返回 " + response.getStatusCode() + "：" + brief(response.getBody());
+            lastFailureKind = FailureKind.UPSTREAM;
             throw new IllegalStateException("Supabase 文件上传失败：" + lastError);
         }
 
         lastError = null;
+        lastFailureKind = FailureKind.NONE;
         // 拼接公开访问 URL
-        return supabaseUrl + "/storage/v1/object/public/" + bucket + "/" + safeName;
+        return baseUrl() + "/storage/v1/object/public/" + bucket + "/" + safeName;
     }
 
     /**
@@ -187,12 +264,12 @@ public class SupabaseStorageService {
      * TOCTOU 窗口，攻击者也无法把抓取目标指向自己控制的域名/内网地址。
      */
     public boolean isOwnPublicUrl(String url) {
-        if (url == null || url.isBlank() || supabaseUrl == null || supabaseUrl.isBlank()) {
+        if (url == null || url.isBlank() || baseUrl().isEmpty()) {
             return false;
         }
         try {
             URI u = new URI(url.trim());
-            URI base = new URI(supabaseUrl.trim());
+            URI base = new URI(baseUrl());
             String host = u.getHost();
             String baseHost = base.getHost();
             if (host == null || baseHost == null) {
@@ -229,10 +306,10 @@ public class SupabaseStorageService {
             if (path.contains("..")) {
                 return publicUrl;
             }
-            String signUrl = supabaseUrl + "/storage/v1/object/sign/" + path;
+            String signUrl = baseUrl() + "/storage/v1/object/sign/" + path;
 
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + serviceKey);
+            headers.set("Authorization", "Bearer " + serviceKey());
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> entity = new HttpEntity<>("{\"expiresIn\":" + ttlSeconds + "}", headers);
 
@@ -253,7 +330,7 @@ public class SupabaseStorageService {
             int quote1 = body.indexOf('"', colon);
             int quote2 = body.indexOf('"', quote1 + 1);
             String signed = body.substring(quote1 + 1, quote2);
-            return supabaseUrl + "/storage/v1" + signed;
+            return baseUrl() + "/storage/v1" + signed;
         } catch (Exception e) {
             log.warn("Supabase 签名 URL 签发异常：{}，回退公开 URL", e.getMessage());
             return publicUrl;

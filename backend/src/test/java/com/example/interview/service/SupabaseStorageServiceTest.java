@@ -320,4 +320,181 @@ class SupabaseStorageServiceTest {
                     any(HttpEntity.class), eq(String.class));
         }
     }
+
+    @Nested
+    @DisplayName("配置值规范化 + 健康快照（v1.44.0 线上实测缺陷的回归锁定）")
+    class NormalizedConfig {
+
+        /**
+         * 原缺陷：部署面板粘贴的 SUPABASE_URL 带尾随换行时，
+         * isConfigured() 做了 trim 判定「已配置」，而 upload() 用原始字段值，
+         * 拼出 https://xxx.supabase.co%0A/storage/v1/... → PUT 直接 DNS 失败。
+         * 线上表现：作答附图 100% 失败，健康检查却一直显示 storage UP。
+         */
+        @Test
+        @DisplayName("URL 带尾随换行时，上传地址不得含 %0A（否则 DNS 必失败）")
+        void upload_urlWithTrailingNewline_normalized() throws IOException {
+            ReflectionTestUtils.setField(service, "supabaseUrl", "https://test.supabase.co\n");
+            when(file.getContentType()).thenReturn(MediaType.IMAGE_PNG_VALUE);
+
+            String publicUrl = service.upload(file, "shot.png");
+
+            ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
+            verify(restTemplate).exchange(url.capture(), any(HttpMethod.class),
+                    any(HttpEntity.class), eq(String.class));
+            assertThat(url.getValue())
+                    .isEqualTo("https://test.supabase.co/storage/v1/object/" + BUCKET + "/shot.png")
+                    .doesNotContain("%0A")
+                    .doesNotContain("\n")
+                    .doesNotContain(" ");
+            assertThat(publicUrl)
+                    .isEqualTo("https://test.supabase.co/storage/v1/object/public/" + BUCKET + "/shot.png");
+        }
+
+        @Test
+        @DisplayName("URL 前后有空格与结尾多余 / 时，同样拼出干净地址")
+        void upload_urlWithSpacesAndTrailingSlash_normalized() throws IOException {
+            ReflectionTestUtils.setField(service, "supabaseUrl", "  https://test.supabase.co/  ");
+
+            service.upload(file, "resume.pdf");
+
+            ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
+            verify(restTemplate).exchange(url.capture(), any(HttpMethod.class),
+                    any(HttpEntity.class), eq(String.class));
+            assertThat(url.getValue())
+                    .isEqualTo("https://test.supabase.co/storage/v1/object/" + BUCKET + "/resume.pdf")
+                    .doesNotContain("//storage");
+        }
+
+        @Test
+        @DisplayName("service key 带尾随换行时，Authorization 头被清洗（HTTP 头不允许换行）")
+        void upload_serviceKeyWithTrailingWhitespace_trimmed() throws IOException {
+            ReflectionTestUtils.setField(service, "serviceKey", SERVICE_KEY + "\n");
+
+            service.upload(file, "resume.pdf");
+
+            ArgumentCaptor<HttpEntity<?>> entity = ArgumentCaptor.forClass(HttpEntity.class);
+            verify(restTemplate).exchange(anyString(), any(HttpMethod.class),
+                    entity.capture(), eq(String.class));
+            String auth = entity.getValue().getHeaders().getFirst("Authorization");
+            assertThat(auth).isEqualTo("Bearer " + SERVICE_KEY);
+        }
+
+        @Test
+        @DisplayName("带尾随空白的配置仍被判定为「已配置」——判定口径与使用口径一致")
+        void isConfigured_trailingWhitespace_true() {
+            ReflectionTestUtils.setField(service, "supabaseUrl", "https://test.supabase.co\n");
+            ReflectionTestUtils.setField(service, "serviceKey", SERVICE_KEY + " ");
+
+            assertThat(service.isConfigured()).isTrue();
+        }
+
+        @Test
+        @DisplayName("健康快照：最近一次上传失败时必须为 DEGRADED，不能报 UP")
+        void healthSnapshot_afterFailure_degraded() {
+            ReflectionTestUtils.setField(service, "lastError", "无法连接存储服务（https://x.supabase.co）：DNS");
+
+            java.util.Map<String, Object> snap = service.healthSnapshot();
+
+            assertThat(snap.get("status")).isEqualTo("DEGRADED");
+            assertThat(snap.get("configured")).isEqualTo(true);
+            assertThat(snap.get("lastError")).isNotNull();
+        }
+
+        @Test
+        @DisplayName("健康快照：配置正常且从未失败时为 UP")
+        void healthSnapshot_ok_up() {
+            assertThat(service.healthSnapshot().get("status")).isEqualTo("UP");
+        }
+
+        @Test
+        @DisplayName("健康快照：未配置时为 DOWN")
+        void healthSnapshot_notConfigured_down() {
+            ReflectionTestUtils.setField(service, "supabaseUrl", "https://your-project.supabase.co");
+
+            java.util.Map<String, Object> snap = service.healthSnapshot();
+
+            assertThat(snap.get("status")).isEqualTo("DOWN");
+            assertThat(snap.get("configured")).isEqualTo(false);
+        }
+    }
+
+    @Nested
+    @DisplayName("失败类型区分（P3-07：别对永久性配置故障提示「请稍后重试」）")
+    class FailureKindTest {
+
+        @Test
+        @DisplayName("连接失败（DNS/TLS）判为 CONFIG_INVALID —— 重试无用")
+        void connectionFailure_isConfigInvalid() {
+            when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(String.class)))
+                    .thenThrow(new org.springframework.web.client.ResourceAccessException(
+                            "I/O error on PUT request: unknown host"));
+
+            assertThatThrownBy(() -> service.upload(file, "resume.pdf"))
+                    .isInstanceOf(RuntimeException.class);
+
+            assertThat(service.getLastFailureKind())
+                    .isEqualTo(SupabaseStorageService.FailureKind.CONFIG_INVALID);
+            assertThat(service.getLastError()).contains("无法连接存储服务");
+        }
+
+        @Test
+        @DisplayName("上游 5xx 判为 UPSTREAM —— 可以重试")
+        void upstreamError_isUpstream() {
+            when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(String.class)))
+                    .thenReturn(new ResponseEntity<>("boom", HttpStatus.INTERNAL_SERVER_ERROR));
+
+            assertThatThrownBy(() -> service.upload(file, "resume.pdf"))
+                    .isInstanceOf(RuntimeException.class);
+
+            assertThat(service.getLastFailureKind())
+                    .isEqualTo(SupabaseStorageService.FailureKind.UPSTREAM);
+        }
+
+        @Test
+        @DisplayName("未配置判为 NOT_CONFIGURED")
+        void notConfigured() {
+            ReflectionTestUtils.setField(service, "supabaseUrl", "https://your-project.supabase.co");
+
+            assertThatThrownBy(() -> service.upload(file, "resume.pdf"))
+                    .isInstanceOf(RuntimeException.class);
+
+            assertThat(service.getLastFailureKind())
+                    .isEqualTo(SupabaseStorageService.FailureKind.NOT_CONFIGURED);
+        }
+
+        @Test
+        @DisplayName("从未失败时为 NONE；成功后也会被重置为 NONE")
+        void successResetsKind() throws IOException {
+            assertThat(service.getLastFailureKind()).isEqualTo(SupabaseStorageService.FailureKind.NONE);
+
+            // 先失败一次
+            when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(String.class)))
+                    .thenThrow(new org.springframework.web.client.ResourceAccessException("dns"));
+            assertThatThrownBy(() -> service.upload(file, "resume.pdf"));
+            assertThat(service.getLastFailureKind())
+                    .isEqualTo(SupabaseStorageService.FailureKind.CONFIG_INVALID);
+
+            // 再成功一次 → 必须复位
+            when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(String.class)))
+                    .thenReturn(new ResponseEntity<>("{}", HttpStatus.OK));
+            service.upload(file, "resume.pdf");
+
+            assertThat(service.getLastFailureKind()).isEqualTo(SupabaseStorageService.FailureKind.NONE);
+            assertThat(service.getLastError()).isNull();
+        }
+
+        @Test
+        @DisplayName("健康快照在失败时带上 lastFailureKind")
+        void healthSnapshotCarriesKind() {
+            ReflectionTestUtils.setField(service, "lastError", "无法连接存储服务（https://x）：dns");
+            ReflectionTestUtils.setField(service, "lastFailureKind",
+                    SupabaseStorageService.FailureKind.CONFIG_INVALID);
+
+            java.util.Map<String, Object> snap = service.healthSnapshot();
+
+            assertThat(snap.get("status")).isEqualTo("DEGRADED");
+            assertThat(snap.get("lastFailureKind")).isEqualTo("CONFIG_INVALID");
+        }
+    }
 }

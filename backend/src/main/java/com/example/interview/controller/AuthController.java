@@ -180,9 +180,13 @@ public class AuthController {
         if (jwtUtil.isAdminUsername(username)) {
             return Result.error(400, "用户名不可用");
         }
-        // 密码强度校验（6-64 字符）
+        // 密码强度校验（长度 6-64 + 弱口令/重复字符/连续序列/含用户名，见 PasswordPolicy）
         if (password.length() < 6 || password.length() > 64) {
             return Result.error(400, "密码长度需 6-64 字符");
+        }
+        String weakReason = com.example.interview.util.PasswordPolicy.validate(password, username);
+        if (weakReason != null) {
+            return Result.error(400, weakReason);
         }
         // 邮箱格式校验
         if (email != null && !email.isBlank()) {

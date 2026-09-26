@@ -242,11 +242,19 @@ public class InterviewController {
             return Result.success(result);
         } catch (Exception e) {
             log.error("作答附图上传失败", e);
-            // 区分「未配置」与「上游失败」：前者是部署问题，给出可执行的指引而不是「请稍后重试」；
-            // 上游的具体原因（状态码 / 响应体）写入 lastError 并暴露在 /api/health/detail 的 storage 区块，
-            // 避免修复者只能靠猜——此前真实原因只存在于日志里，从外部完全不可观测。
+            // 区分三类失败，给出**可执行**的指引（2026-09-26 第三轮 P3-07）：
+            //   未配置      → 部署问题，让用户找管理员
+            //   配置有误    → 例如地址末尾多一个换行导致 DNS 必失败；**重试永远不会成功**，
+            //                此前却统一回「请稍后重试」，用户会反复重试
+            //   上游错误    → 才引导重试
+            // 上游的具体原因（状态码 / 响应体）仍写入 lastError 并暴露在 /api/health/detail
+            // 的 storage 区块，修复者不必靠猜。
             if (!supabaseStorageService.isConfigured()) {
                 return Result.error(503, "图片存储服务未配置，请联系管理员");
+            }
+            if (supabaseStorageService.getLastFailureKind()
+                    == com.example.interview.service.SupabaseStorageService.FailureKind.CONFIG_INVALID) {
+                return Result.error(503, "图片存储服务配置有误，请联系管理员（重试无效）");
             }
             return Result.error(502, "图片上传失败，请稍后重试");
         }

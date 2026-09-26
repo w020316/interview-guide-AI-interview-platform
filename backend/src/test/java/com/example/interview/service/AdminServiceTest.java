@@ -425,13 +425,39 @@ class AdminServiceTest {
     }
 
     @Test
+    @DisplayName("metrics: 耗时窗口有样本时 p95Ms 必须是数字（P2-03 回归锁定，不能为 0）")
+    void metrics_p95FromLatencyWindow() {
+        com.example.interview.config.AiLatencyWindow window =
+                new com.example.interview.config.AiLatencyWindow();
+        window.recordMillis(100);
+        window.recordMillis(1000);
+        window.recordMillis(10000);
+
+        AdminService service = newService(new SimpleMeterRegistry());
+        service.setAiLatencyWindow(window);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> aiCalls = (Map<String, Object>) service.metrics().get("aiCalls");
+
+        assertThat(aiCalls.get("p95Ms")).isInstanceOf(Double.class);
+        assertThat((Double) aiCalls.get("p95Ms")).isEqualTo(10000.0);
+        assertThat((Double) aiCalls.get("p95Ms")).isGreaterThan(0.0);
+    }
+
+    @Test
     @DisplayName("metrics: 空注册表时各指标回退默认值（counter/timer/gauge 为 null 分支）")
     void metrics_emptyRegistry_fallbacks() {
         Map<String, Object> metrics = newService(new SimpleMeterRegistry()).metrics();
 
         @SuppressWarnings("unchecked")
         Map<String, Object> aiCalls = (Map<String, Object>) metrics.get("aiCalls");
-        assertThat(aiCalls).doesNotContainKeys("totalCalls", "avgMs", "p95Ms"); // timer 为 null
+        // timer 为 null → 不返回 totalCalls / avgMs
+        assertThat(aiCalls).doesNotContainKeys("totalCalls", "avgMs");
+        // P2-03：p95Ms 现在始终存在，但无样本时为 null（前端渲染「—」而不是 0）。
+        // 旧断言要求该键不存在，是「无数据就别显示」的写法；改为显式 null 后，
+        // 前端能显示一行「P95 耗时(ms) —」，比整行消失更能说明「暂无样本」。
+        assertThat(aiCalls).containsKey("p95Ms");
+        assertThat(aiCalls.get("p95Ms")).isNull();
         for (String type : List.of("resume", "question", "evaluate", "jobAnalysis", "rag")) {
             assertThat(aiCalls.get(type)).isEqualTo(0L);
         }

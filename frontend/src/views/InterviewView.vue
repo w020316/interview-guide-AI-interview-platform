@@ -79,6 +79,13 @@
     <div v-else class="interview-session fade-in">
       <!-- 进度条 -->
       <div class="progress-wrap">
+        <!-- v1.44.0：显示本场面试的目标岗位。
+             此前从「面试历史」继续面试时，整页找不到「我在面什么岗位」——
+             数据其实早在 jobDesc 里（resumeSession 已回填），只是模板没渲染。 -->
+        <p v-if="jobDesc.trim()" class="session-job">
+          <span class="session-job-label">目标岗位</span>
+          <span class="session-job-name">{{ jobDesc.trim() }}</span>
+        </p>
         <div class="progress-info">
           <span class="progress-label">面试进度</span>
           <span class="progress-count">第 {{ qIndex + 1 }} / {{ questions.length }} 题</span>
@@ -243,6 +250,10 @@
             <div class="report-head">
               <div>
                 <h3 class="report-title">模拟面试复盘报告</h3>
+                <!-- v1.44.0：报告带上本场岗位。此前报告通篇没有岗位名，
+                     截图转发给别人时看不出这是面什么岗位的报告
+                     （分享卡片与导出 PDF 一直有，只有报告本体漏了）。 -->
+                <p v-if="reportJobTitle" class="report-job">{{ reportJobTitle }}</p>
                 <p class="report-sub"><span class="report-star" aria-hidden="true">★</span> {{ reportScopeText }} · 灵感参考 AI 面试工具</p>
               </div>
               <button class="report-close" aria-label="关闭" @click="closeReportGoSetup">✕</button>
@@ -658,6 +669,15 @@ const reportScopeText = computed(() => {
   }
   return `基于本次 ${answeredCount.value} 道作答的结构化总结`
 })
+
+/**
+ * 复盘报告抬头里的岗位名（v1.44.0）。
+ *
+ * <p>取不到时**不渲染**，而不是显示「未指定岗位」——报告是要转发给别人的产物，
+ * 与其印一行占位文案，不如不占这一行。（分享卡片/导出 PDF 有文件名等约束，
+ * 仍保留 `|| '未指定岗位'` 的兜底，两者取舍不同。）
+ */
+const reportJobTitle = computed(() => jobDesc.value.trim())
 /** 各维度平均分 */
 const reportAverages = computed(() => {
   const list = sessionEvals.value
@@ -1674,6 +1694,36 @@ onUnmounted(() => {
   box-shadow: var(--shadow-sm);
 }
 
+/* 本场面试的目标岗位（v1.44.0）。
+   放在进度条上方，用最轻的一行交代「这场面的是什么岗位」——
+   从面试历史继续面试时，此前整页都没有这个信息。 */
+.session-job {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--c-border-light);
+  min-width: 0;
+}
+
+.session-job-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+
+.session-job-name {
+  font-family: var(--font-title);
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .progress-info {
   display: flex;
   justify-content: space-between;
@@ -2175,6 +2225,17 @@ onUnmounted(() => {
   color: var(--c-text);
   margin: 0 0 4px;
   letter-spacing: -0.4px;
+}
+/* 报告抬头里的岗位名（v1.44.0）：用无衬线标题字族 + 强调色，
+   与 22px 的衬线标题形成层级，不抢标题的注意力。 */
+.report-job {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--brand-primary);
+  margin: 0 0 4px;
+  word-break: break-word;
 }
 .report-sub {
   font-size: 12.5px;

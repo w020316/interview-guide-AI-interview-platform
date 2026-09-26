@@ -145,3 +145,82 @@ export function inAppBrowserHint(name: string, host: string): string {
   const hostName = host === 'wechat' ? '微信' : host === 'qq' ? 'QQ' : host === 'dingtalk' ? '钉钉' : host
   return `当前在「${hostName}」内置浏览器中，系统会拦截直接唤起「${name}」。已为你打开网页版入口`
 }
+
+/* ─────────────────────────────────────────────────────────────
+   「网页版只在电脑浏览器可用」的来源（v1.44.0）
+
+   背景（真机截图复现）：微信「文件传输助手」的网页版 filehelper.weixin.qq.com
+   **只在电脑浏览器可用**。手机上打开会被它自己拦下，回一句
+   「暂无法使用微信文件传输助手网页版，可尝试使用电脑端其他浏览器访问」。
+
+   而本页此前把它当作通用兜底：点「微信」卡片 → 提示「已为你打开网页版入口」
+   → 用户点进去看到「请用电脑浏览器」→ 回到本页，卡片下方那条「未自动跳转？
+   点此打开网页版 →」还是同一个死链。产品承诺了一条走不通的路，比不给入口更差。
+
+   判定只需要「是否移动端」+「该来源是否声明网页版仅限电脑」两个纯输入，
+   因此可以脱离 DOM 单测。
+   ───────────────────────────────────────────────────────────── */
+
+/**
+ * 移动端是否不该把用户送进该来源的网页版。
+ *
+ * 桌面端一律放行（电脑上 filehelper 是正常可用的取件入口）。
+ */
+export function isMobileBlockedWebEntry(
+  webOnlyOnDesktop: boolean | undefined,
+  isMobile: boolean,
+): boolean {
+  return !!webOnlyOnDesktop && isMobile
+}
+
+/**
+ * 该场景下的说明与出路（替代打开死链）。
+ *
+ * 措辞原则同 {@link launchFallbackHint}：**说清「这条路走不通」，并给出真的能走的两条路**，
+ * 而不是继续宣称「已为你打开」。
+ */
+export function desktopOnlyWebHint(name: string): string {
+  return `${name}的网页版只在电脑浏览器可用，手机上打不开。可改用下方「选择本机文件」上传，或复制链接到电脑上打开`
+}
+
+/** 「手机上打不开」时，卡片下方兜底入口的替代文案（改为复制链接） */
+export const COPY_LINK_LABEL = '复制链接，到电脑浏览器打开 →'
+
+/** 复制结果提示 */
+export function copyResultHint(ok: boolean): string {
+  return ok ? '链接已复制，可粘贴到电脑浏览器打开' : '自动复制失败，请长按下方链接手动复制'
+}
+
+/**
+ * 复制文本到剪贴板，带 `execCommand` 回退。
+ *
+ * 为什么要回退：`navigator.clipboard` 需要**安全上下文 + 用户授权**，
+ * 微信/钉钉内置 WebView 上经常不可用或直接抛错。只依赖它会让「复制链接」
+ * 这个唯一出路在某些宿主里静默失效。
+ */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // 落到下面的 execCommand 回退
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    ta.style.top = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    ta.setSelectionRange(0, ta.value.length)
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}

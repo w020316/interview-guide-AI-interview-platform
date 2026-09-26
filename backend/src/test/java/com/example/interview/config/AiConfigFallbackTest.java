@@ -7,7 +7,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.web.client.RestClient;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import java.util.Map;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -151,5 +156,44 @@ class AiConfigFallbackTest {
         // 标准厂商：误带的 /v1 仍按原逻辑剥离
         assertThat(AiConfig.toOpenAiCompatibleBaseUrl("https://apihub.agnes-ai.com/v1"))
                 .isEqualTo("https://apihub.agnes-ai.com");
+    }
+
+    @Test
+    @DisplayName("thinking-disabled 松绑定：kebab-case 能绑到 thinkingDisabled（P1-02）")
+    void thinkingDisabledBinds() {
+        // 这是最容易写错的地方：YAML 里写 thinking-disabled，字段名是 thinkingDisabled，
+        // 绑不上时不会报错、只会静默为 null —— 于是「配了关思考」实际没生效。
+        Map<String, Object> cfg = Map.of(
+                "app.ai.chain[0].name", "zhipu-quality",
+                "app.ai.chain[0].base-url", "https://open.bigmodel.cn/api/paas/v4",
+                "app.ai.chain[0].api-key", "sk-x",
+                "app.ai.chain[0].model", "glm-4.7-flash",
+                "app.ai.chain[0].thinking-disabled", "true",
+                "app.ai.chain[1].name", "agnes-primary",
+                "app.ai.chain[1].base-url", "https://apihub.agnes-ai.com",
+                "app.ai.chain[1].api-key", "sk-y",
+                "app.ai.chain[1].model", "agnes-2.5-flash");
+
+        AiProviderProperties props = new Binder(new MapConfigurationPropertySource(cfg))
+                .bind("app.ai", Bindable.of(AiProviderProperties.class))
+                .get();
+
+        assertThat(props.getChain()).hasSize(2);
+        assertThat(props.getChain().get(0).getThinkingDisabled()).isTrue();
+        // 未声明的节点保持 null —— 不下发该字段，不改变其他厂商的请求体
+        assertThat(props.getChain().get(1).getThinkingDisabled()).isNull();
+    }
+
+    @Test
+    @DisplayName("节点声明 thinking-disabled 时降级链仍能正常构建（不影响启动）")
+    void chainWithThinkingDisabledStillBuilds() {
+        AiProviderProperties props = new AiProviderProperties();
+        AiProviderProperties.Provider zhipu = provider("zhipu-quality", "sk-x", "glm-4.7-flash");
+        zhipu.setThinkingDisabled(true);
+        props.getChain().add(zhipu);
+
+        ChatModel model = build(props, UNROUTABLE);
+
+        assertThat(model).isInstanceOf(FallbackChatModel.class);
     }
 }

@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.config.AiLatencyWindow;
 import com.example.interview.entity.JobPostingEntity;
 import com.example.interview.entity.UserEntity;
 import com.example.interview.repository.JobPostingRepository;
@@ -69,6 +70,19 @@ public class AdminService {
         this.jobAgentService = jobAgentService;
         this.userBanRegistry = userBanRegistry;
         this.meterRegistry = meterRegistry;
+    }
+
+    /**
+     * 进程内自算的 AI 耗时窗口（第三轮 P2-03）。
+     *
+     * <p>用 **setter 注入**而非构造器参数：构造器已被多处测试直接调用，加参数会波及全部调用点。
+     * 声明为可选（{@code required = false}）以便纯单测在不搭 Spring 上下文时也能构造本类。
+     */
+    private AiLatencyWindow aiLatencyWindow;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAiLatencyWindow(AiLatencyWindow aiLatencyWindow) {
+        this.aiLatencyWindow = aiLatencyWindow;
     }
 
     // ── 数据总览 ──
@@ -451,8 +465,13 @@ public class AdminService {
         if (timer != null) {
             summary.put("totalCalls", timer.count());
             summary.put("avgMs", timer.mean(java.util.concurrent.TimeUnit.MILLISECONDS));
-            summary.put("p95Ms", timer.percentile(0.95, java.util.concurrent.TimeUnit.MILLISECONDS));
         }
+        // 2026-09-26（第三轮 P2-03）：P95 改为进程内自算。
+        // 线上 Micrometer 的客户端百分位长期恒为 0，而同一响应里 totalCalls / avgMs 正常，
+        // 出现「平均 8659.8ms 但 P95 为 0」这种自相矛盾的指标；8 组对照实验证明配置本身正确、
+        // 根因未能在进程内复现（详见 AiLatencyWindow 类注释），因此不再依赖该行为。
+        // 无样本时返回 null，前端渲染「—」，与同页「缓存命中率」的口径保持一致。
+        summary.put("p95Ms", aiLatencyWindow == null ? null : aiLatencyWindow.p95());
         return summary;
     }
 

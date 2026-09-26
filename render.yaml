@@ -59,9 +59,19 @@ services:
       # ⚠️ 2026-09-23 校正：glm-4.5-flash 已于 2026-01-30 下线，请求会被智谱侧**静默路由**
       #   到 glm-4.7-flash（不报错，于是配置错误被长期掩盖）。改为显式模型名，
       #   避免「配置里写的」与「实际跑的」不是同一个模型。
+      #
+      # ⚠️ 2026-09-26（第三轮 P1-02）补充：光改模型名还不够 —— 智谱默认开启思考模式，
+      #   `reasoning_content` 会吃光输出预算，返回 **HTTP 200 但 content 为空**；
+      #   而 FallbackChatModel 会把空正文判为该节点不可用，于是**兜底节点每次都被静默跳过**，
+      #   跨厂商容灾退化为单点，且每次主模型故障都白撞一次（多 4.25s + 一次免费额度）。
+      #   已在 application.yml 的智谱节点上配置 `thinking-disabled: true`（代码侧
+      #   DisableThinkingInterceptor 注入 `thinking:{"type":"disabled"}`）。
+      #   实测：glm-4.7-flash 4.25s/空内容 → **1.38s/正常内容**。
+      #   另注：该模型并发能力弱（并发 3 只有 1 个成功、其余 429/1305），
+      #   因此放在兜底位置，末端保留实测最稳的 glm-4-flash。
       - key: AI_ZHIPU_CHAT_MODEL
         value: glm-4.7-flash
-      # 兜底 2：智谱 glm-4-flash —— 末位保险
+      # 兜底 2：智谱 glm-4-flash —— 末位保险（实测并发 3/3 通过、1.76s）
       - key: AI_ZHIPU_FALLBACK_MODEL
         value: glm-4-flash
 

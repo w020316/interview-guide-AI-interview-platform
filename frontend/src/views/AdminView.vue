@@ -255,7 +255,7 @@
         <div class="metric-block">
           <h3>AI 调用次数</h3>
           <div class="metric-row" v-for="(v, k) in aiCalls" :key="k">
-            <span>{{ aiLabel(String(k)) }}</span><b>{{ typeof v === 'number' ? Math.round(v * 10) / 10 : v }}</b>
+            <span>{{ aiLabel(String(k)) }}</span><b>{{ fmtMetric(v) }}</b>
           </div>
         </div>
         <div class="metric-block">
@@ -361,7 +361,8 @@ interface SourceRow {
   health?: SourceHealth | null
 }
 interface Metrics {
-  aiCalls: Record<string, number>
+  /** 注意：p95Ms 在「窗口内无样本」时为 null（后端主动返回 null，前端渲染「—」） */
+  aiCalls: Record<string, number | null>
   cache: { hits: number; misses: number; searchCache?: { hits: number; misses: number } }
   sse: { maxConcurrent: number; activeCount: number }
   jvm: { usedMb: number; freeMb: number; totalMb: number; maxMb: number }
@@ -435,6 +436,18 @@ const AI_LABELS: Record<string, string> = {
   p95Ms: 'P95 耗时(ms)',
 }
 const aiLabel = (k: string) => AI_LABELS[k] || k
+
+/**
+ * 指标数值格式化。
+ *
+ * 为什么需要：P95 在「窗口内无样本」时后端返回 null，此前会渲染成空白，
+ * 而 Micrometer 的客户端百分位返回 0 时会渲染成「0」——同一页里
+ * 「命中率」无数据却显示「—」，三处口径不一致。现统一：无数据一律「—」。
+ */
+const fmtMetric = (v: number | null | undefined) => {
+  if (v === null || v === undefined) return '—'
+  return typeof v === 'number' ? Math.round(v * 10) / 10 : v
+}
 
 const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleString('zh-CN', { hour12: false }) : '—')
 

@@ -178,6 +178,30 @@ class JobAgentControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/jobs: size < 1 被显式拒绝（P3-04：此前静默钳成 1 条）")
+    void list_rejectsNonPositiveSize() throws Exception {
+        for (String bad : new String[]{"-5", "0"}) {
+            mockMvc.perform(get("/api/jobs").param("size", bad))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value(
+                            org.hamcrest.Matchers.containsString("size ≥ 1")));
+        }
+    }
+
+    @Test
+    @DisplayName("GET /api/jobs: size 超过上限仍被钳制而非报错（要得太多是有明确意图的）")
+    void list_clampsHugeSize() throws Exception {
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/jobs").param("size", "99999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
     @DisplayName("GET /api/jobs: C++ / C# / node.js 等真实技术关键词不被白名单误伤")
     void list_allowsCommonTechSymbols() throws Exception {
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),

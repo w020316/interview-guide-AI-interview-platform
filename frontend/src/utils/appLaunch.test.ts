@@ -5,6 +5,11 @@ import {
   createHandoffWatcher,
   launchFallbackHint,
   inAppBrowserHint,
+  isMobileBlockedWebEntry,
+  desktopOnlyWebHint,
+  copyResultHint,
+  copyText,
+  COPY_LINK_LABEL,
   HANDOFF_WINDOW_MS,
 } from './appLaunch'
 
@@ -156,6 +161,88 @@ describe('utils/appLaunch · 文案', () => {
   it('文案不含 em-dash（设计系统禁令）', () => {
     for (const s of [launchFallbackHint('微信'), inAppBrowserHint('BOSS 直聘', 'qq')]) {
       expect(s).not.toMatch(/[—–]/)
+    }
+  })
+})
+
+/**
+ * v1.44.0：微信「文件传输助手」网页版只在电脑浏览器可用。
+ *
+ * 真机复现：微信内置浏览器里点「微信」卡片 → 提示「已为你打开网页版入口」
+ * → 落地页回「暂无法使用微信文件传输助手网页版，可尝试使用电脑端其他浏览器访问」
+ * → 回到本页，卡片下方那条兜底链接还是同一个死链。
+ * 产品承诺了一条走不通的路，比不给入口更差。
+ */
+describe('utils/appLaunch · 仅电脑可用的网页版入口', () => {
+  it('移动端 + 声明仅电脑 → 拦截', () => {
+    expect(isMobileBlockedWebEntry(true, true)).toBe(true)
+  })
+
+  it('桌面端不拦截（电脑上该网页版是正常入口）', () => {
+    expect(isMobileBlockedWebEntry(true, false)).toBe(false)
+  })
+
+  it('普通来源在移动端不拦截（多数网页版手机上可用）', () => {
+    expect(isMobileBlockedWebEntry(false, true)).toBe(false)
+    expect(isMobileBlockedWebEntry(undefined, true)).toBe(false)
+  })
+
+  it('说明文案要讲清「走不通」并给出真的能走的两条路', () => {
+    const msg = desktopOnlyWebHint('微信')
+    expect(msg).toContain('微信')
+    expect(msg).toContain('电脑')
+    expect(msg).toContain('选择本机文件')
+    expect(msg).toContain('复制链接')
+    // 不能继续宣称「已为你打开」——那正是原缺陷的误导点
+    expect(msg).not.toContain('已为你打开')
+  })
+
+  it('替代入口文案指向「复制链接」而不是「打开网页版」', () => {
+    expect(COPY_LINK_LABEL).toContain('复制链接')
+    expect(COPY_LINK_LABEL).not.toContain('打开网页版')
+  })
+
+  it('复制结果文案区分成功与失败，且失败时给出人工兜底', () => {
+    expect(copyResultHint(true)).toContain('已复制')
+    expect(copyResultHint(false)).toContain('手动复制')
+  })
+
+  it('文案不含 em-dash（设计系统禁令）', () => {
+    for (const s of [desktopOnlyWebHint('微信'), copyResultHint(true), copyResultHint(false), COPY_LINK_LABEL]) {
+      expect(s).not.toMatch(/[—–]/)
+    }
+  })
+})
+
+describe('utils/appLaunch · copyText', () => {
+  it('优先走 navigator.clipboard', async () => {
+    const written: string[] = []
+    const orig = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (t: string) => { written.push(t) } },
+    })
+    try {
+      expect(await copyText('https://example.com')).toBe(true)
+      expect(written).toEqual(['https://example.com'])
+    } finally {
+      if (orig) Object.defineProperty(navigator, 'clipboard', orig)
+      else delete (navigator as { clipboard?: unknown }).clipboard
+    }
+  })
+
+  it('clipboard 抛错时不崩溃（回退到 execCommand 路径）', async () => {
+    const orig = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => { throw new Error('NotAllowedError') } },
+    })
+    try {
+      // jsdom 里 document.execCommand 未实现 → 回退也失败，但必须返回 false 而不是抛异常
+      expect(typeof (await copyText('x'))).toBe('boolean')
+    } finally {
+      if (orig) Object.defineProperty(navigator, 'clipboard', orig)
+      else delete (navigator as { clipboard?: unknown }).clipboard
     }
   })
 })

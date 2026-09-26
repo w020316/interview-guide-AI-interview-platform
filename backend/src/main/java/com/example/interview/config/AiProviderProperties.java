@@ -47,6 +47,24 @@ public class AiProviderProperties {
         /** 提供方名称（用于日志） */
         private String name;
 
+        /**
+         * 是否在请求体中显式关闭「思考模式」（{@code thinking:{"type":"disabled"}}）。
+         *
+         * <p><b>为什么需要（2026-09-26 线上实测）</b>：智谱 GLM 系列默认开启思考模式，
+         * {@code reasoning_content} 会吃光输出预算，导致**HTTP 200 但正文为空**
+         * （实测 {@code glm-4.7-flash}：{@code content=0}、{@code reasoning_content=358}、
+         * {@code finish_reason=length}）。本项目 {@code FallbackChatModel} 会把「空正文」
+         * 判为该节点不可用并继续降级，于是**兜底节点每次都被静默跳过**，
+        * 跨厂商容灾退化为单点，且每次主模型故障都要白撞一次（多 4.25s 与一次免费额度）。
+         *
+         * <p>实测关闭思考后的效果（同一问题）：{@code glm-4.7-flash} 由 4.25s/空内容
+         * 变为 **1.38s/正常内容**；另外三个智谱免费模型也都接受该字段且返回正常内容，
+         * 因此可以安全地对整个智谱厂商统一开启。
+         *
+         * <p>缺省为 {@code null}（不下发该字段）——不改变任何现有厂商的请求体。
+         */
+        private Boolean thinkingDisabled;
+
         public String getBaseUrl() {
             return baseUrl;
         }
@@ -85,6 +103,14 @@ public class AiProviderProperties {
 
         public void setName(String name) {
             this.name = name;
+        }
+
+        public Boolean getThinkingDisabled() {
+            return thinkingDisabled;
+        }
+
+        public void setThinkingDisabled(Boolean thinkingDisabled) {
+            this.thinkingDisabled = thinkingDisabled;
         }
     }
 }

@@ -15,15 +15,18 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -328,6 +331,73 @@ class InterviewControllerTest {
                             .content(body))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(400));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/interview/upload-image 失败提示（P3-07）")
+    class UploadImageFailures {
+
+        private MockMultipartFile png() {
+            // 必须 ≥ ImageTypeValidator.HEADER_LENGTH(12) 字节，否则会先被内容校验拦成 400，
+            // 到不了上传分支 —— 本组用例要验的是上传失败后的提示文案。
+            byte[] bytes = new byte[16];
+            bytes[0] = (byte) 0x89;
+            bytes[1] = 'P';
+            bytes[2] = 'N';
+            bytes[3] = 'G';
+            bytes[4] = 0x0D;
+            bytes[5] = 0x0A;
+            bytes[6] = 0x1A;
+            bytes[7] = 0x0A;
+            return new MockMultipartFile("file", "shot.png", "image/png", bytes);
+        }
+
+        @Test
+        @DisplayName("未配置存储 → 503 且指引联系管理员，而不是「请稍后重试」")
+        void notConfigured() throws Exception {
+            when(supabaseStorageService.isConfigured()).thenReturn(false);
+            // 真实实现里 upload() 会先做 isConfigured() 前置校验并抛错，这里如实模拟
+            when(supabaseStorageService.upload(any(), anyString()))
+                    .thenThrow(new IllegalStateException(
+                            "Supabase Storage 未配置（app.supabase.url / service-key 仍为占位值或为空）"));
+
+            mockMvc.perform(multipart("/api/interview/upload-image").file(png()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(503))
+                    .andExpect(jsonPath("$.message").value("图片存储服务未配置，请联系管理员"));
+        }
+
+        @Test
+        @DisplayName("已配置但连不上（配置写错）→ 明确说「重试无效」")
+        void configInvalid() throws Exception {
+            when(supabaseStorageService.isConfigured()).thenReturn(true);
+            when(supabaseStorageService.getLastFailureKind())
+                    .thenReturn(com.example.interview.service.SupabaseStorageService.FailureKind.CONFIG_INVALID);
+            when(supabaseStorageService.upload(any(), anyString()))
+                    .thenThrow(new IllegalStateException("无法连接存储服务：unknown host"));
+
+            mockMvc.perform(multipart("/api/interview/upload-image").file(png()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(503))
+                    // 关键：不能引导用户重试一个永远不会成功的操作
+                    .andExpect(jsonPath("$.message").value(
+                            "图片存储服务配置有误，请联系管理员（重试无效）"));
+        }
+
+        @Test
+        @DisplayName("上游临时故障 → 502 且保留「请稍后重试」")
+        void upstreamError() throws Exception {
+            when(supabaseStorageService.isConfigured()).thenReturn(true);
+            when(supabaseStorageService.getLastFailureKind())
+                    .thenReturn(com.example.interview.service.SupabaseStorageService.FailureKind.UPSTREAM);
+            when(supabaseStorageService.upload(any(), anyString()))
+                    .thenThrow(new IllegalStateException("上游返回 500"));
+
+            mockMvc.perform(multipart("/api/interview/upload-image").file(png()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(502))
+                    .andExpect(jsonPath("$.message").value("图片上传失败，请稍后重试"));
         }
     }
 }
