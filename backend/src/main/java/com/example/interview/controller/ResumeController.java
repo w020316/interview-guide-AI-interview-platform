@@ -38,6 +38,17 @@ public class ResumeController {
     /** 允许的文件扩展名 */
     private static final Set<String> ALLOWED_EXTS = Set.of(".pdf", ".txt", ".html", ".htm", ".md", ".markdown");
 
+    /**
+     * 允许的**图片**扩展名（v1.45.0）。
+     *
+     * <p>为什么简历上传要收图片：手机上没有可靠的「从别的 App 取文件」方案
+     * （微信内置浏览器拦 scheme、filehelper 网页版只在电脑可用、wx.chooseMessageFile 需公众号），
+     * 而**截图在任何 App 里都做得到**。所以「截图 → 视觉模型识别 → 走既有分析链路」
+     * 是手机上最通用的一条路。
+     */
+    private static final Set<String> ALLOWED_IMAGE_EXTS =
+            Set.of(".png", ".jpg", ".jpeg", ".webp", ".gif");
+
     /** 允许的 Content-Type */
     private static final Set<String> ALLOWED_CT = Set.of(
             "application/pdf",
@@ -52,6 +63,10 @@ public class ResumeController {
 
     @Autowired
     private ResumeParseService resumeParseService;
+
+    /** 简历图片识别（截图/拍照 → 文本），未配置时该入口会给出明确提示 */
+    @Autowired
+    private com.example.interview.service.ResumeImageOcrService resumeImageOcrService;
 
     @Autowired
     private ResumeService resumeService;
@@ -114,15 +129,21 @@ public class ResumeController {
             return Result.error(400, "文件名不能为空");
         }
         String lower = originalFilename.toLowerCase();
-        if (!ALLOWED_EXTS.stream().anyMatch(lower::endsWith)) {
-            return Result.error(400, "仅支持 PDF / HTML / MD / TXT 格式的简历文件（Word 请转换为 PDF）");
+        boolean isImage = ALLOWED_IMAGE_EXTS.stream().anyMatch(lower::endsWith);
+        if (!isImage && !ALLOWED_EXTS.stream().anyMatch(lower::endsWith)) {
+            return Result.error(400,
+                    "仅支持 PDF / HTML / MD / TXT 文件，或简历截图（PNG / JPG / WEBP）");
         }
 
-        // Content-Type 校验
+        // Content-Type 校验：图片走图片白名单（真实的格式校验在 OCR 服务里按文件头做）
         String contentType = file.getContentType();
-        if (contentType != null && !ALLOWED_CT.contains(contentType.toLowerCase())) {
-            log.warn("非法 Content-Type 上传: {} (filename={})", contentType, originalFilename);
-            return Result.error(400, "文件类型不受支持");
+        if (contentType != null) {
+            String ct = contentType.toLowerCase();
+            boolean ctOk = isImage ? ct.startsWith("image/") : ALLOWED_CT.contains(ct);
+            if (!ctOk) {
+                log.warn("非法 Content-Type 上传: {} (filename={})", contentType, originalFilename);
+                return Result.error(400, "文件类型不受支持");
+            }
         }
 
         // PDF 文件 magic bytes 校验（%PDF-）
@@ -140,8 +161,22 @@ public class ResumeController {
         }
 
         try {
-            // 1. 解析文件为纯文本
-            String resumeText = resumeParseService.parseToText(file);
+            // 1. 解析为纯文本：图片走视觉识别（截图是手机上最通用的取件方式），其余走原有解析
+            String resumeText;
+            boolean ocrTruncated = false;
+            if (isImage) {
+                try {
+                    var ocr = resumeImageOcrService.extractText(file);
+                    resumeText = ocr.text();
+                    ocrTruncated = ocr.truncated();
+                } catch (IllegalStateException e) {
+                    // 识别类失败给明确原因（未配置 / 不是图片 / 上游错误），
+                    // 不落进下面那句笼统的「文件是否损坏」
+                    return Result.error(502, e.getMessage());
+                }
+            } else {
+                resumeText = resumeParseService.parseToText(file);
+            }
             // 2. 调用 AI 分析
             String analysisJson = resumeAnalysisService.analyze(currentUserId(), resumeText, targetJob);
             // 3. 持久化（保存真实简历文本，便于后续优化与回看）
@@ -154,6 +189,13 @@ public class ResumeController {
             Map<String, String> payload = new HashMap<>();
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
+            if (isImage) {
+                // 让前端知道这份文本来自截图识别，并如实告知是否被输出上限截断
+                payload.put("fromImage", "true");
+                if (ocrTruncated) {
+                    payload.put("imageTruncated", "true");
+                }
+            }
             return Result.success(payload);
         } catch (IllegalArgumentException e) {
             return Result.error(400, e.getMessage());

@@ -38,71 +38,20 @@
              现在给出直达入口——移动端唤起对应 App，桌面端打开其网页版。 -->
         <div class="extract-block">
           <div class="extract-head">
-            <p class="extract-title">从其他软件提取简历</p>
+            <p class="extract-title">把简历拿到这里</p>
+            <!-- v1.46.0 重写。旧版给 8 个 App 的「网页版」入口，实测它们落到的是
+                 厂商首页/登录页（im.qq.com / dingtalk.com / kdocs.cn / pan.baidu.com…），
+                 而副标题承诺「点对应入口直达取件」——用户到站后仍要自己摸索，
+                 属于「承诺大于交付」。微信那条更彻底：filehelper 网页版会被它自己拒绝手机端。
+                 现在改成：**3 个不依赖任何 App 的常驻通道 + 一份各 App 的真实操作说明**。
+                 判断依据见 docs/ux5-scripts/mobile-intake-design.md（设计师实测）。 -->
             <p class="extract-sub">
-              点对应入口直达取件，导出 PDF / 复制文本后回到本页；没自动跳转就用卡片下方的网页版
-              （微信文件传输助手的网页版只在电脑上可用）
+              手机上最省事的一条路是<b>截图</b>：在任何 App 里打开简历，截一张图，
+              回来点「选择相册截图」，系统会自动把图里的文字认出来再分析。
             </p>
           </div>
 
-          <div class="extract-grid">
-            <div v-for="s in EXTRACT_SOURCES" :key="s.key" class="extract-card">
-              <button
-                class="ex-main"
-                type="button"
-                :class="{ launching: launchingKey === s.key }"
-                :title="`前往 ${s.name}（${s.hint}）`"
-                @click="openExtractSource(s)"
-              >
-                <span class="ex-ico" :style="{ background: s.bg, color: s.color }">{{ s.glyph }}</span>
-                <span class="ex-body">
-                  <b>
-                    {{ s.name }}
-                    <!-- 手机上打不开的网页版要提前说明，别等用户点进去才发现 -->
-                    <i v-if="isMobileBlockedWebEntry(s.webOnlyOnDesktop, isMobile)" class="ex-flag">网页版仅电脑可用</i>
-                  </b>
-                  <em>{{ s.hint }}</em>
-                </span>
-                <svg class="ex-enter" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M7 17L17 7 M9 7h8v8" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </button>
-              <!-- 网页版入口**常驻**（v1.39.0）：浏览器无法检测 App 是否安装，
-                   一旦判定失误而兜底入口又只在「失败」时才出现，用户就彻底卡住。
-                   常驻后任何一次误判都只是「多了一个入口」，不会变成死路。
-                   唤起未交棒成功的那张卡片会高亮，引导用户走这条路。
-
-                   v1.44.0：若该来源的网页版**只在电脑上可用**而当前是移动端，
-                   这里改成「复制链接」——同一个地址在手机上打开只会被它自己拒绝，
-                   继续当链接给出就是把用户送进死路。
-
-                   v1.44.1：复制失败时提示说「请长按下方链接手动复制」，那就必须真的
-                   把地址渲染出来（`.ex-url`）。只改文案不给元素，等于把死路往下挪一层。 -->
-              <button
-                v-if="isMobileBlockedWebEntry(s.webOnlyOnDesktop, isMobile)"
-                class="ex-fallback ex-fallback-btn"
-                :class="{ prominent: failedKey === s.key }"
-                type="button"
-                @click="copyWebUrl(s)"
-              >{{ COPY_LINK_LABEL }}</button>
-              <a
-                v-else
-                class="ex-fallback"
-                :class="{ prominent: failedKey === s.key }"
-                :href="s.webUrl"
-                target="_blank"
-                rel="noopener"
-              >{{ fallbackLabel(s) }}</a>
-              <!-- 复制失败时的可长按文本：让「请长按下方链接」这句指令可执行 -->
-              <code
-                v-if="copyFailedKey === s.key"
-                class="ex-url"
-                @click="copyWebUrl(s)"
-              >{{ s.webUrl }}</code>
-            </div>
-          </div>
-
+          <!-- 三个常驻通道：不依赖任何 App 的深链，因此在任何环境（含微信内置浏览器）里都可用 -->
           <div class="extract-actions">
             <button class="btn-pick" type="button" @click="triggerFilePicker">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -110,6 +59,15 @@
                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
               选择本机文件
+            </button>
+            <button class="btn-pick" type="button" @click="triggerAlbumPicker">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                <circle cx="9" cy="10" r="1.6" stroke="currentColor" stroke-width="2"/>
+                <path d="M4 17l5-5 4 4 3-3 4 4" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              选择相册截图
             </button>
             <button class="btn-clipboard" type="button" @click="pasteFromClipboard">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -119,19 +77,51 @@
               </svg>
               从剪贴板粘贴
             </button>
-            <!-- 原生文件选择：桌面打开文件管理器，iOS/Android 打开「文件」App（可从 iCloud / 云盘选取） -->
+            <!-- 原生文件选择：桌面打开文件管理器，iOS/Android 打开「文件」App（可从 iCloud / 云盘选取）。
+                 v1.46.0 起同时接受图片——截图是手机上从任何 App 取简历的通用出路。 -->
             <input
               ref="nativeFileInput"
               class="hidden-file"
               type="file"
-              accept=".pdf,.txt,.html,.htm,.md,.markdown"
+              accept=".pdf,.txt,.html,.htm,.md,.markdown,image/png,image/jpeg,image/webp,image/gif"
+              @change="onNativeFile"
+            />
+            <!-- 相册专用入口：accept="image/*" 在手机上会直接打开相册 -->
+            <input
+              ref="albumFileInput"
+              class="hidden-file"
+              type="file"
+              accept="image/*"
               @change="onNativeFile"
             />
           </div>
 
+          <details class="extract-guide">
+            <summary>各 App 里怎么把简历拿出来</summary>
+            <ul>
+              <li><b>微信</b>：打开简历 → 右上角「⋯」→ 截图。文件在「文件传输助手」里时，
+                手机上打不开它的网页版，需要用电脑浏览器打开下面的地址。</li>
+              <li><b>钉钉 / 企业微信</b>：打开文档 → 右上角「⋯」→ 导出为 PDF / 保存到手机，
+                再回来点「选择本机文件」。</li>
+              <li><b>WPS / 腾讯文档</b>：打开文档 → 分享 → 导出为 PDF → 保存到手机。</li>
+              <li><b>BOSS 直聘 / 猎聘等</b>：在线简历通常不给导出，进「我的简历」直接截图最省事。</li>
+              <li><b>网盘（百度网盘等）</b>：长按文件 → 下载到手机 → 点「选择本机文件」。</li>
+              <li>懒得折腾？把简历正文复制下来，用下面的「从剪贴板粘贴」也行。</li>
+            </ul>
+            <div class="guide-copy">
+              <button class="guide-copy-btn" type="button" @click="copyFilehelper">
+                {{ COPY_LINK_LABEL }}
+              </button>
+              <!-- 复制失败时必须把地址渲染出来，否则「请长按下方链接」指向一个不存在的元素 -->
+              <code v-if="copyFailed" class="ex-url" @click="copyFilehelper">
+                https://filehelper.weixin.qq.com/
+              </code>
+            </div>
+          </details>
+
           <p class="extract-note">
-            简历是 Word 文档？在 WPS / 腾讯文档里「导出为 PDF」后，再用上面的
-            「选择本机文件」上传即可（系统会自动识别 PDF 文本）。
+            截图识别会把图片里的文字提取出来再分析。长简历可能只识别到一部分，
+            建议分两张截图，或直接用原始文件上传。
           </p>
         </div>
 
@@ -347,15 +337,7 @@ import {
   COPY_LINK_LABEL,
   copyResultHint,
   copyText,
-  createHandoffWatcher,
-  desktopOnlyWebHint,
-  detectInAppBrowser,
   detectMobile,
-  inAppBrowserHint,
-  isMobileBlockedWebEntry,
-  launchFallbackHint,
-  openFailedHint,
-  HANDOFF_WINDOW_MS,
 } from '../utils/appLaunch'
 import renderMarkdown from '../utils/markdown'
 import { BaseInput, BaseTextarea } from '../components'
@@ -397,102 +379,33 @@ const importUrl = ref('')
 const importLoading = ref(false)
 
 /* ─────────────────────────────────────────────────────────────
-   从其他软件提取简历（v1.37.0）
-   简历的常见存放位置并不在本地磁盘，而是在微信文件传输助手、网盘、
-   WPS 云文档或招聘 App 的在线简历里。这里给出直达取件入口：
-   移动端用 App scheme 唤起，桌面端打开其网页版，再配合「选择本机文件」
-   与「剪贴板粘贴」两条通用兜底通道。
+   取件区（v1.46.0 重写）
+
+   旧版给 8 个 App 的「网页版」入口，实测它们落到的是厂商首页/登录页
+   （im.qq.com / dingtalk.com / kdocs.cn / pan.baidu.com…），而副标题承诺
+   「点对应入口直达取件」——用户到站后仍要自己摸索，属于「承诺大于交付」。
+   微信那条更彻底：filehelper 的网页版会被它自己拒绝手机端。
+
+   现在只保留**不依赖任何 App 深链**的三条通道（本机文件 / 相册截图 / 剪贴板），
+   外加一份「各 App 里怎么把简历拿出来」的真实操作说明。
    ───────────────────────────────────────────────────────────── */
 
-interface ExtractSource {
-  key: string
-  name: string
-  /** 图标字形（单字/字母，避免依赖第三方图标资源） */
-  glyph: string
-  bg: string
-  color: string
-  /** 简历通常在该软件里的位置 */
-  hint: string
-  /** 移动端 App scheme；未提供则移动端也直接走网页版 */
-  scheme?: string
-  /** 桌面端（或唤起失败后）打开的网页地址 */
-  webUrl: string
-  /**
-   * 该网页版**只在电脑浏览器可用**（v1.44.0）。
-   *
-   * 只有微信「文件传输助手」属于这一类：`filehelper.weixin.qq.com` 会主动拒绝
-   * 手机端访问并提示「可尝试使用电脑端其他浏览器访问」。把它当通用兜底，
-   * 等于在手机上给用户一条死路 —— 移动端必须改为「复制链接 + 本机文件」两条出路。
-   */
-  webOnlyOnDesktop?: boolean
-}
-
-const EXTRACT_SOURCES: ExtractSource[] = [
-  {
-    key: 'wechat', name: '微信', glyph: '微', bg: '#e8f7ec', color: '#07c160',
-    hint: '文件传输助手 / 收藏', scheme: 'weixin://',
-    webUrl: 'https://filehelper.weixin.qq.com/',
-    // 实测（真机截图）：手机浏览器打开该地址会被它自己拦下，只回一句
-    // 「暂无法使用微信文件传输助手网页版，可尝试使用电脑端其他浏览器访问」。
-    webOnlyOnDesktop: true,
-  },
-  {
-    key: 'qq', name: 'QQ', glyph: 'Q', bg: '#e8f1ff', color: '#12b7f5',
-    hint: '我的电脑 / 文件中转站', scheme: 'mqq://', webUrl: 'https://im.qq.com',
-  },
-  {
-    key: 'dingtalk', name: '钉钉', glyph: '钉', bg: '#e9f2ff', color: '#1a73e8',
-    hint: '钉盘 / 我的文件', scheme: 'dingtalk://', webUrl: 'https://www.dingtalk.com',
-  },
-  {
-    key: 'wps', name: 'WPS 云文档', glyph: 'W', bg: '#fff1ec', color: '#e6432c',
-    hint: '最近文档', scheme: 'wps://', webUrl: 'https://www.kdocs.cn',
-  },
-  {
-    key: 'docs', name: '腾讯文档', glyph: '腾', bg: '#e8f0ff', color: '#1e6fff',
-    hint: '我的文档', scheme: 'tencentdocs://', webUrl: 'https://docs.qq.com',
-  },
-  {
-    key: 'pan', name: '百度网盘', glyph: '盘', bg: '#e9f3ff', color: '#2b7efb',
-    hint: '我的资源', scheme: 'baiduyun://', webUrl: 'https://pan.baidu.com',
-  },
-  {
-    key: 'wondercv', name: '超级简历', glyph: '超', bg: '#eaf7f4', color: '#0f9b7d',
-    hint: '在线简历 / 导出 PDF', webUrl: 'https://www.wondercv.com',
-  },
-  {
-    key: 'zhipin', name: 'BOSS 直聘', glyph: 'B', bg: '#e8f6f0', color: '#00a97f',
-    hint: '附件简历 / 在线简历', scheme: 'bosszp://', webUrl: 'https://www.zhipin.com',
-  },
-]
-
 const nativeFileInput = ref<HTMLInputElement | null>(null)
+/** 相册专用入口：`accept="image/*"` 在手机上会直接打开相册 */
+const albumFileInput = ref<HTMLInputElement | null>(null)
+
 /**
- * 环境判定（v1.44.1）。
- *
- * 原实现把这两个值放在 `onMounted` 里赋值，**首帧渲染时 `isMobile=false`** ——
- * 手机上会先按桌面分支画出「打开网页版」直链，下一帧才切成「复制链接」。
- * 虽然 Vue 在 `onMounted` 改 ref 会于微任务内重渲染、用户基本看不到那一帧，
- * 但「先画错再改对」本身是不必要的风险，且会让任何基于首屏的自动化断言读到错误分支。
- * `detectMobile` / `detectInAppBrowser` 都做了 `typeof navigator === 'undefined'` 保护，可直接在初始化求值。
+ * 环境判定（v1.44.1）：在 ref 初始化时求值，避免首帧按桌面分支渲染。
+ * 目前只用于按端调整提示文案。
  */
 const isMobile = ref(detectMobile())
-/** 唤起中的软件 key（按钮态反馈，避免用户以为点击没生效而重复点） */
-const launchingKey = ref('')
-/** 唤起未交棒成功、需要用户走网页版兜底的软件 key */
-const failedKey = ref('')
+
 /**
- * 复制失败、需要用户手动长按链接的软件 key（v1.44.1）。
- *
- * 设置后视图会**把地址渲染成可选中的文本**（`.ex-url`），
- * 否则 `copyResultHint(false)` 那句「请长按下方链接」指向一个页面上不存在的元素。
+ * 「文件传输助手」地址复制失败（v1.44.1）。
+ * 复制失败时必须把地址渲染成可选中的文本，否则 `copyResultHint(false)` 那句
+ * 「请长按下方链接」会指向一个页面上不存在的元素。
  */
-const copyFailedKey = ref('')
-/**
- * 宿主 WebView 标识（微信 / 钉钉 / 支付宝 / 微博 / QQ）。
- * 这些宿主会拦截 App scheme，按普通移动端处理必然误报「未检测到 App」。
- */
-const inAppHost = ref(detectInAppBrowser())
+const copyFailed = ref(false)
 
 /** 触发原生文件选择（桌面打开文件管理器；iOS/Android 打开「文件」App，可进 iCloud / 云盘取件） */
 function triggerFilePicker() {
@@ -507,121 +420,26 @@ function onNativeFile(e: Event) {
   input.value = ''
 }
 
-/**
- * 打开取件入口。
- *
- * v1.39.0 重写判定逻辑（此前移动端大面积误报「未检测到 App」）：
- *
- * - **该来源网页版仅支持电脑（如微信文件传输助手）且当前是移动端**：
- *   不打开死链，改为说明原因并引导「选择本机文件 / 复制链接到电脑」（v1.44.0）。
- * - **桌面端 / 未配置 scheme**：直接新标签打开网页版。
- * - **应用内浏览器（微信/钉钉/支付宝/微博/QQ）**：宿主会拦截 scheme，
- *   直接打开网页版并说明原因 —— 不再走「跳一下再判失败」那条必然误报的路径。
- * - **普通移动端浏览器**：跳 scheme，然后由 {@link createHandoffWatcher} 监听
- *   visibilitychange / pagehide / blur 三个信号判断是否交棒成功。
- *   只有「全程没有任何切走信号」时才提示兜底，且文案不再断言用户没装 App。
- *
- * 注意：scheme 跳转必须由用户手势同步发起，因此本函数不做任何 await。
- */
-function openExtractSource(s: ExtractSource) {
-  failedKey.value = ''
-  copyFailedKey.value = ''
-
-  // 手机上打不开的网页版：不打开，直接给出真的能走的路。
-  // 高亮该卡片，让下方那条常驻入口同步切换成「复制链接」。
-  if (isMobileBlockedWebEntry(s.webOnlyOnDesktop, isMobile.value)) {
-    failedKey.value = s.key
-    ElMessage.warning(desktopOnlyWebHint(s.name))
-    return
-  }
-
-  if (!isMobile.value || !s.scheme) {
-    openWebEntry(s)
-    return
-  }
-
-  // 宿主 WebView：scheme 会被拦截，页面永远 visible，按原逻辑必然误报
-  if (inAppHost.value) {
-    failedKey.value = s.key
-    openWebEntry(s, inAppBrowserHint(s.name, inAppHost.value))
-    return
-  }
-
-  launchingKey.value = s.key
-  const watcher = createHandoffWatcher()
-  try {
-    window.location.href = s.scheme
-  } catch {
-    // 个别 WebView 直接对未知 scheme 抛错，交给下面的兜底提示处理
-  }
-
-  window.setTimeout(() => {
-    const handedOff = watcher.handedOff
-    watcher.dispose()
-    launchingKey.value = ''
-    // 已交棒：App 已顶到前台，用户切回来时不该看到任何「失败」提示
-    if (handedOff) return
-    failedKey.value = s.key
-    ElMessage.info(launchFallbackHint(s.name))
-  }, HANDOFF_WINDOW_MS)
+/** 触发相册选择：手机上直接打开相册，桌面端退化为普通文件选择器 */
+function triggerAlbumPicker() {
+  albumFileInput.value?.click()
 }
 
 /**
- * 打开网页版入口，并按**实际结果**给提示（v1.44.1）。
+ * 复制「文件传输助手」的电脑版地址。
  *
- * 宿主 WebView（微信/钉钉）会拦截弹窗，此时 `window.open` 返回 `null`、页面毫无变化。
- * 原实现无论成败都先说「已为你打开网页版入口」—— 断言了一件没发生的事，
- * 与 v1.44.0 修掉的「承诺一条走不通的路」是同一类缺陷。
- *
- * ⚠️ 这里**不能**传 `'noopener'`：按规范，带 `noopener` 时 `window.open` 一律返回 `null`，
- * 返回值就再也无法用来判断「到底有没有被拦」。改为拿到窗口后手动清 `opener`。
+ * 微信「文件传输助手」的网页版**只在电脑浏览器可用**，手机打开会被它自己拒绝。
+ * 所以这里只提供「复制地址」——让用户在电脑上打开，而不是给一个手机点不开的链接。
  */
-function openWebEntry(s: ExtractSource, openingHint?: string) {
-  let opened: Window | null = null
-  try {
-    opened = window.open(s.webUrl, '_blank')
-  } catch {
-    opened = null
-  }
-  if (opened) {
-    try {
-      opened.opener = null
-    } catch {
-      // 跨域时可能抛错，忽略：opener 只是加固，不影响主流程
-    }
-    if (openingHint) ElMessage.info(openingHint)
-    return
-  }
-  // 没拿到窗口句柄 = 被拦下了，此时说「已为你打开」是假承诺
-  ElMessage.warning(openFailedHint(s.name))
-}
-
-/**
- * 卡片下方那条常驻入口的文案。
- *
- * 之所以要按分支取文案：应用内浏览器里**根本没有尝试跳转**（scheme 被宿主拦下），
- * 此时写「未自动跳转？」是错的 —— 用户会以为自己漏了一步。
- */
-function fallbackLabel(s: ExtractSource): string {
-  if (failedKey.value !== s.key) return '打开网页版 →'
-  return inAppHost.value ? '打开网页版入口 →' : '未自动跳转？点此打开网页版 →'
-}
-
-/**
- * 复制网页版地址（手机上打不开时，这是真正能走通的那条路）。
- *
- * 失败时把地址**渲染成可选中的文本**（`copyFailedKey`），
- * 否则提示里的「请长按下方链接」会指向一个页面上不存在的元素（v1.44.1）。
- */
-async function copyWebUrl(s: ExtractSource) {
-  const ok = await copyText(s.webUrl)
-  copyFailedKey.value = ok ? '' : s.key
+async function copyFilehelper() {
+  const ok = await copyText('https://filehelper.weixin.qq.com/')
+  copyFailed.value = !ok
   if (ok) ElMessage.success(copyResultHint(true))
   else ElMessage.warning(copyResultHint(false))
 }
 
-// 环境判定（isMobile / inAppHost）已在 ref 初始化时求值（v1.44.1），
-// 不再放 onMounted：那会让首帧按桌面分支渲染，手机上先画出「打开网页版」直链。
+// 环境判定（isMobile）已在 ref 初始化时求值（v1.44.1），不再放 onMounted：
+// 那会让首帧按桌面分支渲染，手机上先画出桌面端才有的提示。
 
 // 优化简历相关状态
 const optimizing = ref(false)
@@ -1273,6 +1091,92 @@ function formatDate() {
   border-radius: var(--radius-sm);
   word-break: break-all;
   /* 允许长按选中：这是「手动复制」这条路的唯一交互 */
+  user-select: all;
+  -webkit-user-select: all;
+  cursor: text;
+}
+
+/* 各 App 取件说明（v1.46.0）。
+   取代了原先 8 张「网页版直达」卡片——那些卡片实测落到厂商首页/登录页，
+   与「直达取件」的承诺不符。说明用 <details> 折叠，不占首屏。 */
+.extract-guide {
+  margin: 12px 12px 0;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg-alt);
+  font-size: 12.5px;
+}
+
+.extract-guide summary {
+  padding: 11px 12px;
+  font-weight: 600;
+  color: var(--c-text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.extract-guide summary::-webkit-details-marker {
+  display: none;
+}
+
+.extract-guide summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform var(--transition-fast);
+}
+
+.extract-guide[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.extract-guide ul {
+  margin: 0;
+  padding: 0 14px 8px 28px;
+  color: var(--c-text-secondary);
+  line-height: 1.8;
+}
+
+.extract-guide li {
+  margin-bottom: 4px;
+}
+
+.guide-copy {
+  padding: 0 12px 12px;
+}
+
+/* 可点高度按移动端标准给足：这是手机上唯一能走通的那条路的入口 */
+.guide-copy-btn {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 0;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--brand-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.guide-copy-btn:hover {
+  text-decoration: underline;
+}
+
+/* 复制失败时暴露出的原始地址：让「请长按下方链接」这句指令可执行 */
+.ex-url {
+  display: block;
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border-radius: var(--radius-sm);
+  word-break: break-all;
   user-select: all;
   -webkit-user-select: all;
   cursor: text;

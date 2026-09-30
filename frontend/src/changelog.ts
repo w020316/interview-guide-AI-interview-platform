@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.44.3'
+export const CURRENT_VERSION = '1.46.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.46.0',
+    date: '2026-10-01',
+    title: '版本 1.46.0 · 手机上可以直接用截图上传简历',
+    items: [
+      { text: '简历分析：手机上现在可以把简历**截图**直接传上来——在任何 App 里打开简历截一张图，回到本页点「选择相册截图」，系统会自动把图片里的文字认出来再做分析。这是手机上唯一在任何 App 里都做得到的取件方式', level: 'user' },
+      { text: '简历分析：取件区不再给一排点进去是厂商首页的「网页版」入口（那些入口承诺「直达取件」，实际要你自己在首页里找），改成三条在任何环境下都能用的通道：选择本机文件 / 选择相册截图 / 从剪贴板粘贴，并附上一份「各 App 里怎么把简历拿出来」的真实操作说明', level: 'user' },
+      { text: '简历分析：微信「文件传输助手」的网页版确实只能在电脑上用，现在只提供「复制地址到电脑打开」，不再给你一个手机上点不开的链接', level: 'user' },
+      { text: '后端：新增简历图片识别服务（智谱 glm-4v-flash 免费视觉模型，实测 4.14s、关键字段全部命中）；上传接口按**文件头魔数**判定图片类型并复用图片白名单，声明类型与内容不一致时拒绝；长简历被模型输出上限截断时会如实告知，不静默截断', level: 'tech' },
+      { text: '后端：AI 降级链新增第三家厂商兜底（NVIDIA build.nvidia.com 的 gpt-oss-20b）——实测并发 3/3 成功、社区 RPM 约 40，比现有智谱兜底档更可靠；密钥需在部署面板注入，未配置时该节点自动跳过', level: 'tech' },
+    ],
+  },
   {
     version: '1.44.3',
     date: '2026-10-01',

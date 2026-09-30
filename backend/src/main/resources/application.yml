@@ -94,6 +94,21 @@ app:
     embedding:
       base-url: ${AI_EMBEDDING_BASE_URL:}
       api-key: ${AI_EMBEDDING_API_KEY:}
+    # ── 简历图片识别（截图 → 文本，v1.45.0）──────────────────────────────
+    # 手机上没有可靠的「从别的 App 取简历文件」方案（微信内置浏览器拦 scheme、
+    # filehelper 网页版只在电脑可用、wx.chooseMessageFile 需公众号 JS-SDK），
+    # 而**截图在任何 App 里都做得到**。这条链路让「截图 → 识别 → 分析」成为通用出路。
+    #
+    # 模型选型（2026-10-01 实测）：智谱 glm-4v-flash 免费、复用 AI_ZHIPU_API_KEY、
+    # 单张 420×900 简历截图 4.14s、12/12 关键字段命中。
+    # ⚠️ 该模型 max_tokens 上限是 1024（传 2048 直接 400），**长简历会被截断**，
+    #    代码会把 finish_reason=length 如实透出（前端提示用户分两张截图）。
+    # 换模型时注意：glm-4.1v-thinking-flash 可用且上限更高，但慢（8~12s）且输出含思考内容。
+    vision:
+      enabled: ${AI_VISION_ENABLED:true}
+      base-url: ${AI_VISION_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+      api-key: ${AI_ZHIPU_API_KEY:}
+      model: ${AI_VISION_MODEL:glm-4v-flash}
     chain:
       # ══════════════════════════════════════════════════════════════════
       # 降级链（按顺序尝试，命中即返回）
@@ -139,6 +154,21 @@ app:
         api-key: ${AI_API_KEY:}
         model: ${AI_CHAT_MODEL:agnes-2.5-flash}
         temperature: ${AI_TEMPERATURE:0.7}
+      # ── NVIDIA build.nvidia.com（v1.46.0，第三家厂商）────────────────────
+      # 2026-10-01 实测（该 Key 下 81 个模型可选）：主力候选里只有 gpt-oss-20b 稳定可用，
+      # 其余要么超时要么极慢（glm-5.3-flash 85s、kimi-k3 180s、gemma-4-31b 超时、
+      # kimi-k2.6 404 无权限）。
+      # 为什么放这里：**并发 3/3 成功**（对照智谱 glm-4.7-flash 只有 1/3），
+      # 社区实测 RPM ≈40（对照 Agnes 免费档 10）→ 作为跨厂商兜底比智谱那档更可靠。
+      # 代价是慢（≈5.9s，比 Agnes 的 1.4s 慢 4 倍），所以排在主力之后。
+      # ⚠️ gpt-oss-20b 是**推理模型**：显式设小 max_tokens 会返回空正文（本链路不设 max_tokens，
+      #    走模型默认值，因此安全）；也**不要**给它加 thinking-disabled——该字段是智谱专有的。
+      # ⚠️ api-key 需在部署侧注入（AI_NVIDIA_API_KEY）；为空时本节点自动跳过，不影响链路。
+      - name: nvidia-fallback
+        base-url: ${AI_NVIDIA_BASE_URL:https://integrate.api.nvidia.com/v1}
+        api-key: ${AI_NVIDIA_API_KEY:}
+        model: ${AI_NVIDIA_MODEL:openai/gpt-oss-20b}
+        temperature: ${AI_TEMPERATURE:0.7}
       - name: zhipu-quality
         base-url: ${AI_ZHIPU_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
         api-key: ${AI_ZHIPU_API_KEY:}
@@ -171,7 +201,7 @@ app:
     #    导致「与前端同步」这个约定在公开接口上一直没生效（两个端点报两个版本号）。
     #    现已改为读本配置；改版本时除了这里与 changelog.ts，无需再动代码。
     name: ${APP_INFO_NAME:interview-guide}
-    version: ${APP_INFO_VERSION:1.44.3}
+    version: ${APP_INFO_VERSION:1.46.0}
     description: ${APP_INFO_DESCRIPTION:AI 智能面试辅助平台后端}
     # 构建日期，CI 注入；未配置时 fallback 为当天
     build-date: ${APP_INFO_BUILD_DATE:}

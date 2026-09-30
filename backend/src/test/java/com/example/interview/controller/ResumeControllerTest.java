@@ -63,6 +63,10 @@ class ResumeControllerTest {
     @MockBean
     private ResumeService resumeService;
 
+    /** v1.45.0：简历图片识别（截图 → 文本）——控制器新增依赖，@WebMvcTest 必须补 mock */
+    @MockBean
+    private com.example.interview.service.ResumeImageOcrService resumeImageOcrService;
+
     @MockBean
     private JwtUtil jwtUtil;
 
@@ -286,7 +290,7 @@ class ResumeControllerTest {
         }
 
         @Test
-        @DisplayName("不支持的扩展名（.docx）返回 400")
+        @DisplayName("不支持的扩展名（.docx）返回 400，且提示里带上「简历截图」这条新出路")
         void upload_unsupportedExt_returns400() throws Exception {
             MockMultipartFile docx = new MockMultipartFile(
                     "file", "resume.docx", "application/octet-stream", "内容".getBytes());
@@ -294,8 +298,58 @@ class ResumeControllerTest {
             mockMvc.perform(multipart("/api/resume/upload").file(docx))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(400))
+                    // v1.45.0：手机上「截图 → 识别」是最通用的取件方式，提示里必须让用户知道
                     .andExpect(jsonPath("$.message").value(
-                            "仅支持 PDF / HTML / MD / TXT 格式的简历文件（Word 请转换为 PDF）"));
+                            "仅支持 PDF / HTML / MD / TXT 文件，或简历截图（PNG / JPG / WEBP）"));
+        }
+
+        @Test
+        @DisplayName("上传简历截图：走图片识别，返回文本并标记来源为图片")
+        void upload_image_runsOcr() throws Exception {
+            MockMultipartFile shot = new MockMultipartFile(
+                    "file", "resume.png", "image/png",
+                    new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0});
+            when(resumeImageOcrService.extractText(any()))
+                    .thenReturn(new com.example.interview.service.ResumeImageOcrService.OcrResult("陈嘉明\nJava 后端", false));
+            when(resumeAnalysisService.analyze(any(), any(), any())).thenReturn("{\"score\":80}");
+
+            mockMvc.perform(multipart("/api/resume/upload").file(shot))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.resumeText").value("陈嘉明\nJava 后端"))
+                    .andExpect(jsonPath("$.data.fromImage").value("true"))
+                    // 未截断时不应出现截断标记
+                    .andExpect(jsonPath("$.data.imageTruncated").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("识别被输出上限截断时，如实标记 imageTruncated（不静默截断）")
+        void upload_image_truncatedFlag() throws Exception {
+            MockMultipartFile shot = new MockMultipartFile(
+                    "file", "resume.png", "image/png",
+                    new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0});
+            when(resumeImageOcrService.extractText(any()))
+                    .thenReturn(new com.example.interview.service.ResumeImageOcrService.OcrResult("前半部分", true));
+            when(resumeAnalysisService.analyze(any(), any(), any())).thenReturn("{\"score\":70}");
+
+            mockMvc.perform(multipart("/api/resume/upload").file(shot))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.imageTruncated").value("true"));
+        }
+
+        @Test
+        @DisplayName("图片识别失败时返回 502 + 真实原因，不落进「文件是否损坏」那句笼统提示")
+        void upload_image_ocrFailure_returns502() throws Exception {
+            MockMultipartFile shot = new MockMultipartFile(
+                    "file", "resume.png", "image/png",
+                    new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0});
+            when(resumeImageOcrService.extractText(any()))
+                    .thenThrow(new IllegalStateException("图片识别未配置（app.ai.vision.api-key 为空）"));
+
+            mockMvc.perform(multipart("/api/resume/upload").file(shot))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(502))
+                    .andExpect(jsonPath("$.message").value("图片识别未配置（app.ai.vision.api-key 为空）"));
         }
 
         @Test
