@@ -1,0 +1,84 @@
+[
+  {
+    "model": "openai/gpt-oss-20b",
+    "tag": "c2",
+    "http": 200,
+    "ms": 5395,
+    "finish_reason": "stop",
+    "content_len": 223,
+    "json_ok": true
+  },
+  {
+    "model": "openai/gpt-oss-20b",
+    "tag": "c1",
+    "http": 200,
+    "ms": 7881,
+    "finish_reason": "stop",
+    "content_len": 418,
+    "json_ok": true
+  },
+  {
+    "model": "openai/gpt-oss-20b",
+    "tag": "c3",
+    "http": 200,
+    "ms": 15306,
+    "finish_reason": "stop",
+    "content_len": 476,
+    "json_ok": true
+  },
+  {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "tag": "c2",
+    "http": 503,
+    "err_head": "{\"error\":{\"message\":\"Service temporarily overloaded\",\"type\":\"Service Unavailable\",\"code\":503}}",
+    "ms": 1813,
+    "finish_reason": null,
+    "content_len": 0,
+    "json_ok": false
+  },
+  {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "tag": "c3",
+    "http": 200,
+    "ms": 7441,
+    "finish_reason": "stop",
+    "content_len": 365,
+    "json_ok": true
+  },
+  {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "tag": "c1",
+    "http": 200,
+    "ms": 10080,
+    "finish_reason": "stop",
+    "content_len": 428,
+    "json_ok": true
+  },
+  {
+    "model": "z-ai/glm-5.3-flash",
+    "tag": "c1",
+    "http": 200,
+    "ms": 53047,
+    "finish_reason": "stop",
+    "content_len": 489,
+    "json_ok": true
+  },
+  {
+    "model": "z-ai/glm-5.3-flash",
+    "tag": "c2",
+    "http": 200,
+    "ms": 91355,
+    "finish_reason": "stop",
+    "content_len": 541,
+    "json_ok": true
+  },
+  {
+    "model": "z-ai/glm-5.3-flash",
+    "tag": "c3",
+    "http": 200,
+    "ms": 120119,
+    "finish_reason": "stop",
+    "content_len": 431,
+    "json_ok": true
+  }
+]

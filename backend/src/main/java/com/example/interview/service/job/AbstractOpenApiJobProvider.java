@@ -48,8 +48,13 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             + "(KHTML, like Gecko) Chrome/122.0 Safari/537.36";
 
-    /** description 入库长度上限（纯文本字符数） */
-    private static final int DESC_MAX_LEN = 1200;
+    /**
+     * description 入库长度上限（纯文本字符数）。
+     *
+     * <p>v1.45.0 起由 {@code private} 放开为 {@code protected}：子类清洗自己的正文时
+     * 必须用同一个上限，否则不同源的描述长度会不一致。
+     */
+    protected static final int DESC_MAX_LEN = 1200;
 
     /**
      * 公开 API 数据源的最小刷新间隔：6 小时。
@@ -110,6 +115,17 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
      */
     protected static final int MAX_ITEMS_PER_REFRESH = 25;
 
+    /**
+     * 本源的每轮入库配额（v1.45.0 起可覆写）。
+     *
+     * <p>默认沿用 {@link #MAX_ITEMS_PER_REFRESH}（海外源的取值 25）。
+     * 国内中文活源（如 V2EX 酷工作）单轮返回条数少、但**国内岗位总量本来就稀缺**，
+     * 给它 25 的配额没有意义；这类源应当覆写成本方法返回更大的值。
+     */
+    protected int maxItemsPerRefresh() {
+        return MAX_ITEMS_PER_REFRESH;
+    }
+
     /** 该数据源的 JSON 接口地址 */
     protected abstract String endpoint();
 
@@ -147,11 +163,24 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
             throw new IllegalStateException("拉取失败：上游返回空响应体");
         }
         try {
-            return applyQuota(parse(objectMapper.readTree(body)));
+            return applyQuotaForSource(parse(objectMapper.readTree(body)));
         } catch (Exception e) {
             log.warn("公开数据源 {} 数据解析失败：{}", platform(), e.getMessage());
             throw new IllegalStateException("数据解析失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 按**本源**的配额截断（v1.45.0）。
+     *
+     * <p>与静态的 {@link #applyQuota(List)} 的区别：这里走 {@link #maxItemsPerRefresh()}，
+     * 允许子类按源定制配额。静态方法保留给默认配额与既有单测。
+     */
+    protected List<JobDto> applyQuotaForSource(List<JobDto> parsed) {
+        int max = maxItemsPerRefresh();
+        if (parsed == null || parsed.isEmpty()) return List.of();
+        if (max <= 0 || parsed.size() <= max) return parsed;
+        return new ArrayList<>(parsed.subList(0, max));
     }
 
     /**

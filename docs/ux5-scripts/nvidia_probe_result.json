@@ -1,52 +1,288 @@
 [
   {
+    "model": "deepseek-ai/deepseek-v4.1-flash",
+    "max_tokens": 1024,
+    "http": null,
+    "err_head": "TimeoutError:The read operation timed out",
+    "ms": 241206
+  },
+  {
+    "model": "deepseek-ai/deepseek-v4.1-flash",
+    "max_tokens": 2048,
+    "http": null,
+    "err_head": "TimeoutError:The read operation timed out",
+    "ms": 240661
+  },
+  {
+    "model": "google/gemma-4-31b-it",
+    "max_tokens": 1024,
+    "http": null,
+    "err_head": "TimeoutError:The read operation timed out",
+    "ms": 240511
+  },
+  {
+    "model": "google/gemma-4-31b-it",
+    "max_tokens": 2048,
+    "http": null,
+    "err_head": "TimeoutError:The read operation timed out",
+    "ms": 240538
+  },
+  {
+    "model": "moonshotai/kimi-k2.6",
+    "max_tokens": 1024,
+    "http": 404,
+    "err_head": "{\"status\":404,\"title\":\"Not Found\",\"detail\":\"Function '23d4f03a-b8a6-4adb-a183-7daa083a09cc': Not found for account 'NGk0gkMZzP1XeBH05MM8cFVzwKktknSmWVfk0Eu_Ukg'\"}",
+    "ms": 1229,
+    "finish_reason": null,
+    "has_reasoning": false,
+    "reasoning_len": 0,
+    "content_len": 0,
+    "usage": null,
+    "content_head": "",
+    "json_ok": false,
+    "json_err": "Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+    "model": "moonshotai/kimi-k2.6",
+    "max_tokens": 2048,
+    "http": 404,
+    "err_head": "{\"status\":404,\"title\":\"Not Found\",\"detail\":\"Function '23d4f03a-b8a6-4adb-a183-7daa083a09cc': Not found for account 'NGk0gkMZzP1XeBH05MM8cFVzwKktknSmWVfk0Eu_Ukg'\"}",
+    "ms": 1208,
+    "finish_reason": null,
+    "has_reasoning": false,
+    "reasoning_len": 0,
+    "content_len": 0,
+    "usage": null,
+    "content_head": "",
+    "json_ok": false,
+    "json_err": "Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+    "model": "moonshotai/kimi-k3",
+    "max_tokens": 1024,
+    "http": 200,
+    "ms": 177012,
+    "finish_reason": "stop",
+    "has_reasoning": true,
+    "reasoning_len": 17,
+    "content_len": 382,
+    "usage": {
+      "prompt_tokens": 198,
+      "completion_tokens": 202,
+      "total_tokens": 400,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 8
+      }
+    },
+    "content_head": "{\"score\":85,\"strengths\":[\"技术栈匹配主流Java后端岗位，涵盖Spring Cloud微服务、缓存、消息队列等核心技能\",\"有日活百万级系统的实战经验，且性能优化成果量化清晰（P99从800ms降至120ms），体现较强的问题解决能力\",\"具备带3人小组的团队领导经验和微服务拆分、分布式事务等架构能力\"],\"weaknesses\":[\"简历内容过于简略，缺少教育背景、工作经历时间线、项目数量等完整信息\",\"未提及数据库优化、监控告警、CI/CD等工程化能力\",\"缺少学历院校、证书、开源贡献等差异化亮点\"],\"summary\":\"这是一位技术扎实、成果可量化的资深Java后端工程师，核心亮点在于高并发系统优化和微服务架构实践，具备初步团队管理能力，综合竞争力较强；但简历呈现过于精简，建议补充完整项目经历与技术细节以提升通过率。\"}",
+    "json_ok": true,
+    "score": 85
+  },
+  {
+    "model": "moonshotai/kimi-k3",
+    "max_tokens": 2048,
+    "http": 200,
+    "ms": 196196,
+    "finish_reason": "stop",
+    "has_reasoning": true,
+    "reasoning_len": 32,
+    "content_len": 0,
+    "usage": {
+      "prompt_tokens": 198,
+      "completion_tokens": 32,
+      "total_tokens": 230,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 32
+      }
+    },
+    "content_head": "",
+    "json_ok": false,
+    "json_err": "Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "max_tokens": 1024,
+    "http": 200,
+    "ms": 8355,
+    "finish_reason": "stop",
+    "has_reasoning": true,
+    "reasoning_len": 759,
+    "content_len": 419,
+    "usage": {
+      "prompt_tokens": 179,
+      "completion_tokens": 502,
+      "total_tokens": 681
+    },
+    "content_head": "{\"score\":85,\"strengths\":[\"扎实的Java后端技术栈（Spring Boot、Spring Cloud、MySQL、Redis、Kafka）\",\"成功主导日活百万电商订单系统重构，显著提升接口性能（P99从800ms降至120ms）\",\"具备微服务拆分经验，带领小团队完成高并发与分布式事务实践\",\"展现出一定的技术领导和项目推动能力\"],\"weaknesses\":[\"简历未提及测试、CI/CD、云原生或容器化经验\",\"缺乏对系统架构设计、性能调优以外的软技能描述（如沟通、需求分析）\",\"未提供教育细节或证书信息，难以判断学术基础深度\",\"经验集中在电商领域，跨域或新技术探索较少\"],\"summary\":\"张三具备扎实的Java后端开发基础和实际的高并发系统优化经验，在性能提升和微服务落地方面表现突出，但简历中对测试、DevOps、软技能及更广泛技术栈的描述不足，整体表现较为强劲，适合中高级后端岗位。\"}",
+    "json_ok": true,
+    "score": 85
+  },
+  {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "max_tokens": 2048,
+    "http": 200,
+    "ms": 16101,
+    "finish_reason": "stop",
+    "has_reasoning": true,
+    "reasoning_len": 1076,
+    "content_len": 360,
+    "usage": {
+      "prompt_tokens": 179,
+      "completion_tokens": 517,
+      "total_tokens": 696
+    },
+    "content_head": "{\"score\":85,\"strengths\":[\"5年Java后端开发经验，技术栈扎实（Spring Boot、Spring Cloud、MySQL、Redis、Kafka）\",\"主导日活百万电商订单系统重构，显著提升性能（P99 latency从800ms降至120ms）\",\"带领3人团队完成微服务拆分，具备高并发与分布式事务实践经验\"],\"weaknesses\":[\"简历中未提及云平台（AWS/GCP/Azure）经验\",\"缺少对测试、CI/CD、DevOps工具链的描述\",\"未展示个人学习或开源贡献，技术深度及广度略显单一\"],\"summary\":\"候选人具备扎实的Java后端基础和显著的性能优化成果，在微服务架构和高并发场景下有实际领导经验，但在云原生、自动化测试及技术社区影响力方面仍有提升空间。\"}",
+    "json_ok": true,
+    "score": 85
+  },
+  {
+    "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "max_tokens": 1024,
+    "http": 200,
+    "ms": 111749,
+    "finish_reason": "length",
+    "has_reasoning": true,
+    "reasoning_len": 3996,
+    "content_len": 105,
+    "usage": {
+      "prompt_tokens": 179,
+      "completion_tokens": 1024,
+      "total_tokens": 1203
+    },
+    "content_head": "{\"score\":87,\"strengths\":[\"Proven performance optimization achieving P99 reduction from 800ms to 120ms\",\"H",
+    "json_ok": false,
+    "json_err": "Unterminated string starting at: line 1 column 104 (char 103)"
+  },
+  {
+    "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "max_tokens": 2048,
+    "http": 200,
+    "ms": 208504,
+    "finish_reason": "stop",
+    "has_reasoning": true,
+    "reasoning_len": 3164,
+    "content_len": 443,
+    "usage": {
+      "prompt_tokens": 179,
+      "completion_tokens": 1433,
+      "total_tokens": 1612
+    },
+    "content_head": "{\"score\":88,\"strengths\":[\"熟练掌握Spring Boot/Spring Cloud生态、MySQL、Redis、Kafka等核心技术\", \"交付了百万级日活电商订单系统重构，P99响应时间从800ms降至120ms，展现出极强的性能优化能力\", \"带领3人团队完成微服务拆分，具备高并发与分布式事务实战经验\"],\"weaknesses\":[\"缺乏明确的CI/CD流程和自动化测试方面的描述\", \"业务影响描述相对侧重技术指标，可进一步阐述对业务收益的贡献\", \"未提及监控告警、日志系统等运维相关经验\"],\"summary\":\"具备5年Java后端开发经验，精通Spring Cloud生态及高并发系统构建，曾主导百万级日活电商订单系统重构，通过性能优化将P99从800ms降至120ms，并带领团队完成微服务拆分。在分布式事务和高并发场景下有实际落地经验，技术栈扎实，具备良好的代码重构与架构优化能力，建议进一步丰富CI/CD、自动化测试及业务影响描述。\"}",
+    "json_ok": true,
+    "score": 88
+  },
+  {
     "model": "openai/gpt-oss-20b",
     "max_tokens": 1024,
     "http": 200,
-    "ms": 16159,
+    "ms": 6941,
     "finish_reason": "stop",
     "has_reasoning": true,
-    "reasoning_len": 1813,
-    "content_len": 367,
+    "reasoning_len": 1160,
+    "content_len": 376,
     "usage": {
       "prompt_tokens": 195,
-      "total_tokens": 937,
-      "completion_tokens": 742,
+      "total_tokens": 673,
+      "completion_tokens": 478,
       "prompt_tokens_details": null
     },
-    "content_head": "{\"score\":87,\"strengths\":[\"丰富的Java后端开发经验\",\"出色的性能优化能力（将P99从800ms降至120ms）\",\"团队领导与项目主导经验\",\"熟练掌握Spring Boot、Spring Cloud等主流框架\",\"具备高并发与分布式事务实践经验\"],\"weaknesses\":[\"缺乏对前端或全栈技术的了解\",\"未提及测试、代码质量或CI/CD实践\",\"缺少对云原生平台（如K8s、Docker）的经验描述\",\"未展示对安全、治理或监控方面的能力\",\"简历中缺少持续学习或技术社区贡献信息\"],\"summary\":\"张三拥有5年Java后端经验，熟悉主流框架并在性能优化与微服务拆分中取得显著成绩，具备一定的团队领导能力。但简历中对云原生、测试、CI/CD以及安全等方面经验描述不足，可进一步完善。\"}",
+    "content_head": "{\"score\":88,\"strengths\":[\"5年Java后端经验，扎实技术栈（Spring Boot、Spring Cloud、MySQL、Redis、Kafka）\",\"主导日活百万电商订单系统重构，显著提升性能（P99从800ms降至120ms）\",\"具备高并发与分布式事务实践经验\",\"具备团队领导能力，成功带领3人团队完成微服务拆分\"],\"weaknesses\":[\"缺乏多语言或跨平台经验\",\"未提及云平台或容器化操作经验（如Docker、Kubernetes）\",\"未提及自动化测试与CI/CD实践\",\"缺乏公开项目或开源贡献记录\"],\"summary\":\"张三的简历展示了扎实的Java后端开发能力和显著的性能优化与团队领导经验，适合中高级后端岗位。若能补充云平台、容器化、自动化测试及开源贡献等方面的细节，将进一步提升竞争力。\"}",
     "json_ok": true,
-    "parsed_keys": [
-      "score",
-      "strengths",
-      "weaknesses",
-      "summary"
-    ],
-    "score": 87
+    "score": 88
   },
   {
     "model": "openai/gpt-oss-20b",
     "max_tokens": 2048,
     "http": 200,
-    "ms": 13666,
+    "ms": 5154,
     "finish_reason": "stop",
     "has_reasoning": true,
-    "reasoning_len": 1359,
-    "content_len": 412,
+    "reasoning_len": 857,
+    "content_len": 356,
     "usage": {
       "prompt_tokens": 195,
-      "total_tokens": 728,
-      "completion_tokens": 533,
+      "total_tokens": 604,
+      "completion_tokens": 409,
       "prompt_tokens_details": null
     },
-    "content_head": "{\"score\":85,\"strengths\":[\"5年Java后端开发经验\",\"熟练掌握Spring Boot、Spring Cloud、MySQL、Redis、Kafka\",\"主导日活百万电商订单系统重构，将下单接口P99从800ms降到120ms\",\"带领3人小组完成微服务拆分\",\"具备高并发与分布式事务实践经验\"],\"weaknesses\":[\"缺乏对单元测试、集成测试和CI/CD流程的描述\",\"未提及云平台（如AWS、Azure、阿里云）使用经验\",\"未展示更大规模团队的领导经验\",\"缺少架构设计与监控系统经验\",\"未列出相关认证或专业培训\"],\"summary\":\"张三在Java后端领域表现突出，具备丰富的高并发系统优化和微服务拆分经验，能在技术层面快速交付并提升系统性能。然而，他在测试、CI/CD、云平台与架构设计等方面的经验相对有限，若能补充这些领域的能力，将更适合承担更高",
+    "content_head": "{\"score\":90,\"strengths\":[\"5年Java后端开发经验\",\"熟悉Spring Boot、Spring Cloud、MySQL、Redis、Kafka\",\"主导日活百万电商订单系统重构，显著提升P99性能\",\"带领3人团队完成微服务拆分，具备高并发与分布式事务实践\"],\"weaknesses\":[\"缺少前端或全栈经验\",\"未提及CI/CD、自动化测试或监控经验\",\"团队规模有限，缺乏更大规模领导经验\"],\"summary\":\"张三是一位具备扎实Java后端技术栈的资深工程师，擅长大规模系统性能优化与微服务架构拆分，拥有实战的高并发与分布式事务经验。虽然在前端或全栈领域经验不足，且团队领导经验相对较小，但他在关键项目中的技术主导与显著业绩证明了其高度的技术能力与解决复杂问题的能力。\"}",
     "json_ok": true,
-    "parsed_keys": [
-      "score",
-      "strengths",
-      "weaknesses",
-      "summary"
-    ],
-    "score": 85
+    "score": 90
+  },
+  {
+    "model": "z-ai/glm-5.3",
+    "max_tokens": 1024,
+    "http": null,
+    "err_head": "TimeoutError:The read operation timed out",
+    "ms": 240571
+  },
+  {
+    "model": "z-ai/glm-5.3",
+    "max_tokens": 2048,
+    "http": null,
+    "err_head": "TimeoutError:The read operation timed out",
+    "ms": 240555
+  },
+  {
+    "model": "z-ai/glm-5.3-flash",
+    "max_tokens": 1024,
+    "http": 200,
+    "ms": 88766,
+    "finish_reason": "stop",
+    "has_reasoning": true,
+    "reasoning_len": 2472,
+    "content_len": 488,
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 981,
+      "total_tokens": 1108,
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 719,
+        "rejected_prediction_tokens": null
+      }
+    },
+    "content_head": "{\"score\":78,\"strengths\":[\"有明确量化成果：主导日活百万级系统重构，P99从800ms降至120ms，说服力强\",\"技术栈与Java后端岗位高度匹配（Spring Boot、Spring Cloud、MySQL、Redis、Kafka）\",\"具备小团队管理经验（带领3人完成微服务拆分），体现技术领导力\",\"有高并发与分布式事务实战背景，符合中高级岗位要求\"],\"weaknesses\":[\"缺少教育背景细节（院校、专业）与完整工作经历（公司、职级、时间线）\",\"高并发与分布式事务仅一笔带过，未说明具体方案（如Seata、TCC、消息最终一致性等）\",\"未体现业务价值指标（如转化率、成本、稳定性提升）及其他项目经历\",\"缺少工程化能力描述（Docker、K8s、CI/CD、监控体系）及证书、开源贡献等加分项\"],\"summary\":\"整体是一份合格偏上的中高级Java后端简历，核心亮点是量化性能优化成果和带团队完成微服务拆分的经历，技术栈匹配度高；但内容较单薄，教育背景、公司履历、技术方案深度和业务价值均有缺失，建议补充细节以提升竞争力。\"}",
+    "json_ok": true,
+    "score": 78
+  },
+  {
+    "model": "z-ai/glm-5.3-flash",
+    "max_tokens": 2048,
+    "http": 200,
+    "ms": 83492,
+    "finish_reason": "stop",
+    "has_reasoning": true,
+    "reasoning_len": 1872,
+    "content_len": 640,
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 773,
+      "total_tokens": 900,
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 429,
+        "rejected_prediction_tokens": null
+      }
+    },
+    "content_head": "{\"score\":75,\"strengths\":[\"有量化成果，如下单接口P99从800ms降至120ms，说服力强\",\"技术栈主流且完整，覆盖Spring Boot/Spring Cloud、MySQL、Redis、Kafka\",\"有日活百万级系统的实战经验，具备高并发与分布式事务落地能力\",\"有带队完成微服务拆分的经验，体现一定的技术领导力\",\"年龄、学历与工作年限匹配合理，职业发展路径清晰\"],\"weaknesses\":[\"缺少教育背景细节（毕业院校、专业），本科信息过于笼统\",\"未提及任职公司及在职时长，履历可信度难以核验\",\"分布式事务经验未说明具体方案（如TCC、Saga、本地消息表等），深度存疑\",\"缺少QPS、数据量、服务数量等更细的规模指标佐证技术难度\",\"未涉及云原生生态（Docker/K8s）、可观测性、CI/CD等工程化能力\",\"仅突出一个项目，其他项目经历与业务成果（如转化率、成本节约）缺失\",\"无软技能、英语水平、开源贡献或技术影响力相关信息\"],\"summary\":\"这是一份质量中上的Java后端简历。核心亮点在于有可量化的性能优化成果（P99降低85%）",
+    "json_ok": true,
+    "score": 75
   }
 ]
