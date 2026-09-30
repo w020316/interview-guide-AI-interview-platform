@@ -340,7 +340,7 @@ class SupabaseStorageServiceTest {
             String publicUrl = service.upload(file, "shot.png");
 
             ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
-            verify(restTemplate).exchange(url.capture(), any(HttpMethod.class),
+            verify(restTemplate).exchange(url.capture(), eq(HttpMethod.PUT),
                     any(HttpEntity.class), eq(String.class));
             assertThat(url.getValue())
                     .isEqualTo("https://test.supabase.co/storage/v1/object/" + BUCKET + "/shot.png")
@@ -359,7 +359,7 @@ class SupabaseStorageServiceTest {
             service.upload(file, "resume.pdf");
 
             ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
-            verify(restTemplate).exchange(url.capture(), any(HttpMethod.class),
+            verify(restTemplate).exchange(url.capture(), eq(HttpMethod.PUT),
                     any(HttpEntity.class), eq(String.class));
             assertThat(url.getValue())
                     .isEqualTo("https://test.supabase.co/storage/v1/object/" + BUCKET + "/resume.pdf")
@@ -374,7 +374,9 @@ class SupabaseStorageServiceTest {
             service.upload(file, "resume.pdf");
 
             ArgumentCaptor<HttpEntity<?>> entity = ArgumentCaptor.forClass(HttpEntity.class);
-            verify(restTemplate).exchange(anyString(), any(HttpMethod.class),
+            // v1.44.3：上传前会先 POST /storage/v1/bucket 建桶，所以这里必须限定 PUT，
+            // 否则会把建桶请求也capture进来（断言的是上传 URL 的规范化，不是建桶）
+            verify(restTemplate).exchange(anyString(), eq(HttpMethod.PUT),
                     entity.capture(), eq(String.class));
             String auth = entity.getValue().getHeaders().getFirst("Authorization");
             assertThat(auth).isEqualTo("Bearer " + SERVICE_KEY);
@@ -540,6 +542,68 @@ class SupabaseStorageServiceTest {
             ArgumentCaptor<HttpEntity<?>> captor = ArgumentCaptor.forClass(HttpEntity.class);
             verify(restTemplate).exchange(anyString(), eq(HttpMethod.PUT), captor.capture(), eq(String.class));
             return captor.getValue().getHeaders();
+        }
+    }
+
+    /**
+     * v1.44.3：应用自己幂等建桶。
+     *
+     * <p>线上附图上传卡在 `404 Bucket not found` —— 与其要求人在 Supabase 控制台点一下，
+     * 不如用应用自己持有的 service key 把桶建出来（`POST /storage/v1/bucket`）。
+     * 这组用例锁住：建桶发生在上传之前、已存在（409）不算错、只建一次、失败不假绿。
+     */
+    @Nested
+    @DisplayName("bucket 幂等自愈")
+    class BucketProvisioning {
+
+        @Test
+        @DisplayName("首次上传前先 POST /storage/v1/bucket，且声明 public")
+        void createsBucketBeforeUpload() throws IOException {
+            service.upload(file, "resume.pdf");
+
+            ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
+            ArgumentCaptor<HttpEntity<?>> entityCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+            verify(restTemplate).exchange(urlCaptor.capture(), eq(HttpMethod.POST),
+                    entityCaptor.capture(), eq(String.class));
+
+            assertThat(urlCaptor.getValue()).endsWith("/storage/v1/bucket");
+            String body = String.valueOf(entityCaptor.getValue().getBody());
+            assertThat(body).contains("\"id\":\"" + BUCKET + "\"");
+            // 必须 public：upload() 返回的是 /object/public/... 公开 URL
+            assertThat(body).contains("\"public\":true");
+        }
+
+        @Test
+        @DisplayName("bucket 已存在（409）不抛异常，上传照常进行")
+        void conflictIsTreatedAsExists() {
+            when(restTemplate.exchange(anyString(), eq(HttpMethod.POST),
+                    any(HttpEntity.class), eq(String.class)))
+                    .thenReturn(new ResponseEntity<>("{\"message\":\"already exists\"}", HttpStatus.CONFLICT));
+
+            assertThatCode(() -> service.upload(file, "resume.pdf")).doesNotThrowAnyException();
+            assertThat(service.healthSnapshot().get("bucketReady")).isEqualTo(true);
+        }
+
+        @Test
+        @DisplayName("建桶只做一次，后续上传不重复请求")
+        void createsBucketOnlyOnce() throws IOException {
+            service.upload(file, "resume.pdf");
+            service.upload(file, "resume2.pdf");
+
+            verify(restTemplate, times(1)).exchange(anyString(), eq(HttpMethod.POST),
+                    any(HttpEntity.class), eq(String.class));
+        }
+
+        @Test
+        @DisplayName("建桶返回非 2xx 时不标记就绪（避免假绿）")
+        void non2xxDoesNotMarkReady() throws IOException {
+            when(restTemplate.exchange(anyString(), eq(HttpMethod.POST),
+                    any(HttpEntity.class), eq(String.class)))
+                    .thenReturn(new ResponseEntity<>("nope", HttpStatus.INTERNAL_SERVER_ERROR));
+
+            service.upload(file, "resume.pdf");
+
+            assertThat(service.healthSnapshot().get("bucketReady")).isEqualTo(false);
         }
     }
 }

@@ -1,0 +1,52 @@
+[
+  {
+    "model": "openai/gpt-oss-20b",
+    "max_tokens": 1024,
+    "http": 200,
+    "ms": 16159,
+    "finish_reason": "stop",
+    "has_reasoning": true,
+    "reasoning_len": 1813,
+    "content_len": 367,
+    "usage": {
+      "prompt_tokens": 195,
+      "total_tokens": 937,
+      "completion_tokens": 742,
+      "prompt_tokens_details": null
+    },
+    "content_head": "{\"score\":87,\"strengths\":[\"丰富的Java后端开发经验\",\"出色的性能优化能力（将P99从800ms降至120ms）\",\"团队领导与项目主导经验\",\"熟练掌握Spring Boot、Spring Cloud等主流框架\",\"具备高并发与分布式事务实践经验\"],\"weaknesses\":[\"缺乏对前端或全栈技术的了解\",\"未提及测试、代码质量或CI/CD实践\",\"缺少对云原生平台（如K8s、Docker）的经验描述\",\"未展示对安全、治理或监控方面的能力\",\"简历中缺少持续学习或技术社区贡献信息\"],\"summary\":\"张三拥有5年Java后端经验，熟悉主流框架并在性能优化与微服务拆分中取得显著成绩，具备一定的团队领导能力。但简历中对云原生、测试、CI/CD以及安全等方面经验描述不足，可进一步完善。\"}",
+    "json_ok": true,
+    "parsed_keys": [
+      "score",
+      "strengths",
+      "weaknesses",
+      "summary"
+    ],
+    "score": 87
+  },
+  {
+    "model": "openai/gpt-oss-20b",
+    "max_tokens": 2048,
+    "http": 200,
+    "ms": 13666,
+    "finish_reason": "stop",
+    "has_reasoning": true,
+    "reasoning_len": 1359,
+    "content_len": 412,
+    "usage": {
+      "prompt_tokens": 195,
+      "total_tokens": 728,
+      "completion_tokens": 533,
+      "prompt_tokens_details": null
+    },
+    "content_head": "{\"score\":85,\"strengths\":[\"5年Java后端开发经验\",\"熟练掌握Spring Boot、Spring Cloud、MySQL、Redis、Kafka\",\"主导日活百万电商订单系统重构，将下单接口P99从800ms降到120ms\",\"带领3人小组完成微服务拆分\",\"具备高并发与分布式事务实践经验\"],\"weaknesses\":[\"缺乏对单元测试、集成测试和CI/CD流程的描述\",\"未提及云平台（如AWS、Azure、阿里云）使用经验\",\"未展示更大规模团队的领导经验\",\"缺少架构设计与监控系统经验\",\"未列出相关认证或专业培训\"],\"summary\":\"张三在Java后端领域表现突出，具备丰富的高并发系统优化和微服务拆分经验，能在技术层面快速交付并提升系统性能。然而，他在测试、CI/CD、云平台与架构设计等方面的经验相对有限，若能补充这些领域的能力，将更适合承担更高",
+    "json_ok": true,
+    "parsed_keys": [
+      "score",
+      "strengths",
+      "weaknesses",
+      "summary"
+    ],
+    "score": 85
+  }
+]

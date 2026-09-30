@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.44.2'
+export const CURRENT_VERSION = '1.44.3'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.44.3',
+    date: '2026-10-01',
+    title: '版本 1.44.3 · 附图上传不再依赖人工配置存储',
+    items: [
+      { text: '模拟面试：作答附图上传现在会在首次使用时自动准备好所需的存储空间，不再需要人工在后台先建好才能用', level: 'user' },
+      { text: '后端：Supabase Storage 增加幂等建桶——首次上传前调用管理接口创建 bucket（声明 public），已存在时按 409 视为成功；健康检查新增 bucketReady 字段便于区分「桶没建」与「密钥/权限问题」', level: 'tech' },
+    ],
+  },
   {
     version: '1.44.2',
     date: '2026-09-30',

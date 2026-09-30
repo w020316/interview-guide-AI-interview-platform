@@ -142,6 +142,70 @@ public class SupabaseStorageService {
         headers.set("Authorization", "Bearer " + key);
     }
 
+    /** bucket 是否已确认存在（v1.44.3）。成功后置 true，避免每次上传都打一次建桶请求。 */
+    private volatile boolean bucketReady = false;
+
+    /**
+     * 幂等地确保 bucket 存在（v1.44.3）。
+     *
+     * <p><b>为什么由应用自己做：</b>线上附图上传卡在
+     * `404 BAD_REQUEST：Bucket not found（NoSuchBucket）` —— 鉴权已通，只是目标 bucket 没建。
+     * 这原本要靠人在 Supabase 控制台点出来，但**应用自己就持有 service key**，
+     * 完全可以在首次上传前用 Storage 管理接口 `POST /storage/v1/bucket` 把桶建出来。
+     * 把「部署时的人工前置条件」变成「代码里的幂等自愈」，少一个会忘记的步骤。
+     *
+     * <p><b>幂等性</b>：桶已存在时 Supabase 返回 `409`，视为成功。
+     * 其余失败（权限不足、网络问题）只记警告并**继续尝试上传** ——
+     * 建桶失败不该让上传直接失败，万一桶其实已经存在呢。
+     *
+     * <p><b>为什么要 public:true</b>：{@link #upload} 返回的是
+     * `/storage/v1/object/public/{bucket}/{path}` 公开 URL，非 public 桶读不回来。
+     */
+    private void ensureBucket() {
+        if (bucketReady) {
+            return;
+        }
+        synchronized (this) {
+            if (bucketReady) {
+                return;
+            }
+            String url = baseUrl() + "/storage/v1/bucket";
+            HttpHeaders headers = new HttpHeaders();
+            applyAuth(headers);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            // bucket 名来自配置，做一次 JSON 转义，避免配置里混进引号破坏请求体
+            String safeBucket = bucket == null ? "" : bucket.replace("\"", "");
+            String body = "{\"id\":\"" + safeBucket + "\",\"name\":\"" + safeBucket + "\",\"public\":true}";
+            try {
+                ResponseEntity<String> resp = restTemplate.exchange(
+                        url, HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
+                // 注意：不能只看「没抛异常」。上游/测试桩都可能返回一个非 2xx 的 ResponseEntity，
+                // 把它当成功会让 bucketReady 变成假绿，后续每次上传都白撞一次。
+                int sc = resp.getStatusCode().value();
+                if (sc >= 200 && sc < 300) {
+                    bucketReady = true;
+                    log.info("Supabase Storage：已创建 bucket「{}」（public）", safeBucket);
+                } else if (sc == 409) {
+                    bucketReady = true;
+                } else {
+                    log.warn("Supabase Storage：bucket「{}」预创建返回 {}，仍将尝试直接上传",
+                            safeBucket, sc);
+                }
+            } catch (org.springframework.web.client.RestClientResponseException e) {
+                if (e.getStatusCode().value() == 409) {
+                    // 已存在 —— 这才是常态，不是错误
+                    bucketReady = true;
+                    return;
+                }
+                log.warn("Supabase Storage：bucket「{}」预创建失败（{}），仍将尝试直接上传：{}",
+                        safeBucket, e.getStatusCode(), brief(e.getResponseBodyAsString()));
+            } catch (Exception e) {
+                log.warn("Supabase Storage：bucket「{}」预创建异常，仍将尝试直接上传：{}",
+                        safeBucket, e.getMessage());
+            }
+        }
+    }
+
     /**
      * 最近一次上传失败的原始原因（含上游状态码与响应体摘要），供健康检查自诊断。
      *
@@ -202,6 +266,8 @@ public class SupabaseStorageService {
         m.put("status", status);
         m.put("configured", ok);
         m.put("bucket", bucket);
+        // v1.44.3：暴露「桶是否已确认存在」，便于区分「桶没建」与「key/权限问题」
+        m.put("bucketReady", bucketReady);
         if (lastError != null) {
             m.put("lastError", lastError);
             m.put("lastFailureKind", lastFailureKind.name());
@@ -235,6 +301,8 @@ public class SupabaseStorageService {
         }
         // 文件名清洗：只保留字母、数字、点、下划线、连字符，防止路径穿越
         String safeName = fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+        // v1.44.3：首次上传前幂等建桶 —— 把「部署时的人工前置条件」变成代码里的自愈
+        ensureBucket();
         // Supabase Storage REST API: PUT /storage/v1/object/<bucket>/<path>
         // 必须用 baseUrl()（已 trim 掉尾随换行/空格），否则会拼出含 %0A 的主机名
         String uploadUrl = baseUrl() + "/storage/v1/object/" + bucket + "/" + safeName;
@@ -258,8 +326,14 @@ public class SupabaseStorageService {
             // RestTemplate 默认对 4xx/5xx 直接抛异常，走到这里才是常态；
             // 原实现把「非 2xx」判断写在 exchange 之后，是一段永远执行不到的死代码，
             // 真实状态码与响应体（bucket 不存在 / key 无效 / 被 RLS 拒绝 等）就此丢失
-            lastError = "上游返回 " + e.getStatusCode() + "：" + brief(e.getResponseBodyAsString());
+            String upstream = e.getResponseBodyAsString();
+            lastError = "上游返回 " + e.getStatusCode() + "：" + brief(upstream);
             lastFailureKind = FailureKind.UPSTREAM;
+            // v1.44.3：若上游说桶不存在，说明我们的预创建判断过期了（桶可能被删），
+            // 清掉标记，让下一次上传重新尝试建桶 —— 否则会一直卡在同一个错误上。
+            if (upstream != null && upstream.contains("NoSuchBucket")) {
+                bucketReady = false;
+            }
             throw new IllegalStateException("Supabase 文件上传失败：" + lastError, e);
         } catch (org.springframework.web.client.ResourceAccessException e) {
             // 域名解析失败 / 连接超时 / TLS 失败 —— 多为配置指向了不存在的域名
