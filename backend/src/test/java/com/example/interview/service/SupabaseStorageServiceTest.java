@@ -497,4 +497,49 @@ class SupabaseStorageServiceTest {
             assertThat(snap.get("lastFailureKind")).isEqualTo("CONFIG_INVALID");
         }
     }
+
+    /**
+     * v1.44.2：Supabase 鉴权头必须带 `apikey`。
+     *
+     * <p>线上作答附图 100% 失败的根因就是只发了 `Authorization: Bearer` 而**没有 `apikey`**；
+     * 新版密钥（`sb_secret_…`）不是 JWS，被上游判 `403 Invalid Compact JWS`。
+     * 这组用例锁住「两种密钥格式都要能工作」，避免以后有人把 `apikey` 又删掉。
+     */
+    @Nested
+    @DisplayName("鉴权头：兼容 JWT 与新版密钥")
+    class Auth {
+
+        @Test
+        @DisplayName("JWT 形态密钥：apikey 与 Authorization Bearer 都发")
+        void jwtKey_sendsBothHeaders() throws IOException {
+            ReflectionTestUtils.setField(service, "serviceKey", "eyJhbGciOiJIUzI1NiJ9.abc.def");
+
+            service.upload(file, "resume.pdf");
+
+            HttpHeaders headers = capturedUploadHeaders();
+            assertThat(headers.getFirst("apikey")).isEqualTo("eyJhbGciOiJIUzI1NiJ9.abc.def");
+            assertThat(headers.getFirst("Authorization"))
+                    .isEqualTo("Bearer eyJhbGciOiJIUzI1NiJ9.abc.def");
+        }
+
+        @Test
+        @DisplayName("新版密钥（sb_ 前缀）不是 JWS：只发 apikey")
+        void newStyleKey_sendsApikeyOnly() throws IOException {
+            ReflectionTestUtils.setField(service, "serviceKey", "sb_secret_abcdef123456");
+
+            service.upload(file, "resume.pdf");
+
+            HttpHeaders headers = capturedUploadHeaders();
+            assertThat(headers.getFirst("apikey")).isEqualTo("sb_secret_abcdef123456");
+            // 关键：非 JWS 的密钥绝不能进 Authorization，否则上游报 Invalid Compact JWS
+            assertThat(headers.getFirst("Authorization")).isNull();
+        }
+
+        /** 捕获最近一次上传请求的头，供上面的用例断言 */
+        private HttpHeaders capturedUploadHeaders() {
+            ArgumentCaptor<HttpEntity<?>> captor = ArgumentCaptor.forClass(HttpEntity.class);
+            verify(restTemplate).exchange(anyString(), eq(HttpMethod.PUT), captor.capture(), eq(String.class));
+            return captor.getValue().getHeaders();
+        }
+    }
 }

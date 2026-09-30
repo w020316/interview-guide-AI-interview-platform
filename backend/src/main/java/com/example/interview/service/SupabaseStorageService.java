@@ -118,6 +118,31 @@ public class SupabaseStorageService {
     }
 
     /**
+     * 写入 Supabase 鉴权头（v1.44.2）。
+     *
+     * <p><b>为什么不能只发 `Authorization`：</b>Supabase Storage REST 一直要求 `apikey` 头。
+     * 老版密钥是 JWT（`eyJ…`），放进 `Authorization: Bearer` 能过；而新版密钥
+     * （`sb_secret_…` / `sb_publishable_…`）**不是 JWS**，被塞进 Bearer 后上游会直接
+     * 判 `403 Invalid Compact JWS` —— 线上作答附图 100% 失败就是这个原因
+     * （见 `GET /api/health/detail` 的 storage.lastError）。
+     *
+     * <p><b>规则：</b>
+     * <ul>
+     *   <li>JWT 形态：`apikey` 与 `Authorization: Bearer` 都发（与 Supabase 官方示例一致）；</li>
+     *   <li>新版密钥（`sb_` 前缀）：**只发 `apikey`**，不让上游去解析一个不是 JWS 的 Bearer。</li>
+     * </ul>
+     * 这样两种密钥格式都能工作，部署侧换不换密钥都不影响。
+     */
+    private void applyAuth(HttpHeaders headers) {
+        String key = serviceKey();
+        headers.set("apikey", key);
+        if (key.startsWith("sb_")) {
+            return;
+        }
+        headers.set("Authorization", "Bearer " + key);
+    }
+
+    /**
      * 最近一次上传失败的原始原因（含上游状态码与响应体摘要），供健康检查自诊断。
      *
      * <p>此前上传失败的真实原因（上游 4xx/5xx 的响应体、DNS 解析失败等）只落在
@@ -215,7 +240,7 @@ public class SupabaseStorageService {
         String uploadUrl = baseUrl() + "/storage/v1/object/" + bucket + "/" + safeName;
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + serviceKey());
+        applyAuth(headers);
         headers.setContentType(MediaType.parseMediaType(
                 file.getContentType() != null ? file.getContentType() : "application/octet-stream"
         ));
@@ -309,7 +334,7 @@ public class SupabaseStorageService {
             String signUrl = baseUrl() + "/storage/v1/object/sign/" + path;
 
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + serviceKey());
+            applyAuth(headers);
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> entity = new HttpEntity<>("{\"expiresIn\":" + ttlSeconds + "}", headers);
 

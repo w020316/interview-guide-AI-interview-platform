@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.44.1'
+export const CURRENT_VERSION = '1.44.2'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.44.2',
+    date: '2026-09-30',
+    title: '版本 1.44.2 · 作答附图上传的鉴权方式修正',
+    items: [
+      { text: '模拟面试：修正作答附图上传失败的问题——向存储服务发送鉴权信息的方式与新版密钥格式不兼容，导致图片始终上传不成功。现已同时兼容新旧两种密钥格式', level: 'user' },
+      { text: '后端：Supabase Storage 请求补上 apikey 头；新版密钥（sb_ 前缀）不再放进 Authorization——它不是 JWS，会被上游判 Invalid Compact JWS（这正是线上附图上传 100% 失败的直接原因）', level: 'tech' },
+    ],
+  },
   {
     version: '1.44.1',
     date: '2026-09-30',
