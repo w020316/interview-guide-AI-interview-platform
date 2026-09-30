@@ -10,6 +10,8 @@ import {
   copyResultHint,
   copyText,
   COPY_LINK_LABEL,
+  MANUAL_COPY_HINT,
+  openFailedHint,
   HANDOFF_WINDOW_MS,
 } from './appLaunch'
 
@@ -209,6 +211,35 @@ describe('utils/appLaunch · 仅电脑可用的网页版入口', () => {
 
   it('文案不含 em-dash（设计系统禁令）', () => {
     for (const s of [desktopOnlyWebHint('微信'), copyResultHint(true), copyResultHint(false), COPY_LINK_LABEL]) {
+      expect(s).not.toMatch(/[—–]/)
+    }
+  })
+})
+
+/**
+ * v1.44.1：v1.44.0 把「微信网页版只在电脑可用」这条死路修好了，
+ * 但同一类「产品承诺了一件做不到的事」的缺陷还有两处，这组用例把它们锁住。
+ */
+describe('utils/appLaunch · v1.44.1 承诺与事实一致', () => {
+  it('复制失败文案要求「长按下方链接」，必须与视图里真实渲染的元素配套', () => {
+    // 视图侧约定：copyFailedKey 命中时渲染 <code class="ex-url">{{ s.webUrl }}</code>。
+    // v1.44.0 只改了文案、没给元素 —— 用户被要求长按一个页面上不存在的东西。
+    expect(copyResultHint(false)).toBe(MANUAL_COPY_HINT)
+    expect(MANUAL_COPY_HINT).toContain('长按')
+    expect(MANUAL_COPY_HINT).toContain('链接')
+  })
+
+  it('网页版没能打开时不再断言「已为你打开」', () => {
+    // window.open 被宿主 WebView 拦截时返回 null，此时说「已为你打开」是假承诺。
+    const s = openFailedHint('微信')
+    expect(s).toContain('未能自动打开')
+    expect(s).not.toContain('已为你打开')
+    // 必须给出可执行的下一步，而不是只说「失败了」
+    expect(s).toContain('打开网页版')
+  })
+
+  it('新增文案同样不含 em-dash（设计系统禁令）', () => {
+    for (const s of [MANUAL_COPY_HINT, openFailedHint('QQ')]) {
       expect(s).not.toMatch(/[—–]/)
     }
   })

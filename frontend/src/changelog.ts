@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.44.0'
+export const CURRENT_VERSION = '1.44.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.44.1',
+    date: '2026-09-30',
+    title: '版本 1.44.1 · 取件失败时不再让你执行做不到的操作',
+    items: [
+      { text: '简历分析：自动复制「微信文件传输助手」地址失败时，页面会直接把地址显示出来供你长按选择。此前只提示「请长按下方链接手动复制」，而页面上并没有那条链接，等于让你去长按一个不存在的东西', level: 'user' },
+      { text: '简历分析：在微信、钉钉等内置浏览器里点 QQ / 钉钉 / WPS 等入口时，如果弹窗被拦住，提示会如实说「未能自动打开」并指引你点下方入口，不再先告诉你「已为你打开」却什么也没发生', level: 'user' },
+      { text: '简历分析：手机上「复制链接，到电脑浏览器打开」这条唯一的出路更好点了——可点高度从 19 像素加到 36 像素，文字颜色对比度也提到无障碍标准以上', level: 'user' },
+    ],
+  },
   {
     version: '1.44.0',
     date: '2026-09-26',

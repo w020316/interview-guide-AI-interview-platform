@@ -75,7 +75,10 @@
 
                    v1.44.0：若该来源的网页版**只在电脑上可用**而当前是移动端，
                    这里改成「复制链接」——同一个地址在手机上打开只会被它自己拒绝，
-                   继续当链接给出就是把用户送进死路。 -->
+                   继续当链接给出就是把用户送进死路。
+
+                   v1.44.1：复制失败时提示说「请长按下方链接手动复制」，那就必须真的
+                   把地址渲染出来（`.ex-url`）。只改文案不给元素，等于把死路往下挪一层。 -->
               <button
                 v-if="isMobileBlockedWebEntry(s.webOnlyOnDesktop, isMobile)"
                 class="ex-fallback ex-fallback-btn"
@@ -91,6 +94,12 @@
                 target="_blank"
                 rel="noopener"
               >{{ fallbackLabel(s) }}</a>
+              <!-- 复制失败时的可长按文本：让「请长按下方链接」这句指令可执行 -->
+              <code
+                v-if="copyFailedKey === s.key"
+                class="ex-url"
+                @click="copyWebUrl(s)"
+              >{{ s.webUrl }}</code>
             </div>
           </div>
 
@@ -327,7 +336,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
@@ -345,6 +354,7 @@ import {
   inAppBrowserHint,
   isMobileBlockedWebEntry,
   launchFallbackHint,
+  openFailedHint,
   HANDOFF_WINDOW_MS,
 } from '../utils/appLaunch'
 import renderMarkdown from '../utils/markdown'
@@ -457,16 +467,32 @@ const EXTRACT_SOURCES: ExtractSource[] = [
 ]
 
 const nativeFileInput = ref<HTMLInputElement | null>(null)
-const isMobile = ref(false)
+/**
+ * 环境判定（v1.44.1）。
+ *
+ * 原实现把这两个值放在 `onMounted` 里赋值，**首帧渲染时 `isMobile=false`** ——
+ * 手机上会先按桌面分支画出「打开网页版」直链，下一帧才切成「复制链接」。
+ * 虽然 Vue 在 `onMounted` 改 ref 会于微任务内重渲染、用户基本看不到那一帧，
+ * 但「先画错再改对」本身是不必要的风险，且会让任何基于首屏的自动化断言读到错误分支。
+ * `detectMobile` / `detectInAppBrowser` 都做了 `typeof navigator === 'undefined'` 保护，可直接在初始化求值。
+ */
+const isMobile = ref(detectMobile())
 /** 唤起中的软件 key（按钮态反馈，避免用户以为点击没生效而重复点） */
 const launchingKey = ref('')
 /** 唤起未交棒成功、需要用户走网页版兜底的软件 key */
 const failedKey = ref('')
 /**
+ * 复制失败、需要用户手动长按链接的软件 key（v1.44.1）。
+ *
+ * 设置后视图会**把地址渲染成可选中的文本**（`.ex-url`），
+ * 否则 `copyResultHint(false)` 那句「请长按下方链接」指向一个页面上不存在的元素。
+ */
+const copyFailedKey = ref('')
+/**
  * 宿主 WebView 标识（微信 / 钉钉 / 支付宝 / 微博 / QQ）。
  * 这些宿主会拦截 App scheme，按普通移动端处理必然误报「未检测到 App」。
  */
-const inAppHost = ref('')
+const inAppHost = ref(detectInAppBrowser())
 
 /** 触发原生文件选择（桌面打开文件管理器；iOS/Android 打开「文件」App，可进 iCloud / 云盘取件） */
 function triggerFilePicker() {
@@ -499,6 +525,7 @@ function onNativeFile(e: Event) {
  */
 function openExtractSource(s: ExtractSource) {
   failedKey.value = ''
+  copyFailedKey.value = ''
 
   // 手机上打不开的网页版：不打开，直接给出真的能走的路。
   // 高亮该卡片，让下方那条常驻入口同步切换成「复制链接」。
@@ -509,15 +536,14 @@ function openExtractSource(s: ExtractSource) {
   }
 
   if (!isMobile.value || !s.scheme) {
-    window.open(s.webUrl, '_blank', 'noopener')
+    openWebEntry(s)
     return
   }
 
   // 宿主 WebView：scheme 会被拦截，页面永远 visible，按原逻辑必然误报
   if (inAppHost.value) {
     failedKey.value = s.key
-    ElMessage.info(inAppBrowserHint(s.name, inAppHost.value))
-    window.open(s.webUrl, '_blank', 'noopener')
+    openWebEntry(s, inAppBrowserHint(s.name, inAppHost.value))
     return
   }
 
@@ -541,6 +567,36 @@ function openExtractSource(s: ExtractSource) {
 }
 
 /**
+ * 打开网页版入口，并按**实际结果**给提示（v1.44.1）。
+ *
+ * 宿主 WebView（微信/钉钉）会拦截弹窗，此时 `window.open` 返回 `null`、页面毫无变化。
+ * 原实现无论成败都先说「已为你打开网页版入口」—— 断言了一件没发生的事，
+ * 与 v1.44.0 修掉的「承诺一条走不通的路」是同一类缺陷。
+ *
+ * ⚠️ 这里**不能**传 `'noopener'`：按规范，带 `noopener` 时 `window.open` 一律返回 `null`，
+ * 返回值就再也无法用来判断「到底有没有被拦」。改为拿到窗口后手动清 `opener`。
+ */
+function openWebEntry(s: ExtractSource, openingHint?: string) {
+  let opened: Window | null = null
+  try {
+    opened = window.open(s.webUrl, '_blank')
+  } catch {
+    opened = null
+  }
+  if (opened) {
+    try {
+      opened.opener = null
+    } catch {
+      // 跨域时可能抛错，忽略：opener 只是加固，不影响主流程
+    }
+    if (openingHint) ElMessage.info(openingHint)
+    return
+  }
+  // 没拿到窗口句柄 = 被拦下了，此时说「已为你打开」是假承诺
+  ElMessage.warning(openFailedHint(s.name))
+}
+
+/**
  * 卡片下方那条常驻入口的文案。
  *
  * 之所以要按分支取文案：应用内浏览器里**根本没有尝试跳转**（scheme 被宿主拦下），
@@ -551,17 +607,21 @@ function fallbackLabel(s: ExtractSource): string {
   return inAppHost.value ? '打开网页版入口 →' : '未自动跳转？点此打开网页版 →'
 }
 
-/** 复制网页版地址（手机上打不开时，这是真正能走通的那条路） */
+/**
+ * 复制网页版地址（手机上打不开时，这是真正能走通的那条路）。
+ *
+ * 失败时把地址**渲染成可选中的文本**（`copyFailedKey`），
+ * 否则提示里的「请长按下方链接」会指向一个页面上不存在的元素（v1.44.1）。
+ */
 async function copyWebUrl(s: ExtractSource) {
   const ok = await copyText(s.webUrl)
+  copyFailedKey.value = ok ? '' : s.key
   if (ok) ElMessage.success(copyResultHint(true))
   else ElMessage.warning(copyResultHint(false))
 }
 
-onMounted(() => {
-  isMobile.value = detectMobile()
-  inAppHost.value = detectInAppBrowser()
-})
+// 环境判定（isMobile / inAppHost）已在 ref 初始化时求值（v1.44.1），
+// 不再放 onMounted：那会让首帧按桌面分支渲染，手机上先画出「打开网页版」直链。
 
 // 优化简历相关状态
 const optimizing = ref(false)
@@ -1148,10 +1208,12 @@ function formatDate() {
 .ex-fallback {
   display: block;
   margin: 0 12px 8px;
-  padding: 3px 0 0;
-  font-size: 11.5px;
+  padding: 8px 0 2px;
+  font-size: 12.5px;
   font-weight: 500;
-  color: var(--c-text-tertiary);
+  /* v1.44.1：原来用 --c-text-tertiary（#78716c）压在 --c-bg-alt 上只有 4.40:1，
+     低于 WCAG AA 的 4.5:1。改用 secondary 令牌，对比度约 9:1，且随主题切换。 */
+  color: var(--c-text-secondary);
   text-decoration: none;
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
@@ -1174,9 +1236,16 @@ function formatDate() {
 }
 
 /* 「复制链接」形态（v1.44.0）：手机上打不开的网页版，用复制代替打开。
-   视觉与 <a> 形态的 ex-fallback 保持一致，避免同一位置出现两种气质。 */
+   视觉与 <a> 形态的 ex-fallback 保持一致，避免同一位置出现两种气质。
+
+   v1.44.1：实测可点高度只有 19px（移动端建议 ≥44px，本项目按 36px 起步），
+   且它是这一屏**唯一能走通**的入口 —— 手指点不中等于又一条死路。
+   改成 flex + min-height，并让整个宽度都可点。 */
 .ex-fallback-btn {
+  display: flex;
+  align-items: center;
   width: calc(100% - 24px);
+  min-height: 36px;
   text-align: left;
   font-family: var(--font-sans);
   background: transparent;
@@ -1185,7 +1254,28 @@ function formatDate() {
 }
 
 .ex-fallback-btn.prominent {
+  justify-content: center;
   text-align: center;
+}
+
+/* 复制失败时暴露出的原始地址（v1.44.1）。
+   提示语让用户「长按下方链接手动复制」，这里就是那个可长按的元素 —— 缺了它，
+   整条出路在复制失败时就断掉了。 */
+.ex-url {
+  display: block;
+  margin: 0 12px 8px;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--c-text-secondary);
+  background: var(--c-bg-alt);
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+  /* 允许长按选中：这是「手动复制」这条路的唯一交互 */
+  user-select: all;
+  -webkit-user-select: all;
+  cursor: text;
 }
 
 .extract-actions {

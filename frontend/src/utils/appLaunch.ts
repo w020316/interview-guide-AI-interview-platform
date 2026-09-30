@@ -186,9 +186,31 @@ export function desktopOnlyWebHint(name: string): string {
 /** 「手机上打不开」时，卡片下方兜底入口的替代文案（改为复制链接） */
 export const COPY_LINK_LABEL = '复制链接，到电脑浏览器打开 →'
 
+/**
+ * 复制失败时的提示（v1.44.1）。
+ *
+ * 这句话要求用户「长按下方链接」，因此**视图必须真的把地址渲染成可选中的文本**。
+ * v1.44.0 只改了文案、没给可长按的元素：兜底入口是个没有 href 的 `<button>`，
+ * 地址仅存在于 `<a>` 的 `:href` 属性里，屏幕上根本看不到 —— 用户拿到一条
+ * 无法执行的指令，等于把 v1.44.0 修好的死路又往下挪了一层。
+ * 现在由 `ResumeView` 在失败时渲染 `.ex-url` 文本，文案与页面事实一致。
+ */
+export const MANUAL_COPY_HINT = '自动复制失败，请长按下方链接手动复制'
+
 /** 复制结果提示 */
 export function copyResultHint(ok: boolean): string {
-  return ok ? '链接已复制，可粘贴到电脑浏览器打开' : '自动复制失败，请长按下方链接手动复制'
+  return ok ? '链接已复制，可粘贴到电脑浏览器打开' : MANUAL_COPY_HINT
+}
+
+/**
+ * 网页版入口没能打开时的提示（v1.44.1）。
+ *
+ * 为什么不再说「已为你打开」：`window.open` 在宿主 WebView（微信/钉钉）里
+ * 可能被弹窗拦截并返回 `null`，此时页面什么也没发生，文案却已经断言「已打开」。
+ * 检测不出「有没有打开」就不要断言，这与 {@link launchFallbackHint} 是同一条原则。
+ */
+export function openFailedHint(name: string): string {
+  return `未能自动打开「${name}」的网页版，请点卡片下方的「打开网页版」再试一次`
 }
 
 /**
