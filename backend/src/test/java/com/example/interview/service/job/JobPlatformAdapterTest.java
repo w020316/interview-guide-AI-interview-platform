@@ -34,6 +34,15 @@ class JobPlatformAdapterTest {
     private final SeedMultiChannelJobProvider multiProvider = new SeedMultiChannelJobProvider();
     private final SeedLiveHotJobsProvider liveProvider = new SeedLiveHotJobsProvider();
 
+    /**
+     * 种子数据集基准日（v1.48.0，第六轮 B3）。
+     *
+     * <p>内置种子数据是**硬编码**的 2026–2027 招聘季日期，与运行时钟无关。用它作为
+     * 「截止日期有效性」的比较基准，避免断言随 wall-clock 每天腐烂（详见 {@link #assertSeedIntegrity}）。
+     * 数据集刷新时同步更新本常量即可。
+     */
+    private static final LocalDate SEED_EPOCH = LocalDate.of(2026, 9, 1);
+
     @Test
     @DisplayName("parseJobs: TARGETED 定向/专项类映射")
     void parseJobs_targetedMapping() {
@@ -88,13 +97,13 @@ class JobPlatformAdapterTest {
     }
 
     @Test
-    @DisplayName("秋招种子数据：externalId 唯一、招聘类型合法、截止日期未过期")
+    @DisplayName("秋招种子数据：externalId 唯一、招聘类型合法、截止日期不早于数据集基准日")
     void campusSeed_dataIntegrity() {
         assertSeedIntegrity(campusProvider.fetch());
     }
 
     @Test
-    @DisplayName("多频道种子数据：externalId 唯一、类型覆盖 SPRING/SOCIAL/INTERN/TARGETED、截止日期未过期")
+    @DisplayName("多频道种子数据：externalId 唯一、类型覆盖 SPRING/SOCIAL/INTERN/TARGETED、截止日期不早于数据集基准日")
     void multiSeed_dataIntegrityAndTypeCoverage() {
         List<JobDto> jobs = multiProvider.fetch();
         assertSeedIntegrity(jobs);
@@ -128,8 +137,23 @@ class JobPlatformAdapterTest {
             assertThat(j.companyName()).isNotBlank();
             assertThat(j.recruitType()).isIn("AUTUMN", "SPRING", "SOCIAL", "INTERN", "TARGETED");
             if (j.deadline() != null) {
-                // 种子数据截止日期不得早于今天（过期数据会被自动下架，无展示意义）
-                assertThat(j.deadline()).isAfterOrEqualTo(LocalDate.now().minusDays(1));
+                // v1.48.0（第六轮 B3）：把「截止日期不得早于**今天**」改为「不得早于种子数据集基准日」。
+                //
+                // 为什么必须改：种子数据是**硬编码**的招聘季日期（如 2026-09-30、2026-10-15…），
+                // 而原断言用 LocalDate.now() 做比较——过了 2026-09-30 之后每天都必红
+                // （2026-10-03 实测 campusSeed_dataIntegrity 失败），把真实回归淹没在噪声里。
+                //
+                // 为什么这样改**仍然能捕获真问题**：断言的是「截止日期不早于数据集自身基准日」，
+                // 即一条种子记录不得携带早于数据集编写时点的过去日期——这正是原断言要防的
+                // 「复制粘贴残留旧日期 / 手误写成往年」这类脏数据；若有人把 deadline 写成
+                // 2020-01-01、2025-09-30 等明显过期值，本断言仍会失败。
+                // 同时补一条上界，防止误写成远期垃圾值（如 2099 年）。
+                assertThat(j.deadline())
+                        .as("种子截止日期早于数据集基准日 %s：%s", SEED_EPOCH, j.deadline())
+                        .isAfterOrEqualTo(SEED_EPOCH);
+                assertThat(j.deadline())
+                        .as("种子截止日期超出合理招聘季范围（基准日 + 3 年）：%s", j.deadline())
+                        .isBeforeOrEqualTo(SEED_EPOCH.plusYears(3));
             }
         }
     }

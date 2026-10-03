@@ -1010,12 +1010,12 @@ onMounted(() => {
 }
 
 .deadline.urgent {
-  color: #dc2626;
+  color: var(--c-danger);
   font-weight: 600;
 }
 
 .deadline.closed {
-  color: #aaa;
+  color: var(--c-text-quaternary);
   text-decoration: line-through;
 }
 

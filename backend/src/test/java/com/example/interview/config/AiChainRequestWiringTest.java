@@ -102,7 +102,7 @@ class AiChainRequestWiringTest {
 
         AiConfig config = new AiConfig();
         ChatModel model = config.fallbackChatModel(
-                props, RestClient.builder(), WebClient.builder(), 1L, 2L,
+                props, RestClient.builder(), WebClient.builder(), 1L, 2L, true, 2,
                 "https://apihub.agnes-ai.com", "sk-placeholder", "agnes-2.5-flash");
         assertThat(model).isInstanceOf(FallbackChatModel.class);
 

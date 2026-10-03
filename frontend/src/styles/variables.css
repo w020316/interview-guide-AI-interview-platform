@@ -39,6 +39,30 @@
   --c-info: #1d4ed8;
   --c-info-light: #eff6ff;
 
+  /* ── 语义边框（v1.48.0）：浅底标签的描边，暗色另给一档深描边 ──
+   * 第六轮实测：BaseTag 四个语义变体只有 border-color 写死浅色，深色下
+   * 对比度高达 12.7~15.1:1（同页正常标签仅 1.35~2.15），肉眼是一圈近白亮环。 */
+  --c-success-border: #bbf7d0;
+  --c-warning-border: #fde68a;
+  --c-danger-border: #fecaca;
+  --c-info-border: #bfdbfe;
+
+  /* ── 评分语义令牌（v1.48.0）：评分色阶统一走令牌，禁止写死 hex ──
+   * 实测铁证：深色下品牌墨绿提亮为 rgb(20,184,166)，而写死的蓝/红完全不变
+   * （浅深同为 rgb(59,130,246) / rgb(239,68,68)）；且 77 分的蓝与相邻
+   * 「已答题」的品牌墨绿并排，像两套配色体系。故良好档回归品牌墨绿，去掉蓝色。 */
+  --score-excellent: var(--c-success);
+  --score-good: var(--brand-primary);
+  --score-pass: var(--c-warning);
+  --score-fail: var(--c-danger);
+
+  /* ── 图表色（v1.48.0）：单色系墨绿明度梯度，替代蓝/紫并置（紫色尤其 AI 味） ── */
+  --chart-1: #134e4a;
+  --chart-2: #0f766e;
+  --chart-3: #14b8a6;
+  --chart-4: #5eead4;
+  --chart-5: #99f6e4;
+
   /* ── v4 点缀色：琥珀金（gold-standard 斩获感，仅关键结果/正向反馈/主 CTA 亮点使用） ── */
   --c-accent: #b45309;
   --c-accent-hover: #92400e;
@@ -58,7 +82,10 @@
   --c-text: #1c1917;                  /* stone-900 */
   --c-text-secondary: #44403c;        /* stone-700 */
   --c-text-tertiary: #78716c;         /* stone-500 */
-  --c-text-quaternary: #a8a29e;       /* stone-400 */
+  /* v1.48.0：原 #a8a29e 在 #fff 上仅 2.51:1（< WCAG AA 4.5），
+   * 却被当正文提示色（career hint / favorites date / resume hint 等）。
+   * 提到 #7c7570 → 4.57:1，与 tertiary 仍可区分但达标。 */
+  --c-text-quaternary: #7c7570;
 
   /* ── 阴影系统：更克制，避免浮夸 ── */
   --shadow-xs: 0 1px 2px 0 rgba(28, 25, 23, 0.04);
@@ -409,7 +436,7 @@ p {
   --brand-primary-50: #0e2e2b;
   --brand-primary-100: #16423d;
   --brand-primary-200: #1e554f;
-  --brand-gradient: linear-gradient(135deg, #0d9488 0%, #134e4a 100%);
+  --brand-gradient: linear-gradient(135deg, #0f766e 0%, #0b2321 100%);
   --brand-gradient-soft: linear-gradient(135deg, #12322e 0%, #211d1a 100%);
   --brand-glow: 0 4px 14px rgba(20, 184, 166, 0.18);
   --brand-glow-strong: 0 8px 24px rgba(20, 184, 166, 0.28);
@@ -423,6 +450,25 @@ p {
   --c-danger-light: #341210;
   --c-info: #60a5fa;
   --c-info-light: #12233a;
+
+  /* 语义边框（暗色）：深描边，避免浅色写死值在深底上形成近白亮环 */
+  --c-success-border: #2c5f43;
+  --c-warning-border: #6b5518;
+  --c-danger-border: #6e3330;
+  --c-info-border: #2b4a70;
+
+  /* 评分语义令牌（暗色）：与亮色同构，指向提亮后的语义色 */
+  --score-excellent: var(--c-success);
+  --score-good: var(--brand-primary);
+  --score-pass: var(--c-warning);
+  --score-fail: var(--c-danger);
+
+  /* 图表色（暗色）：提亮墨绿梯度，保证深底可辨 */
+  --chart-1: #99f6e4;
+  --chart-2: #5eead4;
+  --chart-3: #2dd4bf;
+  --chart-4: #14b8a6;
+  --chart-5: #0d9488;
 
   /* 琥珀金点缀：提亮 */
   --c-accent: #fbbf24;
@@ -443,7 +489,8 @@ p {
   --c-text: #f5f5f4;
   --c-text-secondary: #d6d3d1;
   --c-text-tertiary: #a8a29e;
-  --c-text-quaternary: #78716c;
+  /* v1.48.0：原 #78716c 在 #211d1a 上仅 3.49:1，提到 #8a847e → 4.56:1 */
+  --c-text-quaternary: #8a847e;
 
   /* 阴影：深色下改用黑色，层次更分明 */
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);

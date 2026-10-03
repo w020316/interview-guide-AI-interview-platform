@@ -20,6 +20,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -150,5 +151,19 @@ class StoryBankControllerTest {
         mockMvc.perform(delete("/api/story-bank/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/story-bank/{id}：不存在返回 HTTP 404 + code 404（v1.48.0 修正 503 误用）")
+    void delete_notFound_returns404() throws Exception {
+        loginAs("user-1");
+        // service 在故事不存在/非本人时抛 ResourceNotFoundException（此前抛 BusinessException → 503）
+        doThrow(new com.example.interview.common.ResourceNotFoundException("故事不存在或无权操作"))
+                .when(storyBankService).delete(eq("user-1"), eq(999999999L));
+
+        mockMvc.perform(delete("/api/story-bank/999999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("故事不存在或无权操作"));
     }
 }

@@ -5,19 +5,19 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <div class="hero-badge fade-in-up">
-            <span>AI 驱动的面试准备平台</span>
+            <span>秋招求职工作台</span>
           </div>
           <h1 class="hero-title fade-in-up" style="animation-delay: 80ms">
-            让每一次面试<br />
-            <span class="hero-em">都有备而来</span>
+            秋招求职<br />
+            <span class="hero-em">一个工作台就够了</span>
           </h1>
           <p class="hero-subtitle fade-in-up" style="animation-delay: 160ms">
-            上传简历获得 AI 多维度评分，生成个性化面试题，
-            实时流式提示与自动评估，助你高效备战求职季。
+            招聘广场聚合 4000+ 岗位，投递看板盯住每一次投递与回复，求职诊断帮你挖出长处——
+            从找岗位、投递到模拟面试与复盘，秋招全流程都在这里完成。
           </p>
           <div class="hero-actions fade-in-up" style="animation-delay: 240ms">
-            <BaseButton variant="primary" size="lg" shadow="sm" hoverable @click="goTo('/resume')">
-              <span>开始简历分析</span>
+            <BaseButton variant="primary" size="lg" shadow="sm" hoverable @click="goTo('/jobs')">
+              <span>进入招聘广场</span>
               <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
@@ -30,6 +30,17 @@
             </BaseButton>
           </div>
 
+          <!-- 首屏求职工具入口（v1.48.0）：把「投递看板 / 求职诊断」等
+               此前埋在二级下拉的高频能力提到首屏，并点名 6 个工具 -->
+          <nav class="hero-tools fade-in-up" style="animation-delay: 280ms" aria-label="求职工具">
+            <span class="hero-tools-label">求职工具</span>
+            <ul class="tool-chips">
+              <li v-for="t in toolLinks" :key="t.to">
+                <router-link class="tool-chip" :to="t.to">{{ t.label }}</router-link>
+              </li>
+            </ul>
+          </nav>
+
           <!-- Hero 数据展示：等宽琥珀金数字，评分面板质感 -->
           <div class="hero-stats fade-in-up" style="animation-delay: 320ms">
             <div class="stat">
@@ -38,8 +49,8 @@
             </div>
             <div class="stat-divider"></div>
             <div class="stat">
-              <div class="stat-num num-display">6</div>
-              <div class="stat-label">求职工具</div>
+              <div class="stat-num num-display">4000+</div>
+              <div class="stat-label">招聘岗位</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat">
@@ -61,9 +72,7 @@
             <div class="visual-card">
               <div class="visual-head">
                 <span class="visual-title">本轮准备度<span v-if="mode === 'demo'" class="demo-badge">示例</span></span>
-                <span class="visual-ready">
-                  <span class="ready-dot"></span>{{ readyText }}
-                </span>
+                <span class="visual-ready">{{ readyText }}</span>
               </div>
               <div class="visual-score">
                 <div class="score-big num-display">{{ displayScore }}</div>
@@ -150,8 +159,8 @@
     <section class="cta-section fade-in-up">
       <div class="cta-card">
         <div class="cta-content">
-          <h2 class="cta-title">准备好开始你的面试之旅了吗？</h2>
-          <p class="cta-desc">免费使用，无需信用卡，立即获得 AI 智能评估</p>
+          <h2 class="cta-title">准备好开启你的秋招了吗？</h2>
+          <p class="cta-desc">免费使用，无需信用卡，从找岗位到模拟面试一站搞定</p>
           <BaseButton variant="cta" size="lg" hoverable @click="goTo('/login')">
             立即开始
             <svg class="arrow-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -174,13 +183,23 @@ import { BaseButton, BaseCard, BaseTag } from '../components'
 const router = useRouter()
 
 function goTo(path: string) {
-  const requiresAuth = ['/resume', '/job', '/interview', '/history', '/profile'].includes(path)
+  const requiresAuth = ['/resume', '/job', '/jobs', '/applications', '/career', '/interview', '/history', '/profile'].includes(path)
   if (requiresAuth && !isLoggedIn()) {
     router.push({ path: '/login', query: { redirect: path } })
     return
   }
   router.push(path)
 }
+
+/** 首屏「求职工具」入口：与 App.vue 主导航/工具下拉保持一致（6 个工具） */
+const toolLinks = [
+  { label: '智能体', to: '/agent' },
+  { label: '求职诊断', to: '/career' },
+  { label: '投递看板', to: '/applications' },
+  { label: '学习中心', to: '/learning' },
+  { label: '历史记录', to: '/history' },
+  { label: '知识库', to: '/knowledge' },
+]
 
 /* ── P2-B：准备度卡片三态 ──────────────────────────────────────────────
  * demo  : 未登录 / 已登录但数据获取失败 → 保留示例卡并标注「示例」
@@ -456,6 +475,54 @@ const steps = [
   background: var(--c-border);
 }
 
+/* ── 首屏求职工具入口（v1.48.0）── */
+.hero-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin: 0 0 26px;
+}
+
+.hero-tools-label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-tertiary);
+  letter-spacing: 0.4px;
+}
+
+.tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 12px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.tool-chip:hover {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+  background: var(--brand-primary-50);
+}
+
 /* ── 视觉锚点：准备度评分卡 ── */
 .hero-visual {
   position: relative;
@@ -535,20 +602,12 @@ const steps = [
 .visual-ready {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   padding: 3px 10px;
   font-size: 12px;
   font-weight: 600;
   color: var(--c-accent);
   background: var(--c-accent-soft);
   border-radius: var(--radius-full);
-}
-
-.ready-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--c-accent);
 }
 
 .visual-score {

@@ -797,8 +797,8 @@ function gapStatusClass(status: string): string {
 }
 
 .list-success li::before { background: var(--c-accent); }
-.list-warning li::before { background: #f59e0b; }
-.list-danger li::before { background: #ef4444; }
+.list-warning li::before { background: var(--c-warning); }
+.list-danger li::before { background: var(--c-danger); }
 .list-info li::before { background: var(--brand-primary); }
 
 .skill-tags {
@@ -874,7 +874,7 @@ function gapStatusClass(status: string): string {
 .gap-missing {
   background: rgba(239, 68, 68, 0.04);
   border-color: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  color: var(--c-danger);
 }
 
 .gap-status-icon {

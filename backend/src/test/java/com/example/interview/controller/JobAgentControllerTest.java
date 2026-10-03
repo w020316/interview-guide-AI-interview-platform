@@ -291,12 +291,12 @@ class JobAgentControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/jobs/{id}: 岗位不存在或已下架返回 404 业务码")
+    @DisplayName("GET /api/jobs/{id}: 岗位不存在或已下架返回 HTTP 404 + code 404（v1.48.0 统一口径）")
     void detail_notFound_returns404() throws Exception {
         when(jobAgentService.findById(999L)).thenReturn(null);
 
         mockMvc.perform(get("/api/jobs/999"))
-                .andExpect(status().isOk())
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404))
                 .andExpect(jsonPath("$.message").value("岗位不存在或已下架"));
     }
@@ -444,5 +444,20 @@ class JobAgentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("jobId 格式不正确"));
+    }
+
+    @Test
+    @DisplayName("POST /favorite/toggle: 岗位不存在返回 HTTP 404 + code 404（v1.48.0 统一口径）")
+    void favoriteToggle_jobNotFound_returns404() throws Exception {
+        when(jobAgentService.findById(999999999L)).thenReturn(null);
+
+        mockMvc.perform(post("/api/jobs/favorite/toggle")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("jobId", 999999999L))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404))
+                .andExpect(jsonPath("$.message").value("岗位不存在或已下架"));
+
+        verify(jobFavoriteService, never()).toggle(anyString(), any());
     }
 }

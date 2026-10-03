@@ -54,6 +54,8 @@ class AiConfigFallbackTest {
                 WebClient.builder(),
                 1L,
                 2L,
+                true,
+                2,
                 springAiBaseUrl,
                 "sk-placeholder",
                 "agnes-2.5-flash");

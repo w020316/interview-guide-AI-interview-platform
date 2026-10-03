@@ -321,4 +321,139 @@ class FallbackChatModelTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("备节点不可用");
     }
+
+    // ══════════ v1.48.0（第六轮 P1）：按厂商 RPM 令牌桶 + 错误码语义 ══════════
+
+    /** 记录退避等待时长（免真实等待），用于断言「退避后重试本节点」 */
+    private FallbackChatModel withPolicy(List<ChatModel> delegates, List<String> names,
+                                         List<String> keys, AiRateLimiter limiter,
+                                         List<Long> sleeps, int maxRetries) {
+        return new FallbackChatModel(delegates, names, keys, limiter, sleeps::add, maxRetries);
+    }
+
+    @Test
+    @DisplayName("classifyFailure: 1305 平台过载 / 1302 与 429 账户限流 / 其它")
+    void classifyFailure_kinds() {
+        assertThat(FallbackChatModel.classifyFailure(new RuntimeException(
+                "{\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大\"}}")))
+                .isEqualTo(FallbackChatModel.FailureKind.PLATFORM_OVERLOAD);
+        assertThat(FallbackChatModel.classifyFailure(new RuntimeException(
+                "{\"error\":{\"code\":\"1302\",\"message\":\"触发账户速率限制\"}}")))
+                .isEqualTo(FallbackChatModel.FailureKind.ACCOUNT_RATE_LIMIT);
+        assertThat(FallbackChatModel.classifyFailure(new RuntimeException("HTTP 429 Too Many Requests")))
+                .isEqualTo(FallbackChatModel.FailureKind.ACCOUNT_RATE_LIMIT);
+        assertThat(FallbackChatModel.classifyFailure(new RuntimeException("You've reached the API rate limit for free users")))
+                .isEqualTo(FallbackChatModel.FailureKind.ACCOUNT_RATE_LIMIT);
+        assertThat(FallbackChatModel.classifyFailure(new RuntimeException("网关 502")))
+                .isEqualTo(FallbackChatModel.FailureKind.OTHER);
+    }
+
+    @Test
+    @DisplayName("classifyFailure: 1305 优先于同时出现的 429（全局过载应立即换节点）")
+    void classifyFailure_overloadTakesPrecedenceOver429() {
+        Throwable e = new RuntimeException("HTTP 429", new IllegalStateException(
+                "{\"error\":{\"code\":\"1305\",\"message\":\"平台服务过载\"}}"));
+        assertThat(FallbackChatModel.classifyFailure(e)).isEqualTo(FallbackChatModel.FailureKind.PLATFORM_OVERLOAD);
+    }
+
+    @Test
+    @DisplayName("1302 账户限流：退避后重试本节点，重试成功则不再降级")
+    void accountRateLimit_1302_retriesSameNodeThenSucceeds() {
+        List<Long> sleeps = new java.util.ArrayList<>();
+        RuntimeException limited = new RuntimeException("{\"error\":{\"code\":\"1302\",\"message\":\"触发账户速率限制\"}}");
+        when(primary.call(any(Prompt.class)))
+                .thenThrow(limited).thenThrow(limited).thenReturn(response("重试成功"));
+        FallbackChatModel model = withPolicy(List.of(primary, secondary), List.of("智谱", "备"),
+                null, null, sleeps, 2);
+
+        assertThat(model.call(new Prompt("问")).getResult().getOutput().getText()).isEqualTo("重试成功");
+        verify(primary, times(3)).call(any(Prompt.class));
+        verify(secondary, times(0)).call(any(Prompt.class));
+        assertThat(sleeps).as("应有 2 次退避（1s / 2s 量级）").hasSize(2);
+        assertThat(sleeps.get(0)).isBetween(1000L, 1300L);
+        assertThat(sleeps.get(1)).isBetween(2000L, 2600L);
+    }
+
+    @Test
+    @DisplayName("429 免费档限流：退避重试耗尽后降级到下一节点")
+    void accountRateLimit_429_retriesThenDegrades() {
+        List<Long> sleeps = new java.util.ArrayList<>();
+        when(primary.call(any(Prompt.class))).thenThrow(new RuntimeException("限流 429"));
+        when(secondary.call(any(Prompt.class))).thenReturn(response("备模型回答"));
+        FallbackChatModel model = withPolicy(List.of(primary, secondary), List.of("Agnes", "备"),
+                null, null, sleeps, 2);
+
+        assertThat(model.call(new Prompt("问")).getResult().getOutput().getText()).isEqualTo("备模型回答");
+        verify(primary, times(3)).call(any(Prompt.class)); // 1 次原始 + 2 次退避重试
+        verify(secondary, times(1)).call(any(Prompt.class));
+        assertThat(sleeps).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("1305 平台过载：立即换下一节点，不重试、不等待")
+    void platformOverload_1305_degradesImmediately() {
+        List<Long> sleeps = new java.util.ArrayList<>();
+        when(primary.call(any(Prompt.class))).thenThrow(new RuntimeException(
+                "{\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大\"}}"));
+        when(secondary.call(any(Prompt.class))).thenReturn(response("备模型回答"));
+        FallbackChatModel model = withPolicy(List.of(primary, secondary), List.of("智谱", "备"),
+                null, null, sleeps, 2);
+
+        assertThat(model.call(new Prompt("问")).getResult().getOutput().getText()).isEqualTo("备模型回答");
+        verify(primary, times(1)).call(any(Prompt.class)); // 不重试本节点
+        verify(secondary, times(1)).call(any(Prompt.class));
+        assertThat(sleeps).as("平台过载不应退避等待").isEmpty();
+    }
+
+    @Test
+    @DisplayName("本地 RPM 令牌桶触顶：不调用该节点，直接降级")
+    void localRpmExhausted_degradesWithoutCalling() {
+        // rpm=1：第一次调用消耗掉唯一令牌，第二次必然触顶
+        AiRateLimiter limiter = new AiRateLimiter(java.util.Map.of("agnes", 1));
+        when(primary.call(any(Prompt.class))).thenReturn(response("首次成功"));
+        when(secondary.call(any(Prompt.class))).thenReturn(response("降级成功"));
+        FallbackChatModel model = withPolicy(List.of(primary, secondary), List.of("Agnes", "备"),
+                List.of("agnes", "nvidia"), limiter, new java.util.ArrayList<>(), 0);
+
+        assertThat(model.call(new Prompt("问")).getResult().getOutput().getText()).isEqualTo("首次成功");
+        // 第二次：agnes 桶已空 → 跳过 primary，直接用 secondary
+        assertThat(model.call(new Prompt("问")).getResult().getOutput().getText()).isEqualTo("降级成功");
+        verify(primary, times(1)).call(any(Prompt.class));
+        verify(secondary, times(1)).call(any(Prompt.class));
+    }
+
+    @Test
+    @DisplayName("反向对照：RPM 不限流（rpm=0）时两次都走主节点，不被跳过")
+    void reverseControl_unlimitedRpm_neverSkips() {
+        // 与 localRpmExhausted_degradesWithoutCalling 唯一差别：rpm=0（不限流）。
+        // 若把限流阈值调成无限，上面那条「触顶降级」测试即失效——本条锁死该对照关系。
+        AiRateLimiter limiter = new AiRateLimiter(java.util.Map.of("agnes", 0));
+        when(primary.call(any(Prompt.class))).thenReturn(response("主节点回答"));
+        FallbackChatModel model = withPolicy(List.of(primary, secondary), List.of("Agnes", "备"),
+                List.of("agnes", "nvidia"), limiter, new java.util.ArrayList<>(), 0);
+
+        assertThat(model.call(new Prompt("问")).getResult().getOutput().getText()).isEqualTo("主节点回答");
+        assertThat(model.call(new Prompt("问")).getResult().getOutput().getText()).isEqualTo("主节点回答");
+        verify(primary, times(2)).call(any(Prompt.class));
+        verify(secondary, times(0)).call(any(Prompt.class));
+    }
+
+    @Test
+    @DisplayName("stream: 本地 RPM 触顶时流式跳过该节点并降级")
+    void stream_localRpmExhausted_degrades() {
+        AiRateLimiter limiter = new AiRateLimiter(java.util.Map.of("agnes", 1));
+        when(primary.stream(any(Prompt.class))).thenReturn(Flux.just(response("主流式")));
+        when(secondary.stream(any(Prompt.class))).thenReturn(Flux.just(response("备流式")));
+        FallbackChatModel model = withPolicy(List.of(primary, secondary), List.of("Agnes", "备"),
+                List.of("agnes", "nvidia"), limiter, new java.util.ArrayList<>(), 0);
+
+        List<ChatResponse> first = model.stream(new Prompt("问")).collectList().block(Duration.ofSeconds(5));
+        List<ChatResponse> second = model.stream(new Prompt("问")).collectList().block(Duration.ofSeconds(5));
+        assertThat(first).hasSize(1);
+        assertThat(first.get(0).getResult().getOutput().getText()).isEqualTo("主流式");
+        assertThat(second).hasSize(1);
+        assertThat(second.get(0).getResult().getOutput().getText()).isEqualTo("备流式");
+        verify(primary, times(1)).stream(any(Prompt.class));
+        verify(secondary, times(1)).stream(any(Prompt.class));
+    }
 }

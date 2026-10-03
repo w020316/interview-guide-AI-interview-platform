@@ -1,5 +1,6 @@
 package com.example.interview.controller;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.common.Result;
 import com.example.interview.entity.JobFavoriteEntity;
 import com.example.interview.entity.JobPostingEntity;
@@ -155,7 +156,11 @@ public class JobAgentController {
     public Result<JobPostingEntity> detail(@PathVariable Long id) {
         JobPostingEntity job = jobAgentService.findById(id);
         if (job == null) {
-            return Result.error(404, "岗位不存在或已下架");
+            // v1.48.0（第六轮 P1-05）：统一「资源不存在」口径为 HTTP 404 + code 404。
+            // 此前这里 return Result.error(404,...) 走「HTTP 200 + code 404」通道，
+            // 与 GET /api/session/{id}（抛 ResourceNotFoundException → HTTP 404）不一致；
+            // 契约（docs/api-error-contract.md §3）明确 ResourceNotFoundException → 404。
+            throw new ResourceNotFoundException("岗位不存在或已下架");
         }
         return Result.success(job);
     }
@@ -283,7 +288,8 @@ public class JobAgentController {
         }
         JobPostingEntity job = jobAgentService.findById(jobId);
         if (job == null) {
-            return Result.error(404, "岗位不存在或已下架");
+            // v1.48.0（第六轮 P1-05）：统一为 HTTP 404 + code 404（见 detail 方法注释）
+            throw new ResourceNotFoundException("岗位不存在或已下架");
         }
         boolean favorited = jobFavoriteService.toggle(currentUserId(), job);
         Map<String, Object> result = new LinkedHashMap<>();

@@ -3,25 +3,38 @@
     :class="[
       'base-textarea',
       `base-textarea--${size}`,
-      { 'is-error': error, 'is-disabled': disabled, 'is-block': block }
+      {
+        'is-error': hasError,
+        'is-disabled': disabled,
+        'is-block': block,
+        'has-error-text': !!errorText,
+      }
     ]"
   >
     <textarea
+      :id="inputId"
       :value="modelValue"
       :rows="rows"
       :placeholder="placeholder"
       :disabled="disabled"
       :readonly="readonly"
       :maxlength="maxlength"
+      :aria-label="ariaLabel || undefined"
+      :aria-invalid="hasError ? 'true' : undefined"
+      :aria-describedby="describedBy"
       class="base-textarea__inner"
       @input="onInput"
       @keyup="onKeyup"
       @blur="onBlur"
     />
+    <p v-if="errorText" :id="errorId" class="base-textarea__error" role="alert">{{ errorText }}</p>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { nextUid } from '../utils/uid'
+
 /**
  * 通用多行文本框组件
  * - 三种尺寸：sm / md / lg
@@ -29,6 +42,12 @@
  * - error 态（红色边框）、block（块级宽度）
  * - resize: vertical（仅允许垂直调整，防布局错乱）
  * - v1.12 新增，替代各 View 内联的 .field-row textarea
+ *
+ * v1.48.0 可访问性增强（第六轮 UX P2）：
+ * - `id`：自动生成或由调用方传入，供 `<label :for>` 关联
+ * - `ariaLabel`：无可见 label 时的可访问名兜底
+ * - `error`：错误态，除红色边框外同时输出 `aria-invalid="true"`
+ * - `errorText`：内联错误文案，并通过 `aria-describedby` 指向该文案
  *
  * 视觉对齐各 View 现有 textarea：
  * - 边框 var(--c-border)，聚焦变 var(--brand-primary) + box-shadow
@@ -44,6 +63,12 @@ interface Props {
   error?: boolean
   block?: boolean
   maxlength?: number
+  /** v1.48.0：原生 textarea id，供 <label :for> 关联；不传则自动生成 */
+  id?: string
+  /** v1.48.0：无可访问 label 时提供可访问名（映射到 aria-label） */
+  ariaLabel?: string
+  /** v1.48.0：内联错误文案；存在时同时进入错误态并输出 aria-describedby */
+  errorText?: string
 }
 const props = withDefaults(defineProps<Props>(), {
   modelValue: '',
@@ -55,12 +80,24 @@ const props = withDefaults(defineProps<Props>(), {
   error: false,
   block: true,
   maxlength: undefined,
+  id: undefined,
+  ariaLabel: undefined,
+  errorText: undefined,
 })
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'keyup', ev: KeyboardEvent): void
   (e: 'blur', ev: FocusEvent): void
 }>()
+
+// 组件实例级唯一 id（Vue 3.4 尚无 useId，见 utils/uid）
+const autoId = nextUid('base-textarea')
+const inputId = computed(() => props.id || autoId)
+const errorId = computed(() => `${inputId.value}-error`)
+
+/** errorText 也视为错误态：保证「有错误文案」时边框与 aria-invalid 同步 */
+const hasError = computed(() => props.error || !!props.errorText)
+const describedBy = computed(() => (props.errorText ? errorId.value : undefined))
 
 function onInput(e: Event) {
   emit('update:modelValue', (e.target as HTMLTextAreaElement).value)
@@ -78,6 +115,11 @@ function onBlur(e: FocusEvent) {
   position: relative;
   display: inline-flex;
   width: auto;
+}
+
+/* 有内联错误文案时允许换行：错误文案独占一行 */
+.base-textarea.has-error-text {
+  flex-wrap: wrap;
 }
 
 .base-textarea.is-block {
@@ -133,5 +175,15 @@ function onBlur(e: FocusEvent) {
 .base-textarea.is-error .base-textarea__inner:focus {
   border-color: var(--c-danger);
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+/* 内联错误文案：占据整行，语义色而非写死颜色 */
+.base-textarea__error {
+  flex-basis: 100%;
+  margin: 6px 0 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--c-danger);
 }
 </style>

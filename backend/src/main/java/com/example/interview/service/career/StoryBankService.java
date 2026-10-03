@@ -1,6 +1,7 @@
 package com.example.interview.service.career;
 
 import com.example.interview.common.BusinessException;
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.entity.StoryBankEntity;
 import com.example.interview.repository.StoryBankRepository;
 import com.example.interview.util.JsonRepairUtil;
@@ -148,7 +149,10 @@ public class StoryBankService {
     public void delete(String userId, Long id) {
         StoryBankEntity existing = findOwned(userId, id);
         if (existing == null) {
-            throw new BusinessException("故事不存在或无权操作");
+            // v1.48.0（第六轮 P1-05）：此前抛 BusinessException → 全局映射 **503「服务不可用」**，
+            // 语义完全错误（503 表示服务侧故障，而这里只是资源不存在）。改为
+            // ResourceNotFoundException → HTTP 404 + code 404，与其它端点统一。
+            throw new ResourceNotFoundException("故事不存在或无权操作");
         }
         repository.delete(existing);
     }

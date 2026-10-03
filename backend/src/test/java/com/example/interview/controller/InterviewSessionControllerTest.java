@@ -234,6 +234,18 @@ class InterviewSessionControllerTest {
                     .andExpect(jsonPath("$.code").value(403))
                     .andExpect(jsonPath("$.message").value("无权访问该会话"));
         }
+
+        @Test
+        @DisplayName("会话不存在返回 HTTP 404 + code 404（v1.48.0 统一口径）")
+        void get_missingSession_returns404() throws Exception {
+            when(sessionService.getBySessionId("no-such"))
+                    .thenThrow(new com.example.interview.common.ResourceNotFoundException("会话不存在：no-such"));
+
+            mockMvc.perform(get("/api/session/no-such"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value(404))
+                    .andExpect(jsonPath("$.message").value("会话不存在：no-such"));
+        }
     }
 
     @Nested

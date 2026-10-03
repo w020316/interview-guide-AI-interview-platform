@@ -1,6 +1,7 @@
 package com.example.interview.config;
 
 import com.example.interview.ai.AiResponseDiagnosticInterceptor;
+import com.example.interview.ai.AiRateLimiter;
 import com.example.interview.ai.FallbackChatModel;
 import com.example.interview.ai.DisableThinkingInterceptor;
 import com.example.interview.ai.VersionPathRewriteInterceptor;
@@ -31,6 +32,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Spring AI ChatClient 配置
@@ -159,6 +161,8 @@ public class AiConfig {
             WebClient.Builder webClientBuilder,
             @Value("${app.ai.connect-timeout-seconds:10}") long connectTimeoutSeconds,
             @Value("${app.ai.read-timeout-seconds:240}") long readTimeoutSeconds,
+            @Value("${app.ai.rate-limit.enabled:true}") boolean rateLimitEnabled,
+            @Value("${app.ai.rate-limit.max-retries:2}") int rateLimitMaxRetries,
             @Value("${spring.ai.openai.base-url:https://apihub.agnes-ai.com}") String springAiBaseUrl,
             @Value("${spring.ai.openai.api-key:sk-placeholder}") String springAiApiKey,
             @Value("${spring.ai.openai.chat.options.model:agnes-2.5-flash}") String springAiModel) {
@@ -192,6 +196,10 @@ public class AiConfig {
 
         List<ChatModel> delegates = new ArrayList<>();
         List<String> names = new ArrayList<>();
+        // v1.48.0（第六轮 P1）：按厂商端点聚合的 RPM 令牌桶。key 用规范化 base-url，
+        // 使同一账户的多个节点（如两个智谱节点）共用一个桶；rateLimitKeys 与 delegates 平行。
+        Map<String, Integer> rpmByKey = new java.util.LinkedHashMap<>();
+        List<String> rateLimitKeys = new ArrayList<>();
         for (AiProviderProperties.Provider p : props.getChain()) {
             if (p.getBaseUrl() == null || p.getBaseUrl().isBlank()
                     || p.getModel() == null || p.getModel().isBlank()
@@ -199,6 +207,11 @@ public class AiConfig {
                 continue;
             }
             String nodeBaseUrl = toOpenAiCompatibleBaseUrl(p.getBaseUrl());
+            // 同 base-url 多节点取最大 RPM，避免「后一个节点把前一个的额度调低」
+            if (p.getRpm() != null && p.getRpm() > 0) {
+                rpmByKey.merge(nodeBaseUrl, p.getRpm(), Math::max);
+            }
+            rateLimitKeys.add(nodeBaseUrl);
             RestClient.Builder nodeBuilder = withDiagnostics(restClientBuilder).clone();
             // P0-05：非 v1 版本段的厂商（如智谱 /api/paas/v4）需剥掉 Spring AI 多拼的 /v1
             if (needsV1Stripping(nodeBaseUrl)) {
@@ -244,8 +257,16 @@ public class AiConfig {
                     restClientBuilder, webClientBuilder, springAiBaseUrl, springAiApiKey, springAiModel));
             names.add("spring-ai-openai/" + (springAiModel == null || springAiModel.isBlank()
                     ? "agnes-2.5-flash" : springAiModel.trim()));
+            rateLimitKeys.add(normalizeOpenAiBaseUrl(springAiBaseUrl));
         }
-        return new FallbackChatModel(delegates, names);
+        AiRateLimiter rateLimiter = AiRateLimiter.disabled();
+        if (rateLimitEnabled && !rpmByKey.isEmpty()) {
+            rateLimiter = new AiRateLimiter(rpmByKey);
+            log.info("AI 厂商 RPM 令牌桶已启用：{}（账户级限流 1302/429 最多退避重试 {} 次）",
+                    rpmByKey, Math.max(0, rateLimitMaxRetries));
+        }
+        return new FallbackChatModel(delegates, names, rateLimitKeys, rateLimiter,
+                Thread::sleep, Math.max(0, rateLimitMaxRetries));
     }
 
     /**

@@ -24,19 +24,15 @@
         <p class="aside-desc">AI 驱动的简历分析与模拟面试平台，助你高效备战求职季</p>
         <ul class="aside-features">
           <li>
-            <span class="dot"></span>
             <span>简历多维度 AI 评分</span>
           </li>
           <li>
-            <span class="dot"></span>
             <span>个性化面试题生成</span>
           </li>
           <li>
-            <span class="dot"></span>
             <span>实时流式 AI 提示</span>
           </li>
           <li>
-            <span class="dot"></span>
             <span>答题质量自动评估</span>
           </li>
         </ul>
@@ -497,7 +493,7 @@ async function handleRegister() {
 /* text-gradient-static 在深绿背景上改为浅白色 */
 .aside-title .text-gradient-static {
   color: rgba(255, 255, 255, 0.92);
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-weight: 600;
   background: none;
   -webkit-text-fill-color: rgba(255, 255, 255, 0.92);
@@ -510,29 +506,18 @@ async function handleRegister() {
   margin: 0 0 36px;
 }
 
-/* aside-features：简洁列表 */
+/* aside-features：简洁列表（用原生列表符号，去掉装饰性圆点 span） */
 .aside-features {
-  list-style: none;
-  padding: 0;
+  list-style: disc;
+  padding-left: 20px;
   margin: 0 0 48px;
-}
-
-.aside-features li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  font-size: 14px;
   color: rgba(255, 255, 255, 0.9);
 }
 
-/* dot：白色小圆点 */
-.aside-features .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  flex-shrink: 0;
+.aside-features li {
+  padding: 10px 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 /* aside-stats：白色文字 + 半透明背景 */
@@ -786,7 +771,7 @@ async function handleRegister() {
 .field-error {
   display: block;
   font-size: 12px;
-  color: #ef4444;
+  color: var(--c-danger);
   margin-top: 2px;
 }
 

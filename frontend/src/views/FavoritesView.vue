@@ -104,6 +104,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
+import { EMPTY } from '../utils/format'
 import { BaseButton, BaseTag } from '../components'
 
 const router = useRouter()
@@ -215,9 +216,9 @@ function difficultyText(d: string) {
   return '简单'
 }
 function fmtDate(dt?: string) {
-  if (!dt) return '-'
+  if (!dt) return EMPTY
   const d = new Date(dt)
-  return isNaN(d.getTime()) ? '-' : d.toLocaleString('zh-CN', { hour12: false })
+  return isNaN(d.getTime()) ? EMPTY : d.toLocaleString('zh-CN', { hour12: false })
 }
 </script>
 

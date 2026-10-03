@@ -1,5 +1,6 @@
 package com.example.interview.controller;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.common.Result;
 import com.example.interview.entity.JobApplicationEntity;
 import com.example.interview.entity.JobFavoriteEntity;
@@ -209,7 +210,8 @@ public class JobApplicationController {
     public Result<Map<String, Object>> remove(@PathVariable Long id) {
         boolean removed = applicationService.remove(currentUserId(), id);
         if (!removed) {
-            return Result.error(404, "未找到该投递记录");
+            // v1.48.0（第六轮 P1-05）：统一「资源不存在」口径为 HTTP 404 + code 404
+            throw new ResourceNotFoundException("未找到该投递记录");
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("removed", true);

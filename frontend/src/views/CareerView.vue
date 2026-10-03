@@ -616,7 +616,7 @@ async function doFollowUp(s: StoryItem) {
 .advice-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .advice-score { font-family: var(--font-mono); font-size: 22px; font-weight: 700; }
 .advice-score.good { color: var(--c-success, #15803d); }
-.advice-score.mid { color: #b45309; }
+.advice-score.mid { color: var(--c-warning); }
 .advice-score.low { color: var(--c-danger, #dc2626); }
 .advice-section { font-size: 13px; line-height: 1.7; color: var(--c-text-secondary); margin-bottom: 6px; }
 .advice-label { font-weight: 600; color: var(--c-text); }

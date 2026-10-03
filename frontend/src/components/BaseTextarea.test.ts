@@ -73,4 +73,44 @@ describe('BaseTextarea', () => {
     const wrapper = mount(BaseTextarea, { props: { maxlength: 500 } })
     expect(wrapper.find('textarea').attributes('maxlength')).toBe('500')
   })
+
+  // ── v1.48.0 可访问性 ──
+  it('自动生成唯一 id，且不同实例互不相同', () => {
+    const a = mount(BaseTextarea)
+    const b = mount(BaseTextarea)
+    const ida = a.find('textarea').attributes('id')
+    const idb = b.find('textarea').attributes('id')
+    expect(ida).toBeTruthy()
+    expect(idb).toBeTruthy()
+    expect(ida).not.toBe(idb)
+  })
+
+  it('显式传入 id 时优先使用（供 <label for> 关联）', () => {
+    const wrapper = mount(BaseTextarea, { props: { id: 'jd-text' } })
+    expect(wrapper.find('textarea').attributes('id')).toBe('jd-text')
+  })
+
+  it('ariaLabel 映射到原生 aria-label', () => {
+    const wrapper = mount(BaseTextarea, { props: { ariaLabel: '岗位描述' } })
+    expect(wrapper.find('textarea').attributes('aria-label')).toBe('岗位描述')
+  })
+
+  it('错误态输出 aria-invalid="true" 且保留 is-error 类', () => {
+    const wrapper = mount(BaseTextarea, { props: { error: true } })
+    expect(wrapper.find('textarea').attributes('aria-invalid')).toBe('true')
+    expect(wrapper.classes()).toContain('is-error')
+  })
+
+  it('errorText：渲染可见错误文案，aria-describedby 指向该元素', () => {
+    const wrapper = mount(BaseTextarea, { props: { errorText: '内容不能为空' } })
+    const ta = wrapper.find('textarea')
+    const err = wrapper.find('.base-textarea__error')
+    expect(err.exists()).toBe(true)
+    expect(err.text()).toBe('内容不能为空')
+    const describedBy = ta.attributes('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(err.attributes('id')).toBe(describedBy)
+    expect(wrapper.find(`#${describedBy}`).exists()).toBe(true)
+    expect(ta.attributes('aria-invalid')).toBe('true')
+  })
 })

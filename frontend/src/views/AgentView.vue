@@ -462,7 +462,7 @@ onMounted(() => {
 }
 
 .conv-del:hover {
-  color: #dc2626;
+  color: var(--c-danger);
 }
 
 .conv-empty {

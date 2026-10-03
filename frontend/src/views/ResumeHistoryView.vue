@@ -227,6 +227,7 @@ import { repairAndCheck } from '../utils/jsonRepair'
 import { compareResume, type ResumeVersion, type DimDiff } from '../utils/resumeCompare'
 import { isParseFailed } from '../utils/resumeAnalysis'
 import { EMPTY } from '../utils/format'
+import { getScoreColor, getScoreGradient } from '../utils/score'
 import { BaseButton } from '../components'
 
 const router = useRouter()
@@ -359,27 +360,18 @@ function fmtDate(dt: string): string {
 }
 
 function scoreColor(s?: number | null): string {
-  if (s == null) return 'var(--c-text-tertiary)'
-  if (s >= 85) return '#10b981'
-  if (s >= 70) return '#3b82f6'
-  if (s >= 60) return '#f59e0b'
-  return '#ef4444'
+  return getScoreColor(s)
 }
 
 function scoreGradient(s?: number | null): string {
   if (s == null) return 'var(--c-border)'
-  if (s >= 85) return 'linear-gradient(90deg, #10b981, #34d399)'
-  if (s >= 70) return 'linear-gradient(90deg, #3b82f6, #60a5fa)'
-  if (s >= 60) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-  return 'linear-gradient(90deg, #ef4444, #f87171)'
+  return getScoreGradient(s)
 }
 
 function scoreBg(s?: number | null): string {
   if (s == null) return 'var(--c-bg-alt)'
-  if (s >= 85) return 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
-  if (s >= 70) return 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
-  if (s >= 60) return 'linear-gradient(135deg, #fef3c7, #fde68a)'
-  return 'linear-gradient(135deg, #fee2e2, #fecaca)'
+  // 柔色底由评分令牌派生，随主题切换（历史实现写死 8 个浅色 hex，深色下会亮成一块）
+  return `color-mix(in srgb, ${getScoreColor(s)} 14%, var(--c-bg-alt))`
 }
 
 // ── 多版本对比（v1.25.0）──
@@ -655,7 +647,7 @@ const summaryText = computed(() => {
   white-space: nowrap;
 }
 .cmp-arrow.up { color: var(--c-success); background: var(--c-success-light); }
-.cmp-arrow.down { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+.cmp-arrow.down { color: var(--c-danger); background: rgba(239, 68, 68, 0.1); }
 .cmp-arrow.flat { color: var(--c-text-tertiary); background: var(--c-surface); }
 .cmp-dims {
   border: 1px solid var(--c-border-light);
@@ -689,7 +681,7 @@ const summaryText = computed(() => {
   text-align: right;
 }
 .cmp-diff.b { color: var(--c-success); }
-.cmp-diff.a { color: #ef4444; }
+.cmp-diff.a { color: var(--c-danger); }
 .cmp-diff.tie { color: var(--c-text-tertiary); }
 .cmp-empty {
   padding: 16px;

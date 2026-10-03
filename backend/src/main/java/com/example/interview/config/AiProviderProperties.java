@@ -48,6 +48,25 @@ public class AiProviderProperties {
         private String name;
 
         /**
+         * 该厂商的每分钟请求上限（RPM）。0 或 null 表示不限制（只走并发闸门）。
+         *
+         * <p>v1.48.0（第六轮 P1）新增：与 {@code AiConcurrencyGuard} 的 Semaphore 叠加，
+         * 按厂商端点聚合成令牌桶。实测 Agnes 免费档 20 RPM、NVIDIA 40 RPM，
+         * 默认对二者留余量分别设为 15 / 30；智谱限流以并发为核心，默认不限 RPM。
+         *
+         * <p>同一 base-url 的多个节点（如两个智谱节点）**共用**一个桶——账户级配额本就共享。
+         */
+        private Integer rpm;
+
+        public Integer getRpm() {
+            return rpm;
+        }
+
+        public void setRpm(Integer rpm) {
+            this.rpm = rpm;
+        }
+
+        /**
          * 是否在请求体中显式关闭「思考模式」（{@code thinking:{"type":"disabled"}}）。
          *
          * <p><b>为什么需要（2026-09-26 线上实测）</b>：智谱 GLM 系列默认开启思考模式，

@@ -119,7 +119,8 @@ public class InterviewSessionController {
      */
     @GetMapping("/{sessionId}")
     public Result<InterviewSessionEntity> getSession(@PathVariable String sessionId) {
-        // service 在会话不存在时抛 IllegalArgumentException，由全局异常处理器统一返回 400
+        // service 在会话不存在时抛 ResourceNotFoundException，由全局异常处理器统一返回 HTTP 404 + code 404
+        // （v1.48.0 更正：此前注释写「统一返回 400」，与实现不符）
         InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
         if (!currentUserId().equals(session.getUserId())) {
             return Result.error(403, "无权访问该会话");

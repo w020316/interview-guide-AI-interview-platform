@@ -89,6 +89,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
+import { EMPTY } from '../utils/format'
 
 interface Session {
   sessionId: string
@@ -150,9 +151,9 @@ function toggleSession(sessionId: string) {
 }
 
 function fmtDate(dt: string) {
-  if (!dt) return '-'
+  if (!dt) return EMPTY
   const d = new Date(dt)
-  if (isNaN(d.getTime())) return '-'
+  if (isNaN(d.getTime())) return EMPTY
   return d.toLocaleString('zh-CN', { hour12: false })
 }
 

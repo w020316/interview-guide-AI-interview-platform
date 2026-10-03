@@ -34,7 +34,7 @@ describe('scoreDisplay', () => {
     it('颜色为中性占位色，且不是危险红', () => {
       const color = scoreColor({ answered: 0, avgScore: 0 })
       expect(color).toBe(NEUTRAL_SCORE_COLOR)
-      expect(color).not.toBe('#ef4444')
+      expect(color).not.toBe('var(--score-fail)')
       expect(scoreFill({ answered: 0, avgScore: 0 })).toBe(NEUTRAL_SCORE_FILL)
     })
   })
@@ -47,7 +47,7 @@ describe('scoreDisplay', () => {
     })
 
     it('answered>0 时按分数返回对应色阶（78 → 良好色）', () => {
-      expect(scoreColor({ answered: 2, avgScore: 78 })).toBe('#3b82f6')
+      expect(scoreColor({ answered: 2, avgScore: 78 })).toBe('var(--score-good)')
     })
 
     it('answered>0 但 avgScore 缺失（异常数据）仍视为无样本', () => {

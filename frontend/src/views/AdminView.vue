@@ -66,7 +66,13 @@
         <!-- 数据源分布 -->
         <div class="chart-card">
           <h3>数据源分布 <span class="chart-hint">按有效岗位数排序</span></h3>
-          <p v-if="!sourceDist.length" class="chart-empty">暂无岗位数据，点击右上角「手动刷新岗位数据」拉取</p>
+          <EmptyChart
+            v-if="!sourceDist.length"
+            text="暂无岗位数据"
+            action-text="手动刷新岗位数据"
+            :action-disabled="refreshing"
+            @action="doRefresh"
+          />
           <div v-else class="bar-list">
             <div v-for="s in sourceDist" :key="s.platform" class="bar-row">
               <span class="bar-name" :title="s.platform">{{ s.platform }}</span>
@@ -82,7 +88,13 @@
         <!-- 招聘类型分布 -->
         <div class="chart-card">
           <h3>招聘类型分布</h3>
-          <p v-if="!recruitDistList.length" class="chart-empty">暂无数据</p>
+          <EmptyChart
+            v-if="!recruitDistList.length"
+            text="暂无招聘类型分布"
+            action-text="手动刷新岗位数据"
+            :action-disabled="refreshing"
+            @action="doRefresh"
+          />
           <div v-else class="donut-wrap">
             <div class="donut" :style="donutStyle">
               <div class="donut-hole">
@@ -108,7 +120,14 @@
           <span><i class="dot jobs" />新增岗位</span>
           <span><i class="dot users" />新增用户</span>
         </div>
-        <div class="trend-chart">
+        <EmptyChart
+          v-if="!trend.length"
+          text="暂无近 7 天趋势数据"
+          action-text="手动刷新岗位数据"
+          :action-disabled="refreshing"
+          @action="doRefresh"
+        />
+        <div v-else class="trend-chart">
           <div v-for="d in trend" :key="d.date" class="trend-col">
             <div class="trend-bars">
               <div class="trend-bar jobs" :style="{ height: barHeight(d.jobs) }" :title="`新增岗位 ${d.jobs}`" />
@@ -293,6 +312,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { authState } from '../auth'
 import { recruitTypeLabel, RECRUIT_TYPE_CODES, RECRUIT_TYPE_LABELS } from '../utils/recruitType'
+import { EmptyChart } from '../components'
 
 /**
  * 管理后台（v1.37.0 视觉与信息架构重构）
@@ -383,8 +403,13 @@ const TABS: { k: TabKey; l: string }[] = [
 // 结构保持 { v, l } 不变，模板无需改动。
 const RECRUIT_TYPES = RECRUIT_TYPE_CODES.map((v) => ({ v, l: RECRUIT_TYPE_LABELS[v] }))
 
-/** 环形图配色（按招聘类型顺序取用，深色模式同样可辨） */
-const DONUT_COLORS = ['#0f766e', '#c2410c', '#1d4ed8', '#b45309', '#7c3aed']
+/**
+ * 环形图配色（按招聘类型顺序取用）。
+ * v1.48.0：原为 ['#0f766e','#c2410c','#1d4ed8','#b45309','#7c3aed']，含蓝(#1d4ed8)与紫(#7c3aed)，
+ * 违反「不要蓝/绿/琥珀/紫四色并置（紫色尤其 AI 味）」。改为单色系墨绿明度梯度令牌，
+ * 亮/暗各一组（随 [data-theme='dark'] 切换）。
+ */
+const DONUT_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
 
 /** 海外数据源标识（与招聘广场的来源 chips 保持一致） */
 const OVERSEAS_MARKERS = ['RemoteOK', 'Remotive', 'Arbeitnow']

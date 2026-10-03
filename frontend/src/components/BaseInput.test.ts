@@ -89,4 +89,58 @@ describe('BaseInput', () => {
     const wrapper = mount(BaseInput, { props: { list: 'job-suggestions' } })
     expect(wrapper.find('input').attributes('list')).toBe('job-suggestions')
   })
+
+  // ── v1.48.0 可访问性 ──
+  it('自动生成唯一 id，且不同实例互不相同', () => {
+    const a = mount(BaseInput)
+    const b = mount(BaseInput)
+    const ida = a.find('input').attributes('id')
+    const idb = b.find('input').attributes('id')
+    expect(ida).toBeTruthy()
+    expect(idb).toBeTruthy()
+    expect(ida).not.toBe(idb)
+  })
+
+  it('显式传入 id 时优先使用（供 <label for> 关联）', () => {
+    const wrapper = mount(BaseInput, { props: { id: 'target-job' } })
+    expect(wrapper.find('input').attributes('id')).toBe('target-job')
+  })
+
+  it('ariaLabel 映射到原生 aria-label', () => {
+    const wrapper = mount(BaseInput, { props: { ariaLabel: '目标岗位' } })
+    expect(wrapper.find('input').attributes('aria-label')).toBe('目标岗位')
+  })
+
+  it('无错误时不输出 aria-invalid', () => {
+    const wrapper = mount(BaseInput)
+    expect(wrapper.find('input').attributes('aria-invalid')).toBeUndefined()
+  })
+
+  it('错误态输出 aria-invalid="true" 且保留 is-error 类', () => {
+    const wrapper = mount(BaseInput, { props: { error: true } })
+    expect(wrapper.find('input').attributes('aria-invalid')).toBe('true')
+    expect(wrapper.classes()).toContain('is-error')
+  })
+
+  it('errorText：渲染可见错误文案，aria-describedby 指向该元素', () => {
+    const wrapper = mount(BaseInput, { props: { errorText: '请输入目标岗位' } })
+    const input = wrapper.find('input')
+    const err = wrapper.find('.base-input__error')
+    expect(err.exists()).toBe(true)
+    expect(err.text()).toBe('请输入目标岗位')
+    const describedBy = input.attributes('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    // aria-describedby 指向的元素必须真实存在且 id 一致
+    expect(err.attributes('id')).toBe(describedBy)
+    expect(wrapper.find(`#${describedBy}`).exists()).toBe(true)
+    // 有错误文案时同时进入错误态
+    expect(input.attributes('aria-invalid')).toBe('true')
+    expect(wrapper.classes()).toContain('is-error')
+  })
+
+  it('errorText 与显式 id 组合时，错误元素 id 基于该 id', () => {
+    const wrapper = mount(BaseInput, { props: { id: 'job', errorText: '必填' } })
+    expect(wrapper.find('.base-input__error').attributes('id')).toBe('job-error')
+    expect(wrapper.find('input').attributes('aria-describedby')).toBe('job-error')
+  })
 })

@@ -198,28 +198,28 @@
         <div class="eval-scores">
           <div class="score-item">
             <div class="score-num num-display">
-              {{ evalResult.overallScore ?? '-' }}
+              {{ evalResult.overallScore ?? EMPTY }}
             </div>
             <div class="score-name">综合</div>
           </div>
           <div class="score-divider"></div>
           <div class="score-item">
             <div class="score-num num-display">
-              {{ evalResult.completeness ?? '-' }}
+              {{ evalResult.completeness ?? EMPTY }}
             </div>
             <div class="score-name">完整性</div>
           </div>
           <div class="score-divider"></div>
           <div class="score-item">
             <div class="score-num num-display">
-              {{ evalResult.accuracy ?? '-' }}
+              {{ evalResult.accuracy ?? EMPTY }}
             </div>
             <div class="score-name">准确性</div>
           </div>
           <div class="score-divider"></div>
           <div class="score-item">
             <div class="score-num num-display">
-              {{ evalResult.expression ?? '-' }}
+              {{ evalResult.expression ?? EMPTY }}
             </div>
             <div class="score-name">表达力</div>
           </div>
@@ -350,6 +350,8 @@ import renderMarkdown from '../utils/markdown'
 import { createSpeechRecorder, isSpeechSupported } from '../utils/speech'
 import { compareWithHistory, suggestNextTarget } from '../utils/reportCompare'
 import { nextGenProgress } from '../utils/genProgress'
+import { getScoreColor } from '../utils/score'
+import { EMPTY } from '../utils/format'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 
 const router = useRouter()
@@ -721,11 +723,7 @@ function diffClass(d: string) {
 }
 
 function scoreColor(s?: number) {
-  if (s == null) return 'var(--c-text-tertiary)'
-  if (s >= 85) return '#10b981'
-  if (s >= 70) return '#3b82f6'
-  if (s >= 60) return '#f59e0b'
-  return '#ef4444'
+  return getScoreColor(s)
 }
 
 /** JSON.parse 失败时返回 fallback，不抛异常 */
@@ -1612,7 +1610,7 @@ onUnmounted(() => {
   font-size: 15px;
   font-weight: 600;
   color: #fff;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, var(--c-success), color-mix(in srgb, var(--c-success) 78%, #000));
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -1795,12 +1793,12 @@ onUnmounted(() => {
 
 .tag-warning {
   background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
+  color: var(--c-warning);
 }
 
 .tag-danger {
   background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
+  color: var(--c-danger);
 }
 
 .q-title {
@@ -2356,9 +2354,9 @@ onUnmounted(() => {
   border-radius: 999px;
   color: #fff;
 }
-.compare-badge.improved { background: #10b981; }
-.compare-badge.steady { background: #3b82f6; }
-.compare-badge.declined { background: #f59e0b; }
+.compare-badge.improved { background: var(--score-excellent); }
+.compare-badge.steady { background: var(--score-good); }
+.compare-badge.declined { background: var(--score-pass); }
 .compare-badge.unknown { background: var(--c-text-tertiary); }
 .compare-text {
   font-size: 13px;

@@ -33,27 +33,26 @@ export const MATCH_THRESHOLDS: ScoreThresholds = {
   pass: 40,
 }
 
-/** 评分对应颜色（hex），null/undefined 返回中性灰 */
+/** 评分对应颜色（语义令牌），null/undefined 返回中性灰
+ *
+ * 返回的是 CSS 令牌（如 `var(--score-good)`），随 `[data-theme='dark']` 切换。
+ * 历史上这里写死 hex（#10b981/#3b82f6/#f59e0b/#ef4444），实测深色下品牌墨绿会
+ * 提亮成 rgb(20,184,166)，而蓝/红完全不变（浅深同为 rgb(59,130,246)/rgb(239,68,68)），
+ * 且 77 分的蓝与相邻「已答题」墨绿并排像两套配色体系。改令牌后根治。
+ */
 export function getScoreColor(score: number | null | undefined, thresholds: ScoreThresholds = DEFAULT_THRESHOLDS): string {
   if (score == null) return 'var(--c-text-tertiary)'
-  if (score >= thresholds.excellent) return '#10b981'
-  if (score >= thresholds.good) return '#3b82f6'
-  if (score >= thresholds.pass) return '#f59e0b'
-  return '#ef4444'
+  if (score >= thresholds.excellent) return 'var(--score-excellent)'
+  if (score >= thresholds.good) return 'var(--score-good)'
+  if (score >= thresholds.pass) return 'var(--score-pass)'
+  return 'var(--score-fail)'
 }
 
-/** 评分对应渐变背景 */
+/** 评分对应渐变背景（令牌 + color-mix，随主题切换） */
 export function getScoreGradient(score: number, thresholds: ScoreThresholds = DEFAULT_THRESHOLDS): string {
-  if (score >= thresholds.excellent) return 'linear-gradient(90deg, #10b981, #34d399)'
-  if (score >= thresholds.good) return 'linear-gradient(90deg, #3b82f6, #60a5fa)'
-  if (score >= thresholds.pass) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-  return 'linear-gradient(90deg, #ef4444, #f87171)'
-}
-
-/** 评分对应浅色背景（用于徽章/标签底色） */
-export function getScoreBg(score: number, thresholds: ScoreThresholds = DEFAULT_THRESHOLDS): string {
-  if (score >= thresholds.excellent) return '#ecfdf5'
-  if (score >= thresholds.good) return '#eff6ff'
-  if (score >= thresholds.pass) return '#fffbeb'
-  return '#fef2f2'
+  const soft = (token: string) => `color-mix(in srgb, ${token} 82%, transparent)`
+  if (score >= thresholds.excellent) return `linear-gradient(90deg, var(--score-excellent), ${soft('var(--score-excellent)')})`
+  if (score >= thresholds.good) return `linear-gradient(90deg, var(--score-good), ${soft('var(--score-good)')})`
+  if (score >= thresholds.pass) return `linear-gradient(90deg, var(--score-pass), ${soft('var(--score-pass)')})`
+  return `linear-gradient(90deg, var(--score-fail), ${soft('var(--score-fail)')})`
 }

@@ -134,6 +134,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
+import { EMPTY } from '../utils/format'
 import { BaseButton } from '../components'
 
 const router = useRouter()
@@ -162,14 +163,14 @@ async function loadStats() {
 }
 
 function formatScore(s?: number | null): string {
-  if (s == null || isNaN(s)) return '-'
+  if (s == null || isNaN(s)) return EMPTY
   return s.toFixed(1)
 }
 
 function fmtRelative(iso: string): string {
-  if (!iso) return '-'
+  if (!iso) return EMPTY
   const d = new Date(iso)
-  if (isNaN(d.getTime())) return '-'
+  if (isNaN(d.getTime())) return EMPTY
   const now = Date.now()
   const diff = now - d.getTime()
   const minute = 60 * 1000

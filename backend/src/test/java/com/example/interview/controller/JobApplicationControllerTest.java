@@ -243,13 +243,13 @@ class JobApplicationControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/application/{id}：不存在返回 404")
+    @DisplayName("DELETE /api/application/{id}：不存在返回 HTTP 404 + code 404（v1.48.0 统一口径）")
     void remove_notFound() throws Exception {
         loginAs("user-1");
         when(applicationService.remove("user-1", 9L)).thenReturn(false);
 
         mockMvc.perform(delete("/api/application/9"))
-                .andExpect(status().isOk())
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404));
     }
 }

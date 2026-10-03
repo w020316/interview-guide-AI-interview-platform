@@ -177,12 +177,12 @@ class StoryBankServiceTest {
     }
 
     @Test
-    @DisplayName("delete：非本人故事抛业务异常")
+    @DisplayName("delete：非本人/不存在故事抛 ResourceNotFoundException（v1.48.0 统一 404 口径）")
     void delete_otherUser_throws() {
         when(repository.findByIdAndUserId(1L, "user-1")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.delete("user-1", 1L))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(com.example.interview.common.ResourceNotFoundException.class);
     }
 
     @Test

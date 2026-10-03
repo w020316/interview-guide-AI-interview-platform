@@ -84,6 +84,15 @@
             <circle :cx="p.x" :cy="p.y" r="4.5" class="chart-dot" />
             <title>{{ p.label }} · {{ p.score }} 分 · {{ p.jobTitle }}</title>
           </g>
+          <!-- X 轴刻度（v1.48.0）：按点数抽稀，窄屏不再挤成一团 -->
+          <text
+            v-for="p in xTickPoints"
+            :key="'x' + p.x"
+            :x="p.x"
+            :y="chartHeight - 4"
+            text-anchor="middle"
+            class="chart-x-tick"
+          >{{ p.label }}</text>
         </svg>
         <div v-else-if="!loading" class="empty-inline">
           <p>暂无面试记录，完成一次模拟面试后这里会呈现你的成长曲线。</p>
@@ -136,6 +145,7 @@ import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
 import type { TrendPoint } from '../utils/scoreTrend'
 import { buildLineChart, computeTrendStats } from '../utils/scoreTrend'
+import { pickTickIndices } from '../utils/chartTicks'
 import { hasScoreSample, scoreText } from '../utils/scoreDisplay'
 
 interface CategoryStat {
@@ -201,6 +211,14 @@ const deltaText = computed(() => {
 })
 
 const linePoints = computed(() => chart.value.points.map((p) => `${p.x},${p.y}`).join(' '))
+
+/** X 轴刻度最多显示的标签数：图表自适应宽度后，按点数抽稀避免拥挤 */
+const MAX_X_TICKS = 6
+const xTickPoints = computed(() => {
+  const pts = chart.value.points
+  const idx = pickTickIndices(pts.length, MAX_X_TICKS)
+  return idx.map((i) => pts[i])
+})
 const areaPoints = computed(() => {
   const pts = chart.value.points
   if (!pts.length) return ''
@@ -344,10 +362,14 @@ onMounted(async () => {
 .goal-title { font-size: 15px; font-weight: 600; color: var(--c-text); margin-bottom: 3px; }
 .goal-text { font-size: 13px; color: var(--c-text-secondary); line-height: 1.6; }
 
-.chart-wrap { width: 100%; overflow-x: auto; }
-.line-chart { width: 100%; min-width: 560px; height: auto; display: block; }
+/* v1.48.0（第六轮 UX P2）：此前 min-width:560px + overflow-x:auto 会在 390px 视口下
+   裁掉右侧数据点且无滚动提示。改为图表自适应容器宽度（viewBox 等比缩放），
+   配合 X 轴刻度抽稀，整页不产生横向溢出。 */
+.chart-wrap { width: 100%; }
+.line-chart { width: 100%; height: auto; display: block; }
 .chart-grid { stroke: var(--c-border); stroke-width: 1; stroke-dasharray: 3 4; }
 .chart-tick { font-family: var(--font-mono); font-size: 11px; fill: var(--c-text-tertiary); }
+.chart-x-tick { font-family: var(--font-mono); font-size: 10px; fill: var(--c-text-tertiary); }
 .chart-area { fill: var(--brand-primary-100); opacity: 0.35; }
 .chart-line { fill: none; stroke: var(--brand-primary); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .chart-dot { fill: var(--c-accent); stroke: var(--c-surface); stroke-width: 2; }

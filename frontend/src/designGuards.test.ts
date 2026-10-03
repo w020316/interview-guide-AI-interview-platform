@@ -27,6 +27,25 @@ const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)))
 
 const SCAN_EXT = new Set(['.vue', '.css'])
 
+/** 写死 hex 扫描范围（含 .ts：评分工具等也在此列） */
+const HEX_SCAN_EXT = new Set(['.vue', '.css', '.ts'])
+
+/**
+ * 写死 hex 的**合理例外**文件（只有这里能出现 hex，其余一律用语义令牌）。
+ */
+const HEX_ALLOWED_FILES = new Set([
+  'styles/variables.css', // 令牌定义文件本身
+  'utils/reportPdf.ts', // 导出 PDF 的独立 HTML 模板，脱离应用主题
+  'utils/reportShare.ts', // Canvas 分享图绘制，无法使用 CSS 变量
+  'changelog.ts', // 版本发布说明文本
+  'designGuards.test.ts', // 守卫自身的白名单/断言定义
+])
+
+/** 纯白/纯黑：与主题无关的基元色（品牌色底上的文字、color-mix 基色） */
+const HEX_NEUTRAL = /^#(fff|ffffff|000|000000)$/i
+/** 十六进制颜色字面量 */
+const HEX_LITERAL = /#[0-9a-fA-F]{3,8}\b/g
+
 /**
  * 已知且**合理**的例外。每条都要写清理由，没有理由就不该进来。
  */
@@ -61,17 +80,33 @@ const DARK_FG = /(?<!-)color:\s*(#[0-9a-fA-F]{3,8}|black)\s*;/g
 const SERIF_FAMILY = /font-family:\s*var\(--font-serif\)/
 
 function walk(dir: string): string[] {
+  return walkExt(dir, SCAN_EXT)
+}
+
+function walkExt(dir: string, exts: Set<string>): string[] {
   const out: string[] = []
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) {
       if (entry.name === 'node_modules') continue
-      out.push(...walk(full))
-    } else if (SCAN_EXT.has(path.extname(entry.name))) {
+      out.push(...walkExt(full, exts))
+    } else if (exts.has(path.extname(entry.name))) {
       out.push(full)
     }
   }
   return out
+}
+
+/**
+ * 去掉「注释行」与「var() 及其 fallback」后再扫描 hex。
+ * - 注释里的 hex（如说明文字）不应算违规；
+ * - `var(--x, #hex)` 的 fallback 不随主题切换，但它是变量缺失时的兜底，
+ *   且大量存量如此，故放行（真正要防的是「直接写死成生效色」）。
+ */
+function stripCommentsAndVarFallbacks(line: string): string {
+  const trimmed = line.trim()
+  if (trimmed.startsWith('*') || trimmed.startsWith('/*') || trimmed.startsWith('//')) return ''
+  return line.replace(/var\([^)]*\)/g, '')
 }
 
 function rel(abs: string): string {
@@ -174,5 +209,37 @@ describe('设计系统防回退守卫', () => {
     const css = fs.readFileSync(path.join(SRC, 'styles', 'variables.css'), 'utf8')
     expect(css).toContain('--font-display: var(--font-serif);')
     expect(css).toContain('--font-title:')
+  })
+
+  it('除 variables.css 外不得出现 var(--font-serif)（展示级衬线只走 --font-display）', () => {
+    const bad: string[] = []
+    for (const file of files) {
+      const r = rel(file)
+      if (r === 'styles/variables.css') continue
+      const text = fs.readFileSync(file, 'utf8')
+      for (const [i, line] of text.split('\n').entries()) {
+        if (line.includes('var(--font-serif)')) bad.push(`${r}:${i + 1}  ${line.trim()}`)
+      }
+    }
+    expect(bad, `请改用 var(--font-display)：\n${bad.join('\n')}`).toEqual([])
+  })
+
+  it('业务文件不得写死颜色 hex（评分/语义色必须走令牌）', () => {
+    const bad: string[] = []
+    for (const file of walkExt(SRC, HEX_SCAN_EXT)) {
+      const r = rel(file)
+      if (HEX_ALLOWED_FILES.has(r)) continue
+      for (const [i, raw] of fs.readFileSync(file, 'utf8').split('\n').entries()) {
+        const line = stripCommentsAndVarFallbacks(raw)
+        if (!line) continue
+        for (const m of line.matchAll(HEX_LITERAL)) {
+          if (HEX_NEUTRAL.test(m[0])) continue
+          if (isAllowed(r, raw)) continue
+          bad.push(`${r}:${i + 1}  ${raw.trim()}`)
+        }
+      }
+    }
+    expect(bad, `请改用语义令牌（如 var(--score-good) / var(--c-danger)），不要写死 hex：\n${bad.join('\n')}`)
+      .toEqual([])
   })
 })

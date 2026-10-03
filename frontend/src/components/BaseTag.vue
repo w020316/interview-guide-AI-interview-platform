@@ -73,28 +73,30 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 }
 .base-tag--primary {
   background: var(--brand-primary-light);
-  color: var(--brand-primary-active);
+  /* v1.48.0：原用 --brand-primary-active，暗色下 #0d9488 on #12322e 仅 3.69:1（<AA）。
+   * 改用 --brand-primary：亮 5.27:1 / 暗 5.55:1，均达标。 */
+  color: var(--brand-primary);
   border-color: var(--brand-primary-200);
 }
 .base-tag--success {
   background: var(--c-success-light);
   color: var(--c-success);
-  border-color: #bbf7d0;
+  border-color: var(--c-success-border);
 }
 .base-tag--warning {
   background: var(--c-warning-light);
   color: var(--c-warning);
-  border-color: #fde68a;
+  border-color: var(--c-warning-border);
 }
 .base-tag--danger {
   background: var(--c-danger-light);
   color: var(--c-danger);
-  border-color: #fecaca;
+  border-color: var(--c-danger-border);
 }
 .base-tag--info {
   background: var(--c-info-light);
   color: var(--c-info);
-  border-color: #bfdbfe;
+  border-color: var(--c-info-border);
 }
 
 /* 关闭按钮 */

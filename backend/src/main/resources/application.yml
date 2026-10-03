@@ -87,6 +87,17 @@ app:
     # 排队超过该时长即快速失败：前台返回 503「AI 并发闸门排队超时」，后台本次跳过。
     # 取值须 < 上游读超时（application.yml 的 app.ai.read-timeout-seconds=240），否则许可可能长期被占。
     guard-acquire-timeout-seconds: ${AI_GUARD_ACQUIRE_TIMEOUT_SECONDS:30}
+    # ── 按厂商 RPM 令牌桶（v1.48.0，第六轮 P1）──────────────────────────
+    # 与上面的并发闸门**叠加**：并发闸门限「同时进行数」，本项限「每分钟请求数」。
+    # 背景：实测 Agnes 免费档 20 RPM，5 并发 × ~2s 可冲到 ~150 RPM；30 并发突发
+    #       时 14/30 成功、16 次 HTTP 429（响应体为空，无法从 body 判断原因）。
+    # 阈值在各 chain 节点的 rpm 字段上配置（对厂商官方额度留余量）；同一 base-url
+    # 的多个节点共用同一个桶（账户级配额共享）。触顶即降级到下一节点，不阻塞等待。
+    # 账户级限流（智谱 1302 / HTTP 429）会退避（约 1s、2s）+ 抖动后重试本节点，
+    # 最多 max-retries 次；平台全局过载（智谱 1305）立即换下一节点。
+    rate-limit:
+      enabled: ${AI_RATE_LIMIT_ENABLED:true}
+      max-retries: ${AI_RATE_LIMIT_MAX_RETRIES:2}
     # P2-06 后续（2026-09-19）：embedding 提供方可插拔——Agnes 已下线全部 embedding 模型，
     # 配置 AI_EMBEDDING_BASE_URL + AI_EMBEDDING_API_KEY + AI_EMBEDDING_MODEL 即指向第三方
     # （如硅基流动 https://api.siliconflow.cn/v1 + BAAI/bge-m3 + AI_EMBEDDING_DIMENSIONS=1024），
@@ -161,6 +172,8 @@ app:
         api-key: ${AI_API_KEY:}
         model: ${AI_CHAT_MODEL:agnes-2.5-flash}
         temperature: ${AI_TEMPERATURE:0.7}
+        # v1.48.0：Agnes 免费档实测 20 RPM，留余量设 15（第六轮 P1）
+        rpm: ${AI_AGNES_RPM:15}
       # ── NVIDIA build.nvidia.com（v1.46.0，第三家厂商）────────────────────
       # 2026-10-01 实测（该 Key 下 81 个模型可选）：主力候选里只有 gpt-oss-20b 稳定可用，
       # 其余要么超时要么极慢（glm-5.3-flash 85s、kimi-k3 180s、gemma-4-31b 超时、
@@ -176,11 +189,16 @@ app:
         api-key: ${AI_NVIDIA_API_KEY:}
         model: ${AI_NVIDIA_MODEL:openai/gpt-oss-20b}
         temperature: ${AI_TEMPERATURE:0.7}
+        # v1.48.0：NVIDIA 实测约 40 RPM，留余量设 30（第六轮 P1）
+        rpm: ${AI_NVIDIA_RPM:30}
       - name: zhipu-quality
         base-url: ${AI_ZHIPU_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
         api-key: ${AI_ZHIPU_API_KEY:}
         model: ${AI_ZHIPU_CHAT_MODEL:glm-4.7-flash}
         temperature: ${AI_TEMPERATURE:0.7}
+        # 智谱限流以并发为核心，默认不设 RPM 上限（0 = 不限）；如需可经 AI_ZHIPU_RPM 开启。
+        # 两个智谱节点同 base-url，共用一个桶。
+        rpm: ${AI_ZHIPU_RPM:0}
         # 智谱默认开思考模式 → content 为空 → 兜底节点被静默跳过（P1-02）
         thinking-disabled: true
       - name: zhipu-lastresort
@@ -188,6 +206,7 @@ app:
         api-key: ${AI_ZHIPU_API_KEY:}
         model: ${AI_ZHIPU_FALLBACK_MODEL:glm-4-flash}
         temperature: ${AI_TEMPERATURE:0.7}
+        rpm: ${AI_ZHIPU_RPM:0}
         thinking-disabled: true
   jwt:
     secret: ${JWT_SECRET}
@@ -208,7 +227,7 @@ app:
     #    导致「与前端同步」这个约定在公开接口上一直没生效（两个端点报两个版本号）。
     #    现已改为读本配置；改版本时除了这里与 changelog.ts，无需再动代码。
     name: ${APP_INFO_NAME:interview-guide}
-    version: ${APP_INFO_VERSION:1.47.0}
+    version: ${APP_INFO_VERSION:1.48.0}
     description: ${APP_INFO_DESCRIPTION:AI 智能面试辅助平台后端}
     # 构建日期，CI 注入；未配置时 fallback 为当天
     build-date: ${APP_INFO_BUILD_DATE:}

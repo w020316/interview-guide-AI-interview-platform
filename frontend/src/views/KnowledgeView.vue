@@ -164,7 +164,7 @@
             <div class="stat-name">已答题</div>
           </div>
           <div class="stat-card">
-            <div class="stat-num" style="color: #ef4444">{{ summary.wrongQuestions }}</div>
+            <div class="stat-num" :style="{ color: summary.wrongQuestions > 0 ? 'var(--c-danger)' : 'var(--c-success)' }">{{ summary.wrongQuestions }}</div>
             <div class="stat-name">错题数</div>
           </div>
           <div class="stat-card">
@@ -834,7 +834,7 @@ function formatTime(t?: string) {
 
 .tag-danger {
   background: rgba(239, 68, 68, 0.08);
-  color: #dc2626;
+  color: var(--c-danger);
   border-color: rgba(220, 38, 38, 0.18);
 }
 

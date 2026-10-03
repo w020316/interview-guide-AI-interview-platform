@@ -85,9 +85,31 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.47.0'
+export const CURRENT_VERSION = '1.48.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.48.0',
+    date: '2026-10-03',
+    title: '版本 1.48.0 · 首页现在讲清了「这是个秋招求职工作台」',
+    items: [
+      { text: '首页：以前首页只讲「简历分析 / 岗位分析 / 模拟面试」三件事，其实这里早就不只是面试练习——现在把**招聘广场、投递看板、求职诊断**这些真正能帮你跑完整个秋招的功能提到了首屏，你不用再翻菜单才发现它们', level: 'user' },
+      { text: '首页：数据条不再只写「6 求职工具」这个数字，而是把六个工具**直接列出来**，一眼知道有什么', level: 'user' },
+      { text: '导航：「岗位分析」改名「**JD 拆解**」——它和「招聘广场」只差一个字，以前很难判断该点哪个（一个是你贴 JD 进来拆解，一个是浏览岗位列表）', level: 'user' },
+      { text: '导航：「**投递看板**」从「求职工具」下拉里提到了主导航，就在「招聘广场」旁边，形成「找岗位 → 管投递」一条线（投递追踪是秋招里除了找岗位最常做的事，以前要点两层才找得到）', level: 'user' },
+      { text: '成长趋势：手机上打开趋势图，右边的数据点不再被裁掉；横轴刻度也会按屏幕宽度自动抽稀，不再挤成一团', level: 'user' },
+      { text: '表单：填错时不再只是「边框变红」——现在会给出**具体的错误说明**，读屏软件也能正确念出是哪个字段错了', level: 'user' },
+      { text: '深色模式：修好了三处「颜色不跟着主题变」的地方——语义标签在深色下不再有一圈刺眼的白边；最浅的那档说明文字对比度提到达标（以前偏灰看不清）；登录页左侧的品牌色块在深色下不再反而更亮', level: 'user' },
+      { text: '知识库：答对/答错统计里的「0 道错题」不再用**危险红**显示（0 是好事）', level: 'user' },
+      { text: '前端：评分配色从写死的 hex 改为语义令牌 `--score-excellent/good/pass/fail`（原先深色下品牌墨绿会提亮、而蓝/红完全不变，是写死色的铁证；「良好」档回归品牌墨绿）；删除零调用的 `getScoreBg` 死代码；同步修正 `score.test.ts` 里锁死写死值的断言', level: 'tech' },
+      { text: '前端：新增 `designGuards` 门禁两条——「业务文件不得写死颜色 hex」（含例外白名单与逐条理由）与「除 variables.css 外禁用 var(--font-serif)」；已用注入 hex 的方式反向验证门禁确实会失败', level: 'tech' },
+      { text: '前端：BaseTag 四变体边框令牌化（原写死浅色，深色下边框对比是同页正常标签的 6~11 倍）；`--c-text-quaternary` 对比度由 2.51:1 / 3.49:1 提到 4.57:1 / 4.56:1；管理后台环形图配色去掉紫与蓝改墨绿单色系；新增 EmptyChart 统一三处空态；导航配置从 App.vue 抽到 navigation.ts 以便单测', level: 'tech' },
+      { text: '后端：新增按厂商的 **RPM 令牌桶** `AiRateLimiter`（Agnes 15 / NVIDIA 30 / 智谱走并发闸门，阈值可配）。此前 `AiConcurrencyGuard` 只限并发不限 RPM —— 实测 30 并发会打到 14/30 成功、16 次 429', level: 'tech' },
+      { text: '后端：AI 降级链按错误码分流 —— 智谱 **1302**（账户限流）与 Agnes **429** 退避后重试本节点，智谱 **1305**（平台过载）立即换下一节点；此前一律「换下一节点」，1302/429 场景处理不当', level: 'tech' },
+      { text: '后端：统一「资源不存在」语义为 **HTTP 404 + code 404**（原先三套并存：HTTP 404 / HTTP 200+code404 / **HTTP 503+code503**），涉及 6 个端点；动手前已核查前端全部走 getErrMessage 读 message，不判 status/code，故不影响线上', level: 'tech' },
+      { text: '后端：修复日期腐烂测试 `campusSeed_dataIntegrity`（种子截止日期 2026-09-30 已过期导致每天必红），改为「不早于数据集基准日 + 上界 3 年」，保留脏数据捕获意图', level: 'tech' },
+    ],
+  },
   {
     version: '1.47.0',
     date: '2026-10-03',

@@ -249,7 +249,7 @@
             <span class="card-icon improvements-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M9 21h6 M10 18h4 M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"
-                  stroke="#d97706" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  stroke="var(--c-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </span>
             <h4>改进建议</h4>
@@ -332,6 +332,7 @@ import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
 import { getScoreColor, getScoreGradient } from '../utils/score'
+import { EMPTY } from '../utils/format'
 import { JOB_SUGGESTIONS } from '../utils/jobOptions'
 import {
   COPY_LINK_LABEL,
@@ -626,7 +627,7 @@ const scoreLevel = computed(() => {
   if (s >= 70) return '良好 · 仍有提升空间'
   if (s >= 60) return '合格 · 建议针对性优化'
   if (s > 0) return '待提升 · 需重点修改'
-  return '-'
+  return EMPTY
 })
 
 /** 重新分析时清空优化简历 */

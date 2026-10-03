@@ -24,7 +24,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -191,6 +193,31 @@ class InterviewEventControllerTest {
             assertThat(captor.getValue().getStatus())
                     .as("未提供 status 时不得修改")
                     .isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/calendar/event/{id} 删除日程")
+    class Delete {
+
+        @Test
+        @DisplayName("日程不存在返回 HTTP 404 + code 404（v1.48.0 统一口径）")
+        void delete_missingEvent_returns404() throws Exception {
+            doThrow(new com.example.interview.common.ResourceNotFoundException("日程不存在：999999999"))
+                    .when(eventService).delete(eq(999999999L), eq(USER_ID));
+
+            mockMvc.perform(delete("/api/calendar/event/999999999"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value(404))
+                    .andExpect(jsonPath("$.message").value("日程不存在：999999999"));
+        }
+
+        @Test
+        @DisplayName("删除成功返回 200")
+        void delete_ok_returns200() throws Exception {
+            mockMvc.perform(delete("/api/calendar/event/1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
         }
     }
 }
