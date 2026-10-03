@@ -28,6 +28,8 @@ import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -134,6 +136,26 @@ class ResumeControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").exists());
+        }
+
+        @Test
+        @DisplayName("analyze: AI 结果格式异常 → 503，且**不落库**（P1-01 回归：失败不写兜底脏数据）")
+        void analyze_invalidResult_returns503AndDoesNotPersist() throws Exception {
+            when(resumeAnalysisService.analyze(USER_ID, "我的简历", "Java 后端"))
+                    .thenThrow(new com.example.interview.common.BusinessException("简历分析结果格式异常，请稍后重试"));
+
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "resumeText", "我的简历", "targetJob", "Java 后端"));
+
+            mockMvc.perform(post("/api/resume/analyze")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.code").value(503))
+                    .andExpect(jsonPath("$.message").value("简历分析结果格式异常，请稍后重试"));
+
+            // 关键：分析失败时绝不调用 saveResume，避免把兜底串当正常结果落库
+            verify(resumeService, never()).saveResume(any(), any(), any(), any());
         }
     }
 

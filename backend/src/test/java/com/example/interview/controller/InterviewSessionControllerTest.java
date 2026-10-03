@@ -108,6 +108,27 @@ class InterviewSessionControllerTest {
         }
 
         @Test
+        @DisplayName("jobDescription 类型错误（数字/布尔/数组/对象）返回 400 而非 500（P1-03 回归）")
+        void create_wrongTypeJobDescription_returns400() throws Exception {
+            // 复现原缺陷输入形状：原实现 (String) req.get("jobDescription") 对这些值强转
+            // 抛 ClassCastException → HTTP 500。修复后应为 400，并指明字段与期望类型。
+            String[] bodies = {
+                    "{\"jobDescription\":12345}",
+                    "{\"jobDescription\":true}",
+                    "{\"jobDescription\":[\"a\",\"b\"]}",
+                    "{\"jobDescription\":{\"x\":1}}"
+            };
+            for (String body : bodies) {
+                mockMvc.perform(post("/api/session/create")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.code").value(400))
+                        .andExpect(jsonPath("$.message").value("jobDescription 类型错误，期望字符串"));
+            }
+        }
+
+        @Test
         @DisplayName("合法入参返回 200 + 会话实体")
         void create_validInput_returns200() throws Exception {
             InterviewSessionEntity session = InterviewSessionEntity.builder()
@@ -434,6 +455,19 @@ class InterviewSessionControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(400))
                     .andExpect(jsonPath("$.message").value("userAnswer 不能为空"));
+        }
+
+        @Test
+        @DisplayName("userAnswer 类型错误（数字）返回 400 而非 500（P1-03 回归）")
+        void saveAnswer_wrongTypeUserAnswer_returns400() throws Exception {
+            String body = "{\"questionId\":1,\"userAnswer\":12345}";
+
+            mockMvc.perform(post("/api/session/answer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("userAnswer 类型错误，期望字符串"));
         }
 
         @Test

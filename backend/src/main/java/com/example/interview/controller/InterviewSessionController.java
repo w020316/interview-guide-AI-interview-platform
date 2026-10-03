@@ -86,7 +86,14 @@ public class InterviewSessionController {
     @PostMapping("/create")
     public Result<InterviewSessionEntity> createSession(@RequestBody Map<String, Object> req) {
         String userId = currentUserId();
-        String jobDesc = (String) req.get("jobDescription");
+        // 第六轮 P1-03：此前 (String) req.get("jobDescription") 对数字/布尔/数组/对象强转
+        // 抛 ClassCastException → 500。改为区分「类型错误（400）」与「缺失/空（400 不能为空）」。
+        com.example.interview.util.RequestFieldUtil.TextField jd =
+                com.example.interview.util.RequestFieldUtil.text(req, "jobDescription");
+        if (jd.hasTypeError()) {
+            return Result.error(400, com.example.interview.util.RequestFieldUtil.typeError("jobDescription"));
+        }
+        String jobDesc = jd.value();
         Long resumeId = req.get("resumeId") != null
                 ? Long.valueOf(req.get("resumeId").toString()) : null;
 
@@ -214,7 +221,13 @@ public class InterviewSessionController {
             return Result.error(400, "questionId 不能为空");
         }
         Long questionId = Long.valueOf(qid.toString());
-        String userAnswer = (String) req.get("userAnswer");
+        // 第六轮 P1-03：userAnswer 同样不再无条件强转（数字/数组/对象 → 400 而非 500）
+        com.example.interview.util.RequestFieldUtil.TextField ua =
+                com.example.interview.util.RequestFieldUtil.text(req, "userAnswer");
+        if (ua.hasTypeError()) {
+            return Result.error(400, com.example.interview.util.RequestFieldUtil.typeError("userAnswer"));
+        }
+        String userAnswer = ua.value();
         Integer score = req.get("evaluationScore") != null
                 ? Integer.valueOf(req.get("evaluationScore").toString()) : null;
 

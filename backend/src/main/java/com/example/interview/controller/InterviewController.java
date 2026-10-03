@@ -5,6 +5,7 @@ import com.example.interview.service.InterviewService;
 import com.example.interview.util.HashUtil;
 import com.example.interview.util.ImageTypeValidator;
 import com.example.interview.util.PromptSanitizer;
+import com.example.interview.util.RequestFieldUtil;
 import com.example.interview.util.SseConcurrencyGuard;
 import com.example.interview.util.SsrUrlValidator;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -100,8 +101,18 @@ public class InterviewController {
      */
     @PostMapping("/questions")
     public Result<String> generateQuestions(@RequestBody Map<String, Object> request) {
-        String resumeText = (String) request.get("resumeText");
-        String jobDescription = (String) request.get("jobDescription");
+        // 第六轮 P1-03：此前 (String) request.get(...) 对数字/布尔/数组/对象强转抛
+        // ClassCastException → 500。类型错误应返回 400（与 MethodArgumentTypeMismatch 对齐）。
+        RequestFieldUtil.TextField rt = RequestFieldUtil.text(request, "resumeText");
+        RequestFieldUtil.TextField jd = RequestFieldUtil.text(request, "jobDescription");
+        if (rt.hasTypeError()) {
+            return Result.error(400, RequestFieldUtil.typeError("resumeText"));
+        }
+        if (jd.hasTypeError()) {
+            return Result.error(400, RequestFieldUtil.typeError("jobDescription"));
+        }
+        String resumeText = rt.value();
+        String jobDescription = jd.value();
         // 安全类型转换：避免 ClassCastException
         int count = 5;
         Object countObj = request.get("count");

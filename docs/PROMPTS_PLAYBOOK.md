@@ -58,7 +58,7 @@
 ## 二、提示词 B：真实用户体验评估（浏览器代理实测）
 
 ```text
-以真实用户视角对 https://interview-guide-ai-interview-platform.pages.dev 做体验评估，
+以真实用户视角对 https://offergo.pages.dev 做体验评估，
 用浏览器自动化（可先注册测试账号）完整走通以下 3 个核心场景并记录：
 
 【场景】

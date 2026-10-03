@@ -50,7 +50,11 @@ public class InterviewEventEntity {
     @Column(name = "interview_at", nullable = false)
     private LocalDateTime interviewAt;
 
-    /** 状态：UPCOMING / COMPLETED / CANCELLED */
+    /**
+     * 状态：UPCOMING / DONE / CANCELLED。
+     * 取值白名单与前端 {@code CalendarView.vue} 的 option、{@code utils/calendar.ts} 的
+     * {@code EventStatus} 保持一致（第六轮 P1-04 校正：此前注释误写 COMPLETED，实际前端用 DONE）。
+     */
     @Column(name = "status", length = 20)
     @Builder.Default
     private String status = "UPCOMING";

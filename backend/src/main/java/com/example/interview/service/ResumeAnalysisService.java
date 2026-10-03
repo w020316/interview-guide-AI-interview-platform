@@ -156,38 +156,32 @@ public class ResumeAnalysisService {
                 throw new com.example.interview.common.BusinessException("AI 返回内容为空，请稍后重试");
             }
 
-            // 5. 清理 Markdown + 修复非标准 JSON
-            String cleaned = JsonRepairUtil.repairAndLog(response, "resume-analyze");
-
-            // 6. 合法性校验：修复后仍非法则用兜底 JSON（保证前端不报错）
-            boolean usedFallback = false;
-            if (!JsonRepairUtil.isValid(cleaned)) {
-                log.warn("AI 返回修复后仍非法，使用兜底 JSON。原始返回前 200 字符：{}",
-                        response.length() > 200 ? response.substring(0, 200) + "..." : response);
-                cleaned = JsonRepairUtil.FALLBACK_JSON;
-                usedFallback = true;
-            }
-
-            // 7. 写入缓存（30 分钟，Redis 不可用时静默跳过）
+            // 5. 清理 Markdown + 修复非标准 JSON，并做**契约校验**：失败重试一次，仍失败抛 BusinessException。
             //
-            // v1.34.1 修复（P2-7）：兜底 JSON 此前也被写入 30 分钟缓存。
-            // AI 只是临时抖动（如上游返回被截断）产生的兜底结果会被缓存住，
-            // 之后即便 AI 已恢复，同一简历仍会命中兜底内容，用户体感「一直坏」。
-            // 现兜底结果一律不缓存（等价于下次重试），脏数据不进缓存。
-            if (!usedFallback) {
-                try {
-                    redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);
-                } catch (Exception e) {
-                    // v1.34.1（P2-5）：Redis 写入失败时落进程内兜底缓存，
-                    // 使无 Redis 环境下的重复简历分析也能命中缓存（否则每次都全额调用 LLM）
-                    log.warn("Redis 缓存写入失败，改用进程内缓存：{}", e.getMessage());
-                    redisFallbackCache.put(cacheKey, cleaned, CACHE_TTL_MILLIS);
-                }
-            } else {
-                log.info("本次为兜底结果，跳过写入缓存（避免抖动结果被缓存 30 分钟）");
+            // v1.47.0（第六轮 P1-01）：此前修复后仍非法就返回兜底 JSON，且该兜底串自带
+            // "overallScore":0 → 被 saveResume 当正常结果落库 → 用户看到「0 分」，
+            // 与真实 0 分无法区分（实测原始输出结构性损坏率 ≈46%，绝非罕见边界）。
+            // 现对齐 InterviewService.validateOrRetry()：校验必需字段与类型，失败重试一次，
+            // 仍失败抛 BusinessException（GlobalExceptionHandler 映射为 503），**不再返回兜底串**。
+            String cleaned = validateOrRetryResume(response, () ->
+                    com.example.interview.ai.AiConcurrencyGuard.call(() ->
+                            chatClient.prompt()
+                                    .user(prompt)
+                                    .call()
+                                    .content()));
+
+            // 6. 写入缓存（30 分钟，Redis 不可用时静默跳过）
+            //    校验已保证 cleaned 为可用结果，因此直接缓存；兜底脏数据不可能再进入缓存。
+            try {
+                redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);
+            } catch (Exception e) {
+                // v1.34.1（P2-5）：Redis 写入失败时落进程内兜底缓存，
+                // 使无 Redis 环境下的重复简历分析也能命中缓存（否则每次都全额调用 LLM）
+                log.warn("Redis 缓存写入失败，改用进程内缓存：{}", e.getMessage());
+                redisFallbackCache.put(cacheKey, cleaned, CACHE_TTL_MILLIS);
             }
 
-            // 8. 简历文本向量化存入向量库
+            // 7. 简历文本向量化存入向量库
             storeResumeEmbedding(cacheKey, userId, resumeText);
 
             return cleaned;
@@ -195,6 +189,87 @@ public class ResumeAnalysisService {
             resumeCounter.increment();
             aiCallTimer.record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         }
+    }
+
+    /** 简历分析 JSON 校验用（字段少、结构固定，独立实例足够，避免与全局 ObjectMapper 配置耦合） */
+    private static final com.fasterxml.jackson.databind.ObjectMapper RESUME_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /**
+     * 校验简历分析结果是否为「可用的」JSON —— 既要能解析，也要满足业务契约：
+     * <ul>
+     *   <li>{@code overallScore} 为**数值**且在 0~100 之间（不能是 null/字符串/越界）；</li>
+     *   <li>{@code dimensions} 为**非空数组**，且每项的 {@code score} 为数值。</li>
+     * </ul>
+     *
+     * <p>为什么必须有这层校验（v1.47.0，第六轮 P1-01）：简历分析 JSON 是**嵌套结构**，
+     * 实测 Agnes 直连复刻提示词 13 次有 6 次（≈46%）原始输出结构性损坏，而 {@code JsonRepairUtil}
+     * 对失败样本 3/3 修复失败 → 此前会落到自带 {@code "overallScore":0} 的兜底串，
+     * 被 {@code saveResume} 当正常结果落库（静默失败）。面试评分链路早有等价的
+     * {@code InterviewService.validateOrRetry()}，本方法补齐简历链路这处漏网点。
+     */
+    static boolean isValidResumeAnalysis(String json) {
+        if (!JsonRepairUtil.isValid(json)) {
+            return false;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = RESUME_MAPPER.readTree(json);
+            com.fasterxml.jackson.databind.JsonNode score = node.get("overallScore");
+            if (score == null || !score.isNumber()) {
+                return false;
+            }
+            double v = score.asDouble();
+            if (v < 0 || v > 100) {
+                return false;
+            }
+            com.fasterxml.jackson.databind.JsonNode dims = node.get("dimensions");
+            if (dims == null || !dims.isArray() || dims.isEmpty()) {
+                return false;
+            }
+            for (com.fasterxml.jackson.databind.JsonNode d : dims) {
+                com.fasterxml.jackson.databind.JsonNode s = d.get("score");
+                if (s == null || !s.isNumber()) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 输出前校验：破损 JSON 先重试一次，仍不合格则抛出明确错误。
+     *
+     * <p>范式对齐 {@code InterviewService.validateOrRetry()}——「要么合法，要么明确失败」，
+     * **不再把兜底串当成功结果返回**。重试会多消耗一次 AI 调用，但只在解析/契约失败时发生，
+     * 相比「把脏数据当成功下发、前端渲染出 0 分或空面板」，这个代价是值得的。
+     *
+     * @param retryCall 重试时重新发起 AI 调用的动作（需自行包裹并发闸门）
+     */
+    private String validateOrRetryResume(String raw, java.util.function.Supplier<String> retryCall) {
+        String repaired = JsonRepairUtil.repairAndLog(raw, "resume-analyze");
+        if (isValidResumeAnalysis(repaired)) {
+            return repaired;
+        }
+        log.warn("简历分析输出非法 JSON（已尝试修复），重试一次。原文前 200 字：{}", TextUtil.truncate(raw, 200));
+
+        String retryRaw;
+        try {
+            retryRaw = retryCall.get();
+        } catch (Exception e) {
+            log.warn("简历分析重试调用失败：{}", e.getMessage());
+            throw new com.example.interview.common.BusinessException("简历分析结果格式异常，请稍后重试");
+        }
+        if (retryRaw == null || retryRaw.isBlank()) {
+            throw new com.example.interview.common.BusinessException("简历分析结果格式异常，请稍后重试");
+        }
+        String retryRepaired = JsonRepairUtil.repairAndLog(retryRaw, "resume-analyze-retry");
+        if (isValidResumeAnalysis(retryRepaired)) {
+            return retryRepaired;
+        }
+        log.error("简历分析重试后仍非法，放弃本次分析。原文前 200 字：{}", TextUtil.truncate(retryRaw, 200));
+        throw new com.example.interview.common.BusinessException("简历分析结果格式异常，请稍后重试");
     }
 
     /**

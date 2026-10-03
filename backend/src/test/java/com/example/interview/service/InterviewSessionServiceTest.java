@@ -316,7 +316,7 @@ class InterviewSessionServiceTest {
     }
 
     @Test
-    @DisplayName("questionSummary: 空用户应返回全零统计")
+    @DisplayName("questionSummary: 空用户应返回零计数，但平均分为 null（无样本 ≠ 0 分，P1-02 回归）")
     void questionSummary_emptyUser_shouldReturnZeroStats() {
         when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of());
 
@@ -325,9 +325,74 @@ class InterviewSessionServiceTest {
         assertThat(summary.get("totalQuestions")).isEqualTo(0L);
         assertThat(summary.get("answeredQuestions")).isEqualTo(0L);
         assertThat(summary.get("wrongQuestions")).isEqualTo(0L);
-        assertThat(summary.get("averageScore")).isEqualTo(0.0);
+        // P1-02：无任何评分时 averageScore 必须是 null，而不是 0.0（0 会被误读为「考了 0 分」）
+        assertThat(summary.get("averageScore")).isNull();
         assertThat((List<?>) summary.get("byCategory")).isEmpty();
         assertThat((List<?>) summary.get("byDifficulty")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("questionSummary: 分组内题目全部未作答时 avgScore 为 null，且不抛 NPE（P1-02 回归）")
+    void questionSummary_unansweredGroup_avgScoreIsNullAndNoNpe() {
+        // 复现原缺陷的输入形状：有题目、有分类，但 evaluationScore 全为 null（从未作答/评分）
+        InterviewQuestionEntity q1 = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("s1").category("核心技术").difficulty("MEDIUM")
+                .userAnswer(null).evaluationScore(null).build();
+        InterviewQuestionEntity q2 = InterviewQuestionEntity.builder()
+                .id(2L).sessionId("s1").category("核心技术").difficulty("MEDIUM")
+                .userAnswer("  ").evaluationScore(null).build();
+        InterviewSessionEntity s1 = InterviewSessionEntity.builder().sessionId("s1").build();
+        when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1")).thenReturn(List.of(s1));
+        when(questionRepository.findBySessionIdInOrderByCreatedAtDesc(anyCollection()))
+                .thenReturn(List.of(q1, q2));
+
+        // 修复前：buildStat 用 .orElse(0.0) → 分组 avgScore=0.0，前端渲染「0 分」+ 危险红
+        // 修复前若改值为 null 而未同步修排序，还会在此处 NPE
+        Map<String, Object> summary = service.questionSummary("user1");
+
+        assertThat(summary.get("answeredQuestions")).isEqualTo(0L);
+        assertThat(summary.get("averageScore")).isNull();
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> byCategory = (List<Map<String, Object>>) summary.get("byCategory");
+        assertThat(byCategory).hasSize(1);
+        Map<String, Object> catStat = byCategory.get(0);
+        assertThat(catStat.get("total")).isEqualTo(2L);
+        assertThat(catStat.get("answered")).isEqualTo(0L);
+        assertThat(catStat.get("avgScore"))
+                .as("全部未作答时 avgScore 必须是 null，不能是 0.0")
+                .isNull();
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> byDifficulty = (List<Map<String, Object>>) summary.get("byDifficulty");
+        assertThat(byDifficulty).hasSize(1);
+        assertThat(byDifficulty.get(0).get("avgScore")).isNull();
+    }
+
+    @Test
+    @DisplayName("questionProfile: 无样本分类的 avgScore 为 null，排序用 nullsLast 不抛 NPE（P1-02 回归）")
+    void questionProfile_nullAvgScore_doesNotThrowAndSortsLast() {
+        when(questionRepository.countByUserId("user1")).thenReturn(3L);
+        when(questionRepository.countWrongByUserId("user1", 60)).thenReturn(0L);
+        when(questionRepository.avgEvaluationScoreByUserId("user1")).thenReturn(null);
+        // 一行 avg=null（无样本分类）、一行 avg=88.0（有样本分类）
+        when(questionRepository.categoryStatsByUserId("user1")).thenReturn(List.<Object[]>of(
+                new Object[]{"未练习分类", 2L, null},
+                new Object[]{"已练习分类", 1L, 88.0}));
+
+        Map<String, Object> profile = service.questionProfile("user1", 60);
+
+        // 无任何评分 → averageScore 为 null（而非 0.0）
+        assertThat(profile.get("averageScore")).isNull();
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> byCategory = (List<Map<String, Object>>) profile.get("byCategory");
+        assertThat(byCategory).hasSize(2);
+        // nullsLast：无样本分类（avgScore=null）排在最后，不再因 (Double) 强转抛 NPE
+        assertThat(byCategory.get(0).get("category")).isEqualTo("已练习分类");
+        assertThat(byCategory.get(0).get("avgScore")).isEqualTo(88.0);
+        assertThat(byCategory.get(1).get("category")).isEqualTo("未练习分类");
+        assertThat(byCategory.get(1).get("avgScore")).isNull();
     }
 
     @Test

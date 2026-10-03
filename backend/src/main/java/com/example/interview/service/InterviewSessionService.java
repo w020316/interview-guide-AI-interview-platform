@@ -13,6 +13,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -163,20 +164,30 @@ public class InterviewSessionService {
         long total = questionRepository.countByUserId(userId);
         long wrong = questionRepository.countWrongByUserId(userId, threshold);
         Double avg = questionRepository.avgEvaluationScoreByUserId(userId);
-        double roundedAvg = avg == null ? 0.0 : Math.round(avg * 10) / 10.0;
+        // v1.47.0（第六轮 P1-02）：无任何评分时返回 null（而非 0.0）——「无样本」≠「0 分」。
+        // 0.0 会被误读为「考了 0 分」，与「还没练过」在画像里无法区分。
+        Double roundedAvg = avg == null ? null : Math.round(avg * 10) / 10.0;
 
         // 各分类掌握度（按平均分升序，最薄弱的排前面，便于直接取 Top3 注入画像）
         List<Map<String, Object>> byCategory = new java.util.ArrayList<>();
         for (Object[] row : questionRepository.categoryStatsByUserId(userId)) {
             if (row == null || row[0] == null) continue;
-            double catAvg = row[2] instanceof Number n ? n.doubleValue() : 0.0;
+            Double catAvg = row[2] instanceof Number n ? n.doubleValue() : null;
             Map<String, Object> item = new java.util.LinkedHashMap<>();
             item.put("category", row[0]);
             item.put("total", row[1] instanceof Number n ? n.longValue() : 0L);
-            item.put("avgScore", Math.round(catAvg * 10) / 10.0);
+            item.put("avgScore", catAvg == null ? null : Math.round(catAvg * 10) / 10.0);
             byCategory.add(item);
         }
-        byCategory.sort((a, b) -> Double.compare((Double) a.get("avgScore"), (Double) b.get("avgScore")));
+        // v1.47.0（第六轮 P1-02）：avgScore 可能为 null，排序必须 null-safe。
+        //
+        // ⚠️ 注意不能写成 Comparator.nullsLast((a,b) -> Double.compare((Double) a.get("avgScore"), ...))：
+        // nullsLast 判断的是**元素本身**（这里是 Map）是否为 null，而 null 在 Map 的 value 里，
+        // 元素永远非 null → 委托比较器仍会拿到 null 值并因 (Double) 拆箱抛 NPE。
+        // 正确做法：用 comparing(keyExtractor, nullsLast(naturalOrder)) 让 null 判定作用在**键值**上。
+        byCategory.sort(Comparator.comparing(
+                (Map<String, Object> m) -> (Double) m.get("avgScore"),
+                Comparator.nullsLast(Comparator.<Double>naturalOrder())));
 
         Map<String, Object> result = new java.util.LinkedHashMap<>();
         result.put("totalQuestions", total);
@@ -271,11 +282,15 @@ public class InterviewSessionService {
                 .filter(q -> q.getEvaluationScore() != null && q.getEvaluationScore() < 60)
                 .count();
 
-        double avgScore = all.stream()
+        // v1.47.0（第六轮 P1-02）：无任何评分时 averageScore 为 null（而非 0.0）——
+        // 「无样本」不得被表达成「0 分」，否则前端会渲染「0 分」并配危险红。
+        java.util.OptionalDouble avgOpt = all.stream()
                 .filter(q -> q.getEvaluationScore() != null)
                 .mapToInt(InterviewQuestionEntity::getEvaluationScore)
-                .average()
-                .orElse(0.0);
+                .average();
+        Double avgScore = avgOpt.isPresent()
+                ? Math.round(avgOpt.getAsDouble() * 10) / 10.0
+                : null;
 
         // 按分类聚合
         Map<String, List<InterviewQuestionEntity>> byCategory = all.stream()
@@ -300,7 +315,7 @@ public class InterviewSessionService {
         result.put("totalQuestions", total);
         result.put("answeredQuestions", answered);
         result.put("wrongQuestions", wrong);
-        result.put("averageScore", Math.round(avgScore * 10) / 10.0);
+        result.put("averageScore", avgScore);
         result.put("byCategory", categoryStats);
         result.put("byDifficulty", difficultyStats);
         return result;
@@ -315,18 +330,22 @@ public class InterviewSessionService {
         long wrong = questions.stream()
                 .filter(q -> q.getEvaluationScore() != null && q.getEvaluationScore() < 60)
                 .count();
-        double avgScore = questions.stream()
+        // v1.47.0（第六轮 P1-02）：该分组内所有 evaluationScore 为 null（即 answered==0）时，
+        // avgScore 输出 null —— 此前 .orElse(0.0) 把「未作答」表达成「0 分」，
+        // 前端据此渲染「核心技术 0 分（共2题·已答0）」并配危险红，与错题本「没有错题」自相矛盾。
+        java.util.OptionalDouble avgOpt = questions.stream()
                 .filter(q -> q.getEvaluationScore() != null)
                 .mapToInt(InterviewQuestionEntity::getEvaluationScore)
-                .average()
-                .orElse(0.0);
+                .average();
 
         Map<String, Object> stat = new HashMap<>();
         stat.put(keyName, key);
         stat.put("total", total);
         stat.put("answered", answered);
         stat.put("wrong", wrong);
-        stat.put("avgScore", Math.round(avgScore * 10) / 10.0);
+        stat.put("avgScore", avgOpt.isPresent()
+                ? Math.round(avgOpt.getAsDouble() * 10) / 10.0
+                : null);
         return stat;
     }
 }

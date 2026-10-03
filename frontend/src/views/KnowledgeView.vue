@@ -168,7 +168,7 @@
             <div class="stat-name">错题数</div>
           </div>
           <div class="stat-card">
-            <div class="stat-num" :style="{ color: getScoreColor(summary.averageScore) }">{{ summary.averageScore }}</div>
+            <div class="stat-num" :style="{ color: scoreColor(summarySample) }">{{ scoreText(summarySample) }}</div>
             <div class="stat-name">平均分</div>
           </div>
         </div>
@@ -190,10 +190,10 @@
           <div v-for="(c, idx) in summary.byCategory" :key="idx" class="group-row">
             <div class="group-head">
               <span class="group-name">{{ c.category }}</span>
-              <span class="group-score" :style="{ color: getScoreColor(c.avgScore) }">{{ c.avgScore }} 分</span>
+              <span class="group-score" :style="{ color: scoreColor(c) }">{{ scoreTextWithUnit(c) }}</span>
             </div>
             <div class="group-bar">
-              <div class="group-bar-fill" :style="{ width: (c.total ? (c.answered / c.total) * 100 : 0) + '%', background: getScoreGradient(c.avgScore) }"></div>
+              <div class="group-bar-fill" :style="{ width: (c.total ? (c.answered / c.total) * 100 : 0) + '%', background: scoreFill(c) }"></div>
             </div>
             <div class="group-meta">
               共 {{ c.total }} 题 · 已答 {{ c.answered }} · 错题 {{ c.wrong }}
@@ -207,10 +207,10 @@
           <div v-for="(d, idx) in summary.byDifficulty" :key="idx" class="group-row">
             <div class="group-head">
               <span class="group-name">{{ diffLabel(d.difficulty) }}</span>
-              <span class="group-score" :style="{ color: getScoreColor(d.avgScore) }">{{ d.avgScore }} 分</span>
+              <span class="group-score" :style="{ color: scoreColor(d) }">{{ scoreTextWithUnit(d) }}</span>
             </div>
             <div class="group-bar">
-              <div class="group-bar-fill" :style="{ width: (d.total ? (d.answered / d.total) * 100 : 0) + '%', background: getScoreGradient(d.avgScore) }"></div>
+              <div class="group-bar-fill" :style="{ width: (d.total ? (d.answered / d.total) * 100 : 0) + '%', background: scoreFill(d) }"></div>
             </div>
             <div class="group-meta">
               共 {{ d.total }} 题 · 已答 {{ d.answered }} · 错题 {{ d.wrong }}
@@ -248,7 +248,14 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import renderMarkdown from '../utils/markdown'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
-import { getScoreColor, getScoreGradient } from '../utils/score'
+import { getScoreColor } from '../utils/score'
+import {
+  scoreText,
+  scoreTextWithUnit,
+  scoreColor,
+  scoreFill,
+  type ScoreSample,
+} from '../utils/scoreDisplay'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 
 type Tab = 'ask' | 'import' | 'wrong' | 'summary'
@@ -289,13 +296,15 @@ interface GroupStat {
   total: number
   answered: number
   wrong: number
-  avgScore: number
+  /** 平均分；`answered == 0` 时后端返回 null（历史脏数据可能是 0） */
+  avgScore: number | null
 }
 interface Summary {
   totalQuestions: number
   answeredQuestions: number
   wrongQuestions: number
-  averageScore: number
+  /** 平均分；无已答题时为 null */
+  averageScore: number | null
   byCategory?: GroupStat[]
   byDifficulty?: GroupStat[]
 }
@@ -303,6 +312,13 @@ const summary = ref<Summary | null>(null)
 const summaryLoading = ref(false)
 
 const renderedAnswer = computed(() => renderMarkdown(answer.value || '*等待提问...*'))
+
+/** 汇总页「平均分」的评分样本：answered=0 或无分数都视为无数据 */
+const summarySample = computed<ScoreSample>(() => ({
+  answered: summary.value?.answeredQuestions ?? 0,
+  avgScore: summary.value?.averageScore ?? null,
+}))
+
 const ratePercent = computed(() => {
   if (!summary.value || !summary.value.totalQuestions) return 0
   return Math.round((summary.value.answeredQuestions / summary.value.totalQuestions) * 100)

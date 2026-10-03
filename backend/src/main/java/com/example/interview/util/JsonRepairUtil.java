@@ -27,9 +27,19 @@ public final class JsonRepairUtil {
     /**
      * 兜底 JSON：AI 返回无法解析时使用，保证前端不报错、JSONB 字段写入不失败。
      * 各 Service / ResumeService 共享同一字面量，避免多处复制导致不一致。
+     *
+     * <p><b>为什么 overallScore 必须是 null 而不是 0（v1.47.0，第六轮 P1-01）</b>：
+     * 兜底串此前自带 {@code "overallScore":0}，而 {@code ResumeService.saveResume()} 会把
+     * 兜底串当正常结果落库，并从它解析出 0 写进数字列。于是「AI 解析失败」与「真的考了 0 分」
+     * 在数据库里**完全无法区分**，错误一路传播到聚合指标（该用户 avgResumeScore 由 72.33 被
+     * 拉低到 62.0）与用户界面（列表显示 0 分、详情因 {@code v-if=0} 整块不渲染）。
+     * 实测原始输出结构性损坏率 ≈46%，这不是罕见边界。
+     *
+     * <p>原则：<b>用于「防写库失败」的兜底值必须语义中立</b>，不得携带看起来像真实业务结果的数值。
+     * 现改为 {@code null} 并显式带 {@code "error":"AI_PARSE_FAILED"} 标记，供落库方识别并拒绝写入评分。
      */
     public static final String FALLBACK_JSON =
-            "{\"overallScore\":0,\"dimensions\":[],\"strengths\":[],\"improvements\":[\"AI 返回内容无法解析，请稍后重试\"]}";
+            "{\"overallScore\":null,\"dimensions\":[],\"strengths\":[],\"improvements\":[],\"error\":\"AI_PARSE_FAILED\"}";
 
     /** 中文左单引号 ’  右单引号 ’ */
     private static final Pattern CN_SINGLE_QUOTE = Pattern.compile("[\u2018\u2019]");

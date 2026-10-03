@@ -44,20 +44,43 @@ class ResumeServiceTest {
     @Test
     @DisplayName("saveResume: 应解析 overallScore 并保存")
     void saveResume_shouldParseScoreAndSave() {
-        when(resumeRepository.save(any())).thenReturn(mockResume);
+        when(resumeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         ResumeEntity saved = service.saveResume("alice", "简历", "Java",
-                "{\"overallScore\":85,\"dimensions\":[]}");
+                "{\"overallScore\":85,\"dimensions\":[{\"name\":\"岗位匹配度\",\"score\":80}],\"strengths\":[],\"improvements\":[]}");
         assertThat(saved.getOverallScore()).isEqualTo(85);
         verify(resumeRepository, times(1)).save(any());
     }
 
     @Test
+    @DisplayName("saveResume: 不可修复的串走兜底，不得写入 overallScore，且带 AI_PARSE_FAILED（P1-01 回归）")
+    void saveResume_unrepairableFallback_shouldNotWriteScore() {
+        when(resumeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // 复现原缺陷的输入形状：AI 原始输出结构性损坏、JsonRepairUtil 也修不回来
+        ResumeEntity saved = service.saveResume("alice", "简历", "Java", "{not json at all");
+        assertThat(saved.getOverallScore())
+                .as("兜底结果不得把 overallScore 落库（否则 0 分与解析失败无法区分）")
+                .isNull();
+        assertThat(saved.getAnalysisResult()).contains("AI_PARSE_FAILED");
+        verify(resumeRepository, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("saveResume: dimensions 为空（旧兜底串形状）即使 overallScore=0 也不得落库评分（P1-01 回归）")
+    void saveResume_emptyDimensions_shouldNotWriteScore() {
+        when(resumeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // 历史脏数据形状：合法 JSON，但 dimensions 为空数组、overallScore=0
+        // —— 这正是线上 id=17 那条 93 字节记录的形态
+        ResumeEntity saved = service.saveResume("alice", "简历", "Java",
+                "{\"strengths\":[],\"dimensions\":[],\"improvements\":[\"AI 返回内容无法解析，请稍后重试\"],\"overallScore\":0}");
+        assertThat(saved.getOverallScore())
+                .as("无维度的分析结果视为失败，不得把 overallScore=0 写入数字列")
+                .isNull();
+    }
+
+    @Test
     @DisplayName("saveResume: 解析失败时不抛异常，overallScore 保持 null")
     void saveResume_invalidJson_shouldNotThrow() {
-        ResumeEntity entity = ResumeEntity.builder()
-                .id(2L).userId("alice").content("x").targetJob("j")
-                .analysisResult("not-json").build();
-        when(resumeRepository.save(any())).thenReturn(entity);
+        when(resumeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         ResumeEntity saved = service.saveResume("alice", "x", "j", "not-json");
         assertThat(saved.getOverallScore()).isNull();
     }

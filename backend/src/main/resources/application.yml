@@ -144,8 +144,15 @@ app:
       #
       # ── 链路设计（质量递减，跨厂商容灾）──────────────────────────────
       #   1) Agnes agnes-2.5-flash   质量最优，日常主力
-      #   2) 智谱 glm-4.7-flash      跨厂商兜底，200K 上下文（已关思考）
-      #   3) 智谱 glm-4-flash        末位保险，实测并发 3/3 通过、1.76s
+      #   2) NVIDIA gpt-oss-20b      跨厂商兜底（40 RPM、并发 3/3）
+      #   3) 智谱 glm-4.7-flash      次兜底，200K 上下文（已关思考）
+      #   4) 智谱 glm-4-flash        末位保险，实测并发 3/3 通过、1.76s
+      #
+      # ⚠️ 2026-10-03（第六轮 P1-05）顺位校正：NVIDIA 提到 glm-4.7-flash **之前**。
+      #   实测：NVIDIA openai/gpt-oss-20b 40 RPM、并发 3/3；智谱 glm-4.7-flash
+      #   并发 0/3（全部 1305 平台过载）+ 单发曾 71.12s 长尾。
+      #   主模型故障时 glm-4.7 大概率**再失败一次并拖慢降级**，故只适合更后位。
+      #   仅调顺序，未改动任何密钥/URL/模型名与 thinking-disabled 配置。
       #
       # api-key 为空的节点自动跳过；任一节点返回空正文也会被判不可用并继续降级。
       # ══════════════════════════════════════════════════════════════════
@@ -158,7 +165,7 @@ app:
       # 2026-10-01 实测（该 Key 下 81 个模型可选）：主力候选里只有 gpt-oss-20b 稳定可用，
       # 其余要么超时要么极慢（glm-5.3-flash 85s、kimi-k3 180s、gemma-4-31b 超时、
       # kimi-k2.6 404 无权限）。
-      # 为什么放这里：**并发 3/3 成功**（对照智谱 glm-4.7-flash 只有 1/3），
+      # 为什么放这里：**并发 3/3 成功**（对照智谱 glm-4.7-flash 并发 0/3、全 1305 平台过载），
       # 社区实测 RPM ≈40（对照 Agnes 免费档 10）→ 作为跨厂商兜底比智谱那档更可靠。
       # 代价是慢（≈5.9s，比 Agnes 的 1.4s 慢 4 倍），所以排在主力之后。
       # ⚠️ gpt-oss-20b 是**推理模型**：显式设小 max_tokens 会返回空正文（本链路不设 max_tokens，
@@ -201,7 +208,7 @@ app:
     #    导致「与前端同步」这个约定在公开接口上一直没生效（两个端点报两个版本号）。
     #    现已改为读本配置；改版本时除了这里与 changelog.ts，无需再动代码。
     name: ${APP_INFO_NAME:interview-guide}
-    version: ${APP_INFO_VERSION:1.46.0}
+    version: ${APP_INFO_VERSION:1.47.0}
     description: ${APP_INFO_DESCRIPTION:AI 智能面试辅助平台后端}
     # 构建日期，CI 注入；未配置时 fallback 为当天
     build-date: ${APP_INFO_BUILD_DATE:}
@@ -238,13 +245,20 @@ app:
     # 关闭场景：本地联调不想消耗 embedding 调用、单元测试、或运维想手动维护知识库
     seed-enabled: ${RAG_SEED_ENABLED:true}
   cors:
-    # 允许的前端来源（逗号分隔），生产精确域名 + 本地调试
-    # 修改部署域名时改环境变量 CORS_ALLOWED_ORIGINS 即可，无需改代码
+    # 允许的前端来源（逗号分隔）。支持通配（Spring 的 allowedOriginPatterns）。
+    # 修改部署域名时改环境变量 CORS_ALLOWED_ORIGINS 即可，无需改代码。
     #
     # v1.34.1 清理：移除已失效的 interview-guide-ai-interview-platform.vercel.app。
-    # 前端实际托管在 Cloudflare Pages（pages.dev），vercel 域名实测已不可达（curl 返回 000），
-    # 保留死域名会让 review 者误以为存在两条前端入口，且放宽了无意义的允许来源。
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://interview-guide-ai-interview-platform.pages.dev,http://localhost:5173,http://127.0.0.1:5173}
+    # 前端实际托管在 Cloudflare Pages（pages.dev），vercel 域名实测已不可达（curl 返回 000）。
+    #
+    # v1.47.0：精确域名 → https://*.pages.dev 通配。
+    #   原因：Cloudflare Pages **不支持重命名项目**，换短域名只能新建项目（得到新的
+    #   <name>.pages.dev）。白名单若写死精确域名，每次换域名都要改后端配置并重新部署，
+    #   而**漏改会让新前端全站 403**（2026-10-03 实测：Origin: https://offergo.pages.dev → HTTP 403）。
+    #   安全性说明：本 API 鉴权走 Bearer token（不是 Cookie），token 存放在各自 origin 的
+    #   localStorage 中，第三方 pages.dev 站点无法读取；且无有效 token 一律 401。
+    #   故通配 pages.dev 不引入越权面，只消除"换域名即全站不可用"的运维陷阱。
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://*.pages.dev,http://localhost:5173,http://127.0.0.1:5173}
   supabase:
     url: ${SUPABASE_URL:https://your-project.supabase.co}
     service-key: ${SUPABASE_SERVICE_KEY:your-service-key}

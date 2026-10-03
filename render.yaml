@@ -56,6 +56,14 @@ services:
       # 实测（2026-10-01）该 Key 下 81 个模型可选，但稳定可用的只有 gpt-oss-20b；
       # 并发 3/3（对照 glm-4.7-flash 的 1/3）、社区实测 RPM ≈40（对照 Agnes 免费档 10）。
       # 代价是慢（≈5.9s）。api-key 为空时该节点自动跳过，不影响链路。
+      #
+      # ⚠️ 2026-10-03（第六轮 P1-05）降级链顺位校正依据（实测）：
+      #   · NVIDIA openai/gpt-oss-20b：**40 RPM、并发 3/3**，跨厂商兜底可靠；
+      #   · 智谱 glm-4.7-flash：**并发 0/3（全部 1305「平台服务过载」）**，
+      #     且单发曾出现 **71.12s** 长尾 —— 主模型故障时它大概率**再失败一次并拖慢降级**，
+      #     因此只适合放在 NVIDIA 之后（顺序由 backend/src/main/resources/application.yml
+      #     的 app.ai.chain 决定：agnes-primary → nvidia-fallback → zhipu-quality → zhipu-lastresort）。
+      #   · 本次**仅调顺序**，未改动任何密钥/URL/模型名，也未动 thinking-disabled 配置。
       # ⚠️ 密钥必须走 sync: false 在面板维护——本仓库是公开的，明文会泄露。
       - key: AI_NVIDIA_API_KEY
         sync: false
@@ -79,8 +87,8 @@ services:
       #   已在 application.yml 的智谱节点上配置 `thinking-disabled: true`（代码侧
       #   DisableThinkingInterceptor 注入 `thinking:{"type":"disabled"}`）。
       #   实测：glm-4.7-flash 4.25s/空内容 → **1.38s/正常内容**。
-      #   另注：该模型并发能力弱（并发 3 只有 1 个成功、其余 429/1305），
-      #   因此放在兜底位置，末端保留实测最稳的 glm-4-flash。
+      #   另注：该模型并发能力弱（第六轮实测**并发 0/3 全部 1305 平台过载**，
+      #   单发曾 71.12s 长尾），因此放在 NVIDIA 之后、末端保留实测最稳的 glm-4-flash。
       - key: AI_ZHIPU_CHAT_MODEL
         value: glm-4.7-flash
       # 兜底 2：智谱 glm-4-flash —— 末位保险（实测并发 3/3 通过、1.76s）

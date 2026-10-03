@@ -2,7 +2,7 @@
 
 > 版本：1.32.0 ｜ 日期：2026-09-13
 > 仓库：https://github.com/w020316/interview-guide-AI-interview-platform
-> 在线：前端 https://interview-guide-ai-interview-platform.pages.dev ｜ 后端 https://interview-guide-backend.onrender.com
+> 在线：前端 https://offergo.pages.dev ｜ 后端 https://interview-guide-backend.onrender.com
 
 一份面向开发者/维护者的权威开发文档，涵盖技术栈、系统架构、模块划分、API 一览、
 关键技术特性、安全与可用性保障、部署与测试流程。随版本演进持续更新。

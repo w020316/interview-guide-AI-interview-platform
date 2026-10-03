@@ -561,14 +561,21 @@ public class AgentService {
             Object total = summary.getOrDefault("totalQuestions", 0);
             Object wrong = summary.getOrDefault("wrongQuestions", 0);
             Object avg = summary.get("averageScore");
+            // v1.47.0（第六轮 P1-02）：questionProfile 在无样本时 averageScore 返回 null，
+            // 画像文案据此显示「暂无」而非字面量 "null"。
             sb.append("- 已练习题目：").append(total).append(" 道，错题 ").append(wrong)
-                    .append(" 道，平均分 ").append(avg instanceof Double ? String.format("%.1f", (Double) avg) : avg).append("\n");
+                    .append(" 道，平均分 ")
+                    .append(avg == null ? "暂无"
+                            : (avg instanceof Double ? String.format("%.1f", (Double) avg) : avg))
+                    .append("\n");
             if (summary.get("byCategory") instanceof List<?> cats && !cats.isEmpty()) {
                 sb.append("- 各分类掌握度（由弱到强）：");
                 int i = 0;
                 for (Object o : cats) {
                     if (o instanceof Map<?, ?> m && i < 6) {
-                        sb.append(m.get("category")).append(" ").append(m.get("avgScore")).append("分；");
+                        Object catAvg = m.get("avgScore");
+                        sb.append(m.get("category")).append(" ")
+                                .append(catAvg == null ? "暂无" : catAvg).append("分；");
                         i++;
                     }
                 }

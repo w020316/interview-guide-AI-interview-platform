@@ -4,7 +4,7 @@
 > 零成本部署到云端（Cloudflare Pages + Render + Supabase + Upstash，全部免费）
 > AI 模型使用 Agnes AI（兼容 OpenAI 协议，免费无限量）
 >
-> **在线入口（唯一）**：前端 <https://interview-guide-ai-interview-platform.pages.dev>　·　后端 API <https://interview-guide-backend.onrender.com>
+> **在线入口（唯一）**：前端 <https://offergo.pages.dev>　·　后端 API <https://interview-guide-backend.onrender.com>
 > 说明：历史文档中出现的 `vercel.app` 域名已停用，前端实际托管在 **Cloudflare Pages**；
 > Render 免费层 15 分钟无访问会休眠，仓库内置 `.github/workflows/keepalive.yml` 每 5 分钟保活。
 

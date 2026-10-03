@@ -297,4 +297,28 @@ class JsonRepairUtilTest {
             assertEquals(true, node.get("flags").get(2).isNull());
         }
     }
+
+    @Nested
+    @DisplayName("兜底串语义中立（第六轮 P1-01）")
+    class FallbackJsonContract {
+
+        /**
+         * 锁定 FALLBACK_JSON 的契约：用于「防写库失败」的兜底值必须**语义中立**，
+         * 不得携带看起来像真实业务结果的数值。
+         *
+         * <p>缺陷形状：旧兜底串自带 {@code "overallScore":0}，被 ResumeService 当正常结果落库后，
+         * 「AI 解析失败」与「真的考了 0 分」在数据库里完全无法区分，
+         * 导致该用户 avgResumeScore 由 72.33 被拉低到 62.0、前端列表显示 0 分。
+         */
+        @Test
+        @DisplayName("overallScore 必须为 null，并带 AI_PARSE_FAILED 标记")
+        void fallbackJsonIsSemanticallyNeutral() throws Exception {
+            JsonNode node = parseStrict(JsonRepairUtil.FALLBACK_JSON);
+            assertTrue(node.get("overallScore") == null || node.get("overallScore").isNull(),
+                    "兜底串的 overallScore 必须是 null，不能是 0（0 会被误认为真实分数）");
+            assertEquals("AI_PARSE_FAILED", node.path("error").asText(),
+                    "兜底串必须带 error 标记，供落库方识别并拒绝写入评分");
+            assertTrue(node.get("dimensions").isArray() && node.get("dimensions").isEmpty());
+        }
+    }
 }

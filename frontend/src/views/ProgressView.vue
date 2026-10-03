@@ -104,15 +104,15 @@
           <div class="dim-head">
             <span class="dim-cat">{{ c.category }}</span>
             <span class="dim-score">
-              <span class="num-display">{{ c.avgScore }}</span>
+              <span class="num-display">{{ scoreText(c) }}</span>
               <span class="dim-count">（{{ c.total }} 题）</span>
             </span>
           </div>
           <div class="dim-track">
             <div
               class="dim-fill num-display"
-              :class="{ 'is-low': c.avgScore < 60, 'is-mid': c.avgScore >= 60 && c.avgScore < 75 }"
-              :style="{ width: barWidth(c.avgScore) }"
+              :class="dimClass(c)"
+              :style="{ width: dimWidth(c) }"
             ></div>
           </div>
         </div>
@@ -136,8 +136,16 @@ import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
 import type { TrendPoint } from '../utils/scoreTrend'
 import { buildLineChart, computeTrendStats } from '../utils/scoreTrend'
+import { hasScoreSample, scoreText } from '../utils/scoreDisplay'
 
-interface CategoryStat { category: string; total: number; avgScore: number }
+interface CategoryStat {
+  category: string
+  total: number
+  /** 已作答数；为 0 时该维度无数据，不显示分数 */
+  answered: number
+  /** 平均分；无作答时为 null（历史脏数据可能是 0） */
+  avgScore: number | null
+}
 
 /** 趋势维度切换：DAY=按次，WEEK=按周聚合，MONTH=按月聚合 */
 const DIMENSIONS = [
@@ -213,6 +221,18 @@ function barWidth(score: number): string {
   return `${Math.max(4, Math.min(100, Math.round(score)))}%`
 }
 
+/** 无作答的维度：不渲染填充（min-width 也清零），避免出现「0 分空条」 */
+function dimWidth(c: CategoryStat): string {
+  return hasScoreSample(c) ? barWidth(c.avgScore as number) : '0%'
+}
+
+/** 低分染红只在「有作答」时生效，空数据不染红 */
+function dimClass(c: CategoryStat): Record<string, boolean> {
+  if (!hasScoreSample(c)) return { 'is-empty': true }
+  const s = c.avgScore as number
+  return { 'is-low': s < 60, 'is-mid': s >= 60 && s < 75 }
+}
+
 /** 切换趋势维度（按次/按周/按月） */
 function setDimension(v: string) {
   if (dimension.value === v) return
@@ -242,7 +262,14 @@ onMounted(async () => {
       api.get('/api/knowledge/question-summary') as unknown as { byCategory?: CategoryStat[] },
     ])
     rawPoints.value = trend || []
-    categoryStats.value = summary?.byCategory?.filter((c) => c.total > 0) || []
+    categoryStats.value = (summary?.byCategory || [])
+      .filter((c) => c.total > 0)
+      .map((c) => ({
+        category: c.category,
+        total: c.total,
+        answered: c.answered ?? 0,
+        avgScore: c.avgScore ?? null,
+      }))
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载成长数据失败'))
   } finally {
@@ -335,6 +362,7 @@ onMounted(async () => {
 .dim-fill { height: 100%; background: var(--brand-primary); border-radius: 999px; min-width: 4px; transition: width var(--transition-base); }
 .dim-fill.is-mid { background: var(--c-warning); }
 .dim-fill.is-low { background: var(--c-danger); }
+.dim-fill.is-empty { min-width: 0; background: var(--c-border); }
 
 .empty-inline { text-align: center; padding: 36px 16px; color: var(--c-text-tertiary); }
 .empty-inline p { margin: 0 0 16px; font-size: 14px; }

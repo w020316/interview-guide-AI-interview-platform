@@ -60,9 +60,16 @@
             <path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </span>
-        <div class="card-score" :style="{ background: scoreBg(r.overallScore) }">
-          <span class="score-num">{{ r.overallScore ?? '—' }}</span>
-          <span class="score-unit" v-if="r.overallScore != null">分</span>
+        <div
+          class="card-score"
+          :class="{ 'is-failed': failedIds.has(r.id) }"
+          :style="{ background: failedIds.has(r.id) ? 'var(--c-bg-alt)' : scoreBg(r.overallScore) }"
+        >
+          <span v-if="failedIds.has(r.id)" class="score-failed">解析失败</span>
+          <template v-else>
+            <span class="score-num">{{ r.overallScore ?? EMPTY }}</span>
+            <span class="score-unit" v-if="r.overallScore != null">分</span>
+          </template>
         </div>
         <div class="card-body">
           <div class="card-title">{{ getPreview(r) }}</div>
@@ -89,55 +96,66 @@
         <div class="modal-body">
           <div v-if="detailLoading" class="loading">加载中…</div>
           <template v-else-if="detail">
-            <div v-if="parseError" class="parse-warning">
-              <span>⚠</span>
-              <span>{{ parseError }}</span>
-            </div>
-            <div v-if="parsed.overallScore" class="detail-score-row">
-              <div class="detail-score-circle" :style="{ '--score-color': scoreColor(parsed.overallScore) }">
-                <svg viewBox="0 0 120 120" class="score-svg">
-                  <circle cx="60" cy="60" r="52" class="score-track" />
-                  <circle cx="60" cy="60" r="52" class="score-fill"
-                    :style="{ strokeDasharray: 327, strokeDashoffset: 327 - (327 * (parsed.overallScore || 0)) / 100 }" />
-                </svg>
-                <div class="score-value">
-                  <span class="score-num">{{ parsed.overallScore }}</span>
-                  <span class="score-unit">分</span>
-                </div>
+            <!-- 失败态：AI 未能解析出结果时给出明确反馈，而不是渲染近乎空白的详情 -->
+            <div v-if="detailFailed" class="analysis-failed">
+              <div class="failed-icon" aria-hidden="true">⚠</div>
+              <div class="failed-title">本次分析未能生成有效结果</div>
+              <div class="failed-desc">
+                {{ parseError || 'AI 未能解析出有效的分析结果，请重新分析这份简历。' }}
               </div>
-              <div>
-                <div class="detail-job">{{ detail.targetJob || '未指定岗位' }}</div>
-                <div class="detail-time">{{ fmtDate(detail.createdAt) }}</div>
+              <div class="failed-actions">
+                <BaseButton variant="gradient" @click="router.push('/resume')">重新分析</BaseButton>
+                <button class="failed-btn" @click="detailVisible = false">关闭</button>
               </div>
             </div>
 
-            <div v-if="parsed.dimensions?.length" class="dim-list">
-              <div v-for="(d, idx) in parsed.dimensions" :key="idx" class="dim-item">
-                <div class="dim-head">
-                  <span class="dim-name">{{ d.name }}</span>
-                  <span class="dim-score" :style="{ color: scoreColor(d.score) }">{{ d.score }}</span>
+            <template v-else>
+              <div v-if="parsed.overallScore != null" class="detail-score-row">
+                <div class="detail-score-circle" :style="{ '--score-color': scoreColor(parsed.overallScore) }">
+                  <svg viewBox="0 0 120 120" class="score-svg">
+                    <circle cx="60" cy="60" r="52" class="score-track" />
+                    <circle cx="60" cy="60" r="52" class="score-fill"
+                      :style="{ strokeDasharray: 327, strokeDashoffset: 327 - (327 * (parsed.overallScore || 0)) / 100 }" />
+                  </svg>
+                  <div class="score-value">
+                    <span class="score-num">{{ parsed.overallScore }}</span>
+                    <span class="score-unit">分</span>
+                  </div>
                 </div>
-                <div class="dim-bar">
-                  <div class="dim-bar-fill" :style="{ width: (d.score || 0) + '%', background: scoreGradient(d.score) }"></div>
+                <div>
+                  <div class="detail-job">{{ detail.targetJob || '未指定岗位' }}</div>
+                  <div class="detail-time">{{ fmtDate(detail.createdAt) }}</div>
                 </div>
-                <p class="dim-suggestion">{{ d.suggestion }}</p>
               </div>
-            </div>
 
-            <div v-if="parsed.strengths?.length || parsed.improvements?.length" class="detail-grid">
-              <div v-if="parsed.strengths?.length" class="detail-card detail-card-success">
-                <h4>优势</h4>
-                <ul>
-                  <li v-for="(s, i) in parsed.strengths" :key="i">{{ s }}</li>
-                </ul>
+              <div v-if="parsed.dimensions?.length" class="dim-list">
+                <div v-for="(d, idx) in parsed.dimensions" :key="idx" class="dim-item">
+                  <div class="dim-head">
+                    <span class="dim-name">{{ d.name }}</span>
+                    <span class="dim-score" :style="{ color: scoreColor(d.score) }">{{ d.score }}</span>
+                  </div>
+                  <div class="dim-bar">
+                    <div class="dim-bar-fill" :style="{ width: (d.score || 0) + '%', background: scoreGradient(d.score) }"></div>
+                  </div>
+                  <p class="dim-suggestion">{{ d.suggestion }}</p>
+                </div>
               </div>
-              <div v-if="parsed.improvements?.length" class="detail-card detail-card-warning">
-                <h4>改进建议</h4>
-                <ul>
-                  <li v-for="(s, i) in parsed.improvements" :key="i">{{ s }}</li>
-                </ul>
+
+              <div v-if="parsed.strengths?.length || parsed.improvements?.length" class="detail-grid">
+                <div v-if="parsed.strengths?.length" class="detail-card detail-card-success">
+                  <h4>优势</h4>
+                  <ul>
+                    <li v-for="(s, i) in parsed.strengths" :key="i">{{ s }}</li>
+                  </ul>
+                </div>
+                <div v-if="parsed.improvements?.length" class="detail-card detail-card-warning">
+                  <h4>改进建议</h4>
+                  <ul>
+                    <li v-for="(s, i) in parsed.improvements" :key="i">{{ s }}</li>
+                  </ul>
+                </div>
               </div>
-            </div>
+            </template>
 
             <details class="raw-detail">
               <summary>查看原始返回 JSON</summary>
@@ -184,10 +202,10 @@
             </div>
             <div v-for="row in compareResult.rows" :key="row.name" class="cmp-row">
               <span class="cmp-name">{{ row.name }}</span>
-              <span :style="{ color: scoreColor(row.a ?? undefined) }">{{ row.a ?? '—' }}</span>
-              <span :style="{ color: scoreColor(row.b ?? undefined) }">{{ row.b ?? '—' }}</span>
+              <span :style="{ color: scoreColor(row.a ?? undefined) }">{{ row.a ?? EMPTY }}</span>
+              <span :style="{ color: scoreColor(row.b ?? undefined) }">{{ row.b ?? EMPTY }}</span>
               <span class="cmp-diff" :class="row.better">
-                {{ row.diff == null ? '—' : row.diff === 0 ? '持平' : (row.diff > 0 ? `+${row.diff}` : `${row.diff}`) }}
+                {{ row.diff == null ? EMPTY : row.diff === 0 ? '持平' : (row.diff > 0 ? `+${row.diff}` : `${row.diff}`) }}
               </span>
             </div>
             <p v-if="!compareResult.rows.length" class="cmp-empty">两个版本均无维度明细，仅综合分可比</p>
@@ -207,6 +225,8 @@ import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
 import { compareResume, type ResumeVersion, type DimDiff } from '../utils/resumeCompare'
+import { isParseFailed } from '../utils/resumeAnalysis'
+import { EMPTY } from '../utils/format'
 import { BaseButton } from '../components'
 
 const router = useRouter()
@@ -223,7 +243,8 @@ interface Resume {
 }
 
 interface AnalysisResult {
-  overallScore: number
+  /** 综合分；缺失/无法解析时为 null（不要用 0 冒充「无评分」） */
+  overallScore: number | null
   dimensions: Array<{ name: string; score: number; suggestion: string }>
   strengths: string[]
   improvements: string[]
@@ -282,31 +303,47 @@ async function openDetail(r: Resume) {
   }
 }
 
+/** 数字转换：无法解析为有限数字时返回 null（不要把缺失分数硬转成 0） */
+function toScore(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
 const parsed = computed<AnalysisResult>(() => {
   if (!detail.value?.analysisResult) {
-    return { overallScore: 0, dimensions: [], strengths: [], improvements: [] }
+    return { overallScore: null, dimensions: [], strengths: [], improvements: [] }
   }
   try {
     const obj = JSON.parse(detail.value.analysisResult)
-    // 强制数字转换（与 ResumeView 保持一致）
-    const rawScore = obj.overallScore
-    const overallScore = typeof rawScore === 'number' ? rawScore
-      : typeof rawScore === 'string' ? (Number(rawScore) || 0)
-      : 0
+    const overallScore = toScore(obj.overallScore)
     const dimensions = Array.isArray(obj.dimensions) ? obj.dimensions.map((d: any) => ({
       name: String(d?.name ?? ''),
-      score: typeof d?.score === 'number' ? d.score
-        : typeof d?.score === 'string' ? (Number(d.score) || 0)
-        : 0,
+      score: toScore(d?.score) ?? 0,
       suggestion: String(d?.suggestion ?? ''),
     })) : []
     const strengths = Array.isArray(obj.strengths) ? obj.strengths.map((s: any) => String(s)) : []
     const improvements = Array.isArray(obj.improvements) ? obj.improvements.map((s: any) => String(s)) : []
     return { overallScore, dimensions, strengths, improvements }
   } catch {
-    return { overallScore: 0, dimensions: [], strengths: [], improvements: [] }
+    return { overallScore: null, dimensions: [], strengths: [], improvements: [] }
   }
 })
+
+/** 列表里哪些记录是「解析失败」——卡片渲染失败态而非「0 分」 */
+const failedIds = computed(() => {
+  const ids = new Set<number>()
+  for (const r of resumes.value) {
+    if (isParseFailed(r)) ids.add(r.id)
+  }
+  return ids
+})
+
+/** 当前详情是否为解析失败 */
+const detailFailed = computed(() => isParseFailed(detail.value))
 
 function getPreview(r: Resume): string {
   if (!r.content) return '简历记录'
@@ -315,9 +352,9 @@ function getPreview(r: Resume): string {
 }
 
 function fmtDate(dt: string): string {
-  if (!dt) return '-'
+  if (!dt) return EMPTY
   const d = new Date(dt)
-  if (isNaN(d.getTime())) return '-'
+  if (isNaN(d.getTime())) return EMPTY
   return d.toLocaleString('zh-CN', { hour12: false })
 }
 
@@ -745,6 +782,20 @@ const summaryText = computed(() => {
   flex-shrink: 0;
 }
 
+/* 解析失败的记录：中性底色 + 文字说明，不套低分红底、不显示 0 分 */
+.card-score.is-failed {
+  background: var(--c-bg-alt);
+}
+
+.score-failed {
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--c-text-quaternary);
+}
+
 .score-num {
   font-size: 22px;
   font-weight: 800;
@@ -898,15 +949,60 @@ const summaryText = computed(() => {
   color: var(--c-text-secondary);
 }
 
-.parse-warning {
-  background: var(--c-warning-light);
-  color: var(--c-warning);
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  margin-bottom: 16px;
+/* ── 解析失败态（P0：不再渲染近乎空白的详情）── */
+.analysis-failed {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 8px;
+  padding: 40px 24px;
+  margin-bottom: 16px;
+  background: var(--c-warning-light);
+  border: 1px solid var(--c-warning);
+  border-radius: var(--radius-lg);
+}
+
+.failed-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.failed-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.failed-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
+  max-width: 420px;
+}
+
+.failed-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.failed-btn {
+  padding: 8px 18px;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: var(--c-text-secondary);
+  background: transparent;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.failed-btn:hover {
+  background: var(--c-bg-alt);
+  color: var(--c-text);
 }
 
 .detail-score-row {

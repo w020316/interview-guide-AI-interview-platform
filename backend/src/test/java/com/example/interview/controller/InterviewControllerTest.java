@@ -138,6 +138,28 @@ class InterviewControllerTest {
         }
 
         @Test
+        @DisplayName("resumeText/jobDescription 类型错误返回 400 而非 500（P1-03 回归）")
+        void questions_wrongType_returns400() throws Exception {
+            // 原实现 (String) request.get(...) 对数字/数组强转抛 ClassCastException → 500
+            String[] bodies = {
+                    "{\"resumeText\":12345,\"jobDescription\":\"Java 后端\"}",
+                    "{\"resumeText\":\"我的简历\",\"jobDescription\":{\"x\":1}}"
+            };
+            mockMvc.perform(post("/api/interview/questions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(bodies[0]))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("resumeText 类型错误，期望字符串"));
+            mockMvc.perform(post("/api/interview/questions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(bodies[1]))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("jobDescription 类型错误，期望字符串"));
+        }
+
+        @Test
         @DisplayName("合法入参返回 200 + 面试题结果")
         void questions_validInput_returns200() throws Exception {
             when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5, "", ""))

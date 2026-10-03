@@ -49,22 +49,40 @@ public class ResumeService {
                 ? JsonRepairUtil.FALLBACK_JSON
                 : JsonRepairUtil.repairOrFallback(analysisResult, "resume-persist", JsonRepairUtil.FALLBACK_JSON);
 
-        // 解析综合评分（容错：解析失败则不存；强制数字转换）
+        // 解析综合评分。
+        //
+        // v1.47.0（第六轮 P1-01）：兜底/失败结果**不得**把 overallScore 写进数字列。
+        // 此前兜底串自带 "overallScore":0，于是「AI 解析失败」被落库成「0 分」，
+        // 与真实 0 分无法区分，污染 avgResumeScore 与前端展示。
+        // 判定依据（**不是** overallScore == 0，那会误伤真实 0 分）：
+        //   ① safeResult 含兜底标记 "AI_PARSE_FAILED"；
+        //   ② 解析出的 dimensions 不是非空数组（无维度 = 无有效分析）。
         Integer overallScore = null;
+        boolean failed = safeResult.contains("AI_PARSE_FAILED");
         try {
             Map<?, ?> obj = objectMapper.readValue(safeResult, Map.class);
-            Object score = obj.get("overallScore");
-            if (score instanceof Number n) {
-                overallScore = n.intValue();
-            } else if (score instanceof String s && !s.isBlank()) {
-                // AI 可能返回字符串 "75"，强制转换
-                try {
-                    overallScore = Integer.parseInt(s.trim());
-                } catch (NumberFormatException ignored) {
+            Object dims = obj.get("dimensions");
+            if (!(dims instanceof List<?> dl) || dl.isEmpty()) {
+                failed = true;
+            }
+            if (!failed) {
+                Object score = obj.get("overallScore");
+                if (score instanceof Number n) {
+                    overallScore = n.intValue();
+                } else if (score instanceof String s && !s.isBlank()) {
+                    // AI 可能返回字符串 "75"，强制转换
+                    try {
+                        overallScore = Integer.parseInt(s.trim());
+                    } catch (NumberFormatException ignored) {
+                    }
                 }
             }
         } catch (Exception e) {
-            log.warn("解析 overallScore 失败：{}", e.getMessage());
+            log.warn("解析 overallScore 失败，按失败结果处理（不写入评分）：{}", e.getMessage());
+            failed = true;
+        }
+        if (failed) {
+            log.warn("简历分析结果为兜底/无效内容，overallScore 置空不落库 userId={}", userId);
         }
 
         ResumeEntity resume = ResumeEntity.builder()

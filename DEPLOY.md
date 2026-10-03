@@ -197,27 +197,39 @@ git push -u origin main
 
 ### Step 6: 部署前端到 Cloudflare Pages（3 分钟）
 
-> ⚠️ **2026-09-21 修正**：本节原为 Vercel 步骤。实际线上前端托管在 **Cloudflare Pages**
-> （`interview-guide-ai-interview-platform.pages.dev`），Vercel 域名已停用，
-> 仓库中的 `vercel.json` 已删除；安全响应头改由 `frontend/public/_headers` 承担。
+> ⚠️ **2026-09-21 修正**：本节原为 Vercel 步骤。实际线上前端托管在 **Cloudflare Pages**，
+> Vercel 域名已停用，仓库中的 `vercel.json` 已删除；安全响应头改由 `frontend/public/_headers` 承担。
+>
+> ⚠️ **2026-10-03 换短域名**：原项目名 `interview-guide-ai-interview-platform` 太长，
+> 已新建 Pages 项目 **`offergo`** → 现用入口 **https://offergo.pages.dev**。
+> ⚠️ **Cloudflare Pages 不支持重命名项目**，所以"改名"= 新建一个项目 + 重新部署；
+> 且**换域名后必须让后端 CORS 放行新来源**，否则新前端会**全站 403**（实测过）。
+> 本项目已把 `app.cors.allowed-origins` 默认值改为通配 `https://*.pages.dev`，
+> 以后换域名**只需新建 Pages 项目，不用再动后端**。
 
 1. 访问 https://dash.cloudflare.com/ → 用 GitHub 登录
 2. **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
 3. 选择 `interview-guide` 仓库
-4. 配置构建：
+4. **项目名填 `offergo`**（这一步决定最终域名 `offergo.pages.dev`；创建后**不可改名**）
+5. 配置构建：
    - **Production branch**: `main`
    - **Framework preset**: `Vue`
    - **Build command**: `npm run build`
    - **Build output directory**: `dist`
    - **Root directory**: `frontend`（**必填**，仓库根不是前端工程）
-5. **Environment Variables**（注意变量名必须与代码一致，写错则前端拿不到后端地址）：
+6. **Environment Variables**（注意变量名必须与代码一致，写错则前端拿不到后端地址）：
    - Key: `VITE_API_BASE_URL`
    - Value: `https://interview-guide-backend.onrender.com`
-6. 点 **Save and Deploy**，等 1-2 分钟，获取访问地址：
-   - 格式：`https://<项目名>.pages.dev`
-7. **确认安全响应头已生效**（`frontend/public/_headers` 会被自动应用）：
+7. 点 **Save and Deploy**，等 1-2 分钟，访问 https://offergo.pages.dev
+8. **确认后端 CORS 已放行**（换域名的必检项）：
    ```bash
-   curl -sSI https://<项目名>.pages.dev/ | grep -i x-frame-options
+   curl -s -o /dev/null -w "%{http_code}\n" -H "Origin: https://offergo.pages.dev" \
+     https://interview-guide-backend.onrender.com/api/info
+   # 期望 200；若返回 403 说明后端白名单没放行这个来源 → 新前端会全站不可用
+   ```
+9. **确认安全响应头已生效**（`frontend/public/_headers` 会被自动应用）：
+   ```bash
+   curl -sSI https://offergo.pages.dev/ | grep -i x-frame-options
    # 期望输出：x-frame-options: DENY
    ```
    > 若缺失，检查 `_headers` 中**注释是否被写在某个路径区块内部**——
@@ -250,7 +262,7 @@ Render 免费层**15 分钟无请求即休眠**，下次访问要等约 1 分钟
    - Friendly Name: `interview-guide-backend`
    - URL: `https://interview-guide-backend.onrender.com/api/health`
    - Monitoring Interval: `5 minutes`
-3. 保存；可再加一个监控前端 `https://interview-guide-ai-interview-platform.pages.dev`
+3. 保存；可再加一个监控前端 `https://offergo.pages.dev`
 
 **前端侧兜底**：`frontend/src/utils/backendWake.ts` 已实现冷启动唤醒器
 （挂载前预热 + 登录页二次确认 + 「正在冷启动，已等待 Ns」实时进度），
@@ -262,7 +274,7 @@ Render 免费层**15 分钟无请求即休眠**，下次访问要等约 1 分钟
 
 | 项目 | 访问地址 | 预期结果 |
 |------|---------|---------|
-| 前端 | https://interview-guide-ai-interview-platform.pages.dev | 看到 AI 面试平台界面 |
+| 前端 | https://offergo.pages.dev | 看到 AI 面试平台界面 |
 | 后端健康检查 | https://interview-guide-backend.onrender.com/actuator/health | `{"status":"UP"}` |
 | API 信息 | https://interview-guide-backend.onrender.com/api/info | 返回 JSON |
 | 简历分析 | 前端 → 简历分析 Tab → 输入简历 → 点分析 | AI 返回评分 |
@@ -275,7 +287,7 @@ Render 免费层**15 分钟无请求即休眠**，下次访问要等约 1 分钟
 
 | 项目 | 访问地址 |
 |------|---------|
-| 前端 | https://interview-guide-ai-interview-platform.pages.dev |
+| 前端 | https://offergo.pages.dev |
 | 后端 API | https://interview-guide-backend.onrender.com |
 | 健康检查 | https://interview-guide-backend.onrender.com/actuator/health |
 

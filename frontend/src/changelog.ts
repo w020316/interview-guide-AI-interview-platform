@@ -85,9 +85,27 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.46.0'
+export const CURRENT_VERSION = '1.47.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.47.0',
+    date: '2026-10-03',
+    title: '版本 1.47.0 · 修好了「没作答却显示 0 分」的问题',
+    items: [
+      { text: '简历分析：AI 偶尔会解析不出结果，以前这种情况会被**悄悄记成「0 分」**——看起来就像你这份简历只值 0 分，还会拉低你的平均分。现在这种失败会明确告诉你「本次没能解析出结果，可以重新分析」，**不再伪装成一个分数**', level: 'user' },
+      { text: '简历历史：以前点开一条「0 分」的记录，评分区会整块消失、只剩一片空白。现在会正常显示，是失败的话也会给出清楚的说明和「重新分析」入口', level: 'user' },
+      { text: '成长趋势 / 知识库：**还没作答**的分类不再显示「0 分」和红色低分条（那会让人误以为自己考砸了），改为「—」。同一份数据在错题本里说「没有错题」、在这里却说「0 分」的矛盾也一并消除', level: 'user' },
+      { text: '面试日历：日程状态只接受「待面试 / 已完成 / 已取消」三个值，填错会明确提示，不会再把你写的奇怪值原样存进去', level: 'user' },
+      { text: '接口健壮性：请求里字段类型写错时（比如本该是文字却传了数字），现在会返回明确的「类型错误」提示，而不是笼统的「服务器内部错误」', level: 'user' },
+      { text: '换了个更好记的网址：新入口 https://offergo.pages.dev（原长网址仍然可用）', level: 'user' },
+      { text: '后端：兜底 JSON 去掉 overallScore:0 并加 AI_PARSE_FAILED 标记（兜底值必须语义中立）；简历分析链路补契约校验 + 重试一次 + 仍失败抛 BusinessException→503，不再把解析失败的脏数据当成功结果落库', level: 'tech' },
+      { text: '后端：题目汇总/分类统计在「无评分样本」时返回 null（原为 .orElse(0.0)，把「没数据」表达成「0 分」），并同步改为 null-safe 排序', level: 'tech' },
+      { text: '后端：新增 RequestFieldUtil，区分「字段缺失」与「类型错误」，请求体字段类型不符统一返回 400（原先 4 处无条件强转会抛 ClassCastException→500）', level: 'tech' },
+      { text: '后端：日历 status 增加枚举白名单校验（create + update），非法值返回 400 而非原样落库', level: 'tech' },
+      { text: '运维：CORS 白名单默认值由精确域名改为通配 https://*.pages.dev——Cloudflare Pages 不支持重命名项目，换域名只能新建项目，写死精确域名会让新前端全站 403', level: 'tech' },
+    ],
+  },
   {
     version: '1.46.0',
     date: '2026-10-01',

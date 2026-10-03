@@ -1,7 +1,6 @@
 package com.example.interview.service;
 
 import com.example.interview.common.BusinessException;
-import com.example.interview.util.JsonRepairUtil;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
 import org.junit.jupiter.api.BeforeEach;
@@ -127,31 +126,95 @@ class ResumeAnalysisServiceTest {
     }
 
     @Test
-    @DisplayName("analyze: AI 返回超长非法文本时回退兜底 JSON，且**不写入缓存**（P2-7）")
-    void analyze_invalidLongJson_usesFallbackJson() {
+    @DisplayName("analyze: AI 连续返回不可修复的非法文本时抛 BusinessException，且不写缓存（P1-01 回归）")
+    void analyze_invalidLongJson_throwsBusinessException() {
         stubCacheMiss();
-        // >200 字符且不含任何 JSON 结构的纯文本
+        // >200 字符且不含任何 JSON 结构的纯文本 —— 复现原始输出结构性损坏的输入形状
         stubChatClient("这不是JSON输出。".repeat(30));
 
-        String result = service.analyze(USER_ID, RESUME, JOB);
+        assertThatThrownBy(() -> service.analyze(USER_ID, RESUME, JOB))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("简历分析结果格式异常");
 
-        assertThat(result).isEqualTo(JsonRepairUtil.FALLBACK_JSON);
-        // v1.34.1（P2-7）：兜底 JSON 不再写入 30 分钟缓存。
-        // 若写入，AI 临时抖动产生的兜底结果会被缓存住——之后即便 AI 已恢复，
-        // 同一简历仍命中兜底内容，用户体感「一直坏」。现改为不缓存（等价于下次重试）。
+        // 不再返回兜底串、也不再写入缓存（避免抖动结果被缓存 30 分钟）
         verify(valueOps, never()).set(anyString(), any(), anyLong(), any());
     }
 
     @Test
-    @DisplayName("analyze: AI 返回 Markdown 代码块包裹的 JSON 时剥离围栏后返回")
-    void analyze_markdownFencedJson_stripsFence() {
+    @DisplayName("analyze: 首次非法、重试合法 → 重试一次后返回合法结果（P1-01 回归）")
+    void analyze_invalidThenValid_retriesOnceAndSucceeds() {
         stubCacheMiss();
-        stubChatClient("```json\n{\"overallScore\":60}\n```");
+        // 第一次返回结构性损坏的串，重试返回合法结果
+        String broken = "{\"overallScore\": 75, \"dimensions\": [{\"name\":\"岗位匹配度\"";
+        when(chatClient.prompt()).thenReturn(chatClientRequestSpec);
+        when(chatClientRequestSpec.user(anyString())).thenReturn(chatClientRequestSpec);
+        when(chatClientRequestSpec.call()).thenReturn(callResponseSpec);
+        when(callResponseSpec.content()).thenReturn(broken, VALID_JSON);
 
         String result = service.analyze(USER_ID, RESUME, JOB);
 
-        assertThat(result).isEqualTo("{\"overallScore\":60}");
-        verify(valueOps).set(anyString(), eq("{\"overallScore\":60}"), eq(30L), eq(TimeUnit.MINUTES));
+        assertThat(result).isEqualTo(VALID_JSON);
+        // 首次 + 重试 = 恰好 2 次 AI 调用
+        verify(chatClient, times(2)).prompt();
+        // 重试成功后正常写缓存
+        verify(valueOps).set(anyString(), eq(VALID_JSON), eq(30L), eq(TimeUnit.MINUTES));
+    }
+
+    @Test
+    @DisplayName("analyze: 两次都非法 → 抛 BusinessException，不写缓存（P1-01 回归）")
+    void analyze_invalidTwice_throwsBusinessException() {
+        stubCacheMiss();
+        stubChatClient("依然不是 JSON".repeat(20));
+
+        assertThatThrownBy(() -> service.analyze(USER_ID, RESUME, JOB))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("简历分析结果格式异常");
+
+        verify(chatClient, times(2)).prompt();
+        verify(valueOps, never()).set(anyString(), any(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("analyze: AI 返回 Markdown 代码块包裹的合法 JSON 时剥离围栏后返回")
+    void analyze_markdownFencedJson_stripsFence() {
+        stubCacheMiss();
+        String fenced = "```json\n{\"overallScore\":60,\"dimensions\":[{\"name\":\"岗位匹配度\",\"score\":60}]}\n```";
+        String expected = "{\"overallScore\":60,\"dimensions\":[{\"name\":\"岗位匹配度\",\"score\":60}]}";
+        stubChatClient(fenced);
+
+        String result = service.analyze(USER_ID, RESUME, JOB);
+
+        assertThat(result).isEqualTo(expected);
+        verify(valueOps).set(anyString(), eq(expected), eq(30L), eq(TimeUnit.MINUTES));
+    }
+
+    // ─────────────────────── isValidResumeAnalysis: 契约校验 ───────────────────────
+
+    @Test
+    @DisplayName("isValidResumeAnalysis: 合法结构（数值分 + 非空 dimensions）返回 true")
+    void isValidResumeAnalysis_valid_returnsTrue() {
+        assertThat(ResumeAnalysisService.isValidResumeAnalysis(VALID_JSON)).isTrue();
+    }
+
+    @Test
+    @DisplayName("isValidResumeAnalysis: 缺失/空 dimensions、非数值分、越界分一律 false（P1-01 契约）")
+    void isValidResumeAnalysis_invalidShapes_returnsFalse() {
+        // 缺 dimensions
+        assertThat(ResumeAnalysisService.isValidResumeAnalysis("{\"overallScore\":60}")).isFalse();
+        // dimensions 为空数组（旧兜底串形状）
+        assertThat(ResumeAnalysisService.isValidResumeAnalysis(
+                "{\"overallScore\":0,\"dimensions\":[]}")).isFalse();
+        // overallScore 为字符串
+        assertThat(ResumeAnalysisService.isValidResumeAnalysis(
+                "{\"overallScore\":\"75\",\"dimensions\":[{\"score\":80}]}")).isFalse();
+        // overallScore 越界
+        assertThat(ResumeAnalysisService.isValidResumeAnalysis(
+                "{\"overallScore\":120,\"dimensions\":[{\"score\":80}]}")).isFalse();
+        // dimension 缺 score
+        assertThat(ResumeAnalysisService.isValidResumeAnalysis(
+                "{\"overallScore\":75,\"dimensions\":[{\"name\":\"x\"}]}")).isFalse();
+        // 非 JSON
+        assertThat(ResumeAnalysisService.isValidResumeAnalysis("{not json")).isFalse();
     }
 
     @Test

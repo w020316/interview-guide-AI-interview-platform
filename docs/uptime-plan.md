@@ -115,11 +115,11 @@
 
 ### 关键联系与入口
 - Render Dashboard：https://dashboard.render.com （服务 `interview-guide-backend`，srv-d94i7ocvikkc73cfjli0）
-- Cloudflare Pages：https://dash.cloudflare.com → interview-guide-ai-interview-platform
+- Cloudflare Pages：https://dash.cloudflare.com → offergo（原 interview-guide-ai-interview-platform）
 - Supabase：项目控制台 → Database / Health
 - Upstash Redis：控制台 → lawai-redis / trusty-monarch-113421
 - 后端健康：https://interview-guide-backend.onrender.com/api/health
-- 前端：https://interview-guide-ai-interview-platform.pages.dev
+- 前端：https://offergo.pages.dev
 
 ---
 

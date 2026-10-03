@@ -2,7 +2,7 @@
 
 > 版本：1.21.0 ｜ 日期：2026-08-31
 > 交付范围：跨场实战升级（难度自适应 + 语音作答 + 趋势月周维度 + 复盘导出 PDF）
-> 线上地址：https://interview-guide-ai-interview-platform.pages.dev
+> 线上地址：https://offergo.pages.dev
 
 ---
 

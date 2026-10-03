@@ -6,7 +6,7 @@
 
 ## 一、开始使用
 
-1. 打开平台：https://interview-guide-ai-interview-platform.pages.dev
+1. 打开平台：https://offergo.pages.dev
 2. 点击右上角「免费注册」创建账号（用户名 2-32 位，密码 ≥6 位，需有效邮箱）。
 3. 登录后进入「首页」。
 
