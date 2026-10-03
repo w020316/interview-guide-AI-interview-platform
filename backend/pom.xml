@@ -22,7 +22,7 @@
         <spring-ai.version>1.0.0</spring-ai.version>
         <jjwt.version>0.12.6</jjwt.version>
         <bucket4j.version>8.10.1</bucket4j.version>
-        <springdoc.version>2.6.0</springdoc.version>
+        <springdoc.version>3.1.1</springdoc.version>
     </properties>
 
     <!-- Spring AI BOM 统一管理版本 -->
