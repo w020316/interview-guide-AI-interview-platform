@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.51.0'
+export const CURRENT_VERSION = '1.51.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.51.1',
+    date: '2026-10-04',
+    title: '版本 1.51.1 · 短板列表去掉重复项',
+    items: [
+      { text: '简历匹配推荐：短板列表里同一技术不再出现两个名字（例如 Postgres 与 PostgreSQL、ES 与 Elasticsearch 只保留更具体的那个），列表更干净、更可读', level: 'user' },
+      { text: '后端：短板判定改为对称的子串匹配——JD 要求的技能只要在简历文本中出现过（哪怕名字更短/更长）就不再列为短板，避免同一技术被误报', level: 'tech' },
+    ],
+  },
   {
     version: '1.51.0',
     date: '2026-10-04',

@@ -78,4 +78,14 @@ class JobMatchServiceTest {
 
         assertThat(result.get(0).missingSkills()).isEmpty();
     }
+
+    @Test
+    @DisplayName("短板：JD 的别名技能会被简历的更具体技能覆盖（postgres ⊂ PostgreSQL）")
+    void match_missingSkills_aliasCoveredByResume() {
+        // JD 明确写了 postgres / es / sql，但简历写的是更具体的 PostgreSQL —— 不应误报为短板
+        var jobs = List.of(job("数据工程师", "PostgreSQL,Elasticsearch,ES", "postgres elasticsearch es sql"));
+        var result = matcher.match("熟悉 PostgreSQL 与 Elasticsearch", jobs, 10);
+
+        assertThat(result.get(0).missingSkills()).isEmpty();
+    }
 }

@@ -79,15 +79,21 @@ public class JobMatchService {
             if (hit.isEmpty()) {
                 continue; // 完全无关的岗位不推荐
             }
-            // 短板：JD 里明确出现、但简历画像里没有的技能（按词表顺序输出，结果确定）。
+            // 短板：JD 里明确出现（jdSkills）、且**简历文本完全没出现**的技能（按词表顺序，结果确定）。
             // 规则推导、零 AI —— 与简历优化「未具备只能进 missingKeywords 待补」的不编造原则同源。
+            // 判定用「简历文本是否包含该技能」（子串级）：这样 JD 的「postgres」会被简历的
+            // 「PostgreSQL」覆盖，不会把同一项技术误报成短板。
+            String resumeLower = resumeText == null ? "" : resumeText.toLowerCase(Locale.ROOT);
             List<String> missing = new ArrayList<>();
             for (String kw : SKILL_KEYWORDS) {
                 String k = kw.toLowerCase(Locale.ROOT);
-                if (jdSkills.contains(k) && !skills.contains(k)) {
+                if (jdSkills.contains(k) && !resumeLower.contains(k)) {
                     missing.add(k);
                 }
             }
+            // 相近词去重：postgres/postgresql、go/golang、es/elasticsearch 同指一项技术，
+            // 不去重会出现「同一技术两个名字占两条短板」的噪声（词表天然成对，此问题必然发生）。
+            missing = dedupeSkills(missing);
             int score = hit.size() * 20;
             String degree = job.getDegree() == null ? "" : job.getDegree();
             if (degree.contains("本科") && resumeText != null
@@ -119,5 +125,29 @@ public class JobMatchService {
         if (s != null) {
             sb.append(' ').append(s);
         }
+    }
+
+    /**
+     * 相近技能去重：若某技能是列表中另一技能的**子串**（postgres ⊂ postgresql、go ⊂ golang、
+     * es ⊂ elasticsearch），保留更具体（更长）的一个，丢弃短名 —— 否则同一技术会以两个名字
+     * 重复出现在短板列表里。顺带消除「es 命中自 redis」这类子串误报。
+     *
+     * <p>顺序保持不变（按词表顺序），只做过滤。仅用于短板展示，不影响打分。
+     */
+    private static List<String> dedupeSkills(List<String> ordered) {
+        List<String> out = new ArrayList<>();
+        for (String s : ordered) {
+            boolean covered = false;
+            for (String t : ordered) {
+                if (!t.equals(s) && t.contains(s)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (!covered) {
+                out.add(s);
+            }
+        }
+        return out;
     }
 }
