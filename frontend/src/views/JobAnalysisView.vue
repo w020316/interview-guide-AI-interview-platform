@@ -16,6 +16,44 @@
     <div v-if="tab === 'analyze'" class="tab-panel">
       <div class="input-card">
         <label>粘贴岗位描述（JD）</label>
+
+        <!-- v1.58.0：从岗位链接导入。放在 textarea 之上——
+             它只是「更快地填满下面那个框」，不是一条独立的替代路径。 -->
+        <div class="url-import">
+          <BaseInput
+            v-model="jdUrl"
+            aria-label="岗位链接"
+            placeholder="或粘贴岗位链接（https://...），自动抓取 JD 正文"
+            @keyup.enter="importFromUrl"
+          />
+          <BaseButton
+            variant="ghost"
+            :loading="urlLoading"
+            :disabled="urlLoading || !jdUrl.trim()"
+            @click="importFromUrl"
+          >
+            {{ urlLoading ? '抓取中...' : '从链接导入' }}
+          </BaseButton>
+        </div>
+        <p class="url-hint">
+          支持 <strong>Ashby / Greenhouse</strong> 托管的岗位页（很多科技公司用它们发布官方岗位，
+          如 <code>jobs.ashbyhq.com/…</code>）。这类页面能从官方公开接口读到完整 JD 原文。
+          BOSS直聘、拉勾、牛客等 App 内页面为动态渲染，服务端读不到正文——
+          <strong>请直接复制正文粘贴到下方输入框</strong>，不要在这里白试。
+        </p>
+        <div v-if="importError" class="import-error">
+          <span class="import-error-text">{{ importError }}</span>
+          <button type="button" class="import-error-close" aria-label="关闭提示" @click="importError = ''">×</button>
+        </div>
+        <div v-if="importedFrom" class="imported-badge">
+          已从链接导入
+          <span v-if="importSource === 'Ashby' || importSource === 'Greenhouse'" class="badge-source">
+            · {{ importSource }} 官方接口（原文）
+          </span>
+          <span v-if="importedTitle">· {{ importedTitle }}</span>
+          <span v-if="importedCompany">@ {{ importedCompany }}</span>
+        </div>
+
         <BaseTextarea v-model="jdText" :rows="10" placeholder="把招聘网站上的岗位描述全文粘贴到这里..." />
         <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="analyzeJd">
           {{ loading ? '分析中...' : '开始分析' }}
@@ -234,7 +272,7 @@ import { repairAndCheck } from '../utils/jsonRepair'
 import { EMPTY } from '../utils/format'
 import { getScoreColor, MATCH_THRESHOLDS } from '../utils/score'
 import renderMarkdown from '../utils/markdown'
-import { BaseButton, BaseTextarea } from '../components'
+import { BaseButton, BaseTextarea, BaseInput } from '../components'
 
 // ── 公共状态 ──
 const tab = ref<'analyze' | 'gap' | 'letter'>('analyze')
@@ -244,6 +282,21 @@ const resumeText = ref('')
 // ── Tab 1: JD 分析 ──
 const loading = ref(false)
 const jdResult = ref<Record<string, any> | null>(null)
+
+// ── Tab 1: 从链接导入（v1.58.0） ──
+const jdUrl = ref('')
+const urlLoading = ref(false)
+/** 导入成功后展示来源，让用户知道这段 JD 是从哪个链接来的（可回溯、可核对） */
+const importedFrom = ref('')
+const importedTitle = ref('')
+const importedCompany = ref('')
+/**
+ * 导入失败的常驻提示。不只是弹个 toast —— 抓取失败时用户需要**照着做**（改用复制粘贴），
+ * 而 toast 几秒就没了。这里把它留在页面上，直到下一次尝试。
+ */
+const importError = ref('')
+/** 数据来源标识（Ashby / Greenhouse / web）—— 让用户知道这段 JD 是怎么来的、可信度如何 */
+const importSource = ref('')
 
 // ── Tab 2: 差距诊断 ──
 const gapLoading = ref(false)
@@ -319,6 +372,68 @@ function clearResumeFile() {
 }
 
 // ── Tab 1: JD 分析 ──
+
+/**
+ * 从岗位链接导入 JD（v1.58.0）。
+ *
+ * 成功只做一件事：**把 JD 正文回填进输入框**，不自动开始分析。
+ * 理由：抓取结果天然含噪声，自动分析会让用户来不及核对就拿到基于脏文本的结论；
+ * 回填后由用户确认/编辑，再点「开始分析」——这是本项目一贯的「不替用户下判断」。
+ */
+async function importFromUrl() {
+  const url = jdUrl.value.trim()
+  if (!url) return ElMessage.warning('请粘贴岗位链接')
+  urlLoading.value = true
+  try {
+    const data = await api.post('/api/job/import-url',
+      { url },
+      { timeout: AI_TIMEOUT }) as unknown as {
+        extracted: string | Record<string, string>
+        sourceUrl: string
+        pageText: string
+        source?: string
+        location?: string
+      }
+
+    // 后端两条路径返回形态不同，这里统一成对象：
+    // - ATS 路径（Ashby/Greenhouse）：extracted 已是结构化对象，字段直接取自官方公开接口
+    // - HTML 抓取路径：extracted 是 AI 返回的 JSON 字符串，需修复 + 解析
+    const extracted: Record<string, string> =
+      typeof data?.extracted === 'string'
+        ? repairAndParse<Record<string, string>>(data.extracted, {})
+        : (data?.extracted ?? {})
+
+    // 优先用 JD 正文；它为空时回退到原始抓取正文（用户仍拿到可编辑的文本）
+    const jd = (extracted.jobDescription || '').trim()
+    const text = jd || (data?.pageText || '').trim()
+    if (!text) {
+      ElMessage.warning('已获取页面，但没有识别出岗位正文，请手动复制粘贴')
+      return
+    }
+
+    jdText.value = text
+    importedFrom.value = data?.sourceUrl || url
+    // 岗位名/公司可能确实为空（页面上没写）——此时留空，不编造
+    importedTitle.value = (extracted.jobTitle || '').trim()
+    importedCompany.value = (extracted.company || '').trim()
+    importSource.value = data?.source || ''
+    importError.value = ''
+
+    const who = [importedCompany.value, importedTitle.value].filter(Boolean).join(' · ')
+    const via = importSource.value === 'Ashby' || importSource.value === 'Greenhouse'
+      ? `（来自 ${importSource.value} 官方接口）`
+      : ''
+    ElMessage.success(who ? `已导入${via}：${who}` : `已导入岗位正文${via}，请核对后点击「开始分析」`)
+  } catch (e: unknown) {
+    // 后端已把「抓不到」细分出 reason（需要登录 / 动态渲染 / 反爬 / 链接贴错）。
+    // toast 一闪而过，用户来不及照着做 —— 因此同时把原因落成页面上的常驻提示。
+    importError.value = getErrMessage(e, '导入失败，请改为手动复制粘贴')
+    ElMessage.error(importError.value)
+  } finally {
+    urlLoading.value = false
+  }
+}
+
 async function analyzeJd() {
   if (!jdText.value.trim()) return ElMessage.warning('请粘贴岗位描述')
   loading.value = true
@@ -496,6 +611,98 @@ function gapStatusClass(status: string): string {
 .field-row textarea:focus {
   border-color: var(--brand-primary);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+/* ── 从链接导入（v1.58.0） ── */
+
+.url-import {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+/* 输入框占满剩余宽度；按钮保持自然宽度不被挤压 */
+.url-import :deep(.base-input),
+.url-import > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.url-import > :last-child {
+  flex: 0 0 auto;
+}
+
+.url-hint {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-text-tertiary);
+}
+
+.url-hint strong {
+  font-weight: 600;
+  color: var(--c-text-secondary);
+}
+
+/* 导入成功后的来源标记：让用户能确认「这段 JD 是从哪来的」 */
+.imported-badge {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--c-info);
+  background: var(--c-info-light);
+  border: 1px solid var(--c-info-border);
+  border-radius: var(--radius-sm);
+}
+
+/* 数据来源标识（Ashby/Greenhouse 官方接口）——强于普通说明，因为它是「原文可信」的信号 */
+.badge-source {
+  font-weight: 600;
+}
+
+/* 导入失败的常驻提示：比 toast 活得久，用户能照着步骤做 */
+.import-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-warning-text, var(--c-text-secondary));
+  background: var(--c-warning-light, rgba(255, 176, 32, 0.1));
+  border: 1px solid var(--c-warning-border, rgba(255, 176, 32, 0.3));
+  border-radius: var(--radius-sm);
+}
+
+.import-error-text {
+  flex: 1;
+}
+
+.import-error-close {
+  flex: 0 0 auto;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.import-error-close:hover {
+  opacity: 1;
+}
+
+/* 窄屏下按钮换行，避免挤压输入框到不可用 */
+@media (max-width: 640px) {
+  .url-import {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 /* ── 简历上传组合（差距诊断用） ── */

@@ -60,6 +60,8 @@ const AI_PATH_FRAGMENTS: readonly string[] = [
   '/api/job/analyze',
   '/api/job/gap',
   '/api/job/letter',
+  // v1.58.0：从岗位链接导入 JD（抓取 + AI 提炼）
+  '/api/job/import-url',
   '/api/jobs/refresh',
   '/api/favorite/bank/start',
   '/api/agent/',

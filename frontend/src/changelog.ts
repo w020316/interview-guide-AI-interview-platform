@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.57.0'
+export const CURRENT_VERSION = '1.58.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.58.0',
+    date: '2026-10-04',
+    title: '版本 1.58.0 · 粘贴岗位链接，自动填入 JD 正文',
+    items: [
+      { text: '岗位分析：新增「从链接导入」——粘贴岗位链接即可自动把 JD 正文填进输入框，不用再手工全选复制', level: 'user' },
+      { text: '岗位分析：对使用 Ashby、Greenhouse 发布岗位的公司（很多科技公司都用它们），导入的是**招聘方发布的原文**，标题、公司、工作地点、职位描述一次填齐', level: 'user' },
+      { text: '岗位分析：抓不到正文时会**明确告诉你原因**——是需要登录、页面靠浏览器动态加载、还是链接不是岗位详情页，并提示改用复制粘贴，而不是笼统报一句「导入失败」', level: 'user' },
+    ],
+  },
   {
     version: '1.57.0',
     date: '2026-10-04',

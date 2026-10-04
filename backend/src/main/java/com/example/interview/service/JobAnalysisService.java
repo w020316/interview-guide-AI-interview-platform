@@ -119,6 +119,43 @@ public class JobAnalysisService {
     }
 
     /**
+     * 从**抓取到的网页正文**里提炼岗位信息（v1.58.0，竞品 #14「粘贴岗位链接自动提取」）。
+     *
+     * <p>定位是<b>纯抽取，不是理解</b>：网页正文里混着导航、推荐位、公司介绍、页脚等噪声，
+     * AI 在这里只做一件事——把「岗位名称 / 公司名 / JD 正文」这三块捞出来。
+     * 因此 prompt 里**明确禁止编造**：页面上没有的字段一律留空字符串，
+     * 而不是「根据上下文合理推测」（那会直接踩到项目的「不编造」红线）。
+     *
+     * @param pageText 抓取并提纯后的网页正文
+     * @return JSON 字符串：{@code {jobTitle, company, jobDescription}}
+     */
+    public String extractJobFromPage(String pageText) {
+        // 正文可能长达数千字；这里给 3000 字预算——足够覆盖一个完整 JD，
+        // 又不会让 prompt 过长（真正的字数控制在于 JobPageFetcher 的抓取上限）。
+        String truncated = TextUtil.truncate(pageText, 3000);
+        String safe = PromptSanitizer.sanitize(truncated);
+        String prompt = new StringBuilder()
+                .append("下面是从一个招聘网页上抓取下来的纯文本，其中混杂着导航栏、页脚、推荐岗位等无关内容。\n")
+                .append("请从中**提取**（不是概括、不是推测）这个页面的招聘岗位信息。\n\n")
+                .append("【网页正文】\n").append(safe).append("\n\n")
+                .append("【输出要求（务必严格遵守）】\n")
+                .append("1. 直接输出 JSON，不要任何 Markdown 代码块、不要 ```json 标记\n")
+                .append("2. 所有字符串必须使用 ASCII 双引号 \"，禁止使用单引号或中文引号\n")
+                .append("3. 字符串值内禁止裸换行符；如需换行请用分号分隔\n")
+                .append("4. **绝不编造**：网页里没有明确写的字段，一律填空字符串 \"\"，不要猜测、不要补全\n")
+                .append("5. jobDescription 只保留与岗位职责/任职要求相关的正文，剔除导航与广告；若原文较长请如实保留\n")
+                .append("6. 输出格式：\n")
+                .append("{\n")
+                .append("  \"jobTitle\": \"岗位名称（网页上写的原文；没有则空字符串）\",\n")
+                .append("  \"company\": \"公司名称（网页上写的原文；没有则空字符串）\",\n")
+                .append("  \"jobDescription\": \"岗位职责与任职要求的正文\"\n")
+                .append("}")
+                .toString();
+
+        return callAi(prompt, "job-from-url");
+    }
+
+    /**
      * 求职信/申请邮件/内推私信生成
      */
     public String generateLetter(String resumeText, String jobDescription, String type) {
