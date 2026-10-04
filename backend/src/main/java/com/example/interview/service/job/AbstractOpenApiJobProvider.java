@@ -7,11 +7,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 免费公开招聘数据 API 适配器基类（v1.37.0）
@@ -77,8 +80,29 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     protected final ObjectMapper objectMapper;
     private final RestClient restClient;
 
+    /**
+     * 各 URL 最近一次响应的 ETag（v1.60.0 条件请求）。
+     *
+     * <p><b>为什么值得做</b>：这些 ATS 板是按公司整板返回的，单板正文实测可达
+     * <b>407KB</b>（Ashby `linear`）。而官方板内容一天变不了几次，
+     * 每 6 小时把 8 个公司的整板全量下载一遍属于纯浪费。
+     * 实测 Ashby 与 Greenhouse **都返回 ETag，且带 `If-None-Match` 时确实回
+     * `304 Not Modified` + 0 字节正文**（已验证，不是文档推断）。
+     *
+     * <p><b>为什么用 ConcurrentHashMap 而不是 Caffeine</b>：条目数等于「URL 数量」，
+     * 本源总共十来个 URL，无需淘汰策略；引入缓存库不值得。
+     *
+     * <p><b>为什么按 URL 为键而不是按平台</b>：{@code TechBoardJobProvider} 一个适配器
+     * 要对 8 家公司的 URL 分别做条件请求，按平台存会把它们互相覆盖。
+     */
+    private final Map<String, String> etagCache = new ConcurrentHashMap<>();
+
     protected AbstractOpenApiJobProvider(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        // ⚠️ 刻意**不**在这里改 setInstanceFollowRedirects。曾一度为「让 ETag 与 URL 精确对应」
+        // 把它关掉，但这条 HTTP 管道同时服务 5 个海外源 + WWR + HN——而这些源的测试
+        // **不打真实网络**，回归全绿并不能证明它们不依赖重定向。为了一个次要的对应关系
+        // 去动所有源共用的连接行为，风险收益不成比例。条件请求不需要它。
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(CONNECT_TIMEOUT_MS);
         factory.setReadTimeout(READ_TIMEOUT_MS);
@@ -168,6 +192,88 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
         } catch (Exception e) {
             log.warn("公开数据源 {} 数据解析失败：{}", platform(), e.getMessage());
             throw new IllegalStateException("数据解析失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 条件请求的结果（v1.60.0）。
+     *
+     * <p><b>为什么要单独一个类型，而不是「返回 null 或空串表示没变」</b>：
+     * 本方法此前用 `null`/`""` 表示「失败」，用字符串表示「拿到内容」。
+     * 若再用其中一个表示「未修改」，调用方就再也分不清
+     * **「上游没变」与「上游挂了」**——这正是本项目反复吃亏的那类「安静失败」。
+     * 三态必须显式：{@link #notModified} / {@link #body} / {@link #failed}。
+     *
+     * <p>该类只在包内使用，故不对外暴露。
+     */
+    protected static final class ConditionalGet {
+        /** 上游返回 304：内容未变，{@code body} 为 null */
+        private final boolean notModified;
+        /** 上游返回 2xx：本次正文 */
+        private final String body;
+        /** 失败原因（上游不可达/异常/空正文）；成功时为 null */
+        private final String error;
+
+        private ConditionalGet(boolean notModified, String body, String error) {
+            this.notModified = notModified;
+            this.body = body;
+            this.error = error;
+        }
+
+        static ConditionalGet modified(String body) { return new ConditionalGet(false, body, null); }
+        static ConditionalGet notModified() { return new ConditionalGet(true, null, null); }
+        static ConditionalGet failed(String error) { return new ConditionalGet(false, null, error); }
+
+        boolean isNotModified() { return notModified; }
+        String body() { return body; }
+        String error() { return error; }
+        boolean isFailed() { return error != null; }
+    }
+
+    /**
+     * 带条件请求的拉取（v1.60.0）。
+     *
+     * <p>若该 URL 已有缓存 ETag，则带上 {@code If-None-Match}；上游回 304 时不下载正文，
+     * 返回 {@link ConditionalGet#notModified()}。首次请求或缓存失效时行为与
+     * {@link #fetchRaw(String)} 一致，并在 2xx 时记录新的 ETag。
+     *
+     * <p><b>不做失败即清缓存</b>：网络抖动导致的失败不应丢掉 ETag ——
+     * 丢了下次就会退化成全量下载，而这正是本机制要避免的。上游若真的换了内容，
+     * 会回 200 + 新 ETag（而不是 304），届时自然覆盖。
+     */
+    protected ConditionalGet fetchRawConditional(String url) {
+        String cachedEtag = etagCache.get(url);
+        try {
+            var spec = restClient.get()
+                    .uri(url)
+                    .header("User-Agent", UA)
+                    .header("Accept", "application/json, text/plain, */*");
+            if (cachedEtag != null) {
+                spec = spec.header("If-None-Match", cachedEtag);
+            }
+            var response = spec.exchange((request, res) -> {
+                int status = res.getStatusCode().value();
+                // 304：内容未变，正文为空，直接返回标记（不要读 body，读了也没内容）
+                if (status == 304) {
+                    return ConditionalGet.notModified();
+                }
+                String etag = res.getHeaders().getETag();
+                String text = new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8);
+                if (etag != null && !etag.isBlank()) {
+                    etagCache.put(url, etag);
+                }
+                return ConditionalGet.modified(text);
+            });
+            if (response.isFailed()) {
+                return response;
+            }
+            if (!response.isNotModified() && (response.body() == null || response.body().isBlank())) {
+                return ConditionalGet.failed("上游返回空响应体");
+            }
+            return response;
+        } catch (Exception e) {
+            log.warn("公开数据源 {} 条件拉取失败：{} ({})", platform(), url, e.getMessage());
+            return ConditionalGet.failed(e.getMessage());
         }
     }
 

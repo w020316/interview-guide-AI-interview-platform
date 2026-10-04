@@ -106,35 +106,69 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
      * <p><b>失败隔离</b>：单家公司失败（网络抖动 / 该公司换了 ATS）只记录并跳过，
      * 不影响其余公司——否则一家挂掉会让整个源在管理后台显示为「故障」，
      * 掩盖「其实大部分公司都是好的」这一事实。
+     *
+     * <p><b>v1.60.0 条件请求</b>：每家公司的板都先带 {@code If-None-Match}。
+     * 上游回 304 时**跳过下载与解析**（Ashby 单板正文实测 407KB）——
+     * 官方板一天变不了几次，6 小时一轮全量重下是纯浪费。
+     *
+     * <p>⚠️ <b>304 不参与「本轮取到 0 条」的计数</b>：{@code BoardFetch.notModified} 单独
+     * 标记未变更的板，用于日志如实说明「本轮跳过 N 家（内容未变）」，而不是让它在
+     * 结果里看起来像「这几家公司没有岗位」。这是本项目反复吃亏的「安静失败」防范。
      */
     @Override
     public List<JobDto> fetch() {
         List<JobDto> all = new ArrayList<>();
+        int notModified = 0;
         for (String[] board : ASHBY_BOARDS) {
-            all.addAll(fetchAshby(board[0], board[1]));
+            var r = fetchAshby(board[0], board[1]);
+            all.addAll(r.jobs());
+            if (r.notModified()) notModified++;
         }
         for (String[] board : GREENHOUSE_BOARDS) {
-            all.addAll(fetchGreenhouse(board[0], board[1]));
+            var r = fetchGreenhouse(board[0], board[1]);
+            all.addAll(r.jobs());
+            if (r.notModified()) notModified++;
         }
+        if (notModified > 0) {
+            log.info("科技公司官方板：{} 家内容未变更（304，已跳过下载与解析），本次实际下载 {} 家",
+                    notModified, ASHBY_BOARDS.size() + GREENHOUSE_BOARDS.size() - notModified);
+        }
+        // v1.60.0：若**全部**公司都 304，说明本轮整源无变化。此时返回空列表是安全的——
+        // JobAgentService 对空列表只做 `continue`，既不下架也不删除（见该处注释），
+        // 因此不会把「未变更」误判成「岗位消失」。
         return applyQuotaForSource(all);
     }
 
-    /** 拉取单个 Ashby 板：{@code {"jobs":[...], "apiVersion":"..."}} */
-    private List<JobDto> fetchAshby(String slug, String company) {
+    /** 单板拉取结果：岗位列表 + 该板本次是否 304 */
+    private record BoardFetch(List<JobDto> jobs, boolean notModified) {
+        static BoardFetch of(List<JobDto> jobs) { return new BoardFetch(jobs, false); }
+        static BoardFetch unchanged() { return new BoardFetch(List.of(), true); }
+    }
+
+    /** 拉取单个 Ashby 板：{@code {"jobs":[...], "apiVersion":"..."}}（v1.60.0 带条件请求） */
+    private BoardFetch fetchAshby(String slug, String company) {
+        var res = fetchRawConditional(String.format(ASHBY_URL, slug));
+        if (res.isNotModified()) return BoardFetch.unchanged();
+        if (res.isFailed()) return BoardFetch.of(List.of());
         try {
-            return parseAshby(objectMapper.readTree(fetchRaw(String.format(ASHBY_URL, slug))), company);
+            return BoardFetch.of(parseAshby(objectMapper.readTree(res.body()), company));
         } catch (Exception e) {
-            return List.of();
+            // 解析失败要能反映为「本板 0 条」，但不应让整源中断——与既有失败隔离一致
+            log.warn("Ashby 板 {} 解析失败：{}", company, e.getMessage());
+            return BoardFetch.of(List.of());
         }
     }
 
-    /** 拉取单个 Greenhouse 板：{@code {"jobs":[...], "meta":{...}}} */
-    private List<JobDto> fetchGreenhouse(String slug, String company) {
+    /** 拉取单个 Greenhouse 板：{@code {"jobs":[...], "meta":{...}}}（v1.60.0 带条件请求） */
+    private BoardFetch fetchGreenhouse(String slug, String company) {
+        var res = fetchRawConditional(String.format(GREENHOUSE_URL, slug));
+        if (res.isNotModified()) return BoardFetch.unchanged();
+        if (res.isFailed()) return BoardFetch.of(List.of());
         try {
-            return parseGreenhouse(
-                    objectMapper.readTree(fetchRaw(String.format(GREENHOUSE_URL, slug))), company);
+            return BoardFetch.of(parseGreenhouse(objectMapper.readTree(res.body()), company));
         } catch (Exception e) {
-            return List.of();
+            log.warn("Greenhouse 板 {} 解析失败：{}", company, e.getMessage());
+            return BoardFetch.of(List.of());
         }
     }
 

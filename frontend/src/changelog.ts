@@ -85,9 +85,17 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.59.0'
+export const CURRENT_VERSION = '1.60.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.60.0',
+    date: '2026-10-05',
+    title: '版本 1.60.0 · 岗位刷新更快也更省',
+    items: [
+      { text: '招聘广场：从科技公司官方招聘板同步岗位时，如果这些公司**这次没有发布新岗位**，系统会跳过重复下载——以前每次刷新都要把全部公司的岗位列表重新拉一遍（单家公司可达 40 万字符），现在只拉有变化的那几家。岗位内容与之前完全一致，只是刷新更快、对招聘网站更友好', level: 'user' },
+    ],
+  },
   {
     version: '1.59.0',
     date: '2026-10-05',
