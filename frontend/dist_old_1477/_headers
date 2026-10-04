@@ -1,0 +1,55 @@
+# Cloudflare Pages 响应头配置
+#
+# ⚠️ 格式与行为约束（2026-09-21 线上实测）：
+# 1) 注释行可以放在路径区块之间，但**不要写在某个区块的内部**（路径行与其 header 行之间），
+#    Cloudflare 对这种写法会静默忽略整块，不报错、不告警。
+# 2) 同一个路径模式（如 `/*`）**只写一个区块**。此前 `/*` 出现两次（安全头 + HSTS 各一块），
+#    实测两个区块的 header 都没有下发；已合并为单块验证。
+# 3) SPA 回退（_redirects 的 `/* /index.html 200`）命中的路径**不会**应用 _headers ——
+#    实测 `/`（被回退改写）拿不到任何自定义头，而真实存在的文件
+#    （/favicon.svg、/assets/*、/index.html）都能正常拿到。
+#    因此若 `/*` 仍不生效，说明全站安全头无法用 _headers 落地
+#    （pages.dev 不是用户可管的 zone，控制台加不了响应头规则），
+#    只能通过绑定自有域名后用 zone 级规则解决——该限制需明确记录，避免误以为已生效。
+
+# 全站响应头（安全 + HSTS，合并为单一区块）
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  X-XSS-Protection: 0
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# favicon 强缓存（内容不变，1 年）
+/favicon.svg
+  Cache-Control: public, max-age=31536000, immutable
+
+# 静态资源强缓存（带 hash 的 assets，Vite 产物文件名含内容指纹）
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML 不缓存，确保用户始终拿到最新版本
+/*.html
+  Cache-Control: no-cache
+
+# API 响应不缓存（避免敏感数据被浏览器/代理缓存）
+/api/*
+  Cache-Control: no-store
+
+# ── PWA（第三批 D）：Service Worker 与 manifest 绝不缓存 ──
+# 「用户卡在旧版本」的根因防护：sw.js 若被 CDN/浏览器缓存，新版本永远不会生效。
+# 下列均为**真实存在的文件**（非 SPA 回退路径），可正常命中 _headers（见文件头约束②③）。
+# 各自独立区块，不与 `/*` 合并（见文件头约束④）。
+
+# Service Worker 脚本：每次请求都回源校验
+/sw.js
+  Cache-Control: no-cache
+
+# Workbox 运行时脚本（generateSW 产物，文件名可能带内容 hash，用通配匹配）
+/workbox-*.js
+  Cache-Control: no-cache
+
+# Web App Manifest：确保图标/名称/主题色的更新即时生效
+/manifest.webmanifest
+  Cache-Control: no-cache

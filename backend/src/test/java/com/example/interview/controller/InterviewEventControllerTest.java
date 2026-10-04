@@ -1,5 +1,6 @@
 package com.example.interview.controller;
 
+import com.example.interview.common.ConflictException;
 import com.example.interview.entity.InterviewEventEntity;
 import com.example.interview.interceptor.RateLimitInterceptor;
 import com.example.interview.security.JwtUtil;
@@ -137,6 +138,21 @@ class InterviewEventControllerTest {
             assertThat(captor.getValue().getStatus())
                     .as("控制器不得为缺失 status 发明取值，交由 service 默认")
                     .isNull();
+        }
+
+        @Test
+        @DisplayName("同标题+同时刻已存在 → HTTP 409 + code 409（第三批收口：不静默去重）")
+        void create_duplicateEvent_returns409() throws Exception {
+            doThrow(new ConflictException("日历中已存在「同标题 + 同时刻」的日程，未重复创建"))
+                    .when(eventService).create(any(), any());
+
+            mockMvc.perform(post("/api/calendar/event")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(createBody(null)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value(409))
+                    .andExpect(jsonPath("$.message")
+                            .value("日历中已存在「同标题 + 同时刻」的日程，未重复创建"));
         }
     }
 

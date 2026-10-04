@@ -1,5 +1,6 @@
 package com.example.interview.service;
 
+import com.example.interview.common.ConflictException;
 import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.entity.InterviewEventEntity;
 import com.example.interview.repository.InterviewEventRepository;
@@ -66,6 +67,34 @@ class InterviewEventServiceTest {
         assertThat(created.getUserId()).isEqualTo("u1");
         assertThat(created.getId()).isNull();
         assertThat(created.getStatus()).isEqualTo("UPCOMING");
+    }
+
+    @Test
+    @DisplayName("create: 同标题+同时刻已存在 → 抛 ConflictException 且不落库（第三批收口）")
+    void create_duplicate_shouldThrowConflictAndNotSave() {
+        InterviewEventEntity input = InterviewEventEntity.builder()
+                .title("字节跳动 · 后端一面").interviewAt(at).build();
+        when(eventRepository.findFirstByUserIdAndTitleAndInterviewAt("u1", "字节跳动 · 后端一面", at))
+                .thenReturn(Optional.of(event(1L, "u1")));
+
+        assertThatThrownBy(() -> service.create("u1", input))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("已存在");
+        verify(eventRepository, never()).save(any(InterviewEventEntity.class));
+    }
+
+    @Test
+    @DisplayName("create: 时刻相同但标题不同 → 正常创建（去重不是粗暴按时间）")
+    void create_sameTimeDifferentTitle_shouldCreate() {
+        InterviewEventEntity input = InterviewEventEntity.builder()
+                .title("另一家公司 · 一面").interviewAt(at).build();
+        when(eventRepository.findFirstByUserIdAndTitleAndInterviewAt("u1", "另一家公司 · 一面", at))
+                .thenReturn(Optional.empty());
+        when(eventRepository.save(any(InterviewEventEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.create("u1", input)).isNotNull();
+        verify(eventRepository).save(any(InterviewEventEntity.class));
     }
 
     @Test

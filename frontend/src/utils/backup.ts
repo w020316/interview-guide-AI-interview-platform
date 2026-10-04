@@ -7,8 +7,10 @@
  * 用于「导出文件 vs 当前数据是否已不同」的本地告警；真正的冲突判定仍以后端
  * {@code currentFingerprint} / HTTP 409 为准，前端不自行计算 sha256（避免环境差异）。
  *
- * <p>纯函数、零网络、零依赖。
+ * <p>纯函数、零网络、零外部依赖。
  */
+
+import { isConflictError } from './httpError'
 
 /** 与后端 BackupService.SCHEMA_VERSION 对齐 */
 export const BACKUP_SCHEMA_VERSION = '3'
@@ -173,9 +175,14 @@ export function isFingerprintMismatch(fileFingerprint?: string | null, currentFi
   return fileFingerprint !== currentFingerprint
 }
 
-/** 是否为后端指纹冲突（HTTP 409）——仅 apply + replace + 指纹不符 + 未 force 才有 */
+/**
+ * 是否为后端指纹冲突（HTTP 409）——仅 apply + replace + 指纹不符 + 未 force 才有。
+ *
+ * <p>实现委托给 {@link isConflictError}（单一来源）：状态码判定只允许有一份实现，
+ * 否则「按 409 分流」的逻辑会随使用点增多而各自漂移。
+ */
 export function isFingerprintConflict(e: unknown): boolean {
-  return (e as { response?: { status?: number } } | null)?.response?.status === 409
+  return isConflictError(e)
 }
 
 /**

@@ -301,6 +301,7 @@ import api, { getErrMessage } from '../api'
 import { BaseButton, BaseTag } from '../components'
 import { EMPTY } from '../utils/format'
 import { parseNotice, hasAnyField, type NoticeParse } from '../utils/noticeParse'
+import { isConflictError } from '../utils/httpError'
 import {
   IMPORT_ACCEPT,
   IMPORT_FIELDS,
@@ -550,18 +551,13 @@ function toIsoSeconds(dtLocal: string): string {
   return dtLocal.length === 16 ? `${dtLocal}:00` : dtLocal
 }
 
-/** 同标题 + 同时刻（到分钟）比较 */
-function sameMinute(a?: string | null, b?: string | null): boolean {
-  if (!a || !b) return false
-  return a.slice(0, 16) === b.slice(0, 16)
-}
-
 /**
  * 写入面试日历。
  *
- * <p>后端 POST /api/calendar/event **没有**去重（无 alreadyExists / 409），
- * 因此这里先用 GET /api/calendar/event/list 做本地预检：命中「同标题 + 同时刻」时
- * 明确提示「已存在」而不重复创建（**不静默去重**）。
+ * <p>去重由**后端**负责（`InterviewEventService.create`：同标题 + 同时刻 → 409）。
+ * 唯一能避免竞态的地方就是写库前的那一次判定，因此前端不再自己「先 GET 列表再本地比对」——
+ * 那种写法有竞态窗口，且两处创建入口（本文件与日历页）要各维护一份判定（同一口径散落多处）。
+ * 这里只消费结果：**409 = 已存在**，明确提示而非静默去重、也不当失败报错。
  */
 async function pushCalendarEvent(targetId: number) {
   const app = items.value.find((a) => a.id === targetId)
@@ -569,20 +565,17 @@ async function pushCalendarEvent(targetId: number) {
   const role = app?.title || noticeForm.title || '面试'
   const title = `${company} · ${role} · 面试`
   const at = toIsoSeconds(noticeForm.interviewAt)
-  let existing = false
   try {
-    const list = (await api.get('/api/calendar/event/list')) as unknown as Array<{ title?: string; interviewAt?: string }>
-    existing = Array.isArray(list) && list.some((e) => e?.title === title && sameMinute(e?.interviewAt, at))
-  } catch {
-    // 预检失败不阻断写入（用户仍可通过日历页查看/删除）
+    await api.post('/api/calendar/event', { title, interviewAt: at, note: '来自投递通知识别' })
+    ElMessage.success('已加入面试日历')
+  } catch (e: unknown) {
+    if (isConflictError(e)) {
+      noticeExistingEvent.value = true
+      ElMessage.warning('日历中已存在「同标题 + 同时刻」的日程，未重复创建')
+      return
+    }
+    throw e
   }
-  if (existing) {
-    noticeExistingEvent.value = true
-    ElMessage.warning('日历中已存在「同标题 + 同时刻」的日程，未重复创建')
-    return
-  }
-  await api.post('/api/calendar/event', { title, interviewAt: at, note: '来自投递通知识别' })
-  ElMessage.success('已加入面试日历')
 }
 
 async function confirmNotice() {

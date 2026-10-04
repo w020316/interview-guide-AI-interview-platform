@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.49.0'
+export const CURRENT_VERSION = '1.49.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.49.1',
+    date: '2026-10-04',
+    title: '版本 1.49.1 · 重复的面试日程不再被重复创建',
+    items: [
+      { text: '面试日历：标题与面试时间完全相同的日程，系统不再重复创建第二条，而是明确提示「已存在」，你可以核对后改时间再存——手工新增和「粘贴通知自动建日程」两条入口都已生效', level: 'user' },
+      { text: '后端：日历创建补「同标题 + 同时刻」去重（写库前判定 → HTTP 409 + 明确文案，被拒绝时零写入）；原先散在前端的两套本地预检收敛为后端一次判定，竞态窗口与「同一口径多处维护」一并消除', level: 'tech' },
+      { text: '前端：新增 utils/httpError.ts 作为「HTTP 409 判定」的单一来源，备份流程里私有的同类判别改为委托调用，避免状态码判定随使用点增多而各自漂移', level: 'tech' },
+    ],
+  },
   {
     version: '1.49.0',
     date: '2026-10-04',

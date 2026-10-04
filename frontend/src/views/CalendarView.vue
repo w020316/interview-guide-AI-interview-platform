@@ -175,6 +175,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
+import { isConflictError } from '../utils/httpError'
 import { BaseButton, BaseTag } from '../components'
 import {
   WEEKDAY_LABELS, fmtDateTime, isSameDate, monthMatrix,
@@ -289,7 +290,18 @@ async function submit() {
       await api.put(`/api/calendar/event/${editingId.value}`, payload)
       ElMessage.success('日程已更新')
     } else {
-      await api.post('/api/calendar/event', payload)
+      try {
+        await api.post('/api/calendar/event', payload)
+      } catch (e: unknown) {
+        // 第三批收口：去重由后端负责（同标题 + 同时刻 → 409）。
+        // 命中时明确告知「已存在」并**保持弹窗打开**，便于用户改时间后重试；
+        // 不静默去重、也不当成保存失败（那会误导用户以为数据坏了）。
+        if (isConflictError(e)) {
+          ElMessage.warning('已存在「同标题 + 同时刻」的日程，未重复创建')
+          return
+        }
+        throw e
+      }
       ElMessage.success('日程已添加')
     }
     showDialog.value = false
