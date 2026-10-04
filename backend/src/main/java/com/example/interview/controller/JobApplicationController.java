@@ -7,6 +7,7 @@ import com.example.interview.entity.JobFavoriteEntity;
 import com.example.interview.entity.JobPostingEntity;
 import com.example.interview.service.JobFavoriteService;
 import com.example.interview.service.career.TailoredResumeService;
+import com.example.interview.service.job.ApplicationImportService;
 import com.example.interview.service.job.JobAgentService;
 import com.example.interview.service.job.JobApplicationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +54,9 @@ public class JobApplicationController {
 
     @Autowired
     private TailoredResumeService tailoredResumeService;
+
+    @Autowired
+    private ApplicationImportService applicationImportService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -215,6 +220,52 @@ public class JobApplicationController {
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("removed", true);
+        return Result.success(result);
+    }
+
+    /**
+     * 批量导入投递台账（第三批 F）
+     * POST /api/application/import
+     * Body: {"source":"csv|tsv|paste","rows":[{...}],"dryRun":true}
+     *
+     * <p>dryRun=true 仅预览零写库；dryRun=false 单事务原子写入。
+     * <b>合规（R1）</b>：导入的行只进本地台账，不触发任何投递动作。
+     * 单次 ≤200 行；存在致命错误行时返回 400 且零写库。
+     */
+    @Operation(summary = "批量导入投递台账（原子写入）")
+    @PostMapping("/import")
+    public Result<Map<String, Object>> importApplications(@RequestBody Map<String, Object> req) {
+        String userId = currentUserId();
+        String source = req.get("source") == null ? "paste" : req.get("source").toString();
+        boolean dryRun = Boolean.TRUE.equals(req.get("dryRun"));
+
+        Object rowsObj = req.get("rows");
+        if (!(rowsObj instanceof List<?> rawList) || rawList.isEmpty()) {
+            return Result.error(400, "rows 不能为空");
+        }
+        if (rawList.size() > ApplicationImportService.MAX_ROWS) {
+            return Result.error(400, "单次最多导入 " + ApplicationImportService.MAX_ROWS + " 行");
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Object o : rawList) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            if (o instanceof Map<?, ?> m) {
+                m.forEach((k, v) -> row.put(String.valueOf(k), v));
+            }
+            rows.add(row);
+        }
+
+        Map<String, Object> result = applicationImportService.run(userId, source, rows, dryRun);
+        // apply（dryRun=false）遇致命错误行：必须回 **HTTP 400**，而非 200 + applied:false 的「假绿灯」。
+        // 「输入缺失/解析失败 ≠ 通过」是本项目铁律，且 200 无法被线上复验为「被拒绝」。
+        // 沿用既有 400 错误契约：抛 IllegalArgumentException → GlobalExceptionHandler 映射为
+        // HTTP 400 + {code:400,message}（与 /api/me/import 的错误语义一致）。
+        // 服务层已在任何写库动作前拦截，保证零写库；**dryRun 仍返回 200**（预览需能返回
+        // canApply:false + 致命明细，否则「预览确认」交互作废）。
+        if (!dryRun && Boolean.FALSE.equals(result.get("canApply"))) {
+            Object msg = result.get("message");
+            throw new IllegalArgumentException(msg == null ? "存在致命错误行，已取消导入" : msg.toString());
+        }
         return Result.success(result);
     }
 

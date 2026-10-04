@@ -8,9 +8,14 @@ import './styles/variables.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { initTheme } from './theme'
 import { prewarmBackend, installWakeRecovery } from './utils/backendWake'
+import { setupPwa } from './utils/pwa'
 
 // 在任何渲染前应用主题，避免首屏闪烁
 initTheme()
+
+// PWA（第三批 D）：注册 Service Worker（prompt 模式，不自动刷新）。
+// 放在挂载前：让 app shell 尽早开始预缓存；新版本只提示，由用户在页脚确认后刷新。
+setupPwa()
 
 // 冷启动预热：后端部署在 Render 免费层，15 分钟无请求即休眠。
 // 2026-09-22 线上实测：真实冷启动 338s / 355s（≈6 分钟，最慢超过 8 分钟也出现过），

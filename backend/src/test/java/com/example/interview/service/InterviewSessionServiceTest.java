@@ -164,7 +164,7 @@ class InterviewSessionServiceTest {
         when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
         when(questionRepository.save(q)).thenReturn(q);
 
-        InterviewQuestionEntity result = service.saveAnswer(1L, "我的回答", 85, "user1");
+        InterviewQuestionEntity result = service.saveAnswer(1L, "我的回答", 85, null, "user1");
 
         assertThat(result.getUserAnswer()).isEqualTo("我的回答");
         assertThat(result.getEvaluationScore()).isEqualTo(85);
@@ -172,10 +172,40 @@ class InterviewSessionServiceTest {
     }
 
     @Test
+    @DisplayName("saveAnswer: 维度明细（evalDetail）与评分同事务落库（第三批 A）")
+    void saveAnswer_shouldPersistEvalDetail() {
+        InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("test-uuid").question("Q").build();
+        when(questionRepository.findById(1L)).thenReturn(Optional.of(q));
+        when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
+        when(questionRepository.save(q)).thenReturn(q);
+
+        String detail = "{\"completeness\":72,\"accuracy\":65,\"expression\":60,\"improvements\":[\"补结果数据\"]}";
+        InterviewQuestionEntity result = service.saveAnswer(1L, "我的回答", 68, detail, "user1");
+
+        assertThat(result.getEvalDetail()).isEqualTo(detail);
+        verify(questionRepository).save(q);
+    }
+
+    @Test
+    @DisplayName("saveAnswer: 存量旧行无维度明细时 evalDetail 为 null（无数据 ≠ 0，第三批 A）")
+    void saveAnswer_nullEvalDetail_shouldRemainNull() {
+        InterviewQuestionEntity q = InterviewQuestionEntity.builder()
+                .id(1L).sessionId("test-uuid").question("Q").build();
+        when(questionRepository.findById(1L)).thenReturn(Optional.of(q));
+        when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
+        when(questionRepository.save(q)).thenReturn(q);
+
+        InterviewQuestionEntity result = service.saveAnswer(1L, "我的回答", 68, null, "user1");
+
+        assertThat(result.getEvalDetail()).isNull();
+    }
+
+    @Test
     @DisplayName("saveAnswer: 题目不存在时抛 ResourceNotFoundException（P3-01：资源不存在=404）")
     void saveAnswer_questionNotFound_shouldThrow() {
         when(questionRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.saveAnswer(99L, "回答", 80, "user1"))
+        assertThatThrownBy(() -> service.saveAnswer(99L, "回答", 80, null, "user1"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("题目不存在");
     }
@@ -188,7 +218,7 @@ class InterviewSessionServiceTest {
         when(questionRepository.findById(1L)).thenReturn(Optional.of(q));
         when(sessionRepository.findBySessionId("ghost-session")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.saveAnswer(1L, "回答", 80, "user1"))
+        assertThatThrownBy(() -> service.saveAnswer(1L, "回答", 80, null, "user1"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("会话不存在");
     }
@@ -201,7 +231,7 @@ class InterviewSessionServiceTest {
         when(questionRepository.findById(1L)).thenReturn(Optional.of(q));
         when(sessionRepository.findBySessionId("test-uuid")).thenReturn(Optional.of(mockSession));
 
-        assertThatThrownBy(() -> service.saveAnswer(1L, "回答", 80, "another-user"))
+        assertThatThrownBy(() -> service.saveAnswer(1L, "回答", 80, null, "another-user"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("无权操作他人题目");
         verify(questionRepository, never()).save(any());

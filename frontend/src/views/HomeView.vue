@@ -1,5 +1,16 @@
 <template>
   <div class="home">
+    <!-- 今日待办（第三批 B）：已登录时置顶；Hero 区整体下移但**不删**
+         （未登录用户仍以 Hero 为主，不请求 /api/todo/today） -->
+    <TodoPanel
+      v-if="loggedIn"
+      class="home-todo"
+      :data="todoData"
+      :loading="todoLoading"
+      :error="todoError"
+      @retry="loadTodo"
+    />
+
     <!-- Hero 区：左文右卡，不对称编辑式构图 -->
     <section class="hero">
       <div class="hero-grid">
@@ -177,10 +188,33 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { isLoggedIn } from '../auth'
-import api from '../api'
+import api, { getErrMessage } from '../api'
 import { BaseButton, BaseCard, BaseTag } from '../components'
+import TodoPanel from '../components/TodoPanel.vue'
+import type { TodoTodayResponse } from '../utils/todo'
 
 const router = useRouter()
+
+/** 登录态在进入首页时一次性判定（决定是否挂载今日待办） */
+const loggedIn = isLoggedIn()
+
+/* ── 今日待办（第三批 B）：已登录时置顶聚合视图，零 AI ── */
+const todoData = ref<TodoTodayResponse | null>(null)
+const todoLoading = ref(false)
+const todoError = ref<string | null>(null)
+
+async function loadTodo() {
+  if (!loggedIn) return
+  todoLoading.value = true
+  todoError.value = null
+  try {
+    todoData.value = (await api.get('/api/todo/today', { params: { days: 3 } })) as unknown as TodoTodayResponse
+  } catch (e: unknown) {
+    todoError.value = getErrMessage(e, '加载今日待办失败，请稍后重试')
+  } finally {
+    todoLoading.value = false
+  }
+}
 
 function goTo(path: string) {
   const requiresAuth = ['/resume', '/job', '/jobs', '/applications', '/career', '/interview', '/history', '/profile'].includes(path)
@@ -259,6 +293,8 @@ const questionChip = computed(() => {
 onMounted(async () => {
   // 未登录不做真实数据请求：直接保留示例卡（带「示例」标注）
   if (!isLoggedIn()) return
+  // 今日待办与首页统计并行拉取（互不阻塞）
+  void loadTodo()
   try {
     const resumes = (await api.get('/api/resume/history')) as unknown as Array<{
       overallScore?: number | null

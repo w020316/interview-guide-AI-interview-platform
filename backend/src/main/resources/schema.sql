@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS interview_question (
     reference_answer TEXT,
     user_answer      TEXT,
     evaluation_score INT,
+    -- 第三批 A：题目维度明细（JSON 文本，可空；存量行=NULL，不回溯、不填 0）
+    eval_detail      TEXT,
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_interview_question_session_id ON interview_question(session_id);
@@ -132,6 +134,8 @@ CREATE TABLE IF NOT EXISTS job_favorite (
     salary       VARCHAR(100),
     deadline     DATE,
     apply_url    VARCHAR(500),
+    -- 第三批 H：偏好四档（可空，NULL=未标记，不得默认成任何一档）
+    preference   VARCHAR(20),
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_job_favorite_user_job UNIQUE (user_id, job_id)
 );
@@ -200,6 +204,18 @@ CREATE TABLE IF NOT EXISTS story_bank (
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_story_bank_user ON story_bank(user_id);
+
+-- 导入幂等日志表（第三批 C：(user_id, import_id) 唯一，跨进程重启持久）
+CREATE TABLE IF NOT EXISTS data_import_log (
+    id           BIGSERIAL    PRIMARY KEY,
+    user_id      VARCHAR(64)  NOT NULL,
+    import_id    VARCHAR(64)  NOT NULL,
+    mode         VARCHAR(10)  NOT NULL,
+    summary_json TEXT,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_data_import_log_user_import UNIQUE (user_id, import_id)
+);
+CREATE INDEX IF NOT EXISTS idx_data_import_log_user ON data_import_log(user_id);
 
 -- 预置知识数据
 INSERT INTO knowledge_doc (category, title, content, source) VALUES

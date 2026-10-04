@@ -114,3 +114,56 @@ describe('generateShareCard 绘制与下载', () => {
     await expect(generateShareCard({ ...basePayload })).rejects.toThrow(/生成失败/)
   })
 })
+
+/**
+ * RK1「无数据 ≠ 0」断言级防护（分享层）：
+ * 旧会话 eval_detail 为 NULL ⇒ 海报不得绘制维度条，也不得把缺失维度补成 0。
+ */
+describe('generateShareCard 降级感知（RK1 无数据 ≠ 0）', () => {
+  let ctxStub: ReturnType<typeof makeCtxStub>
+
+  beforeEach(() => {
+    ctxStub = makeCtxStub()
+    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:mock'), configurable: true })
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function drawnTexts(): string[] {
+    return ctxStub.fillText.mock.calls.map((c) => String(c[0]))
+  }
+
+  it('维度明细缺失 → 不绘制维度条（无 roundRect），改为降级说明文案', async () => {
+    installCanvas(() => ctxStub, (cb) => cb(new Blob(['x'], { type: 'image/png' })))
+    await generateShareCard({ ...basePayload, completeness: null, accuracy: null, expression: null })
+    const texts = drawnTexts()
+    expect(texts.some((t) => t.includes('未记录分维度明细'))).toBe(true)
+    // 不得出现「完整性」等维度名（即不补 0 绘制）
+    expect(texts).not.toContain('完整性')
+    expect(texts).not.toContain('准确性')
+    expect(texts).not.toContain('表达力')
+    // 维度条依赖 roundRect → arcTo；降级时不应调用
+    expect(ctxStub.arcTo).not.toHaveBeenCalled()
+  })
+
+  it('维度明细完整 → 绘制含综合在内的维度条', async () => {
+    installCanvas(() => ctxStub, (cb) => cb(new Blob(['x'], { type: 'image/png' })))
+    await generateShareCard({ ...basePayload })
+    const texts = drawnTexts()
+    expect(texts).toContain('完整性')
+    expect(texts).toContain('准确性')
+    expect(texts).toContain('表达力')
+    expect(ctxStub.arcTo).toHaveBeenCalled()
+  })
+
+  it('综合分缺失 → 展示占位符而非 0', async () => {
+    installCanvas(() => ctxStub, (cb) => cb(new Blob(['x'], { type: 'image/png' })))
+    await generateShareCard({ ...basePayload, overall: null })
+    const texts = drawnTexts()
+    expect(texts).toContain('—')
+    expect(texts).toContain('暂无综合得分')
+  })
+})

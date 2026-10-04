@@ -111,4 +111,49 @@ public class JobFavoriteService {
     public long countByUser(String userId) {
         return jobFavoriteRepository.countByUserId(userId);
     }
+
+    /** 合法偏好档位（单一来源即实体常量） */
+    public static final java.util.Set<String> ALL_PREFERENCES = java.util.Set.of(
+            JobFavoriteEntity.PREFERENCE_STRONG,
+            JobFavoriteEntity.PREFERENCE_ACCEPTABLE,
+            JobFavoriteEntity.PREFERENCE_BACKUP,
+            JobFavoriteEntity.PREFERENCE_EXCLUDED);
+
+    /**
+     * 设置岗位收藏偏好档位（第三批 H）。
+     *
+     * <p>幂等：同值重复提交无副作用。{@code preference} 为 {@code null}/空串表示「清除标记」（回到未标记）。
+     * 非法取值抛 {@link IllegalArgumentException}（由全局处理器映射 400）。
+     *
+     * @param userId     当前用户 ID
+     * @param jobId      岗位 ID
+     * @param preference 档位（STRONG/ACCEPTABLE/BACKUP/EXCLUDED）或 null=清除
+     * @return 更新后的收藏项；未收藏该岗位返回 {@code null}（由控制器转 404）
+     */
+    @Transactional
+    public JobFavoriteEntity setPreference(String userId, Long jobId, String preference) {
+        String normalized = normalizePreference(preference);
+        JobFavoriteEntity entity = jobFavoriteRepository.findByUserIdAndJobId(userId, jobId).orElse(null);
+        if (entity == null) {
+            return null;
+        }
+        entity.setPreference(normalized);
+        return jobFavoriteRepository.save(entity);
+    }
+
+    /** 归一化偏好档位：null/空串→null（未标记）；大小写归一；非法值抛 400。 */
+    private static String normalizePreference(String preference) {
+        if (preference == null) {
+            return null;
+        }
+        String p = preference.trim().toUpperCase();
+        if (p.isEmpty()) {
+            return null;
+        }
+        if (!ALL_PREFERENCES.contains(p)) {
+            throw new IllegalArgumentException(
+                    "preference 非法，合法取值：" + String.join("/", ALL_PREFERENCES) + "（null 表示清除标记）");
+        }
+        return p;
+    }
 }

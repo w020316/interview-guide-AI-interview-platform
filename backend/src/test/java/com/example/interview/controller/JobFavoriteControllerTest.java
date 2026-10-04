@@ -173,4 +173,59 @@ class JobFavoriteControllerTest {
                 .andExpect(jsonPath("$.code").value(404))
                 .andExpect(jsonPath("$.message").value("岗位不存在或已下架"));
     }
+
+    @Test
+    @DisplayName("GET /favorite: row 含 preference 字段（未标记为 null，第三批 H）")
+    void favoriteList_includesPreference() throws Exception {
+        var fav = com.example.interview.entity.JobFavoriteEntity.builder()
+                .id(1L).userId(USER_ID).jobId(100L)
+                .title("Java 后端工程师").companyName("示例科技")
+                .preference("STRONG")
+                .build();
+        when(jobFavoriteService.listByUser(USER_ID)).thenReturn(List.of(fav));
+
+        mockMvc.perform(get("/api/jobs/favorite"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].preference").value("STRONG"));
+    }
+
+    @Test
+    @DisplayName("POST /favorite/preference: 设置档位返回更新后的收藏项（第三批 H）")
+    void setPreference_ok() throws Exception {
+        var updated = com.example.interview.entity.JobFavoriteEntity.builder()
+                .id(1L).userId(USER_ID).jobId(100L)
+                .title("Java 后端工程师").companyName("示例科技")
+                .preference("BACKUP")
+                .build();
+        when(jobFavoriteService.setPreference(USER_ID, 100L, "BACKUP")).thenReturn(updated);
+
+        mockMvc.perform(post("/api/jobs/favorite/preference")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("jobId", 100, "preference", "BACKUP"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.preference").value("BACKUP"));
+    }
+
+    @Test
+    @DisplayName("POST /favorite/preference: jobId 缺失返回 400")
+    void setPreference_missingJobId_returns400() throws Exception {
+        mockMvc.perform(post("/api/jobs/favorite/preference")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"preference\":\"STRONG\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    @DisplayName("POST /favorite/preference: 未收藏该岗位返回 HTTP 404 + code 404")
+    void setPreference_notFound_returns404() throws Exception {
+        when(jobFavoriteService.setPreference(USER_ID, 777L, "STRONG")).thenReturn(null);
+
+        mockMvc.perform(post("/api/jobs/favorite/preference")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("jobId", 777, "preference", "STRONG"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
+    }
 }

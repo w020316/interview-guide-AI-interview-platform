@@ -65,6 +65,18 @@ public class JobAgentController {
         return auth.getPrincipal().toString();
     }
 
+    /** 安全读取 Long（非法/缺省返回 null） */
+    private static Long longVal(Object v) {
+        if (v == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(v.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     /** 搜索关键词允许的字符：中文、英文、数字、空格与常见符号（P2-04） */
     private static final Pattern KEYWORD_ALLOWED =
             Pattern.compile("^[\\u4e00-\\u9fa5a-zA-Z0-9 +#._\\-/&·]*$");
@@ -234,30 +246,60 @@ public class JobAgentController {
     public Result<Map<String, Object>> favoriteList() {
         List<JobFavoriteEntity> items = jobFavoriteService.listByUser(currentUserId());
         LocalDate today = LocalDate.now();
-        List<Map<String, Object>> rows = items.stream().map(f -> {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", f.getId());
-            row.put("jobId", f.getJobId());
-            row.put("title", f.getTitle());
-            row.put("companyName", f.getCompanyName());
-            row.put("platform", f.getPlatform());
-            row.put("location", f.getLocation());
-            row.put("salary", f.getSalary());
-            row.put("deadline", f.getDeadline());
-            row.put("applyUrl", f.getApplyUrl());
-            row.put("createdAt", f.getCreatedAt());
-            if (f.getDeadline() != null) {
-                long daysLeft = ChronoUnit.DAYS.between(today, f.getDeadline());
-                row.put("daysLeft", daysLeft);
-                row.put("expired", daysLeft < 0);
-                row.put("remind", daysLeft >= 0 && daysLeft <= 7);
-            }
-            return row;
-        }).toList();
+        List<Map<String, Object>> rows = items.stream()
+                .map(f -> buildFavoriteRow(f, today))
+                .toList();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", rows.size());
         result.put("items", rows);
         return Result.success(result);
+    }
+
+    /** 组装单条收藏行（收藏列表与偏好设置端点复用，保证字段一致）。 */
+    private Map<String, Object> buildFavoriteRow(JobFavoriteEntity f, LocalDate today) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", f.getId());
+        row.put("jobId", f.getJobId());
+        row.put("title", f.getTitle());
+        row.put("companyName", f.getCompanyName());
+        row.put("platform", f.getPlatform());
+        row.put("location", f.getLocation());
+        row.put("salary", f.getSalary());
+        row.put("deadline", f.getDeadline());
+        row.put("applyUrl", f.getApplyUrl());
+        // 第三批 H：偏好档位（无则 null=未标记，不得默认成任何一档）
+        row.put("preference", f.getPreference());
+        row.put("createdAt", f.getCreatedAt());
+        if (f.getDeadline() != null) {
+            long daysLeft = ChronoUnit.DAYS.between(today, f.getDeadline());
+            row.put("daysLeft", daysLeft);
+            row.put("expired", daysLeft < 0);
+            row.put("remind", daysLeft >= 0 && daysLeft <= 7);
+        }
+        return row;
+    }
+
+    /**
+     * 设置/清除岗位收藏偏好档位（第三批 H）
+     * POST /api/jobs/favorite/preference  Body: {"jobId":1,"preference":"STRONG"}
+     *
+     * <p>{@code preference:null} 清除标记；同值幂等。合法取值见
+     * {@link com.example.interview.entity.JobFavoriteEntity} 的 PREFERENCE_* 常量。
+     */
+    @Operation(summary = "设置岗位收藏偏好档位（四档）")
+    @PostMapping("/favorite/preference")
+    public Result<Map<String, Object>> setFavoritePreference(@RequestBody Map<String, Object> req) {
+        Long jobId = longVal(req.get("jobId"));
+        if (jobId == null) {
+            return Result.error(400, "jobId 不能为空");
+        }
+        String preference = req.get("preference") == null ? null : req.get("preference").toString();
+        // service 内部对非法档位抛 IllegalArgumentException（→400），未收藏返回 null（→404）
+        JobFavoriteEntity updated = jobFavoriteService.setPreference(currentUserId(), jobId, preference);
+        if (updated == null) {
+            throw new ResourceNotFoundException("未找到该收藏记录");
+        }
+        return Result.success(buildFavoriteRow(updated, LocalDate.now()));
     }
 
     /**

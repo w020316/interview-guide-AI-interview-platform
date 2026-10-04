@@ -238,102 +238,26 @@
       </div>
     </div>
 
-    <!-- Step 3: 面试复盘报告弹窗（Lollipop 式结构化复盘） -->
+    <!-- Step 3: 面试复盘报告弹窗（第三批 A：抽出 ReportPanel，供历史回看复用） -->
     <Teleport to="body">
       <Transition name="report-fade">
         <!-- P2-29：遮罩不再关闭报告。
              复盘报告是一次面试的核心产出物，而 reportOpen 全仓只有 finishSession 一处置真、
              resetSession 又已清空 questions/sessionId —— 一旦误点遮罩就永久失去查看入口，
              用户只能重做一场面试。关闭动作收敛到右上角 ✕ 与底部两个明确按钮。 -->
-        <div v-if="reportOpen && answeredCount" class="report-mask">
-          <div class="report-modal" role="dialog" aria-modal="true" aria-label="面试复盘报告">
-            <div class="report-head">
-              <div>
-                <h3 class="report-title">模拟面试复盘报告</h3>
-                <!-- v1.44.0：报告带上本场岗位。此前报告通篇没有岗位名，
-                     截图转发给别人时看不出这是面什么岗位的报告
-                     （分享卡片与导出 PDF 一直有，只有报告本体漏了）。 -->
-                <p v-if="reportJobTitle" class="report-job">{{ reportJobTitle }}</p>
-                <p class="report-sub"><span class="report-star" aria-hidden="true">★</span> {{ reportScopeText }} · 灵感参考 AI 面试工具</p>
-              </div>
-              <button class="report-close" aria-label="关闭" @click="closeReportGoSetup">✕</button>
-            </div>
-
-            <!-- 综合得分 -->
-            <div class="report-overall">
-              <div class="overall-score" :style="{ color: scoreColor(reportAverages.overall) }">
-                {{ reportAverages.overall }}
-                <span class="overall-unit">分</span>
-              </div>
-              <div class="overall-summary">{{ reportSummary }}</div>
-            </div>
-
-            <!-- 四个维度 -->
-            <div class="report-dims">
-              <div v-for="d in [
-                { name: '综合', v: reportAverages.overall },
-                { name: '完整性', v: reportAverages.completeness },
-                { name: '准确性', v: reportAverages.accuracy },
-                { name: '表达力', v: reportAverages.expression }
-              ]" :key="d.name" class="report-dim">
-                <div class="dim-bar">
-                  <div class="dim-fill" :style="{ width: Math.max(0, Math.min(100, d.v)) + '%', background: scoreColor(d.v) }"></div>
-                </div>
-                <div class="dim-row">
-                  <span class="dim-name">{{ d.name }}</span>
-                  <span class="dim-value" :style="{ color: scoreColor(d.v) }">{{ d.v }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 多轮成绩对比（进阶） -->
-            <div v-if="historyCompareLoaded && answeredCount" class="report-block report-compare">
-              <div class="report-block-title">与历史成绩对比</div>
-              <div class="compare-line">
-                <span class="compare-badge" :class="reportCompare.status">{{ compareStatusLabel }}</span>
-                <span class="compare-text">{{ reportCompare.hint }}</span>
-              </div>
-              <div class="compare-target">
-                下一轮目标：综合
-                <b :style="{ color: scoreColor(nextTarget) }">{{ nextTarget }} 分</b>
-                。可在准备页提高难度或聚焦薄弱分类，逐步达成。
-              </div>
-            </div>
-
-            <!-- 逐题得分回顾 -->
-            <div class="report-block">
-              <div class="report-block-title">逐题得分</div>
-              <div class="report-questions">
-                <div v-for="(e, idx) in sessionEvals" :key="idx" class="report-question">
-                  <div class="rq-head">
-                    <span class="rq-index">{{ idx + 1 }}</span>
-                    <span class="rq-cat">{{ e.category }}</span>
-                    <span class="rq-score" :style="{ color: scoreColor(e.overallScore) }">{{ e.overallScore }} 分</span>
-                  </div>
-                  <div class="rq-text">{{ e.question }}</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 高频改进建议 -->
-            <div v-if="reportImprovements.length" class="report-block">
-              <div class="report-block-title">建议提升的要点</div>
-              <ul class="report-improve">
-                <li v-for="(imp, idx) in reportImprovements" :key="idx">
-                  <span class="imp-text">{{ imp.text }}</span>
-                  <span v-if="imp.times > 1" class="imp-times">×{{ imp.times }}</span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="report-actions">
-              <BaseButton variant="ghost" :loading="sharing" @click="shareCard">分享卡片</BaseButton>
-              <BaseButton variant="ghost" @click="exportPdf">导出 PDF</BaseButton>
-              <BaseButton variant="ghost" @click="closeReportGoHistory">查看历史记录</BaseButton>
-              <BaseButton variant="gradient" @click="closeReportGoSetup">完成，继续练习</BaseButton>
-            </div>
-          </div>
-        </div>
+        <ReportPanel
+          v-if="reportOpen && answeredCount"
+          :evals="sessionEvals"
+          :job-title="reportJobTitle"
+          :scope-text="reportScopeText"
+          :compare="reportCompareView"
+          :compare-loaded="historyCompareLoaded"
+          :sharing="sharing"
+          @close="closeReportGoSetup"
+          @go-history="closeReportGoHistory"
+          @export-pdf="exportPdf"
+          @share="shareCard"
+        />
       </Transition>
     </Teleport>
   </div>
@@ -350,9 +274,10 @@ import renderMarkdown from '../utils/markdown'
 import { createSpeechRecorder, isSpeechSupported } from '../utils/speech'
 import { compareWithHistory, suggestNextTarget } from '../utils/reportCompare'
 import { nextGenProgress } from '../utils/genProgress'
-import { getScoreColor } from '../utils/score'
 import { EMPTY } from '../utils/format'
+import { buildReportView, buildScopeText, findDim, type ReportCompareView, type ReportEvalInput } from '../utils/reportView'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
+import ReportPanel from '../components/ReportPanel.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -583,18 +508,13 @@ const speechFeedback = ref('')
 // 识别器仅在打开语音时按需创建，避免占用麦克风资源
 let speechRec: ReturnType<typeof createSpeechRecorder> | null = null
 
-// ── 面试复盘报告（Lollipop 式结构化复盘）──
-interface SessionEval {
-  question: string
-  category: string
-  difficulty: string
-  overallScore: number
-  completeness: number
-  accuracy: number
-  expression: number
-  improvements: string[]
-}
-const sessionEvals = ref<SessionEval[]>([])
+// ── 面试复盘报告（第三批 A：视图模型统一由 utils/reportView.ts 纯函数派生）──
+/**
+ * 本次页面内新作答的题目（含综合分与维度明细）。
+ * 维度明细以 `evalDetail` 原始对象承载——**不在此处 `?? 0` 兜底**，
+ * 缺失交由 {@link buildReportView} 判定降级（RK1「无数据 ≠ 0」）。
+ */
+const sessionEvals = ref<ReportEvalInput[]>([])
 /** P1-18：题目缺 id 导致答案无法上报时，每次会话只提示一次，避免逐题刷屏 */
 const persistWarned = ref(false)
 /**
@@ -616,11 +536,11 @@ const historyCompareLoaded = ref(false)
  */
 const compareFailed = ref(false)
 const hasPastSessions = ref(false)
-/** 下一轮目标分 */
-const nextTarget = computed(() => suggestNextTarget(reportAverages.value.overall))
+/** 下一轮目标分（无综合分时按 0 起步，仅影响建议值） */
+const nextTarget = computed(() => suggestNextTarget(reportView.value.overall ?? 0))
 /** 与历史对比结论（含 P2-20 的三态修正） */
 const reportCompare = computed(() => {
-  const base = compareWithHistory(reportAverages.value.overall, historyScores.value)
+  const base = compareWithHistory(reportView.value.overall ?? 0, historyScores.value)
   if (compareFailed.value) {
     return { ...base, hint: '历史成绩加载失败，本次未参与对比。可稍后重开报告重试。' }
   }
@@ -640,6 +560,16 @@ const compareStatusLabel = computed(() => {
     default: return '首次'
   }
 })
+/** 传给 ReportPanel 的对比视图（仅在历史对比加载完成后提供） */
+const reportCompareView = computed<ReportCompareView | null>(() => {
+  if (!historyCompareLoaded.value) return null
+  return {
+    status: reportCompare.value.status,
+    label: compareStatusLabel.value,
+    hint: reportCompare.value.hint,
+    nextTarget: nextTarget.value,
+  }
+})
 
 // AbortController 用于取消 SSE 流式请求
 let abortController: AbortController | null = null
@@ -657,20 +587,16 @@ const streamHtml = computed(() => renderMarkdown(streamContent.value || '等待�
 const answeredCount = computed(() => sessionEvals.value.length)
 
 /**
- * P2-26：报告覆盖范围说明。
+ * 报告覆盖范围说明（P3-03 口径修正）。
  *
- * <p>复盘报告的数据源是页面级的 sessionEvals，只包含「本次页面内」的作答。
- * 从「面试历史」继续面试时，该会话此前已作答的题目（得分只存在于服务端）不会进入报告，
- * 于是出现「服务端有 4 题、其中 2 题早有得分，报告却写『基于本次 1 道作答』」的割裂。
- * 在补齐服务端回填之前，这里如实标注会话累计量，让用户知道报告覆盖的到底是什么范围。
+ * <p>旧的单一口径（「基于本次 N 道作答」）把「本场总题数 / 本次新作答 / 历史已答」三件事
+ * 压成一句话，从历史恢复作答时尤其误导。现改为三段式：
+ * 「本场共 N 题 · 本次作答 X · 历史已答 Y」。
+ *
+ * <p>用快照 ref 承载：`finishSession()` 会在 `resetSession()` **之前**求值写入，
+ * 避免被清空的 questions / historyAnsweredCount 让报告抬头显示成 0。
  */
-const reportScopeText = computed(() => {
-  const history = historyAnsweredCount.value
-  if (history > 0) {
-    return `基于本次新作答 ${answeredCount.value} 题（该会话累计已作答 ${history + answeredCount.value} 题）的结构化总结`
-  }
-  return `基于本次 ${answeredCount.value} 道作答的结构化总结`
-})
+const reportScopeText = ref('')
 
 /**
  * 复盘报告抬头里的岗位名（v1.44.0）。
@@ -680,50 +606,19 @@ const reportScopeText = computed(() => {
  * 仍保留 `|| '未指定岗位'` 的兜底，两者取舍不同。）
  */
 const reportJobTitle = computed(() => jobDesc.value.trim())
-/** 各维度平均分 */
-const reportAverages = computed(() => {
-  const list = sessionEvals.value
-  const n = list.length
-  if (!n) return { overall: 0, completeness: 0, accuracy: 0, expression: 0 }
-  const mean = (k: keyof SessionEval) => Math.round(list.reduce((a, e) => a + (e[k] as number || 0), 0) / n)
-  return { overall: mean('overallScore'), completeness: mean('completeness'), accuracy: mean('accuracy'), expression: mean('expression') }
-})
-/** 汇总的待改进点：按出现次数排序、去重展示 */
-const reportImprovements = computed(() => {
-  const freq = new Map<string, number>()
-  for (const e of sessionEvals.value) {
-    for (const imp of e.improvements || []) {
-      const k = imp.trim()
-      if (k) freq.set(k, (freq.get(k) || 0) + 1)
-    }
-  }
-  return [...freq.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([text, cnt]) => ({ text, times: cnt }))
-})
-/** 基于均分的综合评价文案（智能生成，非硬编码 AI 调用，稳定可靠） */
-const reportSummary = computed(() => {
-  const { overall, completeness, accuracy, expression } = reportAverages.value
-  const dims = [
-    { name: '完整性', v: completeness },
-    { name: '准确性', v: accuracy },
-    { name: '表达力', v: expression }
-  ].sort((x, y) => y.v - x.v)
-  const weakest = dims[dims.length - 1]
-  const strongest = dims[0]
-  const level = overall >= 85 ? '优秀' : overall >= 70 ? '良好' : overall >= 60 ? '合格' : '待加强'
-  return `本轮共回答 ${answeredCount.value} 题，综合得分 ${overall} 分（${level}）。你的${strongest.name}是相对优势，建议继续保持；${weakest.name}是当前短板，可针对性多加练习。针对短板高频改进点，在下一次练习时有意识地调整，稳扎稳打即可稳步提升。`
-})
+/**
+ * 复盘报告视图模型（单一来源）。
+ *
+ * <p>降级判定、维度条、综合评价、改进建议全部由 {@link buildReportView} 派生——
+ * 组件与导出/分享都读同一份结果，避免各处重复实现（尤其杜绝在组件层 `?? 0` 补零）。
+ * 实时面试的维度明细恒为真，故 `degraded` 通常为 false；历史回看才可能出现降级。
+ */
+const reportView = computed(() => buildReportView(sessionEvals.value))
 
 function diffClass(d: string) {
   if (d === 'HARD') return 'tag-danger'
   if (d === 'MEDIUM') return 'tag-warning'
   return 'tag-success'
-}
-
-function scoreColor(s?: number) {
-  return getScoreColor(s)
 }
 
 /** JSON.parse 失败时返回 fallback，不抛异常 */
@@ -833,24 +728,26 @@ function toggleSpeech() {
 
 // ── 导出复盘报告 PDF（按需动态加载，减小面试页首屏包体） ──
 function exportPdf() {
-  if (!sessionEvals.value.length) return
-  const a = reportAverages.value
+  const v = reportView.value
+  // 无作答则无可导出内容；维度缺失交由导出模块降级处理（不在此处补 0）。
+  if (!v.answeredCount) return
+  const dim = (name: string) => findDim(v, name)
   // 动态 import：仅在点击导出时拉取 PDF 生成模块，避免其进入 Interview 首屏 chunk
   void import('../utils/reportPdf').then(({ exportReportToPdf }) => {
     exportReportToPdf({
       jobTitle: jobDesc.value.trim() || '未指定岗位',
-      answeredCount: answeredCount.value,
-      overall: a.overall,
-      completeness: a.completeness,
-      accuracy: a.accuracy,
-      expression: a.expression,
-      questions: sessionEvals.value.map((e) => ({
-        question: e.question,
-        category: e.category,
-        overallScore: e.overallScore,
+      answeredCount: v.answeredCount,
+      overall: v.overall,
+      completeness: dim('完整性'),
+      accuracy: dim('准确性'),
+      expression: dim('表达力'),
+      questions: v.questions.map((q) => ({
+        question: q.question,
+        category: q.category,
+        overallScore: q.overallScore,
       })),
-      improvements: reportImprovements.value.map((i) => i.text),
-      summary: reportSummary.value,
+      improvements: v.improvements.map((i) => i.text),
+      summary: v.summary,
     })
   }).catch(() => ElMessage.error('导出 PDF 模块加载失败，请重试'))
 }
@@ -859,17 +756,18 @@ function exportPdf() {
 const sharing = ref(false)
 function shareCard() {
   if (sharing.value) return
-  if (!sessionEvals.value.length) return
+  const v = reportView.value
+  if (!v.answeredCount) return
+  const dim = (name: string) => findDim(v, name)
   sharing.value = true
-  const a = reportAverages.value
   void import('../utils/reportShare').then(({ generateShareCard }) =>
     generateShareCard({
       jobTitle: jobDesc.value.trim() || '未指定岗位',
-      answeredCount: answeredCount.value,
-      overall: a.overall,
-      completeness: a.completeness,
-      accuracy: a.accuracy,
-      expression: a.expression,
+      answeredCount: v.answeredCount,
+      overall: v.overall,
+      completeness: dim('完整性'),
+      accuracy: dim('准确性'),
+      expression: dim('表达力'),
     }),
   ).then(() => ElMessage.success('分享卡片已生成并下载'))
     .catch((e: unknown) => ElMessage.error((e as Error)?.message || '分享卡片生成失败，请重试'))
@@ -1065,6 +963,17 @@ async function submitAnswer() {
     }) as unknown as string
     evalResult.value = safeParse<EvalResult>(data, {})
 
+    // 维度明细（第三批 A）：以原始对象承载，**不在此处 `?? 0` 兜底**——
+    // 缺失交由 utils/reportView.ts 判定降级（RK1「无数据 ≠ 0」）。
+    const evalDetail = evalResult.value
+      ? {
+          completeness: evalResult.value.completeness,
+          accuracy: evalResult.value.accuracy,
+          expression: evalResult.value.expression,
+          improvements: evalResult.value.improvements ?? [],
+        }
+      : undefined
+
     // 收集本次回答的评估结果，供面试结束后的综合复盘报告使用
     if (evalResult.value && typeof evalResult.value.overallScore === 'number') {
       sessionEvals.value.push({
@@ -1072,14 +981,11 @@ async function submitAnswer() {
         category: currentQ.value.category,
         difficulty: currentQ.value.difficulty,
         overallScore: evalResult.value.overallScore,
-        completeness: evalResult.value.completeness ?? 0,
-        accuracy: evalResult.value.accuracy ?? 0,
-        expression: evalResult.value.expression ?? 0,
-        improvements: evalResult.value.improvements ?? []
+        evalDetail,
       })
     }
 
-    // 2. 持久化用户答案 + 评估分到后端（关联 questionId）
+    // 2. 持久化用户答案 + 评估分 + 维度明细到后端（关联 questionId）
     //    失败不阻塞流程，仅记录日志（历史回顾会缺失本次答题记录）
     const questionId = currentQ.value.id
     if (questionId != null) {
@@ -1087,7 +993,9 @@ async function submitAnswer() {
         await api.post('/api/session/answer', {
           questionId,
           userAnswer: userAnswer.value,
-          evaluationScore: evalResult.value.overallScore ?? null
+          evaluationScore: evalResult.value.overallScore ?? null,
+          // 后端校验：合法 JSON 且 ≤4000 字；非法则 400。故序列化成字符串后再传。
+          evalDetail: evalDetail ? JSON.stringify(evalDetail) : null
         })
       } catch (persistErr) {
         console.warn('答案持久化失败，历史回顾将缺失本次记录：', persistErr)
@@ -1200,6 +1108,12 @@ async function finishSession() {
     const hasReport = sessionEvals.value.length > 0
     // 有作答记录则弹出综合复盘报告，否则仅提示完成
     if (hasReport) {
+      // P3-03：在 resetSession() 清空 questions/historyAnsweredCount 之前先算好抬头口径
+      reportScopeText.value = buildScopeText(
+        questions.value.length,
+        sessionEvals.value.length,
+        historyAnsweredCount.value,
+      )
       reportOpen.value = true
       // 拉取历史成绩用于“多轮对比”展示（在当前会话 id 被清空前传入）
       loadHistoryCompare(finishedSessionId)
@@ -2186,269 +2100,9 @@ onUnmounted(() => {
 }
 </style>
 
-<!-- 复盘报告弹窗被 Teleport 到 body，需非 scoped 样式 -->
+<!-- 复盘报告弹窗被 Teleport 到 body：报告本体已抽到 components/ReportPanel.vue（自带头部/维度/对比/逐题/建议全量样式）。
+     此处仅保留父级 <Transition name="report-fade"> 所需的过渡类（全局作用，避免在子组件内重复定义）。 -->
 <style>
-.report-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  backdrop-filter: blur(2px);
-}
-.report-modal {
-  width: 720px;
-  max-width: 100%;
-  max-height: 88vh;
-  overflow-y: auto;
-  background: var(--c-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
-  padding: 28px 30px;
-  font-family: var(--font-sans);
-}
-.report-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.report-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--c-text);
-  margin: 0 0 4px;
-  letter-spacing: -0.4px;
-}
-/* 报告抬头里的岗位名（v1.44.0）：用无衬线标题字族 + 强调色，
-   与 22px 的衬线标题形成层级，不抢标题的注意力。 */
-.report-job {
-  font-family: var(--font-title);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
-  color: var(--brand-primary);
-  margin: 0 0 4px;
-  word-break: break-word;
-}
-.report-sub {
-  font-size: 12.5px;
-  color: var(--c-text-tertiary);
-  margin: 0;
-}
-.report-star {
-  color: var(--c-accent);
-  margin-right: 3px;
-}
-.report-close {
-  border: none;
-  background: var(--c-bg-alt);
-  color: var(--c-text-secondary);
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  font-size: 14px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-fast);
-}
-.report-close:hover {
-  background: var(--c-border);
-  color: var(--c-text);
-}
-.report-overall {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  background: var(--c-bg-alt);
-  border: 1px solid var(--c-border-light);
-  border-radius: var(--radius-md);
-  padding: 20px 22px;
-  margin-bottom: 18px;
-}
-.overall-score {
-  font-size: 52px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -2px;
-  min-width: 96px;
-  text-align: center;
-}
-.overall-unit {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--c-text-tertiary);
-  margin-left: 2px;
-}
-.overall-summary {
-  font-size: 13.5px;
-  line-height: 1.75;
-  color: var(--c-text-secondary);
-}
-.report-dims {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 20px;
-}
-.report-dim {
-  background: var(--c-surface);
-  border: 1px solid var(--c-border-light);
-  border-radius: var(--radius-md);
-  padding: 14px;
-}
-.dim-bar {
-  height: 6px;
-  background: var(--brand-primary-50);
-  border-radius: 999px;
-  overflow: hidden;
-  margin-bottom: 10px;
-}
-.dim-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.6s ease;
-}
-.dim-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-.dim-name {
-  font-size: 12.5px;
-  color: var(--c-text-secondary);
-  font-weight: 500;
-}
-.dim-value {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1;
-}
-.report-block {
-  margin-bottom: 20px;
-}
-.report-block-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--c-text);
-  margin-bottom: 10px;
-}
-.compare-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  line-height: 1.6;
-  margin-bottom: 8px;
-}
-.compare-badge {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 2px 10px;
-  border-radius: 999px;
-  color: #fff;
-}
-.compare-badge.improved { background: var(--score-excellent); }
-.compare-badge.steady { background: var(--score-good); }
-.compare-badge.declined { background: var(--score-pass); }
-.compare-badge.unknown { background: var(--c-text-tertiary); }
-.compare-text {
-  font-size: 13px;
-  color: var(--c-text-secondary);
-}
-.compare-target {
-  font-size: 13px;
-  color: var(--c-text-secondary);
-  background: var(--c-bg-alt);
-  border: 1px solid var(--c-border-light);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  line-height: 1.6;
-}
-.report-questions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-.report-question {
-  background: var(--c-bg-alt);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-}
-.rq-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.rq-index {
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--brand-primary-light);
-  color: var(--brand-primary);
-  font-size: 12px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.rq-cat {
-  font-size: 12px;
-  color: var(--c-text-tertiary);
-}
-.rq-score {
-  margin-left: auto;
-  font-size: 13px;
-  font-weight: 700;
-}
-.rq-text {
-  font-size: 13px;
-  color: var(--c-text-secondary);
-  line-height: 1.6;
-}
-.report-improve {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.report-improve li {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: var(--c-accent-soft);
-  border-left: 3px solid var(--c-accent);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--c-text-secondary);
-  line-height: 1.6;
-}
-.imp-times {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--c-warning);
-}
-.report-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 6px;
-}
 .report-fade-enter-active,
 .report-fade-leave-active {
   transition: opacity 0.25s ease;
@@ -2456,18 +2110,5 @@ onUnmounted(() => {
 .report-fade-enter-from,
 .report-fade-leave-to {
   opacity: 0;
-}
-@media (max-width: 640px) {
-  .report-modal {
-    padding: 20px;
-  }
-  .report-overall {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  .report-dims {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 </style>

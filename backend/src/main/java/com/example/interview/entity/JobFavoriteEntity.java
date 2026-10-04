@@ -35,6 +35,15 @@ import java.time.LocalDateTime;
         indexes = @Index(name = "idx_job_favorite_user", columnList = "user_id"))
 public class JobFavoriteEntity {
 
+    /** 强烈意向 */
+    public static final String PREFERENCE_STRONG = "STRONG";
+    /** 可接受 */
+    public static final String PREFERENCE_ACCEPTABLE = "ACCEPTABLE";
+    /** 保底 */
+    public static final String PREFERENCE_BACKUP = "BACKUP";
+    /** 不考虑 */
+    public static final String PREFERENCE_EXCLUDED = "EXCLUDED";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -74,6 +83,16 @@ public class JobFavoriteEntity {
     /** 申请入口 URL（快照） */
     @Column(name = "apply_url", length = 500)
     private String applyUrl;
+
+    /**
+     * 岗位偏好四档（第三批 H）：{@link #PREFERENCE_STRONG} / {@link #PREFERENCE_ACCEPTABLE}
+     * / {@link #PREFERENCE_BACKUP} / {@link #PREFERENCE_EXCLUDED}。
+     *
+     * <p><b>可空，NULL = 未标记</b>——不得默认成任何一档（R3/H：未标记显示「未标记」，
+     * 不伪装成某个真实偏好）。
+     */
+    @Column(name = "preference", length = 20)
+    private String preference;
 
     /** 收藏时间 */
     @Column(name = "created_at", updatable = false)

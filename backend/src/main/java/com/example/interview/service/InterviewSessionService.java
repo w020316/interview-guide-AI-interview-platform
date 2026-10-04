@@ -129,10 +129,12 @@ public class InterviewSessionService {
      * @param questionId      题目 ID
      * @param userAnswer      用户回答文本
      * @param evaluationScore AI 评分（0-100）
+     * @param evalDetail      题目维度明细（JSON 文本，第三批 A；可为 null）
      * @param currentUserId   当前登录用户 ID（用于越权校验）
      */
     @Transactional
-    public InterviewQuestionEntity saveAnswer(Long questionId, String userAnswer, Integer evaluationScore, String currentUserId) {
+    public InterviewQuestionEntity saveAnswer(Long questionId, String userAnswer, Integer evaluationScore,
+                                              String evalDetail, String currentUserId) {
         InterviewQuestionEntity question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("题目不存在：" + questionId));
         // 越权校验：题目所属会话必须归当前用户所有
@@ -143,6 +145,8 @@ public class InterviewSessionService {
         }
         question.setUserAnswer(userAnswer);
         question.setEvaluationScore(evaluationScore);
+        // 第三批 A：维度明细与评分同事务落库（可空；存量行为 null，不写 0）
+        question.setEvalDetail(evalDetail);
         return questionRepository.save(question);
     }
 

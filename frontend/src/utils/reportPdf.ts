@@ -2,25 +2,33 @@
  * 面试复盘报告导出 PDF
  * - buildReportHtml：生成带内联样式的独立 HTML（不依赖 CSS 变量，打印窗口可正常渲染），纯函数可单测
  * - exportReportToPdf：打开新窗口写入 HTML 并触发浏览器打印，由用户「另存为 PDF」本地留存与分享
+ *
+ * <p><b>降级感知（RK1「无数据 ≠ 0」）</b>：历史会话的维度明细可能缺失（`eval_detail` 为 NULL）。
+ * 此时**不打印维度条、不对缺失维度补 0**，只如实说明「未保存分维度明细」。
+ * 是否降级复用 {@link canRenderDimensions}（与报告面板同源），不在本模块复制判定逻辑。
  */
+
+import { canRenderDimensions } from './reportView'
+import { EMPTY } from './format'
 
 export interface ReportExportItem {
   question: string
   category: string
-  overallScore: number
+  /** 逐题综合分；缺失为 `null`（不打印 0） */
+  overallScore: number | null
 }
 
 export interface ReportExportPayload {
   /** 岗位描述，用于标题副题 */
   jobTitle: string
-  /** 作答题目数 */
-  answeredCount: number
-  /** 综合平均分 */
-  overall: number
-  /** 维度平均分 */
-  completeness: number
-  accuracy: number
-  expression: number
+  /** 作答题目数；缺失为 `null`（**不打印 0**，渲染 EMPTY 占位） */
+  answeredCount: number | null
+  /** 综合平均分；缺失为 `null`（不打印 0） */
+  overall: number | null
+  /** 维度平均分；缺失为 `null`（降级：不打印维度条，绝不补 0） */
+  completeness: number | null
+  accuracy: number | null
+  expression: number | null
   /** 逐题明细 */
   questions: ReportExportItem[]
   /** 建议提升要点 */
@@ -31,16 +39,17 @@ export interface ReportExportPayload {
   exportedAt?: string
 }
 
-/** 依据分数返回文字等级 */
-function scoreLevel(score: number): string {
+/** 依据分数返回文字等级（`null` 视为无数据，返回空串） */
+function scoreLevel(score: number | null): string {
+  if (score == null) return ''
   if (score >= 85) return '优秀'
   if (score >= 70) return '良好'
   if (score >= 60) return '合格'
   return '待加强'
 }
 
-/** 依据分数返回对应颜色（打印端无 CSS 变量，直接用固定色值） */
-function scoreHex(score: number): string {
+/** 依据分数返回对应颜色（打印端无 CSS 变量，直接用固定色值；`null` 用中性灰） */
+function scoreHex(score: number | null): string {
   if (score == null) return '#9ca3af'
   if (score >= 85) return '#10b981'
   if (score >= 70) return '#3b82f6'
@@ -61,22 +70,56 @@ function esc(text: string): string {
  * 生成复盘报告的独立 HTML（内联样式，适配打印另存为 PDF）
  */
 export function buildReportHtml(p: ReportExportPayload): string {
-  const level = scoreLevel(p.overall)
+  // 降级判定复用 utils/reportView.ts 的唯一来源：无任何有效维度 ⇒ 不打印维度条、不补 0
+  const degraded = !canRenderDimensions({
+    completeness: p.completeness,
+    accuracy: p.accuracy,
+    expression: p.expression,
+  })
+
   const overallHex = scoreHex(p.overall)
-  const dims = [
-    { name: '综合', v: p.overall, hex: scoreHex(p.overall) },
-    { name: '完整性', v: p.completeness, hex: scoreHex(p.completeness) },
-    { name: '准确性', v: p.accuracy, hex: scoreHex(p.accuracy) },
-    { name: '表达力', v: p.expression, hex: scoreHex(p.expression) },
-  ]
+  const overallText = p.overall === null ? '—' : String(Math.round(p.overall))
+  const level = scoreLevel(p.overall)
+  // 综合分缺失时不渲染等级胶囊，避免出现「0 分（待加强）」的假结论
+  const levelTag = p.overall === null
+    ? ''
+    : `<span class="tag" style="color:#fff;background:${overallHex}">${level}</span>`
+
+  // 维度条：仅在有明细时构建，缺明细的维度**跳过**（不补 0），与实际渲染一一对应
+  const dims: Array<{ name: string; v: number; hex: string }> = []
+  if (!degraded) {
+    if (p.overall !== null) dims.push({ name: '综合', v: p.overall, hex: scoreHex(p.overall) })
+    const others: Array<{ name: string; v: number | null }> = [
+      { name: '完整性', v: p.completeness },
+      { name: '准确性', v: p.accuracy },
+      { name: '表达力', v: p.expression },
+    ]
+    for (const d of others) {
+      if (d.v !== null) dims.push({ name: d.name, v: d.v, hex: scoreHex(d.v) })
+    }
+  }
+
+  const dimsHtml = degraded
+    ? `<p class="degraded" data-report-degraded-note="true">本场为早期会话，未保存分维度明细，故不展示完整性 / 准确性 / 表达力拆解（旧数据不补 0）。</p>`
+    : `<table class="dims">
+    ${dims.map((d) => `<tr>
+      <td class="dim-name">${d.name}</td>
+      <td><div class="dim-bar"><div class="dim-fill" style="width:${Math.max(2, Math.min(100, Math.round(d.v)))}%;background:${d.hex}"></div></div></td>
+      <td class="dim-val" style="color:${d.hex}">${Math.round(d.v)}</td>
+    </tr>`).join('')}
+  </table>`
+
   const improvements = Array.isArray(p.improvements) && p.improvements.length
     ? p.improvements.map((it) => `<li>${esc(it)}</li>`).join('')
     : '<p style="margin:0;color:#6b7280">暂无高频改进点，继续保持！</p>'
   const questions = Array.isArray(p.questions) && p.questions.length
-    ? p.questions.map((q, i) => `<li class="q-item">
-        <div class="q-head"><span class="q-index">${i + 1}</span><span class="q-cat">${esc(q.category)}</span><span class="q-score" style="color:${scoreHex(q.overallScore)}">${Math.round(q.overallScore)} 分</span></div>
+    ? p.questions.map((q, i) => {
+        const scoreText = q.overallScore === null ? '—' : `${Math.round(q.overallScore)} 分`
+        return `<li class="q-item">
+        <div class="q-head"><span class="q-index">${i + 1}</span><span class="q-cat">${esc(q.category)}</span><span class="q-score" style="color:${scoreHex(q.overallScore)}">${scoreText}</span></div>
         <div class="q-text">${esc(q.question)}</div>
-      </li>`).join('')
+      </li>`
+      }).join('')
     : '<li style="color:#6b7280">无逐题记录</li>'
 
   return `<!DOCTYPE html>
@@ -101,6 +144,7 @@ export function buildReportHtml(p: ReportExportPayload): string {
   .dim-bar { height: 10px; background: #f3f4f6; border-radius: 999px; overflow: hidden; }
   .dim-fill { height: 100%; border-radius: 999px; }
   .dim-val { font-weight: 600; text-align: right; width: 48px; }
+  .degraded { font-size: 13px; color: #6b7280; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; margin: 0 0 22px; }
   h2 { font-size: 16px; margin: 24px 0 12px; border-left: 4px solid #10b981; padding-left: 10px; }
   .summary { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #14532d; }
   ul.improve { margin: 0; padding-left: 18px; font-size: 13px; }
@@ -120,22 +164,16 @@ export function buildReportHtml(p: ReportExportPayload): string {
   <div class="head">
     <div>
       <h1>模拟面试复盘报告</h1>
-      <div class="sub">目标岗位：${esc(p.jobTitle)} ｜ 作答 ${p.answeredCount ?? 0} 题 ｜ ${esc(p.exportedAt || new Date().toLocaleString())}</div>
+      <div class="sub">目标岗位：${esc(p.jobTitle)} ｜ 作答 ${p.answeredCount === null ? EMPTY : p.answeredCount} 题 ｜ ${esc(p.exportedAt || new Date().toLocaleString())}</div>
     </div>
   </div>
 
   <div class="overall">
-    <div class="num" style="color:${overallHex}">${Math.round(p.overall ?? 0)}<span class="unit">分</span></div>
-    <span class="tag" style="color:#fff;background:${overallHex}">${level}</span>
+    <div class="num" style="color:${overallHex}">${overallText}${p.overall === null ? '' : '<span class="unit">分</span>'}</div>
+    ${levelTag}
   </div>
 
-  <table class="dims">
-    ${dims.map((d) => `<tr>
-      <td class="dim-name">${d.name}</td>
-      <td><div class="dim-bar"><div class="dim-fill" style="width:${Math.max(2, Math.min(100, Math.round(d.v ?? 0)))}%;background:${d.hex}"></div></div></td>
-      <td class="dim-val" style="color:${d.hex}">${Math.round(d.v ?? 0)}</td>
-    </tr>`).join('')}
-  </table>
+  ${dimsHtml}
 
   <h2>综合评价</h2>
   <div class="summary">${esc(p.summary || '')}</div>

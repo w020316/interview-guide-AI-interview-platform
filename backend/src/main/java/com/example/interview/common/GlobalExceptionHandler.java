@@ -200,6 +200,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 业务冲突 → 409（第三批 C：导入覆盖模式的指纹冲突保护）。
+     *
+     * <p>与乐观锁冲突（409「内容已被更新」）同族语义：数据在客户端导出之后已被改动，
+     * 覆盖前需用户显式确认（{@code force:true}）。文案由抛出方给出（面向用户、可操作），
+     * 原样透出。
+     */
+    @ExceptionHandler(ConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Result<Void> handleConflict(ConflictException ex) {
+        log.warn("业务冲突（409）：{}", ex.getMessage());
+        return Result.error(409, ex.getMessage());
+    }
+
+    /**
      * AI 并发闸门排队超时（v1.34.1，P3-4 异常语义统一）
      *
      * <p>本质是「AI 服务暂不可用」的可重试业务故障，语义应与降级链全失败（503）一致；

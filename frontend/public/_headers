@@ -36,3 +36,20 @@
 # API 响应不缓存（避免敏感数据被浏览器/代理缓存）
 /api/*
   Cache-Control: no-store
+
+# ── PWA（第三批 D）：Service Worker 与 manifest 绝不缓存 ──
+# 「用户卡在旧版本」的根因防护：sw.js 若被 CDN/浏览器缓存，新版本永远不会生效。
+# 下列均为**真实存在的文件**（非 SPA 回退路径），可正常命中 _headers（见文件头约束②③）。
+# 各自独立区块，不与 `/*` 合并（见文件头约束④）。
+
+# Service Worker 脚本：每次请求都回源校验
+/sw.js
+  Cache-Control: no-cache
+
+# Workbox 运行时脚本（generateSW 产物，文件名可能带内容 hash，用通配匹配）
+/workbox-*.js
+  Cache-Control: no-cache
+
+# Web App Manifest：确保图标/名称/主题色的更新即时生效
+/manifest.webmanifest
+  Cache-Control: no-cache

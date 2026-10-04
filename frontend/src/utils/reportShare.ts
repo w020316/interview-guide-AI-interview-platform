@@ -5,33 +5,41 @@
  *
  * 说明：jsdom 测试环境无 2D canvas 实现，generateShareCard 内的绘制逻辑保持薄封装，
  * 可测逻辑全部收敛到导出的纯函数中。
+ *
+ * <p><b>降级感知（RK1「无数据 ≠ 0」）</b>：历史会话维度明细可能缺失（`eval_detail` 为 NULL）。
+ * 此时**不绘制维度条、不补 0**，只如实说明「未记录分维度明细」。
+ * 是否降级复用 {@link canRenderDimensions}（与报告面板同源），不在本模块复制判定逻辑。
  */
+
+import { canRenderDimensions } from './reportView'
 
 export interface ShareCardPayload {
   /** 岗位描述 */
   jobTitle: string
   /** 作答题目数 */
   answeredCount: number
-  /** 综合平均分 */
-  overall: number
-  /** 维度平均分 */
-  completeness: number
-  accuracy: number
-  expression: number
+  /** 综合平均分；缺失为 `null`（不打印 0） */
+  overall: number | null
+  /** 维度平均分；缺失为 `null`（降级：不绘制维度条，绝不补 0） */
+  completeness: number | null
+  accuracy: number | null
+  expression: number | null
   /** 报告日期文本，默认当天 */
   dateText?: string
 }
 
-/** 依据分数返回文字等级（与报告 PDF 口径一致） */
-export function scoreLevel(score: number): string {
+/** 依据分数返回文字等级（与报告 PDF 口径一致；`null` 返回空串） */
+export function scoreLevel(score: number | null): string {
+  if (score == null) return ''
   if (score >= 85) return '优秀'
   if (score >= 70) return '良好'
   if (score >= 60) return '合格'
   return '待加强'
 }
 
-/** 依据分数返回颜色（海报无 CSS 变量，用固定色值） */
-export function scoreHex(score: number): string {
+/** 依据分数返回颜色（海报无 CSS 变量，用固定色值；`null` 用中性灰） */
+export function scoreHex(score: number | null): string {
+  if (score == null) return '#94a3b8'
   if (score >= 85) return '#10b981'
   if (score >= 70) return '#3b82f6'
   if (score >= 60) return '#f59e0b'
@@ -90,35 +98,60 @@ export async function generateShareCard(p: ShareCardPayload): Promise<void> {
   ctx.font = '400 16px system-ui, sans-serif'
   ctx.fillText(`${dateText} · 共 ${p.answeredCount} 题作答`, 40, 152)
 
-  // 综合分
-  ctx.fillStyle = scoreHex(p.overall)
-  ctx.font = '800 88px system-ui, sans-serif'
-  ctx.fillText(String(Math.round(p.overall)), 40, 330)
-  ctx.fillStyle = '#64748b'
-  ctx.font = '500 18px system-ui, sans-serif'
-  ctx.fillText(`综合 ${scoreLevel(p.overall)}`, 40, 364)
+  // 降级判定复用 utils/reportView.ts 的唯一来源：无任何有效维度 ⇒ 不绘制维度条、不补 0
+  const degraded = !canRenderDimensions({
+    completeness: p.completeness,
+    accuracy: p.accuracy,
+    expression: p.expression,
+  })
 
-  // 四维度条
-  const dims = [
-    { name: '完整性', v: p.completeness },
-    { name: '准确性', v: p.accuracy },
-    { name: '表达力', v: p.expression },
-  ]
-  let y = 430
-  ctx.font = '500 18px system-ui, sans-serif'
-  for (const d of dims) {
-    ctx.fillStyle = '#334155'
-    ctx.fillText(d.name, 40, y)
-    // 轨道
-    ctx.fillStyle = '#e2e8f0'
-    roundRect(ctx, 130, y - 14, 430, 14, 7)
-    // 填充
-    ctx.fillStyle = scoreHex(d.v)
-    roundRect(ctx, 130, y - 14, Math.max(14, 430 * Math.min(100, Math.max(0, d.v)) / 100), 14, 7)
-    // 数值
-    ctx.fillStyle = scoreHex(d.v)
-    ctx.fillText(`${Math.round(d.v)}`, 575, y)
-    y += 54
+  // 综合分
+  if (p.overall === null) {
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = '800 72px system-ui, sans-serif'
+    ctx.fillText('—', 40, 330)
+    ctx.fillStyle = '#64748b'
+    ctx.font = '500 18px system-ui, sans-serif'
+    ctx.fillText('暂无综合得分', 40, 364)
+  } else {
+    ctx.fillStyle = scoreHex(p.overall)
+    ctx.font = '800 88px system-ui, sans-serif'
+    ctx.fillText(String(Math.round(p.overall)), 40, 330)
+    ctx.fillStyle = '#64748b'
+    ctx.font = '500 18px system-ui, sans-serif'
+    ctx.fillText(`综合 ${scoreLevel(p.overall)}`, 40, 364)
+  }
+
+  if (degraded) {
+    // 降级：不绘制维度条（也不补 0），如实说明未记录明细
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = '500 17px system-ui, sans-serif'
+    ctx.fillText('本场未记录分维度明细，不展示维度拆解', 40, 440)
+  } else {
+    // 维度条（含综合）——与报告面板同源，缺明细的维度不绘制
+    const dims: Array<{ name: string; v: number | null }> = [
+      { name: '综合', v: p.overall },
+      { name: '完整性', v: p.completeness },
+      { name: '准确性', v: p.accuracy },
+      { name: '表达力', v: p.expression },
+    ]
+    let y = 430
+    ctx.font = '500 18px system-ui, sans-serif'
+    for (const d of dims) {
+      if (d.v === null) continue
+      ctx.fillStyle = '#334155'
+      ctx.fillText(d.name, 40, y)
+      // 轨道
+      ctx.fillStyle = '#e2e8f0'
+      roundRect(ctx, 130, y - 14, 430, 14, 7)
+      // 填充
+      ctx.fillStyle = scoreHex(d.v)
+      roundRect(ctx, 130, y - 14, Math.max(14, 430 * Math.min(100, Math.max(0, d.v)) / 100), 14, 7)
+      // 数值
+      ctx.fillStyle = scoreHex(d.v)
+      ctx.fillText(`${Math.round(d.v)}`, 575, y)
+      y += 54
+    }
   }
 
   // 底部署名

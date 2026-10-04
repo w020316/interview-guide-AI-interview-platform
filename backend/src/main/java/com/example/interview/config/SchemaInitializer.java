@@ -162,7 +162,42 @@ public class SchemaInitializer implements CommandLineRunner {
                     + "check_result TEXT, "
                     + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
                     + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-            "CREATE INDEX IF NOT EXISTS idx_story_bank_user ON story_bank(user_id)"
+            "CREATE INDEX IF NOT EXISTS idx_story_bank_user ON story_bank(user_id)",
+            // ── 第三批（v1.49.0）：历史复盘维度、岗位偏好四档、导入幂等日志 ──
+            // A：题目维度明细（可空；存量行保持 NULL，不回溯、不填 0）
+            "ALTER TABLE interview_question ADD COLUMN IF NOT EXISTS eval_detail TEXT",
+            // H：岗位收藏偏好四档（可空，NULL=未标记，不得默认成任何一档）
+            "ALTER TABLE job_favorite ADD COLUMN IF NOT EXISTS preference VARCHAR(20)",
+            // C：导入幂等日志（新表，跨进程重启持久，(user_id, import_id) 唯一）
+            "CREATE TABLE IF NOT EXISTS data_import_log ("
+                    + "id BIGSERIAL PRIMARY KEY, "
+                    + "user_id VARCHAR(64) NOT NULL, "
+                    + "import_id VARCHAR(64) NOT NULL, "
+                    + "mode VARCHAR(10) NOT NULL, "
+                    + "summary_json TEXT, "
+                    + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "CONSTRAINT uk_data_import_log_user_import UNIQUE (user_id, import_id))",
+            "CREATE INDEX IF NOT EXISTS idx_data_import_log_user ON data_import_log(user_id)"
+    };
+
+    /**
+     * 关键列/表自检清单（第三批）。
+     *
+     * <p>背景：{@link #run} 对 DDL 异常**只告警不阻断启动**（历史高频坑）——一旦 DDL 因故失败，
+     * 应用照常启动但列/表缺失，症状是「新功能与线上行为不符」，且要到运行时才炸。
+     * 这里在 DDL 执行后主动查 {@code information_schema} 复核，缺失时打 <b>ERROR</b> 日志，
+     * 让「列没建成」在启动日志里立刻可见，而不是靠线上事故反查。
+     *
+     * <p>元素格式：{@code {表名, 列名}}；列名为 {@code null} 时表示只校验该表是否存在。
+     */
+    private static final String[][] REQUIRED_COLUMNS = {
+            {"interview_question", "eval_detail"},
+            {"job_favorite", "preference"}
+    };
+
+    /** 必须存在的新表 */
+    private static final String[] REQUIRED_TABLES = {
+            "data_import_log"
     };
 
     @Override
@@ -180,7 +215,58 @@ public class SchemaInitializer implements CommandLineRunner {
                 log.warn("执行建表 DDL 失败（已忽略，功能可能不可用）：{}", e.getMessage());
             }
         }
+        // 可观测判据：DDL 异常被吞掉后，用 information_schema 自检把「列没建成」暴露到启动日志
+        verifySchema();
         log.info("SchemaInitializer 完成：已确保新增表存在");
+    }
+
+    /**
+     * 启动后自检关键列/表是否到位；缺失时打 ERROR 日志（不阻断启动）。
+     *
+     * @return 缺失项数量（0 表示全部就位）；返回值为可测试判据
+     */
+    int verifySchema() {
+        int missing = 0;
+        for (String[] rc : REQUIRED_COLUMNS) {
+            String table = rc[0];
+            String column = rc[1];
+            if (column == null) {
+                continue;
+            }
+            try {
+                Integer n = jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM information_schema.columns "
+                                + "WHERE table_name = ? AND column_name = ?",
+                        Integer.class, table, column);
+                if (n == null || n == 0) {
+                    log.error("SchemaInitializer 自检失败：列 {}.{} 不存在——依赖该列的功能将不可用，"
+                            + "请手动在数据库执行对应 DDL 后重启", table, column);
+                    missing++;
+                }
+            } catch (Exception e) {
+                log.error("SchemaInitializer 自检查询失败（列 {}.{}）：{}", table, column, e.getMessage());
+                missing++;
+            }
+        }
+        for (String table : REQUIRED_TABLES) {
+            try {
+                Integer n = jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
+                        Integer.class, table);
+                if (n == null || n == 0) {
+                    log.error("SchemaInitializer 自检失败：表 {} 不存在——依赖该表的功能将不可用，"
+                            + "请手动在数据库执行对应 DDL 后重启", table);
+                    missing++;
+                }
+            } catch (Exception e) {
+                log.error("SchemaInitializer 自检查询失败（表 {}）：{}", table, e.getMessage());
+                missing++;
+            }
+        }
+        if (missing == 0) {
+            log.info("SchemaInitializer 自检通过：全部新增列/表已就位");
+        }
+        return missing;
     }
 
     /** 检测当前数据库是否为 PostgreSQL */

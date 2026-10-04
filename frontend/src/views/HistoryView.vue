@@ -53,9 +53,13 @@
               <span class="status-badge" :class="statusClass(s.status)">{{ statusText(s.status) }}</span>
             </div>
           </div>
-          <BaseButton variant="ghost" size="sm" :loading="loadingId === s.sessionId" @click.stop="loadQuestions(s.sessionId)">
-            {{ qMap[s.sessionId] ? '收起' : '查看题目' }}
-          </BaseButton>
+          <div class="session-actions">
+            <BaseButton variant="ghost" size="sm" :loading="loadingId === s.sessionId" @click.stop="loadQuestions(s.sessionId)">
+              {{ qMap[s.sessionId] ? '收起' : '查看题目' }}
+            </BaseButton>
+            <!-- 第三批 A：历史回看复用 ReportPanel（旧会话 eval_detail 为 null 时自动降级） -->
+            <BaseButton variant="ghost" size="sm" @click.stop="openReport(s)">复盘报告</BaseButton>
+          </div>
         </div>
 
         <div v-if="qMap[s.sessionId]" class="question-list">
@@ -81,15 +85,32 @@
         </div>
       </div>
     </div>
+
+    <!-- 复盘报告弹窗：复用 ReportPanel（同 InterviewView），旧会话自动降级 -->
+    <Teleport to="body">
+      <Transition name="report-fade">
+        <ReportPanel
+          v-if="reportOpen"
+          :evals="reportEvals"
+          :job-title="reportJobTitle"
+          :scope-text="reportScopeText"
+          :show-history="false"
+          @close="reportOpen = false"
+          @go-history="reportOpen = false"
+        />
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
+import ReportPanel from '../components/ReportPanel.vue'
 import { EMPTY } from '../utils/format'
+import type { ReportEvalInput } from '../utils/reportView'
 
 interface Session {
   sessionId: string
@@ -101,8 +122,12 @@ interface Session {
 interface Question {
   id: number
   question: string
+  category?: string
+  difficulty?: string
   userAnswer?: string
   evaluationScore?: number | null
+  /** 第三批 A：维度明细（JSON 文本或对象）。**旧会话为 null** —— 报告据此降级，不补 0 */
+  evalDetail?: unknown
 }
 
 const sessions = ref<Session[]>([])
@@ -110,6 +135,51 @@ const qMap = ref<Record<string, Question[]>>({})
 const loadingId = ref('')
 const loadError = ref(false)
 const loading = ref(false)
+
+// ── 复盘报告（第三批 A）──
+const reportOpen = ref(false)
+const reportSessionId = ref('')
+const reportJobTitle = ref('')
+const reportScopeText = ref('')
+
+/** 当前报告会话的作答（仅纳入有评分的题；维度明细原样透传给 ReportPanel 判定降级） */
+const reportEvals = computed<ReportEvalInput[]>(() => {
+  const list = qMap.value[reportSessionId.value] || []
+  return list
+    .filter((q) => q.evaluationScore != null)
+    .map((q) => ({
+      question: q.question,
+      category: q.category,
+      overallScore: q.evaluationScore ?? null,
+      evalDetail: q.evalDetail ?? null,
+    }))
+})
+
+/** 打开复盘报告：先确保题目已加载，再交给 ReportPanel */
+async function openReport(s: Session) {
+  if (!qMap.value[s.sessionId]) {
+    loadingId.value = s.sessionId
+    try {
+      const data = (await api.get(`/api/session/${s.sessionId}/questions`)) as unknown as Question[]
+      qMap.value = { ...qMap.value, [s.sessionId]: data || [] }
+    } catch (e: unknown) {
+      ElMessage.error(getErrMessage(e, '加载题目失败'))
+      return
+    } finally {
+      loadingId.value = ''
+    }
+  }
+  const list = qMap.value[s.sessionId] || []
+  const answered = list.filter((q) => q.evaluationScore != null)
+  if (!answered.length) {
+    ElMessage.info('该会话暂无评分记录，无法生成复盘报告')
+    return
+  }
+  reportJobTitle.value = s.jobDescription || ''
+  reportScopeText.value = `本场共 ${list.length} 题 · 已作答 ${answered.length} · 历史回看`
+  reportSessionId.value = s.sessionId
+  reportOpen.value = true
+}
 
 onMounted(() => loadHistory())
 
@@ -311,6 +381,14 @@ function statusText(status: string) {
 .session-info {
   flex: 1;
   min-width: 0;
+}
+
+/* 会话卡右侧操作区：查看题目 + 复盘报告 */
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .session-title {

@@ -198,6 +198,24 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("ConflictException → 409 message 原样透出（第三批 C 导入冲突）")
+    void conflict_returns409() {
+        Result<Void> result = handler.handleConflict(
+                new com.example.interview.common.ConflictException("数据在导出后已发生变化（指纹不符）"));
+        assertThat(result.code()).isEqualTo(409);
+        assertThat(result.message()).contains("指纹不符");
+        assertThat(result.data()).isNull();
+    }
+
+    @Test
+    @DisplayName("ConflictException 不是 IllegalArgumentException（避免被 400 分支吞掉）")
+    void conflict_isNotIllegalArgument() {
+        assertThat(new com.example.interview.common.ConflictException("x"))
+                .isInstanceOf(RuntimeException.class)
+                .isNotInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     @DisplayName("IllegalStateException → 500 不透出内部细节")
     void illegalState_returns500WithoutDetails() {
         Result<Void> result = handler.handleIllegalState(

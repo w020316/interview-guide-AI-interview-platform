@@ -127,7 +127,7 @@
 
       <div v-if="gapResult && !gapLoading" class="result-section fade-in-up">
         <div class="match-score-hero" :style="{ '--score-color': getScoreColor(gapResult.overallMatchScore, MATCH_THRESHOLDS) }">
-          <div class="match-score-num">{{ gapResult.overallMatchScore ?? '-' }}</div>
+          <div class="match-score-num">{{ gapResult.overallMatchScore ?? EMPTY }}</div>
           <div class="match-score-label">综合匹配度</div>
           <p class="match-summary">{{ gapResult.summary }}</p>
         </div>
@@ -231,6 +231,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
+import { EMPTY } from '../utils/format'
 import { getScoreColor, MATCH_THRESHOLDS } from '../utils/score'
 import renderMarkdown from '../utils/markdown'
 import { BaseButton, BaseTextarea } from '../components'

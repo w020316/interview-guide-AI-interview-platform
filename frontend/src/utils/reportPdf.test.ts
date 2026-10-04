@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { buildReportHtml, exportReportToPdf, type ReportExportPayload } from './reportPdf'
+import { EMPTY } from './format'
 
 function basePayload(): ReportExportPayload {
   return {
@@ -48,10 +49,66 @@ describe('reportPdf - buildReportHtml', () => {
     expect(html).toContain('&lt;script&gt;')
   })
 
+  it('作答数缺失（answeredCount=null）：渲染 EMPTY 占位，不打印「作答 0 题」', () => {
+    const html = buildReportHtml({ ...basePayload(), answeredCount: null })
+    expect(html).toContain(`作答 ${EMPTY} 题`)
+    expect(html).not.toContain('作答 0 题')
+  })
+
   it('逐题无记录时给出占位文案而非报错', () => {
     const html = buildReportHtml({ ...basePayload(), questions: [], improvements: [] })
     expect(html).toContain('无逐题记录')
     expect(html).toContain('暂无高频改进点')
+  })
+})
+
+/**
+ * RK1「无数据 ≠ 0」断言级防护（导出层）：
+ * 旧会话 eval_detail 为 NULL ⇒ 导出 HTML 不得出现维度条，也不得把缺失维度补成 0。
+ */
+describe('reportPdf - 降级感知（RK1 无数据 ≠ 0）', () => {
+  function degradedPayload(): ReportExportPayload {
+    return {
+      jobTitle: '历史会话',
+      answeredCount: 2,
+      overall: 66,
+      completeness: null,
+      accuracy: null,
+      expression: null,
+      questions: [
+        { question: '请自我介绍', category: '通用', overallScore: 70 },
+        { question: '项目难点？', category: '项目', overallScore: 62 },
+      ],
+      improvements: [],
+      summary: '本场为早期会话，未保存分维度明细。',
+    }
+  }
+
+  it('维度明细全缺失 → 不打印维度条、不补 0，仅给出降级说明', () => {
+    const html = buildReportHtml(degradedPayload())
+    expect(html).not.toContain('class="dims"')
+    expect(html).not.toContain('class="dim-name"')
+    // 不得出现被补 0 的维度行（>完整性< / >准确性< 等）
+    expect(html).not.toMatch(/>完整性</)
+    expect(html).not.toMatch(/>准确性</)
+    expect(html).not.toMatch(/>表达力</)
+    expect(html).toContain('data-report-degraded-note="true"')
+    expect(html).toContain('未保存分维度明细')
+  })
+
+  it('维度明细完整 → 打印含综合在内的 4 条维度', () => {
+    const html = buildReportHtml(basePayload())
+    expect(html).toContain('class="dims"')
+    expect((html.match(/class="dim-name"/g) || []).length).toBe(4)
+    expect(html).toMatch(/>综合</)
+    expect(html).toMatch(/>完整性</)
+  })
+
+  it('综合分缺失时展示占位符而非 0 分', () => {
+    const html = buildReportHtml({ ...basePayload(), overall: null })
+    // 不出现「0 分」结论（占位符为 —，且不渲染等级胶囊）
+    expect(html).not.toMatch(/>0<span class="unit">分</)
+    expect(html).toContain('—')
   })
 })
 

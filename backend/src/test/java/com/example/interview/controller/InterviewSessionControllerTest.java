@@ -488,7 +488,7 @@ class InterviewSessionControllerTest {
             InterviewQuestionEntity saved = InterviewQuestionEntity.builder()
                     .id(1L).sessionId("s1").question("什么是多态？")
                     .userAnswer("多态是...").evaluationScore(85).build();
-            when(sessionService.saveAnswer(1L, "多态是...", 85, USER_ID))
+            when(sessionService.saveAnswer(1L, "多态是...", 85, null, USER_ID))
                     .thenReturn(saved);
 
             String body = objectMapper.writeValueAsString(Map.of(
@@ -508,7 +508,7 @@ class InterviewSessionControllerTest {
             InterviewQuestionEntity saved = InterviewQuestionEntity.builder()
                     .id(1L).sessionId("s1").question("什么是多态？")
                     .userAnswer("多态是...").build();
-            when(sessionService.saveAnswer(1L, "多态是...", null, USER_ID))
+            when(sessionService.saveAnswer(1L, "多态是...", null, null, USER_ID))
                     .thenReturn(saved);
 
             String body = objectMapper.writeValueAsString(Map.of(
@@ -520,6 +520,91 @@ class InterviewSessionControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.userAnswer").value("多态是..."));
+        }
+
+        @Test
+        @DisplayName("带合法 evalDetail（维度明细 JSON）返回 200 并透传（第三批 A）")
+        void saveAnswer_withValidEvalDetail_returns200() throws Exception {
+            String detail = "{\"completeness\":72,\"accuracy\":65,\"expression\":60,\"improvements\":[\"补结果\"]}";
+            InterviewQuestionEntity saved = InterviewQuestionEntity.builder()
+                    .id(1L).sessionId("s1").question("什么是多态？")
+                    .userAnswer("多态是...").evaluationScore(68).evalDetail(detail).build();
+            when(sessionService.saveAnswer(1L, "多态是...", 68, detail, USER_ID))
+                    .thenReturn(saved);
+
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "questionId", 1, "userAnswer", "多态是...", "evaluationScore", 68,
+                    "evalDetail", detail));
+
+            mockMvc.perform(post("/api/session/answer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.evalDetail").value(detail));
+        }
+
+        @Test
+        @DisplayName("evalDetail 非法 JSON 返回 400（第三批 A）")
+        void saveAnswer_invalidEvalDetailJson_returns400() throws Exception {
+            String body = "{\"questionId\":1,\"userAnswer\":\"回答\",\"evalDetail\":\"{not json}\"}";
+
+            mockMvc.perform(post("/api/session/answer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("evalDetail 必须是合法 JSON"));
+        }
+
+        @Test
+        @DisplayName("evalDetail 超过 4000 字返回 400（第三批 A）")
+        void saveAnswer_tooLongEvalDetail_returns400() throws Exception {
+            String longJson = "{\"note\":\"" + "a".repeat(4100) + "\"}";
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "questionId", 1, "userAnswer", "回答", "evalDetail", longJson));
+
+            mockMvc.perform(post("/api/session/answer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("evalDetail 不能超过 4000 字"));
+        }
+
+        @Test
+        @DisplayName("evalDetail 类型错误（数字）返回 400 而非 500（第三批 A 防御式读取）")
+        void saveAnswer_wrongTypeEvalDetail_returns400() throws Exception {
+            String body = "{\"questionId\":1,\"userAnswer\":\"回答\",\"evalDetail\":12345}";
+
+            mockMvc.perform(post("/api/session/answer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("evalDetail 类型错误，期望字符串"));
+        }
+
+        @Test
+        @DisplayName("evalDetail 为空串时归一为 null 落库（不写假值，第三批 A / R3）")
+        void saveAnswer_blankEvalDetail_normalizedToNull() throws Exception {
+            InterviewQuestionEntity saved = InterviewQuestionEntity.builder()
+                    .id(1L).sessionId("s1").question("什么是多态？")
+                    .userAnswer("多态是...").build();
+            when(sessionService.saveAnswer(1L, "多态是...", null, null, USER_ID))
+                    .thenReturn(saved);
+
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "questionId", 1, "userAnswer", "多态是...", "evalDetail", "   "));
+
+            mockMvc.perform(post("/api/session/answer")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            org.mockito.Mockito.verify(sessionService)
+                    .saveAnswer(1L, "多态是...", null, null, USER_ID);
         }
     }
 }

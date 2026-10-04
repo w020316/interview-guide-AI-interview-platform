@@ -65,6 +65,19 @@ public class InterviewQuestionEntity {
     @Column(name = "evaluation_score")
     private Integer evaluationScore;
 
+    /**
+     * 题目维度明细（JSON 文本），第三批 A。
+     *
+     * <p>形如 {@code {"completeness":72,"accuracy":65,"expression":60,"improvements":["…"]}}，
+     * 在 {@code POST /api/session/answer} 与 {@link #evaluationScore} 同事务落库。
+     *
+     * <p><b>可空，存量行 = NULL</b>：早于 v1.49 的历史题目从未保存维度明细，
+     * 一律保持 NULL（不回溯填充、不用 0 兜底）。前端据此走「降级」分支不渲染 0 分维度条
+     * （R3「无数据 ≠ 0」）。
+     */
+    @Column(name = "eval_detail", columnDefinition = "TEXT")
+    private String evalDetail;
+
     /** 创建时间 */
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

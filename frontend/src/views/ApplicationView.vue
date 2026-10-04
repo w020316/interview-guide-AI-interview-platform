@@ -3,6 +3,10 @@
     <header class="page-header">
       <h1>投递看板</h1>
       <p>本地投递台账：人工确认投递、跟踪回复、针对岗位定制简历。平台不代替你投递，只帮你把「投了什么、谁回了、该催谁」管清楚。</p>
+      <div class="page-actions">
+        <BaseButton variant="ghost" @click="openNotice">粘贴通知识别</BaseButton>
+        <BaseButton variant="ghost" @click="openImport">从表格导入</BaseButton>
+      </div>
     </header>
 
     <!-- 加载骨架 -->
@@ -60,6 +64,8 @@
           <div class="app-title-row">
             <span class="app-title">{{ a.title }}</span>
             <BaseTag :variant="statusVariant(a.status)" size="sm">{{ statusLabel(a.status) }}</BaseTag>
+            <!-- 导入行无真实岗位（后端以负值哨兵 jobId 标记），不得渲染 /jobs/{id} 跳转，仅给文本标记 -->
+            <BaseTag v-if="a.jobId < 0" variant="info" size="sm">自定义导入</BaseTag>
           </div>
           <div class="app-meta">
             <span>{{ a.companyName }}</span>
@@ -149,14 +155,170 @@
         </template>
       </div>
     </div>
+
+    <!-- 粘贴通知识别弹窗（E）：纯本地解析，零网络；可编辑预览后才写入 -->
+    <div v-if="noticeOpen" class="modal-mask" @click.self="noticeOpen = false">
+      <div class="modal">
+        <div class="modal-head">
+          <div class="modal-title">粘贴投递通知 · 识别状态</div>
+          <button class="modal-close" @click="noticeOpen = false">✕</button>
+        </div>
+        <div class="modal-sub">
+          把邮件 / 站内信原文粘贴进来，本地识别「公司 / 岗位 / 阶段 / 时间」。
+          <b>识别完全在本机进行，不联网、不上传、不调用 AI</b>；识别结果需你确认后才写入。
+        </div>
+        <textarea v-model="noticeText" class="input ta" rows="5"
+          placeholder="例：【字节跳动】感谢您的投递，应聘的「Java 后端工程师」岗位已进入面试环节，面试时间 2026-09-05 14:00，地点：北京"></textarea>
+        <div class="modal-actions">
+          <BaseButton variant="gradient" :disabled="!noticeText.trim()" @click="runNoticeParse">识别</BaseButton>
+        </div>
+
+        <template v-if="noticeResult">
+          <div v-if="!hasAnyField(noticeResult)" class="notice-unrecognized">
+            未识别到可用信息——请手动补充下方字段，或改用「从表格导入」。系统不会替你编造任何公司 / 岗位 / 时间。
+          </div>
+
+          <div class="mini-block">
+            <div class="label">识别结果（可编辑，确认后写入）</div>
+            <div class="notice-grid">
+              <label>公司<input v-model="noticeForm.company" class="input" placeholder="未识别" /></label>
+              <label>岗位<input v-model="noticeForm.title" class="input" placeholder="未识别" /></label>
+              <label>阶段
+                <select v-model="noticeForm.stage" class="input">
+                  <option value="">未识别</option>
+                  <option v-for="s in statusOrder" :key="s.key" :value="s.key">{{ s.label }}</option>
+                </select>
+              </label>
+              <label>面试时间<input v-model="noticeForm.interviewAt" type="datetime-local" class="input" /></label>
+            </div>
+            <div v-if="noticeResult.matched.length" class="notice-matched">
+              <BaseTag v-for="m in noticeResult.matched" :key="m" variant="info" size="sm">{{ m }}</BaseTag>
+            </div>
+          </div>
+
+          <div class="mini-block">
+            <div class="label">这条通知对应哪条投递记录？</div>
+            <select v-model="noticeTargetId" class="input">
+              <option :value="null">请选择一条投递记录…</option>
+              <option v-for="a in items" :key="a.id" :value="a.id">{{ a.companyName }} · {{ a.title }}</option>
+            </select>
+            <div v-if="noticeCandidateText" class="field-hint">建议匹配：{{ noticeCandidateText }}</div>
+          </div>
+
+          <div v-if="noticeExistingEvent" class="notice-exists">
+            面试日历中已存在「同标题 + 同时刻」的日程，未重复创建（不静默去重，已在此明确提示）。
+          </div>
+
+          <div class="modal-actions">
+            <BaseButton variant="ghost" @click="noticeOpen = false">取消</BaseButton>
+            <BaseButton variant="gradient"
+              :disabled="noticePushing || !noticeForm.stage || noticeTargetId == null"
+              @click="confirmNotice">
+              {{ noticePushing ? '写入中…' : '确认写入' }}
+            </BaseButton>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- 从表格导入弹窗（F）：选择文件 → 列映射 → dryRun 预览 → 确认导入 -->
+    <div v-if="importOpen" class="modal-mask" @click.self="importOpen = false">
+      <div class="modal modal-wide">
+        <div class="modal-head">
+          <div class="modal-title">从表格导入投递记录</div>
+          <button class="modal-close" @click="importOpen = false">✕</button>
+        </div>
+        <div class="modal-sub">
+          支持 <b>.xlsx / .xls / .csv / .tsv</b>，单次最多 {{ MAX_IMPORT_ROWS }} 行。
+          <b>导入只写入本地台账，不代替你投递</b>。流程：选择文件 → 核对列映射 → 预览 → 确认导入。
+        </div>
+
+        <input type="file" :accept="IMPORT_ACCEPT" class="input" @change="onImportFile" />
+
+        <div v-if="importError" class="notice-unrecognized">{{ importError }}</div>
+        <div v-else-if="importParsing" class="field-hint">正在解析文件…</div>
+
+        <template v-if="importTable">
+          <div class="mini-block">
+            <div class="label">
+              列映射（可修改）· 共 {{ importPreviewRows.length }} 行
+              <template v-if="importTruncated">（超出上限，已截断为 {{ MAX_IMPORT_ROWS }} 行）</template>
+            </div>
+            <div class="map-grid">
+              <div v-for="f in IMPORT_FIELDS" :key="f.field" class="map-item">
+                <span class="map-name">{{ f.label }}<span v-if="f.required" class="req">*</span></span>
+                <select class="input" :value="importMapping[f.field] ?? ''" @change="onMappingChange(f.field, $event)">
+                  <option value="">不导入</option>
+                  <option v-for="(h, i) in importTable.headers" :key="i" :value="i">{{ h || ('第 ' + (i + 1) + ' 列') }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <BaseButton variant="ghost" :disabled="importPreviewing || !importPreviewRows.length" @click="runImportDryRun">
+              {{ importPreviewing ? '预览中…' : '预览（不写库）' }}
+            </BaseButton>
+          </div>
+
+          <div v-if="importDry" class="mini-block">
+            <div class="label">预览结果（dryRun，未写库）</div>
+            <div class="preview-counts">
+              <span class="pc pc-add">新增 {{ importDry.summary.added }}</span>
+              <span class="pc pc-merge">合并 {{ importDry.summary.merged }}</span>
+              <span class="pc pc-skip">跳过 {{ importDry.summary.skipped }}</span>
+              <span class="pc pc-warn">警告 {{ importDry.summary.errors }}</span>
+            </div>
+            <div v-if="!importDry.canApply" class="notice-unrecognized">
+              存在致命错误行（缺少公司名称 / 岗位名称），已阻止导入，数据零变化。请修正单元格后重新选择文件。
+            </div>
+            <div class="plan-table">
+              <div v-for="r in importDry.rows" :key="r.index" class="plan-row">
+                <BaseTag :variant="actionVariant(r.action)" size="sm">{{ actionLabel(r.action) }}</BaseTag>
+                <span class="plan-name">{{ r.normalized.companyName || '（缺公司）' }} · {{ r.normalized.title || '（缺岗位）' }}</span>
+                <span class="plan-reason">{{ r.reason }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <BaseButton variant="ghost" @click="importOpen = false">取消</BaseButton>
+            <BaseButton variant="gradient" :disabled="!importDry || !importDry.canApply || importApplying" @click="applyImport">
+              {{ importApplying ? '导入中…' : '确认导入' }}
+            </BaseButton>
+          </div>
+        </template>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton, BaseTag } from '../components'
+import { EMPTY } from '../utils/format'
+import { parseNotice, hasAnyField, type NoticeParse } from '../utils/noticeParse'
+import {
+  IMPORT_ACCEPT,
+  IMPORT_FIELDS,
+  MAX_IMPORT_ROWS,
+  XLS_SAVE_AS_CSV_HINT,
+  autoMapColumns,
+  buildImportRows,
+  detectTable,
+  fileKind,
+  parseTextTable,
+  sourceLabel,
+  type ColumnMapping,
+  type ImportField,
+  type ImportRow,
+  type ParsedTable,
+  type SpreadsheetKind,
+} from '../utils/tableImport'
+import { XLSX_READ_ERROR_HINT, parseXlsxRows } from '../utils/xlsxLazy'
 
 interface Application {
   id: number
@@ -317,7 +479,7 @@ async function doTailor() {
 }
 
 function statusLabel(key?: string) {
-  return statusOrder.find((s) => s.key === key)?.label || key || '-'
+  return statusOrder.find((s) => s.key === key)?.label || key || EMPTY
 }
 
 function statusVariant(key?: string) {
@@ -327,6 +489,297 @@ function statusVariant(key?: string) {
     case 'REPLIED': return 'info'
     case 'REJECTED': return 'danger'
     case 'WITHDRAWN': return 'info'
+    default: return 'info'
+  }
+}
+
+// ───────────────────────── 投递通知识别（E） ─────────────────────────
+// 解析全部在本地完成（noticeParse.ts 零网络），写入复用既有 /status 与 /calendar/event 接口。
+
+const noticeOpen = ref(false)
+const noticeText = ref('')
+const noticeResult = ref<NoticeParse | null>(null)
+const noticeTargetId = ref<number | null>(null)
+const noticePushing = ref(false)
+const noticeExistingEvent = ref(false)
+const noticeForm = reactive({ company: '', title: '', stage: '', interviewAt: '' })
+
+/** 可能匹配的投递记录（按公司/岗位模糊提示，绝不自动选定） */
+const noticeCandidates = computed(() => {
+  const c = noticeForm.company.trim().toLowerCase()
+  const t = noticeForm.title.trim().toLowerCase()
+  if (!c && !t) return []
+  return items.value.filter((a) => {
+    const at = (a.title || '').toLowerCase()
+    const ac = (a.companyName || '').toLowerCase()
+    return (t !== '' && at.includes(t)) || (c !== '' && ac.includes(c))
+  })
+})
+const noticeCandidateText = computed(() =>
+  noticeCandidates.value.map((a) => `${a.companyName} · ${a.title}`).join('；'),
+)
+
+function openNotice() {
+  noticeOpen.value = true
+  noticeText.value = ''
+  noticeResult.value = null
+  noticeTargetId.value = null
+  noticeExistingEvent.value = false
+  noticeForm.company = ''
+  noticeForm.title = ''
+  noticeForm.stage = ''
+  noticeForm.interviewAt = ''
+}
+
+/** 纯本地识别：调用期间 Network 面板不应出现任何 XHR */
+function runNoticeParse() {
+  const r = parseNotice(noticeText.value)
+  noticeResult.value = r
+  noticeExistingEvent.value = false
+  noticeForm.company = r.company ?? ''
+  noticeForm.title = r.title ?? ''
+  noticeForm.stage = r.stage ?? ''
+  noticeForm.interviewAt = r.interviewAt ?? ''
+  if (!hasAnyField(r)) {
+    ElMessage.info('未识别到可用信息，请手动补充或改用「从表格导入」')
+  }
+}
+
+/** ISO 秒级（后端 LocalDateTime.parse 需要 `YYYY-MM-DDTHH:mm:ss`） */
+function toIsoSeconds(dtLocal: string): string {
+  return dtLocal.length === 16 ? `${dtLocal}:00` : dtLocal
+}
+
+/** 同标题 + 同时刻（到分钟）比较 */
+function sameMinute(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false
+  return a.slice(0, 16) === b.slice(0, 16)
+}
+
+/**
+ * 写入面试日历。
+ *
+ * <p>后端 POST /api/calendar/event **没有**去重（无 alreadyExists / 409），
+ * 因此这里先用 GET /api/calendar/event/list 做本地预检：命中「同标题 + 同时刻」时
+ * 明确提示「已存在」而不重复创建（**不静默去重**）。
+ */
+async function pushCalendarEvent(targetId: number) {
+  const app = items.value.find((a) => a.id === targetId)
+  const company = app?.companyName || noticeForm.company || '面试'
+  const role = app?.title || noticeForm.title || '面试'
+  const title = `${company} · ${role} · 面试`
+  const at = toIsoSeconds(noticeForm.interviewAt)
+  let existing = false
+  try {
+    const list = (await api.get('/api/calendar/event/list')) as unknown as Array<{ title?: string; interviewAt?: string }>
+    existing = Array.isArray(list) && list.some((e) => e?.title === title && sameMinute(e?.interviewAt, at))
+  } catch {
+    // 预检失败不阻断写入（用户仍可通过日历页查看/删除）
+  }
+  if (existing) {
+    noticeExistingEvent.value = true
+    ElMessage.warning('日历中已存在「同标题 + 同时刻」的日程，未重复创建')
+    return
+  }
+  await api.post('/api/calendar/event', { title, interviewAt: at, note: '来自投递通知识别' })
+  ElMessage.success('已加入面试日历')
+}
+
+async function confirmNotice() {
+  const targetId = noticeTargetId.value
+  if (targetId == null) return ElMessage.warning('请选择这条通知对应的投递记录')
+  if (!noticeForm.stage) return ElMessage.warning('未识别到投递阶段，无法更新状态')
+  noticePushing.value = true
+  try {
+    await api.post(`/api/application/${targetId}/status`, { status: noticeForm.stage })
+    ElMessage.success(`已更新为「${statusLabel(noticeForm.stage)}」`)
+    if (noticeForm.interviewAt) await pushCalendarEvent(targetId)
+    noticeOpen.value = false
+    await load()
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '写入失败'))
+  } finally {
+    noticePushing.value = false
+  }
+}
+
+// ───────────────────────── 表格导入（F） ─────────────────────────
+
+interface ImportPlanRow {
+  index: number
+  action: 'ADD' | 'MERGE' | 'SKIP' | 'ERROR'
+  reason: string
+  normalized: ImportRow
+}
+interface ImportResult {
+  source: string
+  dryRun: boolean
+  canApply: boolean
+  summary: { added: number; merged: number; skipped: number; errors: number }
+  rows: ImportPlanRow[]
+  fatalErrors: Array<{ index: number; message: string }>
+  applied?: boolean
+  message?: string
+}
+
+const importOpen = ref(false)
+const importFileName = ref('')
+const importKind = ref<SpreadsheetKind>('unknown')
+const importTable = ref<ParsedTable | null>(null)
+const importMapping = reactive<ColumnMapping>({})
+const importPreviewRows = ref<ImportRow[]>([])
+const importTruncated = ref(false)
+const importParsing = ref(false)
+const importPreviewing = ref(false)
+const importApplying = ref(false)
+const importDry = ref<ImportResult | null>(null)
+const importError = ref('')
+
+function resetImportMapping() {
+  for (const k of Object.keys(importMapping)) delete (importMapping as Record<string, unknown>)[k]
+}
+
+function openImport() {
+  importOpen.value = true
+  importFileName.value = ''
+  importKind.value = 'unknown'
+  importTable.value = null
+  importPreviewRows.value = []
+  importTruncated.value = false
+  importDry.value = null
+  importError.value = ''
+  resetImportMapping()
+}
+
+function applyMapping(mapping: ColumnMapping) {
+  resetImportMapping()
+  Object.assign(importMapping, mapping)
+  rebuildImportPreview()
+}
+
+function rebuildImportPreview() {
+  const table = importTable.value
+  if (!table) {
+    importPreviewRows.value = []
+    return
+  }
+  const { rows, truncated } = buildImportRows(table, importMapping)
+  importPreviewRows.value = rows
+  importTruncated.value = truncated
+  importDry.value = null
+}
+
+function onMappingChange(field: ImportField, ev: Event) {
+  const raw = (ev.target as HTMLSelectElement).value
+  if (raw === '') delete (importMapping as Record<string, unknown>)[field]
+  else importMapping[field] = Number(raw)
+  rebuildImportPreview()
+}
+
+async function onImportFile(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  importFileName.value = file.name
+  importKind.value = fileKind(file.name)
+  importError.value = ''
+  importDry.value = null
+  importTable.value = null
+  importPreviewRows.value = []
+  importParsing.value = true
+  try {
+    let table: ParsedTable
+    if (importKind.value === 'xlsx' || importKind.value === 'xls') {
+      try {
+        table = detectTable(await parseXlsxRows(file))
+      } catch {
+        // .xls 走 best-effort 解析失败 → 显式引导「另存为 CSV」
+        importError.value = importKind.value === 'xls' ? XLS_SAVE_AS_CSV_HINT : XLSX_READ_ERROR_HINT
+        return
+      }
+    } else if (importKind.value === 'csv' || importKind.value === 'tsv') {
+      table = parseTextTable(await file.text(), file.name)
+    } else {
+      importError.value = '仅支持 .xlsx / .xls / .csv / .tsv 文件'
+      return
+    }
+    if (!table.rows.length) {
+      importError.value = '文件没有可导入的内容'
+      return
+    }
+    importTable.value = table
+    applyMapping(autoMapColumns(table.headers))
+  } catch (e: unknown) {
+    importError.value = getErrMessage(e, '文件解析失败')
+  } finally {
+    importParsing.value = false
+    input.value = ''
+  }
+}
+
+async function runImportDryRun() {
+  if (!importPreviewRows.value.length) return ElMessage.warning('没有可导入的行')
+  if (importMapping.companyName === undefined || importMapping.title === undefined) {
+    return ElMessage.warning('请先映射「公司名称」与「岗位名称」两列')
+  }
+  importPreviewing.value = true
+  importError.value = ''
+  try {
+    const res = (await api.post('/api/application/import', {
+      source: sourceLabel(importKind.value),
+      rows: importPreviewRows.value,
+      dryRun: true,
+    })) as unknown as ImportResult
+    importDry.value = res
+    if (!res?.canApply) ElMessage.warning('存在致命错误行，无法导入，请修正后重试')
+  } catch (e: unknown) {
+    importError.value = getErrMessage(e, '预览失败')
+  } finally {
+    importPreviewing.value = false
+  }
+}
+
+async function applyImport() {
+  const dry = importDry.value
+  if (!dry || !dry.canApply) return
+  importApplying.value = true
+  try {
+    const res = (await api.post('/api/application/import', {
+      source: sourceLabel(importKind.value),
+      rows: importPreviewRows.value,
+      dryRun: false,
+    })) as unknown as ImportResult
+    if (res?.applied) {
+      const s = res.summary || { added: 0, merged: 0, skipped: 0, errors: 0 }
+      ElMessage.success(`导入完成：新增 ${s.added}，合并 ${s.merged}，跳过 ${s.skipped}`)
+      importOpen.value = false
+      await load()
+    } else {
+      ElMessage.error(res?.message || '导入未完成')
+    }
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '导入失败'))
+  } finally {
+    importApplying.value = false
+  }
+}
+
+function actionLabel(action: string): string {
+  switch (action) {
+    case 'ADD': return '新增'
+    case 'MERGE': return '合并'
+    case 'SKIP': return '跳过'
+    case 'ERROR': return '警告'
+    default: return action || EMPTY
+  }
+}
+
+function actionVariant(action: string) {
+  switch (action) {
+    case 'ADD': return 'success'
+    case 'MERGE': return 'info'
+    case 'SKIP': return 'info'
+    case 'ERROR': return 'danger'
     default: return 'info'
   }
 }
@@ -411,4 +864,52 @@ function statusVariant(key?: string) {
 .bullet-new { color: var(--c-text); font-weight: 500; }
 .bullet-reason { color: var(--c-accent); font-size: 12px; margin-top: 4px; }
 .summary-box { background: var(--brand-primary-light); border-radius: var(--radius-md); padding: 12px 14px; font-size: 13px; line-height: 1.8; color: var(--c-text-secondary); }
+
+/* ── 页面操作区（E/F 入口） ── */
+.page-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+/* ── 粘贴识别弹窗（E） ── */
+.notice-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.notice-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--c-text-secondary); }
+.notice-grid .input { margin-bottom: 0; }
+.notice-matched { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.notice-unrecognized {
+  background: var(--c-warning-light);
+  border: 1px solid var(--c-warning);
+  color: var(--c-warning);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.notice-exists {
+  background: var(--c-info-light);
+  border: 1px solid var(--c-info);
+  color: var(--c-info);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.field-hint { font-size: 12px; color: var(--c-text-tertiary); margin-top: 6px; line-height: 1.6; }
+
+/* ── 表格导入弹窗（F） ── */
+.modal-wide { max-width: 860px; }
+.map-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.map-item { display: flex; flex-direction: column; gap: 4px; }
+.map-name { font-size: 12px; color: var(--c-text-secondary); }
+.map-item .input { margin-bottom: 0; }
+.req { color: var(--c-danger); margin-left: 2px; }
+.preview-counts { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.pc-add { color: var(--c-success); }
+.pc-merge { color: var(--c-info); }
+.pc-skip { color: var(--c-text-tertiary); }
+.pc-warn { color: var(--c-danger); }
+.plan-table { border: 1px solid var(--c-border-light); border-radius: var(--radius-md); max-height: 280px; overflow-y: auto; }
+.plan-row { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--c-border-light); font-size: 13px; }
+.plan-row:last-child { border-bottom: none; }
+.plan-name { color: var(--c-text); font-weight: 500; }
+.plan-reason { color: var(--c-text-tertiary); font-size: 12px; margin-left: auto; text-align: right; }
 </style>

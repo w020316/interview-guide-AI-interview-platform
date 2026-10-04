@@ -54,6 +54,8 @@ class JobApplicationControllerTest {
     @MockBean
     private TailoredResumeService tailoredResumeService;
     @MockBean
+    private com.example.interview.service.job.ApplicationImportService applicationImportService;
+    @MockBean
     private JwtUtil jwtUtil;
     @MockBean
     private RateLimitInterceptor rateLimitInterceptor;
@@ -251,5 +253,113 @@ class JobApplicationControllerTest {
         mockMvc.perform(delete("/api/application/9"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(404));
+    }
+
+    // ── 批量导入（第三批 F）──
+
+    @Test
+    @DisplayName("POST /api/application/import：dryRun 返回四类计数（code=200）")
+    void import_dryRun_ok() throws Exception {
+        loginAs("user-1");
+        when(applicationImportService.run(eq("user-1"), eq("csv"), any(), eq(true)))
+                .thenReturn(Map.of("dryRun", true, "canApply", true,
+                        "summary", Map.of("added", 2, "merged", 0, "skipped", 1, "errors", 0)));
+
+        mockMvc.perform(post("/api/application/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"source\":\"csv\",\"dryRun\":true,\"rows\":[{\"companyName\":\"字节\",\"title\":\"Java\"}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.summary.added").value(2));
+    }
+
+    @Test
+    @DisplayName("POST /api/application/import：rows 为空返回 400")
+    void import_emptyRows_returns400() throws Exception {
+        loginAs("user-1");
+        mockMvc.perform(post("/api/application/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dryRun\":true,\"rows\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    @DisplayName("POST /api/application/import：超过 200 行返回 400")
+    void import_tooManyRows_returns400() throws Exception {
+        loginAs("user-1");
+        StringBuilder sb = new StringBuilder("{\"dryRun\":true,\"rows\":[");
+        for (int i = 0; i < 201; i++) {
+            if (i > 0) {
+                sb.append(",");
+            }
+            sb.append("{\"companyName\":\"c\",\"title\":\"t\"}");
+        }
+        sb.append("]}");
+
+        mockMvc.perform(post("/api/application/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(sb.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("单次最多导入 200 行"));
+    }
+
+    @Test
+    @DisplayName("POST /api/application/import：dryRun 含致命行 → HTTP 200 + canApply:false + 致命明细")
+    void import_dryRunFatal_returns200WithDetails() throws Exception {
+        loginAs("user-1");
+        when(applicationImportService.run(eq("user-1"), eq("paste"), any(), eq(true)))
+                .thenReturn(Map.of("dryRun", true, "canApply", false,
+                        "summary", Map.of("added", 0, "merged", 0, "skipped", 0, "errors", 1),
+                        "fatalErrors", List.of(Map.of("index", 0, "message", "缺少公司名称"))));
+
+        mockMvc.perform(post("/api/application/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"source\":\"paste\",\"dryRun\":true,\"rows\":[{\"title\":\"无公司\"}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.canApply").value(false))
+                .andExpect(jsonPath("$.data.fatalErrors[0].message").value("缺少公司名称"));
+    }
+
+    @Test
+    @DisplayName("POST /api/application/import：apply 含致命行 → HTTP 400 且不写库")
+    void import_applyFatal_returns400() throws Exception {
+        loginAs("user-1");
+        when(applicationImportService.run(eq("user-1"), eq("paste"), any(), eq(false)))
+                .thenReturn(Map.of("dryRun", false, "canApply", false, "applied", false,
+                        "message", "存在致命错误行（缺少公司名称/岗位名称），已取消导入，未写入任何数据"));
+
+        mockMvc.perform(post("/api/application/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"source\":\"paste\",\"dryRun\":false,\"rows\":[{\"title\":\"无公司\"}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("致命错误行")))
+                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @DisplayName("POST /api/application/import：正常 apply（无致命行）→ HTTP 200 + applied:true + 四类计数")
+    void import_apply_ok() throws Exception {
+        // 护栏：apply 的「有致命行 → 抛 400」条件分支写在 return 之前。
+        // 若该条件写得过宽（如 Boolean.FALSE.equals 恒真），正常导入会被误判成 400——
+        // 这是用户可见的数据写入失败。本用例锁死「正常路径仍 200 且 applied:true」。
+        loginAs("user-1");
+        when(applicationImportService.run(eq("user-1"), eq("csv"), any(), eq(false)))
+                .thenReturn(Map.of("dryRun", false, "canApply", true, "applied", true,
+                        "summary", Map.of("added", 2, "merged", 1, "skipped", 1, "errors", 0)));
+
+        mockMvc.perform(post("/api/application/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"source\":\"csv\",\"dryRun\":false,\"rows\":[{\"companyName\":\"字节\",\"title\":\"Java\"}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.applied").value(true))
+                .andExpect(jsonPath("$.data.summary.added").value(2))
+                .andExpect(jsonPath("$.data.summary.merged").value(1))
+                .andExpect(jsonPath("$.data.summary.skipped").value(1))
+                .andExpect(jsonPath("$.data.summary.errors").value(0));
     }
 }

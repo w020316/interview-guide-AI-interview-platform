@@ -1,6 +1,15 @@
 <template>
   <el-config-provider :locale="zhCn">
     <div class="app-wrapper">
+      <!-- 离线横幅（第三批 D）：仅离线时出现，克制、不遮挡导航 -->
+      <div v-if="!isOnline" class="offline-banner" role="status" aria-live="polite">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 3l18 18 M8.5 16.5a5 5 0 0 1 7 0 M5 12.5a10 10 0 0 1 4-2.4 M2 8.8A15 15 0 0 1 9 6 M14 7a15 15 0 0 1 8 5 M12 20h.01"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>当前处于离线状态，部分功能暂不可用</span>
+      </div>
+
       <!-- 顶部导航栏 -->
       <header ref="navRef" class="navbar" :class="{ scrolled }">
         <div class="nav-inner">
@@ -242,6 +251,17 @@
                    替代「首访直接弹模态框遮挡首屏」的打扰式提醒 -->
               <span v-if="hasUnreadChangelog" class="version-dot" aria-label="有更新" />
             </button>
+            <!-- PWA 新版本提示（第三批 D）：prompt 模式，用户主动点击才刷新，
+                 绝不静默打断作答；无更新时不占位 -->
+            <button
+              v-if="needRefresh"
+              class="update-link"
+              :aria-label="'有新版本可用，点击刷新'"
+              @click="applyUpdate"
+            >
+              <span class="update-dot" aria-hidden="true" />
+              有新版本，点击刷新
+            </button>
           </p>
         </div>
       </footer>
@@ -263,6 +283,7 @@ import { CURRENT_VERSION } from './changelog'
 import { theme, toggleTheme as toggle } from './theme'
 import { ICONS, primaryNav, toolNav, buildMobileGroups } from './navigation'
 import type { NavItem } from './navigation'
+import { needRefresh, isOnline, applyUpdate } from './utils/pwa'
 
 const router = useRouter()
 const route = useRoute()
@@ -1054,6 +1075,66 @@ function logout() {
   border-radius: 50%;
   background: var(--c-danger, #f56c6c);
   box-shadow: 0 0 0 1.5px var(--c-bg, #fff);
+}
+
+/* ── PWA：新版本提示（第三批 D）── */
+.update-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  margin: -4px 0 -4px 8px;
+  padding: 2px 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-warning, inherit);
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  letter-spacing: 0.2px;
+}
+
+.update-link:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background: var(--brand-primary-50);
+}
+
+.update-link:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
+}
+
+/* 轻量蓝点：以 CSS 绘制，避免在模板里写 emoji */
+.update-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  animation: update-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes update-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ── PWA：离线横幅（第三批 D）── */
+.offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 16px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-warning, inherit);
+  background: var(--c-bg-alt);
+  border-bottom: 1px solid var(--c-border-light);
 }
 
 /* ── 页面切换动画 ── */

@@ -5,6 +5,66 @@
       <p>用数据看见每一次面试的进步，定位薄弱维度</p>
     </header>
 
+    <!-- 准备度检测（第三批 G）：规则化「客观完成度」，与「求职诊断」（AI 能力画像）互补 -->
+    <section class="readiness-card fade-in-up" data-readiness-card>
+      <div v-if="readinessLoading" class="readiness-skeleton">
+        <div class="skeleton skeleton-line w-30"></div>
+        <div class="skeleton skeleton-line w-70"></div>
+        <div class="skeleton skeleton-line w-50"></div>
+      </div>
+
+      <!-- 空态（R3）：不得出现「C 级」「0/14」等任何看起来像真实评估结果的文案 -->
+      <div v-else-if="!readiness.hasData" class="readiness-empty" data-readiness-empty>
+        <div class="readiness-empty-icon" aria-hidden="true">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2 M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2 M9 12h6 M9 16h4"
+              stroke="var(--brand-primary)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="readiness-empty-title">尚未开始准备</p>
+        <p class="readiness-empty-desc">上传一份简历，或先收藏几个心仪岗位，我们就会开始帮你跟踪准备进度。</p>
+        <div class="readiness-empty-actions">
+          <BaseButton variant="primary" size="sm" @click="go('/resume')">上传简历</BaseButton>
+          <BaseButton variant="ghost" size="sm" @click="go('/jobs')">去招聘广场</BaseButton>
+        </div>
+      </div>
+
+      <template v-else>
+        <div class="readiness-head">
+          <div class="readiness-title-wrap">
+            <h2 class="readiness-title">我的准备度</h2>
+            <span class="readiness-grade" :class="'grade-' + readiness.grade">{{ gradeLabel(readiness.grade) }}</span>
+          </div>
+          <span class="readiness-progress">{{ progressText(readiness) }}</span>
+        </div>
+
+        <ul class="readiness-list">
+          <li
+            v-for="it in readiness.items"
+            :key="it.id"
+            class="readiness-item"
+            :class="{ done: it.achieved, manual: !!it.manualKey }"
+          >
+            <button v-if="it.manualKey" type="button" class="ri-btn" @click="toggleManual(it.manualKey)">
+              <span class="ri-check" aria-hidden="true">{{ it.achieved ? '✅' : '⬜' }}</span>
+              <span class="ri-dim">{{ it.dimension }}</span>
+              <span class="ri-label">{{ it.label }}</span>
+              <span class="ri-evidence">{{ it.evidence }}</span>
+              <span class="ri-toggle-hint">自述</span>
+            </button>
+            <div v-else class="ri-row">
+              <span class="ri-check" aria-hidden="true">{{ it.achieved ? '✅' : '⬜' }}</span>
+              <span class="ri-dim">{{ it.dimension }}</span>
+              <span class="ri-label">{{ it.label }}</span>
+              <span class="ri-evidence">{{ it.evidence }}</span>
+            </div>
+          </li>
+        </ul>
+
+        <p class="readiness-rule">等级规则：≥11 项 A · 6–10 项 B · ≤5 项 C</p>
+      </template>
+    </section>
+
     <!-- 统计摘要 -->
     <section class="stat-grid fade-in-up">
       <div class="stat-card">
@@ -140,6 +200,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
@@ -147,6 +208,22 @@ import type { TrendPoint } from '../utils/scoreTrend'
 import { buildLineChart, computeTrendStats } from '../utils/scoreTrend'
 import { pickTickIndices } from '../utils/chartTicks'
 import { hasScoreSample, scoreText } from '../utils/scoreDisplay'
+import {
+  buildReadiness,
+  gradeLabel,
+  loadManual,
+  progressText,
+  saveManual,
+  type ReadinessInput,
+  type ReadinessManual,
+  type ReadinessResult,
+} from '../utils/readiness'
+
+const router = useRouter()
+
+function go(path: string) {
+  void router.push(path)
+}
 
 interface CategoryStat {
   category: string
@@ -273,6 +350,91 @@ async function loadTrend(dim: string) {
   }
 }
 
+// ── 准备度检测（第三批 G，零 AI）─────────────────────────────────────
+/** 全空快照：未加载完成前不产出任何等级（守 R3） */
+function emptySnapshot(): Omit<ReadinessInput, 'manual'> {
+  return {
+    resumeCount: null,
+    resumeScore: null,
+    favoriteCount: null,
+    applicationCount: null,
+    appliedCount: null,
+    interviewInviteCount: null,
+    finishedSessionCount: null,
+    interviewAvgScore: null,
+    answeredQuestionCount: null,
+    questionTotal: null,
+    storyCount: null,
+  }
+}
+
+function toNumOrNull(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null
+}
+
+const readinessLoading = ref(true)
+const manual = ref<ReadinessManual>(loadManual())
+const snapshot = ref<Omit<ReadinessInput, 'manual'>>(emptySnapshot())
+
+/** 等级 / 清单 / 进度全部由纯函数派生（单一来源） */
+const readiness = computed<ReadinessResult>(() =>
+  buildReadiness({ ...snapshot.value, manual: manual.value }),
+)
+
+/** 勾选自述项并持久化 */
+function toggleManual(key: keyof ReadinessManual) {
+  manual.value = { ...manual.value, [key]: !manual.value[key] }
+  saveManual(manual.value)
+}
+
+/**
+ * 拉取准备度快照——数据全部来自**已有接口**，每项独立容错（一路失败不影响其余）。
+ * @param categories 已加载的 question-summary 分类（用于刷题覆盖率，避免二次请求）
+ */
+async function loadReadiness(categories: CategoryStat[]) {
+  readinessLoading.value = true
+  const base = emptySnapshot()
+  // 刷题：answered / total 合计（无分类数据 → 保持 null，不臆造 0）
+  if (categories.length) {
+    base.answeredQuestionCount = categories.reduce((s, c) => s + (Number.isFinite(c.answered) ? c.answered : 0), 0)
+    base.questionTotal = categories.reduce((s, c) => s + (Number.isFinite(c.total) ? c.total : 0), 0)
+  }
+  try {
+    const [dash, favs, apps, stories] = await Promise.all([
+      api.get('/api/stats/dashboard').catch(() => null),
+      api.get('/api/jobs/favorite').catch(() => null),
+      api.get('/api/application/list').catch(() => null),
+      api.get('/api/story-bank').catch(() => null),
+    ])
+
+    const d = dash as { resumeCount?: unknown; avgResumeScore?: unknown; finishedSessionCount?: unknown; avgInterviewScore?: unknown } | null
+    base.resumeCount = toNumOrNull(d?.resumeCount)
+    base.resumeScore = toNumOrNull(d?.avgResumeScore)
+    base.finishedSessionCount = toNumOrNull(d?.finishedSessionCount)
+    base.interviewAvgScore = toNumOrNull(d?.avgInterviewScore)
+
+    const f = favs as { items?: unknown[] } | null
+    base.favoriteCount = Array.isArray(f?.items) ? f.items.length : null
+
+    const a = apps as { items?: Array<{ status?: unknown }> } | null
+    if (Array.isArray(a?.items)) {
+      const list = a.items
+      const statusOf = (x: { status?: unknown }) => String(x?.status ?? '')
+      base.applicationCount = list.length
+      base.appliedCount = list.filter((x) => statusOf(x) !== 'PLANNED').length
+      base.interviewInviteCount = list.filter((x) => statusOf(x) === 'INTERVIEW' || statusOf(x) === 'OFFER').length
+    }
+
+    base.storyCount = Array.isArray(stories) ? stories.length : null
+  } catch (e: unknown) {
+    // 理论上 .catch 已吸收单点失败；此处兜底防未预期异常中断整块
+    ElMessage.error(getErrMessage(e, '加载准备度失败'))
+  } finally {
+    snapshot.value = base
+    readinessLoading.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     const [trend, summary] = await Promise.all([
@@ -288,8 +450,11 @@ onMounted(async () => {
         answered: c.answered ?? 0,
         avgScore: c.avgScore ?? null,
       }))
+    void loadReadiness(categoryStats.value)
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载成长数据失败'))
+    // 主数据失败也要让准备度卡落到确定状态（用空分类，仍尝试其余数据源）
+    void loadReadiness([])
   } finally {
     loading.value = false
   }
@@ -389,6 +554,129 @@ onMounted(async () => {
 .empty-inline { text-align: center; padding: 36px 16px; color: var(--c-text-tertiary); }
 .empty-inline p { margin: 0 0 16px; font-size: 14px; }
 
+/* ── 准备度检测卡（第三批 G）── */
+.readiness-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 20px;
+}
+.readiness-skeleton { display: flex; flex-direction: column; gap: 12px; }
+.skeleton-line.w-70 { width: 70%; }
+.skeleton-line.w-50 { width: 50%; }
+
+.readiness-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.readiness-title-wrap { display: flex; align-items: center; gap: 10px; }
+.readiness-title {
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--c-text);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+.readiness-grade {
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+  color: var(--c-surface);
+}
+.readiness-grade.grade-A { background: var(--score-excellent); }
+.readiness-grade.grade-B { background: var(--score-good); }
+.readiness-grade.grade-C { background: var(--score-pass); }
+.readiness-progress { font-size: 13px; color: var(--c-text-secondary); }
+
+.readiness-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 18px;
+}
+.readiness-item { min-width: 0; }
+.ri-row, .ri-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+}
+.ri-btn {
+  border: 1px solid var(--c-border-light);
+  background: var(--c-bg-alt);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.ri-btn:hover { border-color: var(--brand-primary); background: var(--brand-primary-50); }
+.ri-check { flex-shrink: 0; font-size: 13px; }
+.ri-dim {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--brand-primary);
+  background: var(--brand-primary-50);
+  border-radius: var(--radius-sm);
+  padding: 1px 7px;
+}
+.ri-label { font-size: 13px; color: var(--c-text); }
+.readiness-item.done .ri-label { color: var(--c-text-secondary); }
+.ri-evidence {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+  white-space: nowrap;
+}
+.ri-toggle-hint {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--c-text-quaternary);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 0 5px;
+}
+.readiness-rule { margin: 16px 0 0; font-size: 12px; color: var(--c-text-tertiary); }
+
+.readiness-empty { text-align: center; padding: 22px 16px 14px; }
+.readiness-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--brand-primary-50);
+  margin-bottom: 12px;
+}
+.readiness-empty-title {
+  margin: 0 0 6px;
+  font-family: var(--font-title);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+.readiness-empty-desc { margin: 0 0 16px; font-size: 13px; color: var(--c-text-secondary); }
+.readiness-empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 /* 加载骨架 */
 .chart-skeleton { height: 200px; border-radius: var(--radius-md); background: linear-gradient(90deg, var(--c-bg-alt) 25%, var(--c-border-light) 37%, var(--c-bg-alt) 63%); background-size: 400% 100%; animation: skeleton-loading 1.4s ease infinite; }
 .dim-skeleton { gap: 16px; }
@@ -400,5 +688,7 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .stat-value { font-size: 32px; }
+  .readiness-list { grid-template-columns: 1fr; }
+  .ri-evidence { display: none; }
 }
 </style>

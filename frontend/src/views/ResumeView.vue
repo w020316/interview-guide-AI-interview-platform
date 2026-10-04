@@ -194,8 +194,9 @@
               :style="{ strokeDasharray: 327, strokeDashoffset: 327 - (327 * (parsed.overallScore || 0)) / 100 }" />
           </svg>
           <div class="score-value">
-            <span class="score-num">{{ parsed.overallScore ?? '-' }}</span>
-            <span class="score-unit">分</span>
+            <span class="score-num">{{ parsed.overallScore ?? EMPTY }}</span>
+            <!-- 无评分时不再拼「分」单位，避免出现「— 分」这种占位符+单位的错误渲染 -->
+            <span v-if="parsed.overallScore != null" class="score-unit">分</span>
           </div>
         </div>
         <div class="score-meta">

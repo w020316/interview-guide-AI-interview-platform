@@ -129,4 +129,58 @@ class JobFavoriteServiceTest {
         when(repository.countByUserId("u1")).thenReturn(2L);
         assertThat(service.countByUser("u1")).isEqualTo(2L);
     }
+
+    @Test
+    @DisplayName("setPreference: 设置档位并持久化（大小写归一）")
+    void setPreference_setsAndNormalizes() {
+        JobFavoriteEntity own = fav();
+        when(repository.findByUserIdAndJobId("u1", 100L)).thenReturn(Optional.of(own));
+        when(repository.save(own)).thenReturn(own);
+
+        JobFavoriteEntity updated = service.setPreference("u1", 100L, "strong");
+
+        assertThat(updated.getPreference()).isEqualTo("STRONG");
+        verify(repository).save(own);
+    }
+
+    @Test
+    @DisplayName("setPreference: null 清除标记（回到未标记）")
+    void setPreference_nullClears() {
+        JobFavoriteEntity own = fav().toBuilder().preference("STRONG").build();
+        when(repository.findByUserIdAndJobId("u1", 100L)).thenReturn(Optional.of(own));
+        when(repository.save(own)).thenReturn(own);
+
+        JobFavoriteEntity updated = service.setPreference("u1", 100L, null);
+
+        assertThat(updated.getPreference()).isNull();
+    }
+
+    @Test
+    @DisplayName("setPreference: 未收藏该岗位返回 null（→404）")
+    void setPreference_notFavorited_returnsNull() {
+        when(repository.findByUserIdAndJobId("u1", 999L)).thenReturn(Optional.empty());
+        assertThat(service.setPreference("u1", 999L, "STRONG")).isNull();
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("setPreference: 非法档位抛 IllegalArgumentException（→400）")
+    void setPreference_invalid_throws() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.setPreference("u1", 100L, "NOT_A_TIER"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("preference 非法");
+    }
+
+    @Test
+    @DisplayName("setPreference: 同值重复提交幂等（无副作用差异）")
+    void setPreference_sameValueIdempotent() {
+        JobFavoriteEntity own = fav().toBuilder().preference("BACKUP").build();
+        when(repository.findByUserIdAndJobId("u1", 100L)).thenReturn(Optional.of(own));
+        when(repository.save(own)).thenReturn(own);
+
+        JobFavoriteEntity updated = service.setPreference("u1", 100L, "BACKUP");
+
+        assertThat(updated.getPreference()).isEqualTo("BACKUP");
+    }
 }

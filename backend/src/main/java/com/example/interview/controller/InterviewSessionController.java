@@ -213,7 +213,10 @@ public class InterviewSessionController {
     /**
      * 提交用户回答及评估结果
      * POST /api/session/answer
-     * Body: {"questionId":1,"userAnswer":"...","evaluationScore":80}
+     * Body: {"questionId":1,"userAnswer":"...","evaluationScore":80,"evalDetail":"{...}"}
+     *
+     * <p>第三批 A：新增可选 {@code evalDetail}（题目维度明细 JSON），与评分同事务落库。
+     * 校验：非空时必须是合法 JSON 且 ≤4000 字，否则返回 400（不回退 500）。
      */
     @PostMapping("/answer")
     public Result<InterviewQuestionEntity> saveAnswer(@RequestBody Map<String, Object> req) {
@@ -235,6 +238,29 @@ public class InterviewSessionController {
         if (userAnswer == null || userAnswer.isBlank()) {
             return Result.error(400, "userAnswer 不能为空");
         }
-        return Result.success(sessionService.saveAnswer(questionId, userAnswer, score, currentUserId()));
+
+        // 第三批 A：可选维度明细。防御式读取（类型错误→400），非空时校验合法 JSON 与长度上限。
+        com.example.interview.util.RequestFieldUtil.TextField ed =
+                com.example.interview.util.RequestFieldUtil.text(req, "evalDetail");
+        if (ed.hasTypeError()) {
+            return Result.error(400, com.example.interview.util.RequestFieldUtil.typeError("evalDetail"));
+        }
+        String evalDetail = ed.value();
+        if (evalDetail != null && evalDetail.isBlank()) {
+            // 空串归一为 null：不写入看起来像业务结果的值（R3）
+            evalDetail = null;
+        }
+        if (evalDetail != null) {
+            if (evalDetail.length() > 4000) {
+                return Result.error(400, "evalDetail 不能超过 4000 字");
+            }
+            try {
+                objectMapper.readTree(evalDetail);
+            } catch (Exception e) {
+                return Result.error(400, "evalDetail 必须是合法 JSON");
+            }
+        }
+
+        return Result.success(sessionService.saveAnswer(questionId, userAnswer, score, evalDetail, currentUserId()));
     }
 }

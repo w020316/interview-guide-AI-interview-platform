@@ -83,6 +83,30 @@
       </div>
     </div>
 
+    <!-- 数据与备份（第三批 C） -->
+    <section class="data-section fade-in-up">
+      <div class="section-header">
+        <h2>数据与备份</h2>
+        <span class="section-note">导出为单个 JSON 备份；导入前会自动先下载一份「导入前快照」</span>
+      </div>
+
+      <div class="data-actions">
+        <BaseButton variant="gradient" :disabled="exporting || importing" @click="exportData">
+          {{ exporting ? '导出中…' : '导出我的数据' }}
+        </BaseButton>
+        <BaseButton variant="ghost" :disabled="exporting || importing" @click="pickImportFile">
+          {{ importing ? '导入中…' : '从备份导入' }}
+        </BaseButton>
+        <select v-model="importMode" class="mode-select" :disabled="importing">
+          <option v-for="m in IMPORT_MODES" :key="m.value" :value="m.value">{{ m.label }}</option>
+        </select>
+        <span class="mode-hint">{{ modeHint }}</span>
+        <input ref="importInput" type="file" accept=".json,application/json" class="hidden-file" @change="onImportFile" />
+      </div>
+
+      <div v-if="importNote" class="data-note" :class="'note-' + importNoteKind">{{ importNote }}</div>
+    </section>
+
     <!-- 最近活动 -->
     <section class="recent-section">
       <div class="section-header">
@@ -130,11 +154,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { EMPTY } from '../utils/format'
+import {
+  EXPORT_PATH,
+  IMPORT_MODES,
+  IMPORT_PATH,
+  exportFileName,
+  fingerprintSource,
+  describeImportSummary,
+  isFingerprintConflict,
+  isFingerprintMismatch,
+  parseBackupFile,
+  type BackupPayload,
+  type ImportApplyResult,
+  type ImportDryRunResult,
+  type ImportMode,
+} from '../utils/backup'
 import { BaseButton } from '../components'
 
 const router = useRouter()
@@ -159,6 +198,154 @@ async function loadStats() {
     ElMessage.error(getErrMessage(e, '加载统计数据失败'))
   } finally {
     loading.value = false
+  }
+}
+
+// ───────────────────────── 数据导出 / 导入（第三批 C） ─────────────────────────
+// 导入严格按序：① 先 await 完成「导入前快照下载」→ ② dryRun 预览 → ③ 确认后 apply。
+// dryRun 永不 409；仅 apply + replace + 指纹不符 + 未 force 才 409（此时给出 force 入口）。
+
+const exporting = ref(false)
+const importing = ref(false)
+const importMode = ref<ImportMode>('merge')
+const importNote = ref('')
+const importNoteKind = ref<'info' | 'warn' | 'ok'>('info')
+const importInput = ref<HTMLInputElement | null>(null)
+let currentImportId = ''
+
+const modeHint = computed(() => IMPORT_MODES.find((m) => m.value === importMode.value)?.hint ?? '')
+
+/** 稳定 importId：同一备份 + 同一模式 → 同一 id → 后端可幂等重放（不二次写入） */
+function importIdFor(payload: BackupPayload): string {
+  const fp = payload.dataFingerprint || fingerprintSource(payload.data)
+  const short = fp.replace(/[^a-z0-9]/gi, '').slice(0, 24)
+  return `imp-${importMode.value}-${short || 'empty'}`
+}
+
+function setNote(kind: 'info' | 'warn' | 'ok', text: string) {
+  importNoteKind.value = kind
+  importNote.value = text
+}
+
+/** 触发浏览器下载（前端生成 Blob，不经后端） */
+function downloadJson(obj: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+async function fetchExport(): Promise<Record<string, unknown>> {
+  return (await api.get(EXPORT_PATH, { params: { includeConversations: false } })) as unknown as Record<string, unknown>
+}
+
+async function exportData() {
+  exporting.value = true
+  try {
+    downloadJson(await fetchExport(), exportFileName())
+    ElMessage.success('数据已导出')
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '导出失败'))
+  } finally {
+    exporting.value = false
+  }
+}
+
+function pickImportFile() {
+  importInput.value?.click()
+}
+
+async function onImportFile(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  importing.value = true
+  importNote.value = ''
+  try {
+    const payload = parseBackupFile(await file.text())
+    currentImportId = importIdFor(payload)
+
+    // ① 导入前快照：必须先 await 完成下载，再进入预览/写入
+    setNote('info', '正在下载「导入前快照」…')
+    downloadJson(await fetchExport(), exportFileName().replace(/\.json$/, '-before-import.json'))
+
+    // ② dryRun 预览（不写库、永不 409）
+    setNote('info', '正在生成预览（dryRun，不写库）…')
+    const dry = (await api.post(IMPORT_PATH, {
+      mode: importMode.value,
+      dryRun: true,
+      payload,
+    })) as unknown as ImportDryRunResult
+
+    const mismatch = isFingerprintMismatch(payload.dataFingerprint, dry.currentFingerprint)
+
+    if (!dry.canApply) {
+      setNote('warn',
+        `预览未通过（未写库）：${describeImportSummary(dry.summary).join('，')}。` +
+        (dry.fatalErrors?.length ? `存在 ${dry.fatalErrors.length} 条致命错误。` : '') +
+        (mismatch ? '当前数据与备份不一致——「覆盖」模式需二次确认。' : '') +
+        ' 可改用「合并」模式后重试。')
+      return
+    }
+
+    setNote('info',
+      `预览：${describeImportSummary(dry.summary).join('，')}。` +
+      (dry.warnings?.length ? `另有 ${dry.warnings.length} 条提示。` : '') +
+      (mismatch ? '（当前数据与备份不同）' : '') + ' 正在导入…')
+
+    // ③ apply（幂等 importId + 指纹预校验）
+    await applyImport(payload, dry, false)
+  } catch (e: unknown) {
+    setNote('warn', getErrMessage(e, '导入失败'))
+    ElMessage.error(getErrMessage(e, '导入失败'))
+  } finally {
+    importing.value = false
+  }
+}
+
+async function applyImport(payload: BackupPayload, dry: ImportDryRunResult, force: boolean) {
+  try {
+    const res = (await api.post(IMPORT_PATH, {
+      mode: importMode.value,
+      dryRun: false,
+      force,
+      expectedFingerprint: dry.currentFingerprint,
+      importId: currentImportId,
+      payload,
+    })) as unknown as ImportApplyResult
+
+    setNote('ok', res.idempotent
+      ? '该备份此前已导入过（幂等，未重复写入）。'
+      : `导入完成：${describeImportSummary(res.appliedCounts || res.summary).join('，')}`)
+    ElMessage.success('导入完成')
+    await loadStats()
+  } catch (e: unknown) {
+    if (isFingerprintConflict(e)) {
+      // 只有 apply + replace + 指纹不符 + 未 force 才会到这里
+      let ok = false
+      try {
+        await ElMessageBox.confirm(
+          '当前数据与这份备份不一致，继续将用备份「覆盖」现有数据（已自动下载导入前快照，可回退）。确定继续？',
+          '覆盖确认',
+          { type: 'warning', confirmButtonText: '覆盖', cancelButtonText: '取消' },
+        )
+        ok = true
+      } catch {
+        ok = false
+      }
+      if (!ok) {
+        setNote('info', '已取消导入，数据未发生变化。')
+        return
+      }
+      return applyImport(payload, dry, true)
+    }
+    throw e
   }
 }
 
@@ -487,6 +674,59 @@ function fmtRelative(iso: string): string {
   color: var(--c-text-secondary);
   margin-bottom: 20px;
 }
+
+/* ── 数据与备份（第三批 C） ── */
+.data-section {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-xs);
+  margin-bottom: 24px;
+}
+
+.section-note {
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+
+.data-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mode-select {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--c-text);
+  background: var(--c-bg);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.mode-hint {
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+
+.hidden-file {
+  display: none;
+}
+
+.data-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.note-info { background: var(--c-info-light); color: var(--c-info); }
+.note-warn { background: var(--c-warning-light); color: var(--c-warning); }
+.note-ok { background: var(--c-success-light); color: var(--c-success); }
 
 /* ── 响应式 ── */
 @media (max-width: 768px) {
