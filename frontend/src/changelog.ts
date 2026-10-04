@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.54.0'
+export const CURRENT_VERSION = '1.54.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.54.1',
+    date: '2026-10-04',
+    title: '版本 1.54.1 · Hacker News 数据源已就绪',
+    items: [
+      { text: '招聘广场：Hacker News「Who is hiring?」数据源现已正常入库（**25 个岗位**）——上一版本该源因接口参数问题未拉到数据，现已修复', level: 'user' },
+      { text: '后端：Algolia API 的作者过滤改用 tag 语法（author_whoishiring），评论文本改读 comment_text 字段', level: 'tech' },
+    ],
+  },
   {
     version: '1.54.0',
     date: '2026-10-04',
