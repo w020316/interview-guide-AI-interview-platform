@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.54.1'
+export const CURRENT_VERSION = '1.55.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.55.0',
+    date: '2026-10-04',
+    title: '版本 1.55.0 · 每个岗位都告诉你「它从哪来」',
+    items: [
+      { text: '招聘广场：岗位卡片新增**数据来源标注**——一眼看出这条岗位来自官方数据接口、官方订阅、社区发帖还是平台精选，点开详情还有完整的来源说明，投递前心里有数', level: 'user' },
+      { text: '招聘广场：岗位**没有直达申请入口时会明确标出**（例如部分社区招聘帖只有一段描述），避免点了「立即申请」却发现无处可去', level: 'user' },
+      { text: '岗位详情：新增「数据来源说明」区块，如实说明来源渠道与类型、申请入口情况与有效期；社区发帖且无申请链接时会提示先核实再投递', level: 'user' },
+    ],
+  },
   {
     version: '1.54.1',
     date: '2026-10-04',

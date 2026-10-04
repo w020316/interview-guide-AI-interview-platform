@@ -157,6 +157,14 @@
             <span v-for="(s, si) in missingOf(job).slice(0, 4)" :key="'mi' + si" class="tag tag-miss">−{{ s }}</span>
             <span v-if="missingOf(job).length > 4" class="tag tag-miss">还有 {{ missingOf(job).length - 4 }} 项</span>
             <span class="tag tag-source">{{ job.platform }}</span>
+            <!-- 数据可信度标注（竞品清单 #22）：只陈述来源事实，不打「信任分」。
+                 kinds 角标说明这条岗位从哪来；无直达申请链接时如实标出，不让用户白点。 -->
+            <span class="tag tag-trust" :title="trustOf(job).kindHint">{{ trustOf(job).kindLabel }}</span>
+            <span
+              v-if="!trustOf(job).hasApplyUrl"
+              class="tag tag-trust-warn"
+              :title="trustOf(job).applyHint"
+            >无直达入口</span>
             <span v-if="job.industry" class="tag">{{ job.industry }}</span>
             <span v-if="job.jobType" class="tag">{{ job.jobType }}</span>
             <span v-for="(t, i) in tagList(job.tags)" :key="'t' + i" class="tag">{{ t }}</span>
@@ -211,7 +219,7 @@
           <span v-if="detail.degree">🎓 {{ detail.degree }}</span>
           <span v-if="detail.experience">💼 {{ detail.experience }}</span>
           <span v-if="detail.industry">🏢 {{ detail.industry }}</span>
-          <span v-if="detail.deadline">⏰ 截止：{{ detail.deadline }}</span>
+          <!-- 截止日期统一由下方「数据来源说明」的有效期一行呈现，此处不再重复 -->
         </div>
         <div v-if="detail.description" class="detail-block">
           <h4>岗位描述</h4>
@@ -221,13 +229,48 @@
           <h4>岗位要求</h4>
           <p class="pre-wrap">{{ detail.requirements }}</p>
         </div>
+        <!-- 数据可信度标注（竞品清单 #22）：把「这条信息从哪来、能不能直接投」讲清楚。
+             措辞只描述来源与事实，不给出任何「可信 / 不可信」的判断。 -->
+        <div class="detail-block trust-block">
+          <h4>数据来源说明</h4>
+          <div class="trust-rows">
+            <div class="trust-row">
+              <span class="trust-key">来源渠道</span>
+              <span class="trust-val">{{ detail.platform }}</span>
+            </div>
+            <div class="trust-row">
+              <span class="trust-key">来源类型</span>
+              <span class="trust-val">
+                <span class="tag tag-trust">{{ trustOf(detail).kindLabel }}</span>
+                <span class="trust-note">{{ trustOf(detail).kindHint }}</span>
+              </span>
+            </div>
+            <div class="trust-row">
+              <span class="trust-key">申请入口</span>
+              <span class="trust-val">
+                <span class="tag tag-trust">{{ trustOf(detail).applyLabel }}</span>
+                <span class="trust-note">{{ trustOf(detail).applyHint }}</span>
+              </span>
+            </div>
+            <div class="trust-row">
+              <span class="trust-key">有效期</span>
+              <span class="trust-val">
+                <span class="tag" :class="{ 'tag-trust-warn': freshnessOf(detail).urgent }">
+                  {{ freshnessOf(detail).label }}
+                </span>
+              </span>
+            </div>
+          </div>
+          <p v-if="trustOf(detail).needsVerify" class="trust-warn">
+            该岗位来自社区发帖且没有直达申请入口，岗位详情由发帖人提供，建议点开原始链接核实后再投递。
+          </p>
+        </div>
         <div v-if="detail.tags" class="detail-block">
           <div class="job-tags">
             <span v-for="(t, i) in tagList(detail.tags)" :key="i" class="tag">{{ t }}</span>
           </div>
         </div>
         <div class="detail-footer">
-          <span class="detail-source">数据来源：{{ detail.platform }}</span>
           <button
             class="apply-btn"
             :disabled="planning"
@@ -258,6 +301,7 @@ import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
 import { validateJobKeyword } from '../utils/jobKeyword'
 import { toQueryRecruitType } from '../utils/recruitType'
+import { jobTrust, jobFreshness, type JobTrust, type Freshness } from '../utils/jobTrust'
 
 /**
  * 招聘信息广场
@@ -653,6 +697,22 @@ async function refreshData() {
   } finally {
     refreshing.value = false
   }
+}
+
+/**
+ * 岗位数据可信度标注（竞品清单 #22）。
+ *
+ * 只把**来源事实**摆出来（它是官方接口还是社区发帖、有没有直达申请链接），
+ * 不生成任何「信任分」——本平台没有能力核实岗位真伪，打分即臆造。
+ * 判定逻辑全部在 utils/jobTrust.ts 的纯函数里，这里只管取值给模板用。
+ */
+function trustOf(job: Pick<JobPosting, 'platform' | 'applyUrl'>): JobTrust {
+  return jobTrust(job.platform, job.applyUrl)
+}
+
+/** 岗位有效期（与 deadlineText 同口径，但额外给出 urgent 供 UI 强调） */
+function freshnessOf(job: Pick<JobPosting, 'deadline'>): Freshness {
+  return jobFreshness(job.deadline)
 }
 
 function deadlineText(deadline: string | null): string {
@@ -1187,11 +1247,6 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
-.detail-source {
-  font-size: 12px;
-  color: var(--c-text-secondary);
-}
-
 .fade-in-up {
   animation: fadeInUp 0.3s ease;
 }
@@ -1226,4 +1281,25 @@ onMounted(() => {
 .tag-skill { color: var(--c-info); border-color: var(--c-info); }
 /* 短板：信息性弱化展示（不用警示色——「缺」是待补项，不是错误） */
 .tag-miss { color: var(--c-text-tertiary); border-color: var(--c-border); background: transparent; }
+
+/* 数据可信度标注（#22）：来源类型用中性色如实陈述，不用「可信/不可信」的暗示色。
+   「无直达入口」用 warning 色——它确实需要用户多走一步，属于有用的提醒而非指控。 */
+.tag-trust { color: var(--c-text-secondary); border-color: var(--c-border); background: transparent; }
+.tag-trust-warn { color: var(--c-warning); border-color: var(--c-warning-border); }
+
+/* 详情弹窗里的「数据来源说明」区块 */
+.trust-block .trust-rows { display: flex; flex-direction: column; gap: 10px; }
+.trust-row { display: flex; gap: 12px; align-items: flex-start; font-size: 13px; }
+.trust-key { flex: 0 0 68px; color: var(--c-text-tertiary); }
+.trust-val { flex: 1; color: var(--c-text); display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.trust-note { color: var(--c-text-tertiary); font-size: 12px; line-height: 1.6; }
+.trust-warn {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--c-warning-light);
+  color: var(--c-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
 </style>
