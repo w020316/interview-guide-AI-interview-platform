@@ -74,17 +74,6 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
     private static final String ASHBY_URL = "https://api.ashbyhq.com/posting-api/job-board/%s";
     private static final String GREENHOUSE_URL = "https://boards-api.greenhouse.io/v1/boards/%s/jobs";
 
-    /**
-     * 全部已配置的板名（slug）集合。
-     *
-     * <p>用于识别「URL 只到板级、没有岗位级 id」的畸形链接——这类链接提取出的
-     * 尾段恰好等于板名，若照单用作 externalId，会让该板所有此类岗位撞成同一个键。
-     */
-    private static final java.util.Set<String> BOARD_SLUGS = java.util.stream.Stream
-            .concat(ASHBY_BOARDS.stream(), GREENHOUSE_BOARDS.stream())
-            .map(b -> b[0])
-            .collect(java.util.stream.Collectors.toUnmodifiableSet());
-
     /** 单个雇主最多取多少条（防止某家一次性灌入数百条淹没其他源） */
     private static final int MAX_PER_BOARD = 12;
 
@@ -309,7 +298,7 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
         // seg 会退化成**主机名**（jobs.ashbyhq.com）——这是整板共用的常量，不是岗位级 id。
         // 若照单使用，该板所有此类岗位会拿到同一个 externalId 而互相覆盖。含 '.' 即判定为主机名。
         if (seg.isEmpty() || seg.indexOf('.') >= 0) return "";
-        return BOARD_SLUGS.contains(seg) ? "" : seg;
+        return seg;
     }
 
     /** ISO-8601（含时区偏移）→ LocalDate；解析不动时回退日期前缀解析 */
