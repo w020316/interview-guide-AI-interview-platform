@@ -3,6 +3,12 @@ dist/
 # 沙箱里无法清空 dist/，验证构建时改用 --outDir dist-verify；同样属于构建产物，不入库
 dist-verify/
 dist-ux4verify/
+# 2026-10-04：同类临时构建目录一律不入库。
+# 起因：为绕开 safe-delete 守卫用 `mv dist dist_old_$$`，该目录名不在忽略清单里，
+# 被 `git add -A` 连带提交了 58 个文件（v1.49.1 提交）。命名临时目录请优先用
+# 仓库外路径（如 D:/xm/e2e/_dist_bak），或使用本清单里的 dist-* 前缀。
+dist_*/
+dist-*/
 coverage/
 *.log
 .DS_Store

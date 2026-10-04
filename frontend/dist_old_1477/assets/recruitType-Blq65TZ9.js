@@ -1,1 +1,0 @@
-var e=[`AUTUMN`,`SPRING`,`SOCIAL`,`INTERN`,`PART_TIME`,`TARGETED`],t={AUTUMN:`秋招`,SPRING:`春招`,SOCIAL:`社招`,INTERN:`实习`,PART_TIME:`兼职`,TARGETED:`定向专项`};function n(e){return e?t[e]||e:`—`}function r(e){if(e&&e!==`OVERSEAS`&&e!==`FAVORITE`)return e}export{r as i,t as n,n as r,e as t};
