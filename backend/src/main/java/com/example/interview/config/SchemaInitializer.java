@@ -71,6 +71,11 @@ public class SchemaInitializer implements CommandLineRunner {
                     + "status VARCHAR(20) DEFAULT 'UPCOMING', "
                     + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
             "CREATE INDEX IF NOT EXISTS idx_interview_event_user_id ON interview_event(user_id)",
+            // v1.61.0 投递 ↔ 面试时序视图（竞品清单 #4）：日历事件关联到投递记录。
+            // ⚠️ 用 ALTER 而非改上面的 CREATE TABLE —— 生产库该表已存在，
+            // `CREATE TABLE IF NOT EXISTS` 对已存在的表是空操作，只改 CREATE 不会生效。
+            "ALTER TABLE interview_event ADD COLUMN IF NOT EXISTS application_id BIGINT",
+            "CREATE INDEX IF NOT EXISTS idx_interview_event_application ON interview_event(application_id)",
             "CREATE TABLE IF NOT EXISTS job_posting ("
                     + "id BIGSERIAL PRIMARY KEY, "
                     + "platform VARCHAR(50) NOT NULL, "

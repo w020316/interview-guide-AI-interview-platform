@@ -2,9 +2,11 @@ package com.example.interview.controller;
 
 import com.example.interview.common.ConflictException;
 import com.example.interview.entity.InterviewEventEntity;
+import com.example.interview.entity.JobApplicationEntity;
 import com.example.interview.interceptor.RateLimitInterceptor;
 import com.example.interview.security.JwtUtil;
 import com.example.interview.service.InterviewEventService;
+import com.example.interview.service.job.JobApplicationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +50,16 @@ class InterviewEventControllerTest {
 
     @MockBean
     private InterviewEventService eventService;
+
+    /**
+     * v1.61.0 新增依赖（投递关联归属校验）。
+     *
+     * <p>⚠️ {@code @WebMvcTest} 下控制器新依赖<b>必须</b>补 {@code @MockBean}，
+     * 否则整类报 {@code NoSuchBeanDefinitionException}——表现是「所有测试 ERROR」，
+     * 极易被误读成业务失败。
+     */
+    @MockBean
+    private JobApplicationService applicationService;
 
     @MockBean
     private JwtUtil jwtUtil;
@@ -234,6 +246,154 @@ class InterviewEventControllerTest {
             mockMvc.perform(delete("/api/calendar/event/1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/calendar/event 投递关联（v1.61.0）")
+    class CreateWithApplicationLink {
+
+        @Test
+        @DisplayName("关联他人投递记录 → HTTP 404（防 IDOR：不得把日程挂到他人台账上）")
+        void create_linkToOthersApplication_returns404() throws Exception {
+            // findOwned 对非本人记录返回 null —— 归属校验的唯一判据是 userId
+            when(applicationService.findOwned(eq(USER_ID), eq(99L))).thenReturn(null);
+
+            mockMvc.perform(post("/api/calendar/event")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"一面\",\"interviewAt\":\"" + VALID_TIME + "\",\"applicationId\":99}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(404))
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("未找到该投递记录")));
+        }
+
+        @Test
+        @DisplayName("applicationId 传了非数字类型 → HTTP 400（不是 500）")
+        void create_linkWrongType_returns400() throws Exception {
+            mockMvc.perform(post("/api/calendar/event")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"一面\",\"interviewAt\":\"" + VALID_TIME + "\",\"applicationId\":{\"a\":1}}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("applicationId")));
+        }
+
+        @Test
+        @DisplayName("不带 applicationId 时正常创建，关联为 null（手工日程无需归属校验）")
+        void create_withoutLink_ok() throws Exception {
+            when(eventService.create(eq(USER_ID), any())).thenAnswer(inv -> inv.getArgument(1));
+
+            mockMvc.perform(post("/api/calendar/event")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"笔试\",\"interviewAt\":\"" + VALID_TIME + "\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            ArgumentCaptor<InterviewEventEntity> captor = ArgumentCaptor.forClass(InterviewEventEntity.class);
+            org.mockito.Mockito.verify(eventService).create(eq(USER_ID), captor.capture());
+            assertThat(captor.getValue().getApplicationId()).isNull();
+            // 不涉及关联时不应去查台账（避免无谓查询与误判）
+            org.mockito.Mockito.verifyNoInteractions(applicationService);
+        }
+
+        @Test
+        @DisplayName("关联本人投递记录成功，applicationId 写入实体")
+        void create_linkOwnApplication_ok() throws Exception {
+            when(applicationService.findOwned(eq(USER_ID), eq(7L)))
+                    .thenReturn(JobApplicationEntity.builder().id(7L).userId(USER_ID).build());
+            when(eventService.create(eq(USER_ID), any())).thenAnswer(inv -> inv.getArgument(1));
+
+            mockMvc.perform(post("/api/calendar/event")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"一面\",\"interviewAt\":\"" + VALID_TIME + "\",\"applicationId\":7}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            ArgumentCaptor<InterviewEventEntity> captor = ArgumentCaptor.forClass(InterviewEventEntity.class);
+            org.mockito.Mockito.verify(eventService).create(eq(USER_ID), captor.capture());
+            assertThat(captor.getValue().getApplicationId()).isEqualTo(7L);
+        }
+    }
+
+    @Nested
+    @DisplayName("PUT /api/calendar/event/{id} 投递关联三态（v1.61.0）")
+    class UpdateApplicationLink {
+
+        @Test
+        @DisplayName("请求体未带 applicationId → 走普通 update，不触碰关联")
+        void update_withoutLinkField_usesPlainUpdate() throws Exception {
+            when(eventService.update(eq(1L), eq(USER_ID), any())).thenAnswer(inv -> {
+                InterviewEventEntity e = inv.getArgument(2);
+                return InterviewEventEntity.builder().id(1L).userId(USER_ID)
+                        .title("x").interviewAt(LocalDateTime.parse(VALID_TIME)).build();
+            });
+
+            mockMvc.perform(put("/api/calendar/event/1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"新标题\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            org.mockito.Mockito.verify(eventService).update(eq(1L), eq(USER_ID), any());
+            org.mockito.Mockito.verify(eventService, org.mockito.Mockito.never())
+                    .updateAndClearApplicationLink(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("显式传 applicationId:null → 走「清除关联」路径，而非普通 update")
+        void update_explicitNull_clearsLink() throws Exception {
+            when(eventService.updateAndClearApplicationLink(eq(1L), eq(USER_ID), any())).thenAnswer(inv -> {
+                InterviewEventEntity e = inv.getArgument(2);
+                return InterviewEventEntity.builder().id(1L).userId(USER_ID)
+                        .title("x").interviewAt(LocalDateTime.parse(VALID_TIME)).build();
+            });
+
+            mockMvc.perform(put("/api/calendar/event/1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"x\",\"applicationId\":null}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            org.mockito.Mockito.verify(eventService)
+                    .updateAndClearApplicationLink(eq(1L), eq(USER_ID), any());
+            org.mockito.Mockito.verify(eventService, org.mockito.Mockito.never())
+                    .update(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("传 applicationId:0 → 同样按「清除关联」处理，且不去查台账")
+        void update_zero_clearsLinkWithoutLookup() throws Exception {
+            when(eventService.updateAndClearApplicationLink(eq(1L), eq(USER_ID), any())).thenAnswer(inv -> {
+                InterviewEventEntity e = inv.getArgument(2);
+                return InterviewEventEntity.builder().id(1L).userId(USER_ID)
+                        .title("x").interviewAt(LocalDateTime.parse(VALID_TIME)).build();
+            });
+
+            mockMvc.perform(put("/api/calendar/event/1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"applicationId\":0}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            org.mockito.Mockito.verify(eventService)
+                    .updateAndClearApplicationLink(eq(1L), eq(USER_ID), any());
+            // 清除语义不需要查台账；若实现误把 0 当 id 去查，会多一次交互
+            org.mockito.Mockito.verifyNoInteractions(applicationService);
+        }
+
+        @Test
+        @DisplayName("关联他人投递记录 → HTTP 404")
+        void update_linkToOthersApplication_returns404() throws Exception {
+            when(applicationService.findOwned(eq(USER_ID), eq(88L))).thenReturn(null);
+
+            mockMvc.perform(put("/api/calendar/event/1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"applicationId\":88}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(404));
+
+            org.mockito.Mockito.verify(eventService, org.mockito.Mockito.never())
+                    .update(any(), any(), any());
         }
     }
 }

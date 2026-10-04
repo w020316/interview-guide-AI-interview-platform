@@ -90,9 +90,16 @@ CREATE TABLE IF NOT EXISTS interview_event (
     note         TEXT,
     interview_at TIMESTAMP NOT NULL,
     status       VARCHAR(20) DEFAULT 'UPCOMING',
+    -- v1.61.0：关联的投递记录（可为 NULL = 用户在日历里手工建的日程）
+    application_id BIGINT,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_interview_event_user_id ON interview_event(user_id);
+
+-- v1.61.0 投递 ↔ 面试时序视图：存量库补列。
+-- ⚠️ 必须写 ALTER：上面的 CREATE TABLE IF NOT EXISTS 对已存在的表是空操作，加列不会生效。
+ALTER TABLE interview_event ADD COLUMN IF NOT EXISTS application_id BIGINT;
+CREATE INDEX IF NOT EXISTS idx_interview_event_application ON interview_event(application_id);
 
 -- 岗位信息表（招聘信息智能体，v1.22.0）
 CREATE TABLE IF NOT EXISTS job_posting (

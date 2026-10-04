@@ -55,6 +55,10 @@ class JobApplicationControllerTest {
     private TailoredResumeService tailoredResumeService;
     @MockBean
     private com.example.interview.service.job.ApplicationImportService applicationImportService;
+
+    /** v1.61.0：时序视图服务（新端点 /timeline 的依赖，@WebMvcTest 下必须补 @MockBean） */
+    @MockBean
+    private com.example.interview.service.job.ApplicationTimelineService applicationTimelineService;
     @MockBean
     private JwtUtil jwtUtil;
     @MockBean
@@ -361,5 +365,36 @@ class JobApplicationControllerTest {
                 .andExpect(jsonPath("$.data.summary.merged").value(1))
                 .andExpect(jsonPath("$.data.summary.skipped").value(1))
                 .andExpect(jsonPath("$.data.summary.errors").value(0));
+    }
+
+    // ───────── v1.61.0 投递 ↔ 面试时序视图 ─────────
+
+    @Test
+    @DisplayName("GET /api/application/timeline：透传服务结果，且按 JWT 用户隔离（不透传请求体 userId）")
+    void timeline_returnsServiceResultScopedToJwtUser() throws Exception {
+        loginAs("user-7");
+        // 用 LinkedHashMap 而非 Map.of —— Map.of 不接受 null 值，
+        // 而「无样本时 avgDaysToInterview 为 null」正是本用例要验证的行为。
+        Map<String, Object> stats = new java.util.LinkedHashMap<>();
+        stats.put("appliedCount", 1L);
+        stats.put("interviewSampleSize", 0);
+        stats.put("avgDaysToInterview", null);
+
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("nodes", List.of(Map.of("kind", "APPLIED", "at", "2026-10-01T10:00")));
+        payload.put("stats", stats);
+        when(applicationTimelineService.timeline(eq("user-7"))).thenReturn(payload);
+
+        mockMvc.perform(get("/api/application/timeline"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.nodes[0].kind").value("APPLIED"))
+                .andExpect(jsonPath("$.data.stats.appliedCount").value(1))
+                // 无样本时统计值为 null，不得渲染成 0（无数据 ≠ 0）
+                .andExpect(jsonPath("$.data.stats.avgDaysToInterview").doesNotExist());
+
+        // 归属来源必须是 JWT subject；若实现改从请求体取 userId，这条会失败
+        org.mockito.Mockito.verify(applicationTimelineService).timeline("user-7");
+        org.mockito.Mockito.verifyNoMoreInteractions(applicationTimelineService);
     }
 }

@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.60.0'
+export const CURRENT_VERSION = '1.61.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.61.0',
+    date: '2026-10-05',
+    title: '版本 1.61.0 · 投了什么、什么时候面，串成一条线',
+    items: [
+      { text: '投递看板：新增「投递 → 面试时序」——把每一次投递和每一场面试按时间先后排成一条时间线，一眼看清「投了之后多久接到面试」', level: 'user' },
+      { text: '面试日历：新增日程时可以选一条对应的投递记录，之后日历里会显示「这条日程是为哪次投递安排的」', level: 'user' },
+      { text: '投递看板：粘贴投递通知并把面试写入日历时，会自动挂上对应的投递记录，不必再去日历里手工关联一遍', level: 'user' },
+      { text: '关于「平均几天接到面试」：只有你确实关联过的记录才会计入，样本不足时会明确说明「还没有可比较的记录」，不会拿 0 天冒充结果', level: 'user' },
+    ],
+  },
   {
     version: '1.60.0',
     date: '2026-10-05',

@@ -60,4 +60,51 @@ public final class RequestFieldUtil {
     public static String typeError(String key) {
         return key + " 类型错误，期望字符串";
     }
+
+    /**
+     * 字段取值结果（数值型）。
+     *
+     * @param value     数值；缺失/null 时为 {@code null}
+     * @param typeError 是否传了无法解析为数值的类型（布尔/数组/对象/非数字字符串）
+     */
+    public record NumberField(Number value, boolean typeError) {
+        public boolean hasTypeError() {
+            return typeError;
+        }
+    }
+
+    /**
+     * 读取「期望为数值」的字段（ID 类外键最常见），区分「缺失/null」与「类型错误」。
+     *
+     * <p>与 {@link #text} 同理：{@code (Long) req.get("applicationId")} 在客户端传
+     * {@code "12"}（字符串）时会抛 {@code ClassCastException} → HTTP 500，
+     * 把用户的输入问题伪装成平台故障。JSON 里数字有时会以字符串形态到达，
+     * 故此处**接受数字与数字字符串**，其余一律判类型错误。
+     */
+    public static NumberField number(Map<String, ?> src, String key) {
+        Object v = src.get(key);
+        if (v == null) {
+            return new NumberField(null, false);
+        }
+        if (v instanceof Number n) {
+            return new NumberField(n, false);
+        }
+        if (v instanceof String s) {
+            String t = s.trim();
+            if (t.isEmpty()) {
+                return new NumberField(null, false);
+            }
+            try {
+                return new NumberField(Long.valueOf(t), false);
+            } catch (NumberFormatException e) {
+                return new NumberField(null, true);
+            }
+        }
+        return new NumberField(null, true);
+    }
+
+    /** 数值字段类型错误时的提示文案 */
+    public static String numberTypeError(String key) {
+        return key + " 类型错误，期望数字";
+    }
 }

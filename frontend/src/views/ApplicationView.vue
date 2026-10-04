@@ -49,6 +49,53 @@
       </div>
     </section>
 
+    <!-- 投递 ↔ 面试时序（v1.61.0，竞品清单 #4）：把「投了什么」和「什么时候面」串成一条线 -->
+    <section v-if="!loading && timeline && timeline.nodes.length" class="card" data-timeline>
+      <div class="channel-head">
+        <h2 class="channel-title">投递 → 面试时序</h2>
+        <span class="channel-hint">按时间先后串起每一次投递与每一场面试</span>
+      </div>
+      <p class="tl-summary">{{ summaryText(timeline.stats) }}</p>
+      <div class="tl-legend">
+        <span>共 {{ timeline.stats.appliedCount }} 次投递</span>
+        <span>·</span>
+        <span>{{ timeline.stats.interviewCount }} 场面试</span>
+        <template v-if="timeline.stats.unlinkedInterviewCount > 0">
+          <span>·</span>
+          <span class="tl-unlinked">{{ timeline.stats.unlinkedInterviewCount }} 场未关联投递</span>
+        </template>
+      </div>
+
+      <ol class="tl-list">
+        <li v-for="(n, i) in timeline.nodes" :key="`${n.kind}-${n.eventId ?? n.applicationId}-${i}`" class="tl-node">
+          <div class="tl-rail" :class="`tl-rail-${n.kind.toLowerCase()}`" aria-hidden="true"></div>
+          <div class="tl-body">
+            <div class="tl-head">
+              <BaseTag :variant="n.kind === 'INTERVIEW' ? 'warning' : 'info'" size="sm">{{ kindLabel(n.kind) }}</BaseTag>
+              <span class="tl-at num-display">{{ timelineAtText(n.at) }}</span>
+              <span v-if="n.kind === 'APPLIED' && n.stageLabel" class="tl-stage">{{ n.stageLabel }}</span>
+              <span v-if="n.kind === 'INTERVIEW'" class="tl-event-status">{{ eventStatusText(n.eventStatus) }}</span>
+            </div>
+            <div class="tl-title">{{ n.companyName ? `${n.companyName} · ` : '' }}{{ n.title || '—' }}</div>
+            <div v-if="n.kind === 'INTERVIEW'" class="tl-meta">
+              <!-- 未关联投递时如实说明，不硬塞一个公司名 -->
+              <span v-if="n.applicationId == null" class="tl-nolink">未关联投递记录</span>
+              <span v-else class="tl-gap">
+                投出后 <b>{{ daysText(n.daysSinceApplied) }}</b>
+              </span>
+              <span v-if="n.location">· {{ n.location }}</span>
+              <span v-if="n.interviewer">· {{ n.interviewer }}</span>
+            </div>
+            <div v-else-if="n.channel" class="tl-meta">
+              <span>渠道：{{ n.channel }}</span>
+              <a v-if="n.applyUrl" :href="n.applyUrl" target="_blank" rel="noopener" class="tl-link">前往投递 →</a>
+            </div>
+            <div v-if="n.note" class="tl-note">{{ n.note }}</div>
+          </div>
+        </li>
+      </ol>
+    </section>
+
     <!-- 渠道效果（竞品清单 #6）：哪个渠道回音率更高，精力该往哪放 -->
     <section v-if="!loading && channels.length" class="card" data-channel-stats>
       <div class="channel-head">
@@ -341,6 +388,14 @@ import { parseNotice, hasAnyField, type NoticeParse } from '../utils/noticeParse
 import { isConflictError } from '../utils/httpError'
 import { formatRate, type ChannelStat } from '../utils/channelStats'
 import {
+  daysText,
+  eventStatusText,
+  kindLabel,
+  summaryText,
+  timelineAtText,
+  type TimelineData,
+} from '../utils/timeline'
+import {
   IMPORT_ACCEPT,
   IMPORT_FIELDS,
   MAX_IMPORT_ROWS,
@@ -403,6 +458,8 @@ const funnel = ref<Record<string, number>>({})
 const channels = ref<ChannelStat[]>([])
 const followUps = ref<Application[]>([])
 const busyId = ref<number | null>(null)
+/** 投递 ↔ 面试时序（v1.61.0）。为 null 表示还没加载到或不适用 —— 不渲染空壳区块 */
+const timeline = ref<TimelineData | null>(null)
 
 const tailorTarget = ref<Application | null>(null)
 const tailorResume = ref('')
@@ -433,6 +490,20 @@ async function load() {
     ElMessage.error(getErrMessage(e, '加载投递台账失败'))
   } finally {
     loading.value = false
+  }
+  // 时序数据单独加载：它是**附加视图**，取不到就不显示该区块，
+  // 不能让它的失败把已加载好的台账与看板一并清空。
+  await loadTimeline()
+}
+
+async function loadTimeline() {
+  try {
+    const data = (await api.get('/api/application/timeline')) as unknown as TimelineData
+    timeline.value = data && Array.isArray(data.nodes) ? data : null
+  } catch {
+    // 明确降级：不弹错误提示（台账本身可用），仅隐藏时序区块。
+    // 若这里改成「保持上一次的数据」，用户会看到过期时间线却以为是最新的。
+    timeline.value = null
   }
 }
 
@@ -607,7 +678,12 @@ async function pushCalendarEvent(targetId: number) {
   const title = `${company} · ${role} · 面试`
   const at = toIsoSeconds(noticeForm.interviewAt)
   try {
-    await api.post('/api/calendar/event', { title, interviewAt: at, note: '来自投递通知识别' })
+    // v1.61.0：带上 applicationId 建立「投递 ↔ 面试」关联。
+    // 用户此刻正是在「把这条通知挂到某条投递记录上」，关联是已知事实而非猜测
+    // → 时序视图因此能算出「投出后几天面的」，无需任何启发式匹配。
+    await api.post('/api/calendar/event', {
+      title, interviewAt: at, note: '来自投递通知识别', applicationId: targetId,
+    })
     ElMessage.success('已加入面试日历')
   } catch (e: unknown) {
     if (isConflictError(e)) {
@@ -861,6 +937,42 @@ function actionVariant(action: string) {
 .channel-table tr:last-child td { border-bottom: none; }
 .channel-table .ch-name { font-family: inherit; color: var(--c-text); font-weight: 500; }
 .channel-table .ch-na { color: var(--c-text-quaternary); }
+
+/* ── 投递 → 面试时序（v1.61.0） ── */
+.tl-summary { font-size: 13px; color: var(--c-text-secondary); line-height: 1.7; margin: 0 0 8px; }
+.tl-legend { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--c-text-tertiary); margin-bottom: 14px; }
+.tl-unlinked { color: var(--c-warning); }
+
+.tl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.tl-node { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
+.tl-node:last-child { padding-bottom: 0; }
+.tl-node:last-child .tl-rail::after { display: none; }
+.tl-rail { position: relative; flex-shrink: 0; width: 10px; display: flex; justify-content: center; }
+.tl-rail::before {
+  content: ''; width: 10px; height: 10px; border-radius: 50%;
+  margin-top: 5px; z-index: 1; flex-shrink: 0;
+}
+.tl-rail::after {
+  content: ''; position: absolute; top: 15px; bottom: -14px; width: 2px;
+  background: var(--c-border-light);
+}
+/* 用形状 + 颜色双重区分：投递=实心方绿，面试=实心圆琥珀。
+   只靠颜色区分对色觉障碍用户不可用。 */
+.tl-rail-applied::before { background: var(--c-success); border-radius: 2px; }
+.tl-rail-interview::before { background: var(--c-warning); }
+.tl-rail-status::before { background: var(--c-info); }
+
+.tl-body { flex: 1; min-width: 0; }
+.tl-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tl-at { font-size: 13px; color: var(--c-text); font-weight: 600; }
+.tl-stage, .tl-event-status { font-size: 12px; color: var(--c-text-tertiary); }
+.tl-title { font-family: var(--font-title); font-size: 14px; font-weight: 600; color: var(--c-text); margin-top: 4px; }
+.tl-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--c-text-tertiary); margin-top: 4px; }
+.tl-gap b { color: var(--brand-primary); font-family: var(--font-mono); }
+.tl-nolink { color: var(--c-text-quaternary); }
+.tl-link { color: var(--brand-primary); text-decoration: none; font-size: 12px; }
+.tl-link:hover { text-decoration: underline; }
+.tl-note { font-size: 12px; color: var(--c-text-secondary); margin-top: 4px; white-space: pre-wrap; }
 .fu-status { font-size: 12px; color: var(--c-warning); background: var(--c-warning-light); border-radius: var(--radius-sm); padding: 1px 6px; }
 .fu-link { color: var(--brand-primary); text-decoration: none; font-size: 12px; }
 .fu-link:hover { text-decoration: underline; }

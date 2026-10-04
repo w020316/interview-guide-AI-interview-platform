@@ -2,7 +2,9 @@ package com.example.interview.controller;
 
 import com.example.interview.common.Result;
 import com.example.interview.entity.InterviewEventEntity;
+import com.example.interview.entity.JobApplicationEntity;
 import com.example.interview.service.InterviewEventService;
+import com.example.interview.service.job.JobApplicationService;
 import com.example.interview.util.RequestFieldUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +32,9 @@ public class InterviewEventController {
 
     @Autowired
     private InterviewEventService eventService;
+
+    @Autowired
+    private JobApplicationService applicationService;
 
     /**
      * 日历状态合法取值（第六轮 P1-04，v1.47.0）。
@@ -123,6 +128,19 @@ public class InterviewEventController {
         if (statusError != null) {
             return Result.error(400, statusError);
         }
+        // v1.61.0：可选关联投递记录。必须做归属校验（防 IDOR——
+        // 否则可把日程挂到他人投递记录上，时序视图会泄漏他人岗位/公司信息）。
+        Long applicationId = null;
+        if (req.get("applicationId") != null) {
+            RequestFieldUtil.NumberField appIdF = RequestFieldUtil.number(req, "applicationId");
+            if (appIdF.hasTypeError()) {
+                return Result.error(400, RequestFieldUtil.numberTypeError("applicationId"));
+            }
+            applicationId = appIdF.value() == null ? null : appIdF.value().longValue();
+            if (applicationId != null && applicationService.findOwned(userId, applicationId) == null) {
+                return Result.error(404, "未找到该投递记录，无法关联");
+            }
+        }
         InterviewEventEntity event = InterviewEventEntity.builder()
                 .title(title.trim())
                 .interviewer(ivF.value())
@@ -130,6 +148,7 @@ public class InterviewEventController {
                 .note(noteF.value())
                 .interviewAt(interviewAt)
                 .status(statusF.value())
+                .applicationId(applicationId)
                 .build();
         return Result.success(eventService.create(userId, event));
     }
@@ -168,7 +187,36 @@ public class InterviewEventController {
             if (at == null) return Result.error(400, "interviewAt 格式错误");
             updates.setInterviewAt(at);
         }
-        return Result.success(eventService.update(id, userId, updates));
+        // v1.61.0：关联字段的三态处理（区别于上面几行的二态「有则改」）：
+        //   ① 请求体**未带** applicationId          → 保持原关联不动
+        //   ② 带了且为 null / 空串 / 0              → 取消关联（写回 null）
+        //   ③ 带了正数                              → 关联到该记录（须归属校验，防 IDOR）
+        // 用独立标志位表达「要清除」，因为 null 在本方法里同时意味着「未提供」，
+        // 只靠实体字段无法区分这两者。
+        boolean clearLink = false;
+        if (req.containsKey("applicationId")) {
+            Object raw = req.get("applicationId");
+            boolean blank = raw == null
+                    || (raw instanceof String s && s.trim().isEmpty())
+                    || "0".equals(String.valueOf(raw).trim());
+            if (blank) {
+                clearLink = true;
+            } else {
+                RequestFieldUtil.NumberField appIdF = RequestFieldUtil.number(req, "applicationId");
+                if (appIdF.hasTypeError() || appIdF.value() == null) {
+                    return Result.error(400, RequestFieldUtil.numberTypeError("applicationId"));
+                }
+                Long appId = appIdF.value().longValue();
+                if (applicationService.findOwned(userId, appId) == null) {
+                    return Result.error(404, "未找到该投递记录，无法关联");
+                }
+                updates.setApplicationId(appId);
+            }
+        }
+        InterviewEventEntity updated = clearLink
+                ? eventService.updateAndClearApplicationLink(id, userId, updates)
+                : eventService.update(id, userId, updates);
+        return Result.success(updated);
     }
 
     /**

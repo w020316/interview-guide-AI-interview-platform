@@ -65,6 +65,33 @@ public class InterviewEventService {
         if (updates.getNote() != null) existing.setNote(updates.getNote());
         if (updates.getInterviewAt() != null) existing.setInterviewAt(updates.getInterviewAt());
         if (updates.getStatus() != null) existing.setStatus(updates.getStatus());
+        // v1.61.0：投递关联可显式设置或清除。
+        // 注意与上面几行的差别——applicationId 需要支持「取消关联」，
+        // 而 null 在这里既表示「未提供」也表示「要清除」，无法用同一套判据区分。
+        // 故调用方（控制器）只在请求体**显式带该字段**时才置位，未带则不动。
+        if (updates.getApplicationId() != null) existing.setApplicationId(updates.getApplicationId());
+        return eventRepository.save(existing);
+    }
+
+    /**
+     * 更新日程，并在同一事务内**清除投递关联**（v1.61.0）。
+     *
+     * <p>为什么单独开一个方法而不是在 {@link #update} 里加分支：{@code applicationId == null}
+     * 在 {@code update} 的语义里表示「未提供、保持原值」，而「取消关联」同样要写 null——
+     * 同一个值承担两种含义时，只能靠调用方的意图区分。把它显式拆成两个入口，
+     * 读代码的人不必再去追「是谁在什么条件下传的 null」。
+     */
+    @Transactional
+    public InterviewEventEntity updateAndClearApplicationLink(Long id, String userId,
+                                                             InterviewEventEntity updates) {
+        InterviewEventEntity existing = getOwned(id, userId);
+        if (updates.getTitle() != null) existing.setTitle(updates.getTitle());
+        if (updates.getInterviewer() != null) existing.setInterviewer(updates.getInterviewer());
+        if (updates.getLocation() != null) existing.setLocation(updates.getLocation());
+        if (updates.getNote() != null) existing.setNote(updates.getNote());
+        if (updates.getInterviewAt() != null) existing.setInterviewAt(updates.getInterviewAt());
+        if (updates.getStatus() != null) existing.setStatus(updates.getStatus());
+        existing.setApplicationId(null);
         return eventRepository.save(existing);
     }
 

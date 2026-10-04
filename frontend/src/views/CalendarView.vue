@@ -96,6 +96,7 @@
               <span v-if="e.interviewer" class="meta-item">· {{ e.interviewer }}</span>
             </div>
             <div v-if="e.note" class="event-note">{{ e.note }}</div>
+            <div v-if="linkedLabel(e)" class="event-linked">投递：{{ linkedLabel(e) }}</div>
           </div>
           <div class="event-actions">
             <button class="icon-btn" aria-label="标记完成" title="标记完成" @click="setStatus(e, 'DONE')">
@@ -158,6 +159,18 @@
             </select>
           </label>
           <label class="field">
+            <span class="field-label">关联投递记录</span>
+            <select v-model="form.applicationId" class="field-input">
+              <option :value="null">不关联（如笔试、宣讲会）</option>
+              <option v-for="a in applications" :key="a.id" :value="a.id">
+                {{ a.companyName }} · {{ a.title }}
+              </option>
+            </select>
+            <span class="field-hint">
+              关联后「投递看板」会显示「投出后几天面的」。不关联也能正常使用。
+            </span>
+          </label>
+          <label class="field">
             <span class="field-label">备注</span>
             <textarea v-model="form.note" class="field-input field-textarea" placeholder="准备要点、携带资料、注意事项…" rows="3" maxlength="300"></textarea>
           </label>
@@ -190,6 +203,15 @@ interface CalendarEvent {
   note?: string | null
   interviewAt: string
   status: string
+  /** v1.61.0：关联的投递记录 ID；null = 手工日程（如笔试、宣讲会） */
+  applicationId?: number | null
+}
+
+/** 投递台账中的一条（用于「关联投递记录」下拉） */
+interface ApplicationOption {
+  id: number
+  title: string
+  companyName: string
 }
 
 const now = new Date()
@@ -197,11 +219,16 @@ const viewYear = ref(now.getFullYear())
 const viewMonth = ref(now.getMonth())
 const selectedDate = ref(toDateString(now))
 const events = ref<CalendarEvent[]>([])
+/** 投递台账选项（v1.61.0）。取不到就只显示「不关联」，不影响日历本身使用 */
+const applications = ref<ApplicationOption[]>([])
 
 const showDialog = ref(false)
 const submitting = ref(false)
 const editingId = ref<number | null>(null)
-const form = reactive({ title: '', interviewAt: '', location: '', interviewer: '', status: 'UPCOMING', note: '' })
+const form = reactive({
+  title: '', interviewAt: '', location: '', interviewer: '', status: 'UPCOMING', note: '',
+  applicationId: null as number | null,
+})
 
 const days = computed(() => monthMatrix(viewYear.value, viewMonth.value))
 const monthTitle = computed(() => `${viewYear.value} 年 ${viewMonth.value + 1} 月`)
@@ -216,6 +243,19 @@ const selectedEvents = computed(() =>
 
 function dayEvents(date: string): CalendarEvent[] {
   return events.value.filter((e) => isSameDate(e.interviewAt.slice(0, 10), date))
+}
+
+/**
+ * 关联投递的展示文案（v1.61.0）。
+ *
+ * <p>台账里找不到该 id 时返回空串——可能对应记录已被移除（本平台允许用户在台账里
+ * 清掉不再追踪的投递）。此时**不显示任何关联信息**，而不是显示 ID 数字或「未知记录」：
+ * 前者对用户无意义，后者会让人以为出了故障。
+ */
+function linkedLabel(e: CalendarEvent): string {
+  if (e.applicationId == null) return ''
+  const a = applications.value.find((x) => x.id === e.applicationId)
+  return a ? `${a.companyName} · ${a.title}` : ''
 }
 
 function shiftMonth(n: number) {
@@ -241,10 +281,23 @@ async function load() {
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载日程失败'))
   }
+  // 台账选项单独加载：它是「关联」这个可选增强的输入源，
+  // 取不到时退化为「只能选不关联」，不该影响日历主功能。
+  await loadApplications()
 }
+
 async function itemsReload() {
   const data = (await api.get('/api/calendar/event/list')) as unknown as CalendarEvent[]
   events.value = data || []
+}
+
+async function loadApplications() {
+  try {
+    const data = (await api.get('/api/application/list')) as unknown as { items?: ApplicationOption[] }
+    applications.value = data?.items || []
+  } catch {
+    applications.value = []
+  }
 }
 
 function openCreate() {
@@ -255,6 +308,7 @@ function openCreate() {
   form.interviewer = ''
   form.status = 'UPCOMING'
   form.note = ''
+  form.applicationId = null
   showDialog.value = true
 }
 
@@ -266,6 +320,7 @@ function openEdit(e: CalendarEvent) {
   form.interviewer = e.interviewer || ''
   form.status = e.status || 'UPCOMING'
   form.note = e.note || ''
+  form.applicationId = e.applicationId ?? null
   showDialog.value = true
 }
 
@@ -285,6 +340,10 @@ async function submit() {
       interviewer: form.interviewer.trim(),
       status: form.status,
       note: form.note.trim(),
+      // v1.61.0：显式提交 applicationId（包含 null = 取消关联）。
+      // 后端按「请求体是否带该字段」区分「不改动」与「清除」，
+      // 所以这里必须始终带上——漏带会让用户「取消关联」的操作被静默忽略。
+      applicationId: form.applicationId,
     }
     if (editingId.value) {
       await api.put(`/api/calendar/event/${editingId.value}`, payload)
@@ -394,6 +453,7 @@ onMounted(load)
 .event-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--c-text-tertiary); margin-top: 4px; }
 .meta-item { display: inline-flex; align-items: center; gap: 3px; }
 .event-note { font-size: 12px; color: var(--c-text-secondary); margin-top: 4px; white-space: pre-wrap; }
+.event-linked { font-size: 12px; color: var(--brand-primary); margin-top: 4px; }
 .event-actions { display: flex; gap: 4px; align-items: flex-start; }
 .icon-btn { width: 28px; height: 28px; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: transparent; color: var(--c-text-secondary); cursor: pointer; transition: all var(--transition-fast); font-size: 13px; }
 .icon-btn:hover { color: var(--brand-primary); border-color: var(--brand-primary); background: var(--brand-primary-light); }
@@ -410,6 +470,7 @@ onMounted(load)
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-size: 13px; font-weight: 500; color: var(--c-text-secondary); }
 .field-label em { color: var(--c-danger); font-style: normal; }
+.field-hint { font-size: 12px; color: var(--c-text-tertiary); line-height: 1.6; margin-top: 2px; }
 .field-input { font-family: inherit; padding: 9px 12px; font-size: 14px; color: var(--c-text); background: var(--c-bg-alt); border: 1px solid var(--c-border); border-radius: var(--radius-md); transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
 .field-input:focus { outline: none; border-color: var(--brand-primary); box-shadow: 0 0 0 3px var(--brand-primary-100); }
 .field-textarea { resize: vertical; min-height: 64px; }

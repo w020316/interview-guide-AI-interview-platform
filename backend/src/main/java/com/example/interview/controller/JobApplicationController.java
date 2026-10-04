@@ -8,6 +8,7 @@ import com.example.interview.entity.JobPostingEntity;
 import com.example.interview.service.JobFavoriteService;
 import com.example.interview.service.career.TailoredResumeService;
 import com.example.interview.service.job.ApplicationImportService;
+import com.example.interview.service.job.ApplicationTimelineService;
 import com.example.interview.service.job.JobAgentService;
 import com.example.interview.service.job.JobApplicationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,6 +59,9 @@ public class JobApplicationController {
     @Autowired
     private ApplicationImportService applicationImportService;
 
+    @Autowired
+    private ApplicationTimelineService applicationTimelineService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 从 SecurityContext 获取当前登录用户 ID（JWT subject） */
@@ -93,6 +97,20 @@ public class JobApplicationController {
     @GetMapping("/board")
     public Result<Map<String, Object>> board() {
         return Result.success(applicationService.board(currentUserId()));
+    }
+
+    /**
+     * 投递 ↔ 面试时序视图（v1.61.0，竞品清单 #4）
+     * GET /api/application/timeline
+     *
+     * <p>把「投递」与「面试日程」两类真实时间点合并成一条时间线，回答
+     * 「投了之后多久接到面试」。**只输出数据库里真实存在的时间**——未填投出时间的草稿
+     * 不在时间线上，未关联投递的日程如实标为「未关联」，不硬塞关联、不推算时间。
+     */
+    @Operation(summary = "投递↔面试时序视图")
+    @GetMapping("/timeline")
+    public Result<Map<String, Object>> timeline() {
+        return Result.success(applicationTimelineService.timeline(currentUserId()));
     }
 
     /**
