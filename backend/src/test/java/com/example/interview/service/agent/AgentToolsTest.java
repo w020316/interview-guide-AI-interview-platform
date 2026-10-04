@@ -173,7 +173,9 @@ class AgentToolsTest {
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
         String out = newTools().searchWebJobs("Java", "沈阳");
-        assertThat(out).contains("搜索与本地岗位库均未找到");
+        // v1.59.0：不再说「搜索与本地岗位库均未找到」（暗示联网搜索还活着），
+        // 只说岗位库没找到，并单独如实说明联网源已被封禁
+        assertThat(out).contains("本地岗位库中未找到匹配岗位").contains("已封禁服务端自动访问");
     }
 
     @Test
@@ -482,7 +484,10 @@ class AgentToolsTest {
         when(webJobSearcherService.searchWeb(anyString(), any())).thenThrow(new RuntimeException("network down"));
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
-        assertThat(newTools().searchWebJobs("Java", "深圳")).contains("均未找到匹配岗位");
+        // v1.59.0：联网抛异常与「联网返回空」现在走同一套诚实文案，不再出现
+        // 「联网搜索与本地岗位库均未找到」这种暗示联网尚可用的说法
+        assertThat(newTools().searchWebJobs("Java", "深圳"))
+                .contains("本地岗位库中未找到匹配岗位").contains("已封禁服务端自动访问");
     }
 
     @Test
@@ -515,12 +520,15 @@ class AgentToolsTest {
     }
 
     @Test
-    @DisplayName("searchWebJobs：联网降级时本地库检索也异常→双降级文案")
+    @DisplayName("searchWebJobs：联网降级时本地库检索也异常→只提岗位库，不再声称「联网与本地都不可用」")
     void searchWebJobs_fallbackLocalThrows() {
         when(webJobSearcherService.searchWeb(anyString(), any())).thenReturn(List.of());
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenThrow(new RuntimeException("db down"));
-        assertThat(newTools().searchWebJobs("Java", null)).contains("联网搜索与本地岗位库暂时都不可用");
+        // v1.59.0：联网抓取早已结构性失效，把它和本地库并列说成「暂时都不可用」
+        // 会让用户误以为等一会儿联网就好了。现在只如实说岗位库不可用。
+        String out = newTools().searchWebJobs("Java", null);
+        assertThat(out).contains("岗位库暂时不可用").doesNotContain("联网搜索与本地岗位库暂时都不可用");
     }
 
     @Test
@@ -532,11 +540,31 @@ class AgentToolsTest {
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job)));
         String out = newTools().searchWebJobs("Java", null);
-        assertThat(out).contains("本地岗位库推荐").doesNotContain("申请:");
+        // v1.59.0：不再说「联网实时搜索暂未抓取到新岗位」（把结构性失效说成暂时性），
+        // 改为明确「来自平台聚合库，非联网实时抓取」
+        assertThat(out).contains("本地岗位库").contains("非联网实时抓取").doesNotContain("申请:");
+    }
+
+    @Test
+    @DisplayName("searchWebJobs：空结果文案必须如实说明国内源已封禁，且不得诱导「多试几次」")
+    void searchWebJobs_emptyResultWordingIsHonest() {
+        // 这条断言是「链路失效必须可见」的项目铁律的守卫：
+        // 若将来有人把文案改回「暂未抓取到新岗位」这类把结构性失效说成暂时性问题的说法，
+        // 本测试立即失败。
+        when(webJobSearcherService.searchWeb(anyString(), any())).thenReturn(List.of());
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        String out = newTools().searchWebJobs("Java", "北京");
+
+        assertThat(out)
+                .contains("已封禁服务端自动访问")
+                .contains("招聘广场")
+                .doesNotContain("暂未抓取到新岗位")
+                .doesNotContain("确认网络可访问");
     }
 
     // ───────────────────── matchResumeJobs：参数与异常 ─────────────────────
-
     @Test
     @DisplayName("matchResumeJobs：字符串“null”视为空简历")
     void matchResumeJobs_nullString() {

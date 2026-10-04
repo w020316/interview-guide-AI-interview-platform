@@ -177,4 +177,47 @@ class WebJobSearcherServiceTest {
         assertThat(WebJobSearcherService.mergeFromSource(out, List.of(), 8)).isZero();
         assertThat(out).isEmpty();
     }
+
+    // ─────────────── 数据源健康登记（v1.59.0「失效可见」）───────────────
+    // 背景：4 个国内招聘源已全部结构性失效，searchWeb 恒返回 0 条却耗时数百毫秒。
+    // 之前「全部失败」只写进日志，单实例部署时无人察觉，运营方唯一信号是「岗位变少了」。
+    // 现在每个源的成败都写入 JobSourceHealthRegistry，后台「数据源」视图能直接看到。
+
+    @Test
+    @DisplayName("searchWeb：未注入健康登记表时（单测直接 new）不抛 NPE，正常返回")
+    void searchWeb_withoutHealthRegistry_doesNotThrow() {
+        // 本测试方法跑在无网络的 CI 上，searchWeb 内部抓取会失败并返回空列表；
+        // 关键是：healthRegistry 为 null 时不得抛 NPE（否则智能体整条链路挂掉）
+        List<WebJobSearcherService.WebJob> jobs = svc.searchWeb("java", "全国");
+
+        assertThat(jobs).isNotNull();
+    }
+
+    @Test
+    @DisplayName("searchWeb：注入健康登记表后，4 个国内源即便失败也各留下一条失败记录")
+    void searchWeb_failingSourcesAreRecordedInHealthRegistry() {
+        JobSourceHealthRegistry registry = new JobSourceHealthRegistry();
+        svc.setHealthRegistry(registry);
+
+        svc.searchWeb("java", "全国");
+
+        // 环境若可联网且上游恰好放开，某些源可能成功；此时至少「有登记」这一点必须成立。
+        // 断言「四个源名都出现在快照里」比断言「全是失败」更稳健，也能在联网环境跑绿。
+        List<String> recorded = registry.snapshot().stream()
+                .map(JobSourceHealthRegistry.Health::platform).toList();
+        assertThat(recorded).contains(
+                WebJobSearcherService.SOURCE_ZHILIAN,
+                WebJobSearcherService.SOURCE_LAGOU,
+                WebJobSearcherService.SOURCE_51JOB,
+                WebJobSearcherService.SOURCE_ZHIPIN);
+    }
+
+    @Test
+    @DisplayName("registerHealth：源名与后台登记表键一致，避免后台出现两套命名")
+    void sourceNamesAreStable() {
+        assertThat(WebJobSearcherService.SOURCE_ZHILIAN).isEqualTo("智联招聘(联网)");
+        assertThat(WebJobSearcherService.SOURCE_LAGOU).isEqualTo("拉勾网(联网)");
+        assertThat(WebJobSearcherService.SOURCE_51JOB).isEqualTo("前程无忧(联网)");
+        assertThat(WebJobSearcherService.SOURCE_ZHIPIN).isEqualTo("BOSS直聘(联网)");
+    }
 }

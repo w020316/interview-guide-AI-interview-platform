@@ -158,7 +158,11 @@ public class AgentTools {
                         str(params, "jobType"), str(params, "location"), str(params, "recruitType"),
                         asBool(params, "overseas"))));
         registry.put("searchWebJobs", new ToolSpec("searchWebJobs",
-                "【联网实时搜索】通过联网搜索各大招聘平台（BOSS直聘/智联/拉勾/前程无忧等）的全国实时岗位信息，返回真实岗位：标题、企业、地点、薪资。用于用户要求最新/全网岗位，或本地岗位不足时",
+                "【联网实时搜索·当前不可用】尝试联网抓取国内招聘平台（BOSS直聘/智联/拉勾/前程无忧）的实时岗位。"
+                        + "⚠️ 截至 2026-10，这四个平台已全部封禁服务端自动访问（智联接入腾讯云 WAF 拦截、"
+                        + "其余为 JS 动态渲染），本工具通常返回空结果，随后自动降级到本地聚合岗位库。"
+                        + "因此不要因为本工具返回 0 条就改口说「没有岗位」，也不要反复调用它——"
+                        + "它已经不再是获取岗位信息的可靠途径，平台岗位库（searchJobs）才是。",
                 "keyword(必填,岗位关键词如:Java/产品/算法), location(可选,城市如:深圳,空或全国表示全国范围)",
                 (raw, params) -> searchWebJobs(str(params, "keyword"), str(params, "location"))));
         registry.put("matchResumeJobs", new ToolSpec("matchResumeJobs",
@@ -389,7 +393,7 @@ public class AgentTools {
         if (jobs.isEmpty()) {
             return fallbackToLocalJobs(kw, loc);
         }
-        StringBuilder sb = new StringBuilder("联网实时搜索到 ").append(jobs.size()).append(" 个全国岗位（数据来自公开招聘平台）：\n");
+        StringBuilder sb = new StringBuilder("联网实时搜索到 ").append(jobs.size()).append(" 个岗位（数据来自公开招聘平台）：\n");
         for (var j : jobs) {
             sb.append("- ").append(j.title())
                     .append(" | ").append(j.company() == null || j.company().isBlank() ? "企业待确认" : j.company())
@@ -403,7 +407,7 @@ public class AgentTools {
             }
             sb.append("\n");
         }
-        sb.append("\n提示：以上岗位为联网实时抓取，投递前请以招聘平台页面为准。");
+        sb.append("\n提示：以上为联网抓取的岗位（当前仅海外公开源可用），投递前请以招聘平台页面为准。");
         return truncate(sb);
     }
 
@@ -415,9 +419,14 @@ public class AgentTools {
             var page = jobAgentService.search(kw, null, null, loc, null, null, null, null, false, 0, 8);
             List<com.example.interview.entity.JobPostingEntity> items = page.getContent();
             if (items.isEmpty()) {
-                return "当前联网搜索与本地岗位库均未找到匹配岗位。可提示用户：换关键词（如 Java/产品/算法）、换城市，或确认网络可访问公开招聘站点；也可在「招聘广场」刷新数据。";
+                return "本地岗位库中未找到匹配岗位。"
+                        + "另需说明：四个国内招聘平台（BOSS直聘/智联/拉勾/前程无忧）已封禁服务端自动访问，"
+                        + "本平台的联网实时搜索自 2026-10 起取不到结果，这一限制不会随时间自动恢复。"
+                        + "可提示用户：换关键词（如 Java/产品/算法）或换城市再查；"
+                        + "也可到「招聘广场」浏览由海外公开源与官方招聘板持续刷新入库的岗位。";
             }
-            StringBuilder sb = new StringBuilder("联网实时搜索暂未抓取到新岗位，已为你从本地岗位库推荐 ").append(items.size()).append(" 个相近岗位：\n");
+            StringBuilder sb = new StringBuilder("以下是为你在本地岗位库中找到的 ")
+                    .append(items.size()).append(" 个相近岗位（来自平台聚合库，非联网实时抓取）：\n");
             for (var j : items) {
                 sb.append("- ").append(j.getTitle())
                         .append(" | ").append(j.getCompanyName())
@@ -430,7 +439,7 @@ public class AgentTools {
             }
             return truncate(sb);
         } catch (Exception e) {
-            return "联网搜索与本地岗位库暂时都不可用，请稍后再试或换一种问法。";
+            return "岗位库暂时不可用，请稍后再试或换一种问法。";
         }
     }
 

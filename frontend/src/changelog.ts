@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.58.0'
+export const CURRENT_VERSION = '1.59.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.59.0',
+    date: '2026-10-05',
+    title: '版本 1.59.0 · 找岗位不再「假装在联网」',
+    items: [
+      { text: '智能体找岗位：此前询问「帮我找最新的 Java 岗位」时，系统会先说「正在联网实时搜索」，然后悄悄退回到平台岗位库——你不会知道联网那一步**其实从没成功过**。现在这句话改成了如实说明，也不再拿「再试几次」搪塞', level: 'user' },
+      { text: '智能体找岗位：明确告知四个国内招聘网站（BOSS直聘、智联、拉勾、前程无忧）已经封禁了自动访问，平台无法再从中取到实时岗位（这不是临时故障），请以「招聘广场」里的岗位为准', level: 'user' },
+      { text: '管理后台：数据源页面现在能看到联网搜索各入口的连续失败记录，运维方不必再靠「岗位总数变少」去猜是哪个来源出了问题', level: 'user' },
+    ],
+  },
   {
     version: '1.58.0',
     date: '2026-10-04',
