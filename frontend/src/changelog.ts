@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.55.0'
+export const CURRENT_VERSION = '1.56.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.56.0',
+    date: '2026-10-04',
+    title: '版本 1.56.0 · 岗位来源再扩充：科技公司官方招聘板',
+    items: [
+      { text: '招聘广场：新增**科技公司官方招聘板**数据源——直接对接 OpenAI、Stripe、Notion、Linear、Airbnb、Dropbox 等知名公司的官方招聘接口，岗位为一手发布、含完整职位描述与申请入口', level: 'user' },
+      { text: '招聘广场：官方板岗位的**发布时间即为真实发布日期**，比聚合站更及时；远程/坐班、雇佣类型（全职/实习/合同）也如实标注', level: 'user' },
+    ],
+  },
   {
     version: '1.55.0',
     date: '2026-10-04',
