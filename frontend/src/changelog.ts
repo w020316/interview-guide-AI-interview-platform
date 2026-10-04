@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.49.1'
+export const CURRENT_VERSION = '1.50.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.50.0',
+    date: '2026-10-04',
+    title: '版本 1.50.0 · 投递看板能看到「哪个渠道更有回音」',
+    items: [
+      { text: '投递看板：新增「**渠道效果**」——按来源（招聘平台 / 内推 / 自行导入等）分别统计你投出去的回复率与面试率，一眼看出哪个渠道更有回音，把精力往那边多放一些', level: 'user' },
+      { text: '投递看板：还没投出过的渠道，回复率显示为「—」而不是 0% —— 「还没开始投」和「投了没人理」是两件事，不混在一起（没有渠道标注的老记录会归到「未标注」，不会被丢掉）', level: 'user' },
+      { text: '后端：投递看板新增按渠道聚合（byChannel）；顺带把「阶段判定」抽成与转化漏斗共用的单一来源，避免同一口径在两处各写一份而漂移；并移除重构后失效的 countFrom 死代码', level: 'tech' },
+    ],
+  },
   {
     version: '1.49.1',
     date: '2026-10-04',

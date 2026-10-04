@@ -250,4 +250,76 @@ class JobApplicationServiceTest {
         assertThat(JobApplicationService.label(JobApplicationEntity.STATUS_OFFER)).isEqualTo("已拿 Offer");
         assertThat(JobApplicationService.label(null)).isEqualTo("未知");
     }
+
+    // ───────── 渠道效果（竞品清单 #6） ─────────
+
+    private JobApplicationEntity appWithChannel(Long id, String status, String platform) {
+        return JobApplicationEntity.builder()
+                .id(id).userId(USER).jobId(id)
+                .title("Java 后端").companyName("腾讯")
+                .platform(platform)
+                .status(status)
+                .build();
+    }
+
+    @Test
+    @DisplayName("board：渠道效果按 platform 聚合，空/空白渠道归「未标注」且不被丢弃")
+    void board_byChannel_groupsAndSorts() {
+        when(repository.findByUserIdOrderByUpdatedAtDesc(USER)).thenReturn(List.of(
+                appWithChannel(1L, JobApplicationEntity.STATUS_APPLIED, "牛客网"),
+                appWithChannel(2L, JobApplicationEntity.STATUS_INTERVIEW, "牛客网"),
+                appWithChannel(3L, JobApplicationEntity.STATUS_REPLIED, "官方内推"),
+                appWithChannel(4L, JobApplicationEntity.STATUS_PLANNED, null),      // 草稿：不计入已投出
+                appWithChannel(5L, JobApplicationEntity.STATUS_APPLIED, "   ")));   // 空白：归未标注
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> byChannel =
+                (List<Map<String, Object>>) service.board(USER).get("byChannel");
+
+        assertThat(byChannel).hasSize(3);   // 两个渠道 + 一个「未标注」桶
+        assertThat(byChannel.get(0)).containsEntry("channel", "牛客网")
+                .containsEntry("submitted", 2).containsEntry("interviewOrBeyond", 1);
+        // 官方内推 与 未标注 的已投出数都是 1 → 并列时按渠道名升序（「官」< 「未」）
+        assertThat(byChannel.get(1)).containsEntry("channel", "官方内推").containsEntry("submitted", 1);
+        assertThat(byChannel.get(2)).containsEntry("channel", JobApplicationService.CHANNEL_UNLABELED)
+                .containsEntry("total", 2)        // 草稿 + 空白渠道那条，一条都没丢
+                .containsEntry("submitted", 1);   // 草稿不计入已投出，另一条计入
+    }
+
+    @Test
+    @DisplayName("board：渠道没有已投出记录时，比率是 null 而不是 0（无数据 ≠ 0）")
+    void board_byChannel_rateIsNullWhenNothingSubmitted() {
+        when(repository.findByUserIdOrderByUpdatedAtDesc(USER)).thenReturn(List.of(
+                appWithChannel(1L, JobApplicationEntity.STATUS_PLANNED, "牛客网")));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> byChannel =
+                (List<Map<String, Object>>) service.board(USER).get("byChannel");
+
+        assertThat(byChannel).hasSize(1);
+        Map<String, Object> c = byChannel.get(0);
+        assertThat(c.get("submitted")).isEqualTo(0);
+        assertThat(c.get("replyRate"))
+                .as("该渠道还没投出过 → 比率不可定义，必须是 null（0% 会被误读成「投了没人理」）")
+                .isNull();
+        assertThat(c.get("interviewRate")).isNull();
+    }
+
+    @Test
+    @DisplayName("board：渠道比率以「已投出」为分母，保留三位（1/3 → 0.333）")
+    void board_byChannel_rateRounds() {
+        when(repository.findByUserIdOrderByUpdatedAtDesc(USER)).thenReturn(List.of(
+                appWithChannel(1L, JobApplicationEntity.STATUS_REPLIED, "牛客网"),
+                appWithChannel(2L, JobApplicationEntity.STATUS_APPLIED, "牛客网"),
+                appWithChannel(3L, JobApplicationEntity.STATUS_APPLIED, "牛客网")));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> byChannel =
+                (List<Map<String, Object>>) service.board(USER).get("byChannel");
+
+        assertThat(byChannel.get(0))
+                .containsEntry("submitted", 3)
+                .containsEntry("repliedOrBeyond", 1)
+                .containsEntry("replyRate", 0.333);
+    }
 }

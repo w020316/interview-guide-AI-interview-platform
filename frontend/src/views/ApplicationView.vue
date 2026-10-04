@@ -49,6 +49,43 @@
       </div>
     </section>
 
+    <!-- 渠道效果（竞品清单 #6）：哪个渠道回音率更高，精力该往哪放 -->
+    <section v-if="!loading && channels.length" class="card" data-channel-stats>
+      <div class="channel-head">
+        <h2 class="channel-title">渠道效果</h2>
+        <span class="channel-hint">按来源统计回复情况——回复率高的渠道，值得多投一些</span>
+      </div>
+      <div class="channel-scroll">
+        <table class="channel-table">
+          <thead>
+            <tr>
+              <th>渠道</th>
+              <th>投递</th>
+              <th>已投出</th>
+              <th>有回复</th>
+              <th>面试</th>
+              <th>Offer</th>
+              <th>回复率</th>
+              <th>面试率</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="c in channels" :key="c.channel">
+              <td class="ch-name">{{ c.channel }}</td>
+              <td>{{ c.total }}</td>
+              <td>{{ c.submitted }}</td>
+              <td>{{ c.repliedOrBeyond }}</td>
+              <td>{{ c.interviewOrBeyond }}</td>
+              <td>{{ c.offer }}</td>
+              <!-- 后端在「已投出为 0」时返回 null（比率不可定义）→ 显示占位符而非 0% -->
+              <td :class="{ 'ch-na': c.replyRate == null }">{{ formatRate(c.replyRate) }}</td>
+              <td :class="{ 'ch-na': c.interviewRate == null }">{{ formatRate(c.interviewRate) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- 空状态 -->
     <div v-if="!loading && total === 0" class="empty-state">
       <div class="empty-icon">📮</div>
@@ -302,6 +339,7 @@ import { BaseButton, BaseTag } from '../components'
 import { EMPTY } from '../utils/format'
 import { parseNotice, hasAnyField, type NoticeParse } from '../utils/noticeParse'
 import { isConflictError } from '../utils/httpError'
+import { formatRate, type ChannelStat } from '../utils/channelStats'
 import {
   IMPORT_ACCEPT,
   IMPORT_FIELDS,
@@ -362,6 +400,7 @@ const loading = ref(true)
 const items = ref<Application[]>([])
 const counts = ref<Record<string, number>>({})
 const funnel = ref<Record<string, number>>({})
+const channels = ref<ChannelStat[]>([])
 const followUps = ref<Application[]>([])
 const busyId = ref<number | null>(null)
 
@@ -383,10 +422,12 @@ async function load() {
     const board = (await api.get('/api/application/board')) as unknown as {
       counts?: Record<string, number>
       funnel?: Record<string, number>
+      byChannel?: ChannelStat[]
       followUps?: Application[]
     }
     counts.value = board?.counts || {}
     funnel.value = board?.funnel || {}
+    channels.value = board?.byChannel || []
     followUps.value = board?.followUps || []
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载投递台账失败'))
@@ -801,6 +842,25 @@ function actionVariant(action: string) {
 .followup-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; font-size: 13px; }
 .fu-title { font-weight: 500; color: var(--c-text); }
 .fu-company { color: var(--c-text-tertiary); }
+
+/* 渠道效果表：窄屏用容器内横向滚动，避免整页横向溢出 */
+.channel-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.channel-title { font-size: 15px; font-weight: 600; color: var(--c-text); margin: 0; }
+.channel-hint { font-size: 12px; color: var(--c-text-tertiary); }
+.channel-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.channel-table { width: 100%; min-width: 460px; border-collapse: collapse; font-size: 13px; }
+.channel-table th {
+  text-align: right; font-weight: 500; font-size: 12px; color: var(--c-text-tertiary);
+  padding: 6px 10px; border-bottom: 1px solid var(--c-border-light); white-space: nowrap;
+}
+.channel-table th:first-child, .channel-table td:first-child { text-align: left; }
+.channel-table td {
+  text-align: right; padding: 8px 10px; color: var(--c-text-secondary);
+  border-bottom: 1px solid var(--c-border-light); font-family: var(--font-mono);
+}
+.channel-table tr:last-child td { border-bottom: none; }
+.channel-table .ch-name { font-family: inherit; color: var(--c-text); font-weight: 500; }
+.channel-table .ch-na { color: var(--c-text-quaternary); }
 .fu-status { font-size: 12px; color: var(--c-warning); background: var(--c-warning-light); border-radius: var(--radius-sm); padding: 1px 6px; }
 .fu-link { color: var(--brand-primary); text-decoration: none; font-size: 12px; }
 .fu-link:hover { text-decoration: underline; }

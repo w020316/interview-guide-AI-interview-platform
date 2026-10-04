@@ -292,19 +292,23 @@ public class JobApplicationService {
             }
         }
 
-        int applied = countFrom(counts, JobApplicationEntity.STATUS_APPLIED);
-        int viewed = countFrom(counts, JobApplicationEntity.STATUS_VIEWED);
-        int replied = countFrom(counts, JobApplicationEntity.STATUS_REPLIED);
-        int interview = countFrom(counts, JobApplicationEntity.STATUS_INTERVIEW);
-        int offer = countFrom(counts, JobApplicationEntity.STATUS_OFFER);
-        int rejected = countFrom(counts, JobApplicationEntity.STATUS_REJECTED);
-        int submitted = applied + viewed + replied + interview + offer + rejected;
+        // 漏斗改为按「阶段判定」逐条累加（与渠道效果共用同一套判定，见 SUBMITTED_STAGES 等常量）。
+        // 此前是各状态计数相加，口径藏在算术里，新增维度时极易漂移。
+        int submitted = 0, viewedOrBeyond = 0, repliedOrBeyond = 0, interviewOrBeyond = 0, offer = 0;
+        for (JobApplicationEntity a : all) {
+            String st = statusOf(a);
+            if (SUBMITTED_STAGES.contains(st)) submitted++;
+            if (VIEWED_STAGES.contains(st)) viewedOrBeyond++;
+            if (REPLIED_STAGES.contains(st)) repliedOrBeyond++;
+            if (INTERVIEW_STAGES.contains(st)) interviewOrBeyond++;
+            if (JobApplicationEntity.STATUS_OFFER.equals(st)) offer++;
+        }
 
         Map<String, Object> funnel = new LinkedHashMap<>();
         funnel.put("submitted", submitted);
-        funnel.put("viewedOrBeyond", viewed + replied + interview + offer + rejected);
-        funnel.put("repliedOrBeyond", replied + interview + offer);
-        funnel.put("interviewOrBeyond", interview + offer);
+        funnel.put("viewedOrBeyond", viewedOrBeyond);
+        funnel.put("repliedOrBeyond", repliedOrBeyond);
+        funnel.put("interviewOrBeyond", interviewOrBeyond);
         funnel.put("offer", offer);
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -312,6 +316,9 @@ public class JobApplicationService {
         result.put("counts", counts);
         result.put("statusLabels", STATUS_LABELS);
         result.put("funnel", funnel);
+        // 渠道效果（竞品清单 #6）：回答「哪个渠道回音率最高，精力该往哪放」
+        result.put("byChannel", byChannel(all));
+        result.put("channelUnlabeledLabel", CHANNEL_UNLABELED);
         result.put("followUpCount", followUps.size());
         result.put("followUps", followUps.stream().limit(10).toList());
         return result;
@@ -337,7 +344,97 @@ public class JobApplicationService {
         return STATUS_LABELS.getOrDefault(status, status);
     }
 
-    private static int countFrom(Map<String, Integer> counts, String status) {
-        return counts.getOrDefault(status, 0);
+    // ── 阶段判定与渠道聚合（竞品清单 #6「渠道效果分析」）─────────────────────
+    // 单一来源：漏斗与渠道效果共用下面四组判定，避免同一口径在两处各写一份而漂移。
+    // 口径与既有漏斗一致：PLANNED（还没投出）与 WITHDRAWN（已撤回）不计入「已投出」。
+
+    /** 已投出及之后（不含草稿与已撤回） */
+    private static final Set<String> SUBMITTED_STAGES = Set.of(
+            JobApplicationEntity.STATUS_APPLIED, JobApplicationEntity.STATUS_VIEWED,
+            JobApplicationEntity.STATUS_REPLIED, JobApplicationEntity.STATUS_INTERVIEW,
+            JobApplicationEntity.STATUS_OFFER, JobApplicationEntity.STATUS_REJECTED);
+
+    /** 已查看及之后（含被拒——被拒必然已被看到） */
+    private static final Set<String> VIEWED_STAGES = Set.of(
+            JobApplicationEntity.STATUS_VIEWED, JobApplicationEntity.STATUS_REPLIED,
+            JobApplicationEntity.STATUS_INTERVIEW, JobApplicationEntity.STATUS_OFFER,
+            JobApplicationEntity.STATUS_REJECTED);
+
+    /** 有回复及之后 */
+    private static final Set<String> REPLIED_STAGES = Set.of(
+            JobApplicationEntity.STATUS_REPLIED, JobApplicationEntity.STATUS_INTERVIEW,
+            JobApplicationEntity.STATUS_OFFER);
+
+    /** 进入面试及之后 */
+    private static final Set<String> INTERVIEW_STAGES = Set.of(
+            JobApplicationEntity.STATUS_INTERVIEW, JobApplicationEntity.STATUS_OFFER);
+
+    /** platform 为空/空白时归入的渠道名（不丢弃、不猜值） */
+    public static final String CHANNEL_UNLABELED = "未标注";
+
+    /** 状态归一：null 视为 PLANNED（与 counts 累加口径一致） */
+    private static String statusOf(JobApplicationEntity a) {
+        return a.getStatus() == null ? JobApplicationEntity.STATUS_PLANNED : a.getStatus();
+    }
+
+    /** 渠道归一：空/空白 → {@link #CHANNEL_UNLABELED}，其余去首尾空格 */
+    private static String channelOf(JobApplicationEntity a) {
+        String p = a.getPlatform();
+        return (p == null || p.isBlank()) ? CHANNEL_UNLABELED : p.trim();
+    }
+
+    /**
+     * 比率：分母为 0 时返回 {@code null}，**不产出假 0**。
+     *
+     * <p>「无数据 ≠ 0」是本项目纪律（同类问题已复发两次）：某渠道一条都没投出时，
+     * 「回复率 0%」会被误读成「投了没人理」，而真相是「还没有数据」。前端拿到 null 显示占位符。
+     */
+    private static Double rate(int numerator, int denominator) {
+        if (denominator <= 0) {
+            return null;
+        }
+        return Math.round((double) numerator / denominator * 1000.0) / 1000.0;
+    }
+
+    /**
+     * 按来源渠道聚合投递效果。
+     *
+     * <p>返回按「已投出数」降序、并列时渠道名升序的列表（输出确定，便于断言）。
+     * 每个渠道给出 total / submitted / repliedOrBeyond / interviewOrBeyond / offer
+     * 与两个比率 replyRate（有回复/已投出）、interviewRate（面试/已投出）。
+     */
+    private List<Map<String, Object>> byChannel(List<JobApplicationEntity> all) {
+        Map<String, int[]> agg = new java.util.HashMap<>();   // [total, submitted, replied, interview, offer]
+        for (JobApplicationEntity a : all) {
+            int[] c = agg.computeIfAbsent(channelOf(a), k -> new int[5]);
+            c[0]++;
+            String st = statusOf(a);
+            if (SUBMITTED_STAGES.contains(st)) c[1]++;
+            if (REPLIED_STAGES.contains(st)) c[2]++;
+            if (INTERVIEW_STAGES.contains(st)) c[3]++;
+            if (JobApplicationEntity.STATUS_OFFER.equals(st)) c[4]++;
+        }
+
+        List<Map.Entry<String, int[]>> entries = new java.util.ArrayList<>(agg.entrySet());
+        entries.sort((x, y) -> {
+            int cmp = Integer.compare(y.getValue()[1], x.getValue()[1]);
+            return cmp != 0 ? cmp : x.getKey().compareTo(y.getKey());
+        });
+
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (Map.Entry<String, int[]> e : entries) {
+            int[] c = e.getValue();
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("channel", e.getKey());
+            m.put("total", c[0]);
+            m.put("submitted", c[1]);
+            m.put("repliedOrBeyond", c[2]);
+            m.put("interviewOrBeyond", c[3]);
+            m.put("offer", c[4]);
+            m.put("replyRate", rate(c[2], c[1]));
+            m.put("interviewRate", rate(c[3], c[1]));
+            out.add(m);
+        }
+        return out;
     }
 }
