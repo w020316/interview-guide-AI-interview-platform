@@ -50,7 +50,8 @@ class HnWhoIsHiringJobProviderTest {
         assertThat(dto.companyName()).isEqualTo("Acme Corp");
         assertThat(dto.recruitType()).isEqualTo("SOCIAL");
         assertThat(dto.location()).isEqualTo("全球远程");
-        assertThat(dto.deadline()).isEqualTo(java.time.LocalDate.parse("2026-11-30"));
+        // 上游只有发帖时间、没有截止时间 → deadline 留 null（前端显示「长期有效」）
+        assertThat(dto.deadline()).isNull();
         assertThat(dto.description()).contains("我们使用 Java/Spring");
         // 评论区第一个外部链接作为申请入口；HN 站内链接不算
         assertThat(dto.applyUrl()).isEqualTo("https://acme.com/careers");

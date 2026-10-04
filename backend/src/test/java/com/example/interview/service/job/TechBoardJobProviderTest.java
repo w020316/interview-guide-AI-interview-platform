@@ -122,10 +122,10 @@ class TechBoardJobProviderTest {
     }
 
     @Test
-    @DisplayName("Ashby：publishedAt 按截止日推算有效期（+60 天），不做「无截止日期」的假象")
-    void ashby_deadlineFromPublished() {
+    @DisplayName("Ashby：上游无截止信息 → deadline 留空，不再按 publishedAt 推算假日期")
+    void ashby_deadlineIsNull() {
         List<JobDto> jobs = provider.parseAshby(readTree(ASHBY_JSON), "Linear");
-        assertThat(jobs.get(0).deadline()).isEqualTo(java.time.LocalDate.parse("2021-04-27").plusDays(60));
+        assertThat(jobs.get(0).deadline()).isNull();
     }
 
     @Test
@@ -150,10 +150,10 @@ class TechBoardJobProviderTest {
     }
 
     @Test
-    @DisplayName("Greenhouse：优先用 first_published 推算有效期，缺失时回退 updated_at")
-    void greenhouse_deadlinePrefersFirstPublished() {
+    @DisplayName("Greenhouse：上游无截止信息 → deadline 留空（first_published/updated_at 只作时效参考）")
+    void greenhouse_deadlineIsNull() {
         List<JobDto> jobs = provider.parseGreenhouse(readTree(GREENHOUSE_JSON), "Stripe");
-        assertThat(jobs.get(0).deadline()).isEqualTo(java.time.LocalDate.parse("2026-08-01").plusDays(60));
+        assertThat(jobs.get(0).deadline()).isNull();
     }
 
     @Test

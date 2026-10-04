@@ -58,7 +58,6 @@ public class HimalayasJobProvider extends AbstractOpenApiJobProvider {
             if (title == null || company == null || idPart == null) {
                 continue;
             }
-            LocalDate posted = fromEpochSecond(node.path("pubDate").asLong(0));
             LocalDate expiry = fromEpochSecond(node.path("expiryDate").asLong(0));
 
             result.add(new JobDto(
@@ -72,8 +71,8 @@ public class HimalayasJobProvider extends AbstractOpenApiJobProvider {
                     "不限",
                     "不限",
                     "SOCIAL",
-                    // 上游给了到期时间就用它；没给才按发帖日 + 60 天推算
-                    expiry != null ? expiry : deadlineFrom(posted, 60),
+                    // 上游给了到期时间就用它；**没给就留空**（v1.57.0：不再按发帖日推算假日期）
+                    expiry,
                     clip(text(node, "applicationLink", "guid"), LEN_URL),
                     plainText(text(node, "description", "excerpt"), 1200),
                     null,

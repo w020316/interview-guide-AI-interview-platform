@@ -61,7 +61,8 @@ class V2exJobsJobProviderTest {
         assertThat(job.recruitType()).isEqualTo("SOCIAL");
         assertThat(job.applyUrl()).isEqualTo("https://www.v2ex.com/t/900001");
         assertThat(job.description()).contains("负责后端开发");
-        assertThat(job.deadline()).isNotNull();
+        // 上游只有发帖时间、没有截止时间 → deadline 留 null
+        assertThat(job.deadline()).isNull();
     }
 
     @Test

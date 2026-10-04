@@ -56,8 +56,9 @@ class OpenApiJobProviderTest {
         assertThat(job.recruitType()).isEqualTo("SOCIAL");
         assertThat(job.tags()).isEqualTo("java,spring");
         assertThat(job.description()).isEqualTo("Build things at scale");
-        // 发帖日 + 60 天为截止日（上游不提供 deadline，用于临期排序与自动下架）
-        assertThat(job.deadline()).isEqualTo(LocalDate.of(2026, 9, 1).plusDays(60));
+        // v1.57.0：上游不提供 deadline → **留空**（不再按发帖日推算假日期，
+        // 否则常青岗会被 deactivateExpired 每轮误下架）
+        assertThat(job.deadline()).isNull();
     }
 
     @Test
@@ -149,7 +150,7 @@ class OpenApiJobProviderTest {
         assertThat(job.location()).isEqualTo("Berlin（可远程）");
         assertThat(job.tags()).isEqualTo("node,full-time,远程");
         assertThat(job.description()).isEqualTo("Node & Go");
-        assertThat(job.deadline()).isNotNull();
+        assertThat(job.deadline()).isNull();   // v1.57.0：上游无截止信息 → 留空
     }
 
     @Test
@@ -197,7 +198,7 @@ class OpenApiJobProviderTest {
         assertThat(job.salary()).isEqualTo("$120000 - $170000 / 年");
         assertThat(job.tags()).isEqualTo("full-time,Senior");
         assertThat(job.description()).isEqualTo("Build pipelines");
-        assertThat(job.deadline()).isEqualTo(LocalDate.of(2026, 9, 5).plusDays(60));
+        assertThat(job.deadline()).isNull();   // v1.57.0：上游无截止信息 → 留空
     }
 
     @Test
@@ -256,7 +257,7 @@ class OpenApiJobProviderTest {
     }
 
     @Test
-    @DisplayName("Himalayas: 无 expiryDate 时按发帖日 +60 天；缺链接时用标题兜底作 ID")
+    @DisplayName("Himalayas: 无 expiryDate 时截止日留空（v1.57.0 不再推算）；缺链接时用标题兜底作 ID")
     void himalayas_fallbacks() throws Exception {
         String json = """
                 {"jobs":[
@@ -270,8 +271,9 @@ class OpenApiJobProviderTest {
         assertThat(jobs).hasSize(1);
         assertThat(jobs.get(0).externalId()).isEqualTo("hml-Co-Designer");
         assertThat(jobs.get(0).jobType()).isEqualTo("设计");
-        assertThat(jobs.get(0).deadline())
-                .isEqualTo(AbstractOpenApiJobProvider.fromEpochSecond(1780000000).plusDays(60));
+        // 上游未给 expiryDate → deadline 留 null（前端显示「长期有效」），
+        // 不再用 pubDate+60 天伪造一个上游从未声明的截止日
+        assertThat(jobs.get(0).deadline()).isNull();
     }
 
     // ── 开关 ──
@@ -414,15 +416,13 @@ class OpenApiJobProviderTest {
     }
 
     @Test
-    @DisplayName("fromEpochSecond / deadlineFrom: 0 或 null 均安全降级")
+    @DisplayName("fromEpochSecond: 0 或 null 均安全降级")
     void timeHelpers_areNullSafe() {
         assertThat(AbstractOpenApiJobProvider.fromEpochSecond(0)).isNull();
         assertThat(AbstractOpenApiJobProvider.fromEpochSecond(-1)).isNull();
         assertThat(AbstractOpenApiJobProvider.fromEpochSecond(1780000000)).isNotNull();
 
-        assertThat(AbstractOpenApiJobProvider.deadlineFrom(null, 60)).isNull();
-        assertThat(AbstractOpenApiJobProvider.deadlineFrom(LocalDate.of(2026, 1, 1), 30))
-                .isEqualTo(LocalDate.of(2026, 1, 31));
+        // v1.57.0：deadlineFrom 已删除（它按发帖日编造截止日，会让常青岗被误下架）
     }
 
     @Test

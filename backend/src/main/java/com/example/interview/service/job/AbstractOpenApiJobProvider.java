@@ -288,15 +288,16 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     }
 
     /**
-     * 由发帖日期推导截止日期。
+     * ⚠️ v1.57.0 已删除 {@code deadlineFrom(posted, days)}。
      *
-     * <p>上游多数源不提供 deadline，而截止日期同时承担两个职责：
-     * 「临期优先」排序，以及 {@code JobAgentService} 的过期自动下架。
-     * 因此按发帖日 + 有效期推算，保证海外岗位也会自然新陈代谢。
+     * <p>它曾用「发帖日 + N 天」**推算** deadline，而上游从未提供截止信息 ——
+     * 那个 N 天是我们编的。后果是常青岗被 {@code deactivateExpired} 每轮误下架，
+     * 哪怕上游仍在正常招聘。**各源现在一律传 {@code null}（除非上游确实给了，
+     * 如 Himalayas 的 {@code expiryDate}），语义上「没有就说没有」。**
+     *
+     * <p>{@code deadline == null} 是合法状态，见 MEMORY.md §9.2：
+     * 前端显示「长期有效」、SQL 比较自动跳过、陈旧清理交给 {@code updatedAt}。
      */
-    protected static LocalDate deadlineFrom(LocalDate posted, int validDays) {
-        return posted == null ? null : posted.plusDays(validDays);
-    }
 
     /** 解析 yyyy-MM-dd / yyyy-MM-dd'T'HH:mm:ss 前缀日期 */
     protected static LocalDate parseDatePrefix(String raw) {

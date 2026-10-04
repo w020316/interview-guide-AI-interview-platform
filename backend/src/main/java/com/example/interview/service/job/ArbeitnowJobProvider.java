@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,7 +57,6 @@ public class ArbeitnowJobProvider extends AbstractOpenApiJobProvider {
                 continue;
             }
             boolean remote = node.path("remote").asBoolean(false);
-            LocalDate posted = fromEpochSecond(node.path("created_at").asLong(0));
 
             result.add(new JobDto(
                     clip("arb-" + rawId, LEN_EXTERNAL_ID),
@@ -71,7 +69,7 @@ public class ArbeitnowJobProvider extends AbstractOpenApiJobProvider {
                     "不限",
                     "不限",
                     "SOCIAL",
-                    deadlineFrom(posted, 60),
+                    null,   // 上游无截止信息 → 留空（不再按发帖日推算）
                     clip(text(node, "url"), LEN_URL),
                     desc(node),
                     null,

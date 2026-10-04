@@ -9,10 +9,6 @@ import org.xml.sax.InputSource;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -31,8 +27,6 @@ import java.util.Locale;
 public class WeWorkRemotelyJobProvider extends AbstractOpenApiJobProvider {
 
     private static final String FEED_URL = "https://weworkremotely.com/remote-jobs.rss";
-    private static final DateTimeFormatter RSS_DATE =
-            DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
 
     private final JobAgentProperties properties;
 
@@ -98,7 +92,6 @@ public class WeWorkRemotelyJobProvider extends AbstractOpenApiJobProvider {
                     region = titleLine.substring(open + 1, close).trim();
                     titleLine = titleLine.substring(0, open).trim();
                 }
-                LocalDate posted = parseRssDate(textOf(it, "pubDate"));
                 String category = textOf(it, "category");
 
                 result.add(new JobDto(
@@ -112,7 +105,7 @@ public class WeWorkRemotelyJobProvider extends AbstractOpenApiJobProvider {
                         "不限",
                         "不限",
                         "SOCIAL",
-                        deadlineFrom(posted, 45),
+                        null,   // 上游无截止信息 → 留空
                         clip(link, LEN_URL),
                         plainText(textOf(it, "description"), DESC_MAX_LEN),
                         null,
@@ -139,16 +132,6 @@ public class WeWorkRemotelyJobProvider extends AbstractOpenApiJobProvider {
         while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
         int slash = s.lastIndexOf('/');
         return slash >= 0 ? s.substring(slash + 1) : s;
-    }
-
-    private static LocalDate parseRssDate(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        try {
-            return LocalDateTime.parse(raw.trim(), RSS_DATE)
-                    .atZone(ZoneId.systemDefault()).toLocalDate();
-        } catch (Exception e) {
-            return parseDatePrefix(raw);
-        }
     }
 
     /** 地点：WWR 全站即远程岗；无地区标注时统一「全球远程」 */

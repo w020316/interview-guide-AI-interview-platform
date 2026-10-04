@@ -356,10 +356,14 @@ public class JobAgentService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("experience"), experience.trim()));
         }
         spec = spec.and((root, query, cb) -> cb.isTrue(root.get("active")));
-        // 排序：临期优先（截止日期升序，空截止日期排后），再按更新时间倒序
+        // 排序：临期优先（截止日期升序），**无截止日期的排最后**，再按更新时间倒序。
+        // ⚠️ v1.57.0 显式加 nullsLast()：此前只用 Order.asc("deadline")，
+        // 而 NULL 的排序位置**依方言而定**（PostgreSQL ASC 默认 NULLS LAST，
+        // H2 默认 NULLS FIRST）→ 本地与生产结果不一致；且 v1.57.0 起
+        // deadline 为 null 成为常态（不再编造截止日），必须显式声明意图。
         var pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50),
                 org.springframework.data.domain.Sort.by(
-                        org.springframework.data.domain.Sort.Order.asc("deadline"),
+                        org.springframework.data.domain.Sort.Order.asc("deadline").nullsLast(),
                         org.springframework.data.domain.Sort.Order.desc("updatedAt")));
         return repository.findAll(spec, pageable);
     }

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -125,8 +124,6 @@ public class V2exJobsJobProvider extends AbstractOpenApiJobProvider {
             if (url == null) {
                 url = "https://www.v2ex.com/t/" + id;
             }
-            long created = node.path("created").asLong(0L);
-            LocalDate posted = created > 0 ? fromEpochSecond(created) : null;
             // 帖子正文优先用渲染后的 HTML（内容更完整），清洗成纯文本
             String body = text(node, "content_rendered", "content");
 
@@ -141,7 +138,7 @@ public class V2exJobsJobProvider extends AbstractOpenApiJobProvider {
                     "不限",
                     "不限",
                     recruitTypeOf(title),
-                    deadlineFrom(posted, 60),
+                    null,   // 上游无截止信息 → 留空
                     clip(url, LEN_URL),
                     body == null ? null : plainText(body, DESC_MAX_LEN),
                     null,

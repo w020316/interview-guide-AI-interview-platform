@@ -171,7 +171,6 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
             boolean remote = j.path("isRemote").asBoolean(false);
             String dept = text(j, "department");
             String team = text(j, "team");
-            LocalDate posted = parseIsoDate(text(j, "publishedAt"));
 
             result.add(new JobDto(
                     clip("ashby-" + slugOf(url), LEN_EXTERNAL_ID),
@@ -184,7 +183,7 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
                     "不限",
                     "不限",
                     "SOCIAL",
-                    deadlineFrom(posted, 60),
+                    null,   // 上游无截止信息 → 留空（不再按发帖日推算假日期）
                     clip(url, LEN_URL),
                     plainText(text(j, "descriptionPlain"), DESC_MAX_LEN),
                     null,
@@ -230,8 +229,6 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
                 continue;
             }
             String location = j.path("location").path("name").asText(null);
-            LocalDate posted = parseIsoDate(firstNonBlank(
-                    text(j, "first_published"), text(j, "updated_at")));
 
             result.add(new JobDto(
                     clip("gh-" + externalId, LEN_EXTERNAL_ID),
@@ -244,7 +241,7 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
                     "不限",
                     "不限",
                     "SOCIAL",
-                    deadlineFrom(posted, 60),
+                    null,   // 上游无截止信息 → 留空（不再按发帖日推算假日期）
                     clip(url, LEN_URL),
                     null,
                     null,

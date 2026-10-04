@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,7 +60,6 @@ public class RemoteOkJobProvider extends AbstractOpenApiJobProvider {
             if (url == null && slug != null) {
                 url = "https://remoteok.com/remote-jobs/" + slug;
             }
-            LocalDate posted = parseDatePrefix(text(node, "date"));
 
             result.add(new JobDto(
                     clip("rok-" + rawId, LEN_EXTERNAL_ID),
@@ -74,7 +72,7 @@ public class RemoteOkJobProvider extends AbstractOpenApiJobProvider {
                     "不限",
                     "不限",
                     "SOCIAL",
-                    deadlineFrom(posted, 60),
+                    null,   // 上游无截止信息 → 留空
                     clip(url, LEN_URL),
                     desc(node),
                     null,

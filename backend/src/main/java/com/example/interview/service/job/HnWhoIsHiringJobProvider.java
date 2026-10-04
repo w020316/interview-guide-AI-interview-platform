@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -123,7 +122,6 @@ public class HnWhoIsHiringJobProvider extends AbstractOpenApiJobProvider {
         String firstLine = plain.split("\\R", 2)[0].trim();
         String title = firstLine.length() > 120 ? firstLine.substring(0, 120) : firstLine;
         String company = companyNameOf(firstLine, c.path("author").asText(""));
-        LocalDate posted = parseDatePrefix(c.path("created_at").asText(null));
         String url = firstExternalUrl(html);
         String location = plain.toLowerCase().contains("remote") ? "全球远程" : null;
 
@@ -138,7 +136,7 @@ public class HnWhoIsHiringJobProvider extends AbstractOpenApiJobProvider {
                 "不限",
                 "不限",
                 "SOCIAL",
-                deadlineFrom(posted, 60),
+                null,   // 上游无截止信息 → 留空
                 clip(url != null ? url : "https://news.ycombinator.com/item?id=" + objectId, LEN_URL),
                 clip(plain, DESC_MAX_LEN),
                 null,

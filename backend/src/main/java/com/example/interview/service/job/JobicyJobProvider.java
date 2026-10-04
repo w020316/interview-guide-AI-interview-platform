@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,7 +58,6 @@ public class JobicyJobProvider extends AbstractOpenApiJobProvider {
             if (title == null || company == null || rawId == null) {
                 continue;
             }
-            LocalDate posted = parseDatePrefix(text(node, "pubDate"));
 
             result.add(new JobDto(
                     clip("jby-" + rawId, LEN_EXTERNAL_ID),
@@ -72,7 +70,7 @@ public class JobicyJobProvider extends AbstractOpenApiJobProvider {
                     "不限",
                     "不限",
                     "SOCIAL",
-                    deadlineFrom(posted, 60),
+                    null,   // 上游无截止信息 → 留空
                     clip(text(node, "url"), LEN_URL),
                     plainText(text(node, "jobDescription", "jobExcerpt"), 1200),
                     null,

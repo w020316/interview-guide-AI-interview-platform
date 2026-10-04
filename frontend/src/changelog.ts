@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.56.1'
+export const CURRENT_VERSION = '1.57.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.57.0',
+    date: '2026-10-04',
+    title: '版本 1.57.0 · 岗位有效期显示更诚实了',
+    items: [
+      { text: '招聘广场：**不再给岗位编造截止日期**。此前系统会把「发布日期 + 固定天数」当成岗位的截止日期显示出来，于是长期有效的常青岗位会被标上一个从未存在过的截止日，甚至到期后被悄悄下架；现在凡是招聘方没说明截止日期的岗位，一律显示为「长期有效」', level: 'user' },
+      { text: '招聘广场：岗位排序修正——**长期有效的岗位不再插到最前面**，真正临近截止的岗位会优先展示', level: 'user' },
+    ],
+  },
   {
     version: '1.56.1',
     date: '2026-10-04',
