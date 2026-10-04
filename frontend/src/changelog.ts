@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.51.1'
+export const CURRENT_VERSION = '1.52.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.52.0',
+    date: '2026-10-04',
+    title: '版本 1.52.0 · 岗位匹配更准了（不再被关键词子串干扰）',
+    items: [
+      { text: '简历匹配推荐：技能命中改为**按词匹配**——以前「JavaScript」会被误认成「Java」、「Redis」会顺带命中「ES」，现在只有真正独立的技能才会命中。匹配分会因此变化，但更真实', level: 'user' },
+      { text: '后端：技能命中器重构为单一来源（ASCII 词用词边界正则、中文词用子串），并新增词边界回归测试（JavaScript 简历不得误报 Java 技能）', level: 'tech' },
+    ],
+  },
   {
     version: '1.51.1',
     date: '2026-10-04',
