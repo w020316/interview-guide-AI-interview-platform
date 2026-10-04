@@ -3,6 +3,8 @@ package com.example.interview.service.job;
 import com.example.interview.config.JobAgentProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -42,6 +44,8 @@ import java.util.Locale;
 @Component
 public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
 
+    private static final Logger log = LoggerFactory.getLogger(TechBoardJobProvider.class);
+
     /**
      * 精选公司清单（slug → 雇主展示名）。
      *
@@ -69,6 +73,17 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
 
     private static final String ASHBY_URL = "https://api.ashbyhq.com/posting-api/job-board/%s";
     private static final String GREENHOUSE_URL = "https://boards-api.greenhouse.io/v1/boards/%s/jobs";
+
+    /**
+     * 全部已配置的板名（slug）集合。
+     *
+     * <p>用于识别「URL 只到板级、没有岗位级 id」的畸形链接——这类链接提取出的
+     * 尾段恰好等于板名，若照单用作 externalId，会让该板所有此类岗位撞成同一个键。
+     */
+    private static final java.util.Set<String> BOARD_SLUGS = java.util.stream.Stream
+            .concat(ASHBY_BOARDS.stream(), GREENHOUSE_BOARDS.stream())
+            .map(b -> b[0])
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     /** 单个雇主最多取多少条（防止某家一次性灌入数百条淹没其他源） */
     private static final int MAX_PER_BOARD = 12;
@@ -147,13 +162,22 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
         JsonNode jobs = root.path("jobs");
         if (!jobs.isArray()) return result;
         int taken = 0;
+        int skipped = 0;
         for (JsonNode j : jobs) {
             if (taken >= MAX_PER_BOARD) break;
             // 上游用 isListed 标记该岗位是否对公开页可见；false 明确表示「未公开」
             if (j.has("isListed") && !j.path("isListed").asBoolean(true)) continue;
             String title = text(j, "title");
             String url = text(j, "jobUrl");
-            if (title == null || url == null) continue;
+            // 必需字段非空校验：缺任一则丢弃该条（避免「HTTP 200 但字段为空」的安静失败）。
+            // ⚠️ 必须校验「归一化后的 slug」，而不是裸 url——slugOf 会剥掉尾部斜杠，
+            // 所以 "https://jobs.ashbyhq.com/linear/" 仍能得到 "linear"（合法）；
+            // 真正要拦的是 slugOf 结果为空的情况（如 "https://jobs.ashbyhq.com/"），
+            // 否则 externalId 退化成 "ashby-"，多条会撞成同一个键互相覆盖。
+            if (title == null || title.isBlank() || url == null || slugOf(url).isBlank()) {
+                skipped++;
+                continue;
+            }
             String location = text(j, "location");
             boolean remote = j.path("isRemote").asBoolean(false);
             String dept = text(j, "department");
@@ -179,6 +203,7 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
             ));
             taken++;
         }
+        logSkipped("Ashby", company, skipped);
         return result;
     }
 
@@ -196,17 +221,31 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
         JsonNode jobs = root.path("jobs");
         if (!jobs.isArray()) return result;
         int taken = 0;
+        int skipped = 0;
         for (JsonNode j : jobs) {
             if (taken >= MAX_PER_BOARD) break;
             String title = text(j, "title");
             String url = text(j, "absolute_url");
-            if (title == null || url == null) continue;
+            String id = text(j, "id");
+            // 必需字段只有 title 与 url。**id 不作为丢弃条件**——它虽是首选 externalId，
+            // 但上游若临时缺失，整板 40 条会被一起丢掉（曾实测：只校验 id 会让配额用例全空），
+            // 那是比「重复」更严重的故障。缺 id 时回退用 absolute_url 的末段做 externalId，
+            // 同样稳定且唯一；两者都拿不到才丢弃。
+            if (title == null || title.isBlank() || url == null) {
+                skipped++;
+                continue;
+            }
+            String externalId = id != null && !id.isBlank() ? id : slugOf(url);
+            if (externalId.isBlank()) {
+                skipped++;
+                continue;
+            }
             String location = j.path("location").path("name").asText(null);
             LocalDate posted = parseIsoDate(firstNonBlank(
                     text(j, "first_published"), text(j, "updated_at")));
 
             result.add(new JobDto(
-                    clip("gh-" + text(j, "id"), LEN_EXTERNAL_ID),
+                    clip("gh-" + externalId, LEN_EXTERNAL_ID),
                     clip(title, LEN_TITLE),
                     clip(company, LEN_COMPANY),
                     "互联网",
@@ -224,10 +263,25 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
             ));
             taken++;
         }
+        logSkipped("Greenhouse", company, skipped);
         return result;
     }
 
     // ────────────────────────── 字段工具 ──────────────────────────
+
+    /**
+     * 记录被丢弃的条目数。
+     *
+     * <p><b>为什么必须打日志</b>：上游字段变更（如某天把 {@code title} 改名）不会报错，
+     * 只会让被丢弃数**悄悄上涨**。没有这条日志，表现就是「这家公司的岗位怎么变少了」，
+     * 而日志里一片正常——正是报告里说的那种「安静失败」。
+     */
+    private static void logSkipped(String ats, String company, int skipped) {
+        if (skipped > 0) {
+            log.warn("{} 板 {} 有 {} 条岗位缺少必需字段（标题/链接，或链接取不到岗位级标识），已丢弃",
+                    ats, company, skipped);
+        }
+    }
 
     private static String text(JsonNode node, String key) {
         JsonNode v = node.get(key);
@@ -245,9 +299,17 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
         String s = url.trim();
         int q = s.indexOf('?');
         if (q > 0) s = s.substring(0, q);
+        // 去掉尾部斜杠：若去掉后与**板名**同名（如 .../linear/），说明 URL 只到板级、
+        // 没有岗位级 id —— 此时返回空串交由调用方丢弃，避免多条岗位共用 ashby-<板名>
+        // 这个相同 externalId 而互相覆盖
         while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
         int slash = s.lastIndexOf('/');
-        return slash >= 0 ? s.substring(slash + 1) : s;
+        String seg = slash >= 0 ? s.substring(slash + 1) : s;
+        // URL 只到主机名（如 "https://jobs.ashbyhq.com"）时，lastIndexOf('/') 落在协议分隔符上，
+        // seg 会退化成**主机名**（jobs.ashbyhq.com）——这是整板共用的常量，不是岗位级 id。
+        // 若照单使用，该板所有此类岗位会拿到同一个 externalId 而互相覆盖。含 '.' 即判定为主机名。
+        if (seg.isEmpty() || seg.indexOf('.') >= 0) return "";
+        return BOARD_SLUGS.contains(seg) ? "" : seg;
     }
 
     /** ISO-8601（含时区偏移）→ LocalDate；解析不动时回退日期前缀解析 */

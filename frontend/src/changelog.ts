@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.56.0'
+export const CURRENT_VERSION = '1.56.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.56.1',
+    date: '2026-10-04',
+    title: '版本 1.56.1 · 官方招聘板：数据更完整，不再漏岗',
+    items: [
+      { text: '招聘广场：修复科技公司官方招聘板在**上游数据格式不完整时整批岗位消失**的问题——现在会逐条保留可用的岗位，只在确实缺少标题或链接时才跳过该条', level: 'user' },
+      { text: '招聘广场：修复官方板岗位**链接不含岗位编号时互相覆盖**的问题（此前同一家公司的多岗可能只显示出一条）', level: 'user' },
+    ],
+  },
   {
     version: '1.56.0',
     date: '2026-10-04',

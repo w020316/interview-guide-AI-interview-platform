@@ -179,6 +179,64 @@ class TechBoardJobProviderTest {
     }
 
     @Test
+    @DisplayName("安静失败防线：Greenhouse 缺 id 时回退用链接末段做 externalId，不得整板丢弃")
+    void greenhouse_missingIdFallsBackToUrl() {
+        // ⚠️ 这个用例最初写错了：期望「缺 id 一律丢弃」，结果 40 条一起消失（perBoardCap 全红）。
+        // id 只是首选 externalId；缺它时用 absolute_url 末段即可——**两者都拿不到**才该丢。
+        String missingId = """
+                {"jobs":[
+                  {"title":"Role A","absolute_url":"https://ex.com/a","location":{"name":"X"}},
+                  {"title":"Role B","absolute_url":"https://ex.com/b","location":{"name":"Y"}}
+                ]}
+                """;
+        List<JobDto> jobs = provider.parseGreenhouse(readTree(missingId), "Y");
+        assertThat(jobs).hasSize(2);
+        assertThat(jobs).extracting(JobDto::externalId).containsExactly("gh-a", "gh-b");
+    }
+
+    @Test
+    @DisplayName("安静失败防线：Greenhouse 链接取不到末段（externalId 会退化成 gh-）时丢弃")
+    void greenhouse_skipsUnderivableExternalId() {
+        String noTail = """
+                {"jobs":[
+                  {"title":"Bad Role","absolute_url":"https://boards.greenhouse.io/","location":{"name":"Z"}}
+                ]}
+                """;
+        assertThat(provider.parseGreenhouse(readTree(noTail), "Z")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("安静失败防线：Ashby 链接取不到 slug 时丢弃，避免撞成同一个 externalId")
+    void ashby_skipsBlankSlugTail() {
+        // ⚠️ slugOf 会先剥掉尾部斜杠，所以 "…/linear/" 得到 "linear"（合法岗位页）——
+        // 真正要拦的是**取不到末段**的链接（末段为空），否则 externalId 退化成 "ashby-"。
+        String noSlug = """
+                {"jobs":[
+                  {"title":"Weird Role","jobUrl":"https://jobs.ashbyhq.com/","isListed":true}
+                ]}
+                """;
+        List<JobDto> jobs = provider.parseAshby(readTree(noSlug), "Linear");
+        assertThat(jobs).isEmpty();
+    }
+
+    @Test
+    @DisplayName("正常岗位链接（尾段为 uuid）不受上述防线影响")
+    void ashby_normalUrlUnaffected() {
+        List<JobDto> jobs = provider.parseAshby(readTree(ASHBY_JSON), "Linear");
+        assertThat(jobs).hasSize(1);
+        assertThat(jobs.get(0).externalId()).isEqualTo("ashby-d3bc1ced-3ce4-4086-a050-555055dbb1ff");
+    }
+
+    @Test
+    @DisplayName("幂等：externalId 前缀稳定（ashby-/gh-），改前缀会导致旧岗位全部重复入库")
+    void externalIdPrefixStable() {
+        List<JobDto> a = provider.parseAshby(readTree(ASHBY_JSON), "Linear");
+        List<JobDto> g = provider.parseGreenhouse(readTree(GREENHOUSE_JSON), "Stripe");
+        assertThat(a.get(0).externalId()).startsWith("ashby-");
+        assertThat(g.get(0).externalId()).startsWith("gh-");
+    }
+
+    @Test
     @DisplayName("空/异常输入不抛错，返回空列表（失败隔离的上游保护）")
     void malformedInputsReturnEmpty() {
         assertThat(provider.parseAshby(null, "X")).isEmpty();
@@ -201,7 +259,8 @@ class TechBoardJobProviderTest {
         StringBuilder sb = new StringBuilder("{\"jobs\":[");
         for (int i = 0; i < 40; i++) {
             if (i > 0) sb.append(',');
-            sb.append("{\"title\":\"Eng ").append(i)
+            sb.append("{\"id\":").append(1000 + i)
+              .append(",\"title\":\"Eng ").append(i)
               .append("\",\"absolute_url\":\"https://ex.com/").append(i)
               .append("\",\"location\":{\"name\":\"L\"}}");
         }
