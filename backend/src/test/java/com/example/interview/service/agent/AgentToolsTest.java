@@ -197,7 +197,7 @@ class AgentToolsTest {
                 .salary("30k-50k").applyUrl("https://jobs.bytedance.com").build();
         when(jobAgentService.activeJobs()).thenReturn(List.of(job));
         when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of(
-                new com.example.interview.service.job.JobMatchService.MatchResult(job, 80, List.of("java", "spring"))));
+                new com.example.interview.service.job.JobMatchService.MatchResult(job, 80, List.of("java", "spring"), List.of())));
         String out = newTools().matchResumeJobs("熟悉Java和Spring，本科");
         assertThat(out).contains("Java 后端").contains("80 分").contains("命中技能:java/spring");
     }
@@ -558,7 +558,7 @@ class AgentToolsTest {
                 .title("Java 后端").companyName("某公司").build();
         when(jobAgentService.activeJobs()).thenReturn(List.of(job));
         when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of(
-                new com.example.interview.service.job.JobMatchService.MatchResult(job, 60, List.of("java"))));
+                new com.example.interview.service.job.JobMatchService.MatchResult(job, 60, List.of("java"), List.of())));
         String out = newTools().matchResumeJobs("熟悉Java");
         assertThat(out).contains("60 分").contains("地点未标注").contains("面议").doesNotContain("申请:");
     }
@@ -702,7 +702,7 @@ class AgentToolsTest {
                 .title("Java 后端").companyName("某公司").build();
         when(jobAgentService.activeJobs()).thenReturn(List.of(job));
         when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of(
-                new com.example.interview.service.job.JobMatchService.MatchResult(job, 75, List.of("java"))));
+                new com.example.interview.service.job.JobMatchService.MatchResult(job, 75, List.of("java"), List.of())));
 
         String out = newTools().dispatch("matchResumeJobs", "{\"resumeText\":\"熟悉Java\"}");
         assertThat(out).contains("75 分").contains("Java 后端");

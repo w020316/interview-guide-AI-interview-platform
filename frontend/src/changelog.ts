@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.50.0'
+export const CURRENT_VERSION = '1.51.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.51.0',
+    date: '2026-10-04',
+    title: '版本 1.51.0 · 岗位匹配会告诉你「差什么」',
+    items: [
+      { text: '简历匹配推荐：以前只显示「匹配多少分」和命中的技能，现在还会**明确列出短板**——这个岗位明确要求、但你简历里没有的技能（比如缺 Kafka、Redis），最多展示 4 项。知道自己差什么，比只看分数更有用', level: 'user' },
+      { text: '后端：岗位匹配结果新增 missingSkills（JD 明确要求但简历没有的技能）——规则推导、零 AI 调用，与简历优化「未具备只能进 missingKeywords 待补」的不编造原则同源；JD 没提的技能不会被列入', level: 'tech' },
+    ],
+  },
   {
     version: '1.50.0',
     date: '2026-10-04',

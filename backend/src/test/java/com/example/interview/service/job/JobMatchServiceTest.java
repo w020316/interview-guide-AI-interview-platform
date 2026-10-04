@@ -53,4 +53,29 @@ class JobMatchServiceTest {
         var skills = matcher.extractSkills("我用 Java、Redis 和 Kubernetes 部署");
         assertThat(skills).contains("java", "redis", "kubernetes");
     }
+
+    @Test
+    @DisplayName("短板：JD 明确出现但简历没有的技能，按词表顺序输出（零 AI 规则推导）")
+    void match_missingSkills_rules() {
+        var jobs = List.of(
+                job("Java 后端工程师", "Java,Spring,Redis,Kafka", "用 Kafka 与 Redis 做高并发"));
+        var result = matcher.match("熟悉 Java、Spring，做过核心系统", jobs, 10);
+
+        assertThat(result).hasSize(1);
+        var r = result.get(0);
+        assertThat(r.matchedSkills()).contains("java", "spring");
+        // JD 的 tags 与 description 都提到 redis/kafka/「高并发」，简历没有 → 短板（按词表顺序，中英混合）
+        assertThat(r.missingSkills()).containsExactly("redis", "kafka", "并发");
+        // JD 没提的技能不得出现在短板里（不编造）
+        assertThat(r.missingSkills()).doesNotContain("mongodb", "vue", "react");
+    }
+
+    @Test
+    @DisplayName("短板：简历已覆盖 JD 全部技能时为空（不输出无意义空档）")
+    void match_missingSkills_emptyWhenCovered() {
+        var jobs = List.of(job("Java 后端工程师", "Java,Spring", "纯 Java 栈"));
+        var result = matcher.match("Java Spring SpringBoot Redis", jobs, 10);
+
+        assertThat(result.get(0).missingSkills()).isEmpty();
+    }
 }

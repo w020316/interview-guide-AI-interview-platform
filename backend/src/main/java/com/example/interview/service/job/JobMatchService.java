@@ -29,8 +29,15 @@ public class JobMatchService {
             "spark", "flink"
     };
 
-    /** 匹配结果 */
-    public record MatchResult(JobPostingEntity job, int matchScore, List<String> matchedSkills) {
+    /**
+     * 匹配结果
+     *
+     * @param missingSkills JD 中明确出现、但简历画像里没有的技能（短板）。按词表顺序输出（确定）。
+     *                      <b>规则推导、零 AI</b> —— 与简历优化「未具备只能进 missingKeywords 待补」的
+     *                      不编造原则同源：缺什么就说缺什么，不猜、不编。
+     */
+    public record MatchResult(JobPostingEntity job, int matchScore, List<String> matchedSkills,
+                              List<String> missingSkills) {
     }
 
     /** 提取简历中的技能画像（小写，归一化） */
@@ -61,6 +68,7 @@ public class JobMatchService {
         }
         for (JobPostingEntity job : jobs) {
             String text = concat(job);
+            Set<String> jdSkills = extractSkills(text);   // 与命中判定同一份词表、同一段文本（口径同源）
             List<String> hit = new ArrayList<>();
             for (String s : skills) {
                 // text 由 concat(job) 生成，永不为 null
@@ -70,6 +78,15 @@ public class JobMatchService {
             }
             if (hit.isEmpty()) {
                 continue; // 完全无关的岗位不推荐
+            }
+            // 短板：JD 里明确出现、但简历画像里没有的技能（按词表顺序输出，结果确定）。
+            // 规则推导、零 AI —— 与简历优化「未具备只能进 missingKeywords 待补」的不编造原则同源。
+            List<String> missing = new ArrayList<>();
+            for (String kw : SKILL_KEYWORDS) {
+                String k = kw.toLowerCase(Locale.ROOT);
+                if (jdSkills.contains(k) && !skills.contains(k)) {
+                    missing.add(k);
+                }
             }
             int score = hit.size() * 20;
             String degree = job.getDegree() == null ? "" : job.getDegree();
@@ -81,7 +98,7 @@ public class JobMatchService {
                     && resumeText.toLowerCase(Locale.ROOT).contains("硕士")) {
                 score += 10;
             }
-            result.add(new MatchResult(job, score, hit));
+            result.add(new MatchResult(job, score, hit, missing));
         }
         result.sort((a, b) -> Integer.compare(b.matchScore(), a.matchScore()));
         return limit > 0 ? result.stream().limit(limit).toList() : result;

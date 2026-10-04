@@ -207,6 +207,8 @@ public class JobAgentController {
             row.put("job", m.job());
             row.put("matchScore", m.matchScore());
             row.put("matchedSkills", m.matchedSkills());
+            // 竞品清单 #20：岗位详情显式「短板」——JD 要求但简历没有的技能（后端规则推导，零 AI）
+            row.put("missingSkills", m.missingSkills());
             return row;
         }).toList();
         result.put("items", items);

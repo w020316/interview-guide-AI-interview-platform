@@ -153,6 +153,9 @@
           <div class="job-tags">
             <span v-if="matchInfo(job)" class="tag tag-match">匹配 {{ matchInfo(job)?.matchScore ?? 0 }} 分</span>
             <span v-for="(s, si) in matchInfo(job)?.matchedSkills || []" :key="'ms' + si" class="tag tag-skill">+{{ s }}</span>
+            <!-- 短板：JD 明确要求但简历没有的技能（后端规则推导，零 AI）。最多展示 4 个，其余以数量收口 -->
+            <span v-for="(s, si) in missingOf(job).slice(0, 4)" :key="'mi' + si" class="tag tag-miss">−{{ s }}</span>
+            <span v-if="missingOf(job).length > 4" class="tag tag-miss">还有 {{ missingOf(job).length - 4 }} 项</span>
             <span class="tag tag-source">{{ job.platform }}</span>
             <span v-if="job.industry" class="tag">{{ job.industry }}</span>
             <span v-if="job.jobType" class="tag">{{ job.jobType }}</span>
@@ -374,7 +377,7 @@ const matchOpen = ref(false)
 const matchActive = ref(false)
 const matching = ref(false)
 const matchResume = ref('')
-interface MatchedResult { job: JobPosting; matchScore: number; matchedSkills: string[] }
+interface MatchedResult { job: JobPosting; matchScore: number; matchedSkills: string[]; missingSkills?: string[] }
 const matched = ref<MatchedResult[]>([])
 try {
   const pre = sessionStorage.getItem('interview_prefill_resume')
@@ -383,6 +386,10 @@ try {
 
 function matchInfo(job: JobPosting) {
   return matched.value.find((m) => m.job.id === job.id) ?? null
+}
+/** 短板（竞品 #20）：JD 明确要求但简历没有的技能（后端规则推导，零 AI） */
+function missingOf(job: JobPosting) {
+  return matchInfo(job)?.missingSkills || []
 }
 async function runMatch() {
   if (!matchResume.value.trim()) return ElMessage.warning('请粘贴简历内容')
@@ -1217,4 +1224,6 @@ onMounted(() => {
 .match-actions { display: flex; gap: 8px; align-items: center; }
 .tag-match { color: var(--brand-primary, #0d7377); border-color: var(--brand-primary, #0d7377); font-weight: 600; }
 .tag-skill { color: var(--c-info); border-color: var(--c-info); }
+/* 短板：信息性弱化展示（不用警示色——「缺」是待补项，不是错误） */
+.tag-miss { color: var(--c-text-tertiary); border-color: var(--c-border); background: transparent; }
 </style>
