@@ -40,16 +40,56 @@ public class JobMatchService {
                               List<String> missingSkills) {
     }
 
-    /** 提取简历中的技能画像（小写，归一化） */
+    /**
+     * 技能命中器：ASCII 词用「词边界」正则（根治 java ⊂ javascript、es ⊂ redis 这类子串误报）；
+     * 含非 ASCII 的词（并发/分布式/c语言）没有词边界概念，保持子串匹配。
+     * 边界用前后 lookaround 而非 \b —— \b 对 c++ 结尾、k8s 这类拼写不可靠。
+     */
+    private record SkillMatcher(String keyword, java.util.regex.Pattern boundary) {
+        /** 严格命中：词边界匹配（ASCII）或子串匹配（中文） */
+        boolean hitStrict(String lowerText) {
+            if (boundary != null) {
+                return boundary.matcher(lowerText).find();
+            }
+            return lowerText.contains(keyword);
+        }
+
+        /** 宽松命中：子串匹配 —— 仅用于「短板豁免」（简历以更具体的形式覆盖了该技能） */
+        boolean hitLenient(String lowerText) {
+            return lowerText.contains(keyword);
+        }
+    }
+
+    private static final List<SkillMatcher> SKILL_MATCHERS = buildSkillMatchers();
+
+    private static List<SkillMatcher> buildSkillMatchers() {
+        List<SkillMatcher> out = new ArrayList<>(SKILL_KEYWORDS.length);
+        for (String kw : SKILL_KEYWORDS) {
+            String k = kw.toLowerCase(Locale.ROOT);
+            boolean ascii = true;
+            for (int i = 0; i < k.length() && ascii; i++) {
+                ascii = k.charAt(i) < 128;
+            }
+            if (ascii) {
+                out.add(new SkillMatcher(k, java.util.regex.Pattern.compile(
+                        "(?<![A-Za-z0-9])" + java.util.regex.Pattern.quote(k) + "(?![A-Za-z0-9])")));
+            } else {
+                out.add(new SkillMatcher(k, null));
+            }
+        }
+        return out;
+    }
+
+    /** 提取文本中的技能画像（小写，归一化；词边界匹配，无子串误报） */
     public Set<String> extractSkills(String resumeText) {
         Set<String> result = new HashSet<>();
         if (resumeText == null) {
             return result;
         }
         String lower = resumeText.toLowerCase(Locale.ROOT);
-        for (String kw : SKILL_KEYWORDS) {
-            if (lower.contains(kw.toLowerCase(Locale.ROOT))) {
-                result.add(kw.toLowerCase(Locale.ROOT));
+        for (SkillMatcher m : SKILL_MATCHERS) {
+            if (m.hitStrict(lower)) {
+                result.add(m.keyword());
             }
         }
         return result;
@@ -61,35 +101,30 @@ public class JobMatchService {
      * 未命中任何技能不计分。
      */
     public List<MatchResult> match(String resumeText, List<JobPostingEntity> jobs, int limit) {
-        Set<String> skills = extractSkills(resumeText);
+        String resumeLower = resumeText == null ? "" : resumeText.toLowerCase(Locale.ROOT);
         List<MatchResult> result = new ArrayList<>();
         if (jobs == null) {
             return result;
         }
         for (JobPostingEntity job : jobs) {
-            String text = concat(job);
-            Set<String> jdSkills = extractSkills(text);   // 与命中判定同一份词表、同一段文本（口径同源）
+            // 必须先小写：词边界正则区分大小写，而 JD 文本是原始大小写（Java/Spring/Redis…）
+            String jdText = concat(job).toLowerCase(Locale.ROOT);
             List<String> hit = new ArrayList<>();
-            for (String s : skills) {
-                // text 由 concat(job) 生成，永不为 null
-                if (text.toLowerCase(Locale.ROOT).contains(s)) {
-                    hit.add(s);
+            List<String> missing = new ArrayList<>();
+            for (SkillMatcher m : SKILL_MATCHERS) {
+                // 严格命中：JD 明确出现该技能（词边界，避免 es ⊂ redis / java ⊂ javascript 误报）
+                if (!m.hitStrict(jdText)) {
+                    continue;
                 }
+                if (m.hitStrict(resumeLower)) {
+                    hit.add(m.keyword());               // 优势：双方词边界命中
+                } else if (!m.hitLenient(resumeLower)) {
+                    missing.add(m.keyword());           // 简历文本完全没提 → 短板
+                }
+                // 简历以更具体形式覆盖（如 postgres ⊂ postgresql）→ 既不算优势也不列短板
             }
             if (hit.isEmpty()) {
                 continue; // 完全无关的岗位不推荐
-            }
-            // 短板：JD 里明确出现（jdSkills）、且**简历文本完全没出现**的技能（按词表顺序，结果确定）。
-            // 规则推导、零 AI —— 与简历优化「未具备只能进 missingKeywords 待补」的不编造原则同源。
-            // 判定用「简历文本是否包含该技能」（子串级）：这样 JD 的「postgres」会被简历的
-            // 「PostgreSQL」覆盖，不会把同一项技术误报成短板。
-            String resumeLower = resumeText == null ? "" : resumeText.toLowerCase(Locale.ROOT);
-            List<String> missing = new ArrayList<>();
-            for (String kw : SKILL_KEYWORDS) {
-                String k = kw.toLowerCase(Locale.ROOT);
-                if (jdSkills.contains(k) && !resumeLower.contains(k)) {
-                    missing.add(k);
-                }
             }
             // 相近词去重：postgres/postgresql、go/golang、es/elasticsearch 同指一项技术，
             // 不去重会出现「同一技术两个名字占两条短板」的噪声（词表天然成对，此问题必然发生）。
