@@ -33,7 +33,7 @@ import java.util.List;
 public class HnWhoIsHiringJobProvider extends AbstractOpenApiJobProvider {
 
     private static final String SEARCH_URL =
-            "https://hn.algolia.com/api/v1/search_by_date?tags=story&author=whoishiring&hitsPerPage=10";
+            "https://hn.algolia.com/api/v1/search_by_date?tags=story,author_whoishiring&hitsPerPage=10";
 
     /** 首行之外链接的提取（评论区第一个 http 链接通常是申请入口） */
     private static final java.util.regex.Pattern HREF = java.util.regex.Pattern.compile(
@@ -110,7 +110,8 @@ public class HnWhoIsHiringJobProvider extends AbstractOpenApiJobProvider {
     /** 单条评论 → JobDto；非招聘内容（过短）跳过，宁缺毋滥 */
     private JobDto toDto(JsonNode c) {
         String objectId = c.path("objectID").asText(null);
-        String html = c.path("text").asText(null);
+        // 搜索接口的评论文本在 comment_text（text 对评论常为 null），回退兼容
+        String html = c.path("comment_text").asText(c.path("text").asText(null));
         if (objectId == null || html == null || html.isBlank()) {
             return null;
         }
