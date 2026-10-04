@@ -129,8 +129,16 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     /** 该数据源的 JSON 接口地址 */
     protected abstract String endpoint();
 
-    /** 解析上游 JSON 为统一 JobDto 列表（同源内无需去重，跨源去重由 JobAgentService 负责） */
-    protected abstract List<JobDto> parse(JsonNode root);
+    /**
+     * 解析上游 JSON 为统一 JobDto 列表（同源内无需去重，跨源去重由 JobAgentService 负责）。
+     *
+     * <p>默认实现抛出 {@link UnsupportedOperationException}：走 XML/RSS 等非 JSON 格式、
+     * 或需要多步调用而覆写了 {@link #fetch()} 的数据源（如 WWR RSS、HN 两步查询）无需实现本方法。
+     */
+    protected List<JobDto> parse(JsonNode root) {
+        throw new UnsupportedOperationException(
+                platform() + " 覆写了 fetch()，不使用默认的 JSON 解析");
+    }
 
     /**
      * 拉取并解析。
@@ -148,19 +156,12 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     public List<JobDto> fetch() {
         String body;
         try {
-            body = restClient.get()
-                    .uri(endpoint())
-                    .header("User-Agent", UA)
-                    .header("Accept", "application/json, text/plain, */*")
-                    .retrieve()
-                    .body(String.class);
+            body = fetchRaw(endpoint());
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("公开数据源 {} 拉取失败：{}", platform(), e.getMessage());
             throw new IllegalStateException("拉取失败：" + e.getMessage(), e);
-        }
-        if (body == null || body.isBlank()) {
-            log.warn("公开数据源 {} 返回空响应体", platform());
-            throw new IllegalStateException("拉取失败：上游返回空响应体");
         }
         try {
             return applyQuotaForSource(parse(objectMapper.readTree(body)));
@@ -168,6 +169,33 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
             log.warn("公开数据源 {} 数据解析失败：{}", platform(), e.getMessage());
             throw new IllegalStateException("数据解析失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 拉取原始文本（v1.54.0：从 {@link #fetch()} 抽出，供多步数据源复用 HTTP 管道）。
+     *
+     * <p>部分数据源需要两步调用（如 Hacker News 先查最新一期 Who is hiring 帖、
+     * 再取该帖评论），单次 GET 无法覆盖。超时与 UA 约定与主流程一致。
+     *
+     * @throws IllegalStateException 上游不可达或返回空响应体（带原因，供调度层登记健康状态）
+     */
+    protected String fetchRaw(String url) {
+        String body;
+        try {
+            body = restClient.get()
+                    .uri(url)
+                    .header("User-Agent", UA)
+                    .header("Accept", "application/json, text/plain, */*")
+                    .retrieve()
+                    .body(String.class);
+        } catch (Exception e) {
+            log.warn("公开数据源 {} 拉取失败：{} ({})", platform(), url, e.getMessage());
+            throw new IllegalStateException("拉取失败：" + e.getMessage(), e);
+        }
+        if (body == null || body.isBlank()) {
+            throw new IllegalStateException("拉取失败：上游返回空响应体");
+        }
+        return body;
     }
 
     /**

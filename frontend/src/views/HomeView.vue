@@ -16,15 +16,15 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <div class="hero-badge fade-in-up">
-            <span>秋招求职工作台</span>
+            <span>求职工作台 · 全时段全行业</span>
           </div>
           <h1 class="hero-title fade-in-up" style="animation-delay: 80ms">
-            秋招求职<br />
+            求职<br />
             <span class="hero-em">一个工作台就够了</span>
           </h1>
           <p class="hero-subtitle fade-in-up" style="animation-delay: 160ms">
             招聘广场聚合 4000+ 岗位，投递看板盯住每一次投递与回复，求职诊断帮你挖出长处——
-            从找岗位、投递到模拟面试与复盘，秋招全流程都在这里完成。
+            从找岗位、投递到模拟面试与复盘，求职全流程都在这里完成。
           </p>
           <div class="hero-actions fade-in-up" style="animation-delay: 240ms">
             <BaseButton variant="primary" size="lg" shadow="sm" hoverable @click="goTo('/jobs')">
@@ -170,7 +170,7 @@
     <section class="cta-section fade-in-up">
       <div class="cta-card">
         <div class="cta-content">
-          <h2 class="cta-title">准备好开启你的秋招了吗？</h2>
+          <h2 class="cta-title">准备好开启下一段职业旅程了吗？</h2>
           <p class="cta-desc">免费使用，无需信用卡，从找岗位到模拟面试一站搞定</p>
           <BaseButton variant="cta" size="lg" hoverable @click="goTo('/login')">
             立即开始

@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.53.0'
+export const CURRENT_VERSION = '1.54.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.54.0',
+    date: '2026-10-04',
+    title: '版本 1.54.0 · 不只是秋招：全时段全行业的求职工作台',
+    items: [
+      { text: '定位更新：本平台**不只服务秋招**——现在覆盖全时段、全行业的岗位：公开招聘数据源持续滚动更新（社招/远程为主），内置校招/实习/兼职/服务业等精选数据全量保留，任何季节打开都有岗位可投', level: 'user' },
+      { text: '招聘广场：新增两个公开招聘数据源——**Hacker News「Who is hiring?」**（每月一帖，全球初创与技术岗）与 **We Work Remotely**（技术/设计/产品/市场/客服等全行业远程岗），岗位供给继续扩充', level: 'user' },
+      { text: '首页：文案更新为「全时段全行业」的求职工作台，不再局限秋招场景', level: 'user' },
+      { text: '后端：新增两个公开招聘数据源适配器——HN「Who is hiring?」（Algolia 官方 API，两步拉取：最新一期帖 → 最新 25 条评论）与 WeWorkRemotely（官方 RSS，JDK 内置 DOM 解析 + XXE 防护）；基类抽出 fetchRaw 供多步数据源复用 HTTP 管道；parse(JsonNode) 改为默认抛 UnsupportedOperationException（覆写 fetch 的源无需实现）', level: 'tech' },
+    ],
+  },
   {
     version: '1.53.0',
     date: '2026-10-04',
