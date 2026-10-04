@@ -165,7 +165,8 @@ public class AiConfig {
             @Value("${app.ai.rate-limit.max-retries:2}") int rateLimitMaxRetries,
             @Value("${spring.ai.openai.base-url:https://apihub.agnes-ai.com}") String springAiBaseUrl,
             @Value("${spring.ai.openai.api-key:sk-placeholder}") String springAiApiKey,
-            @Value("${spring.ai.openai.chat.options.model:agnes-2.5-flash}") String springAiModel) {
+            @Value("${spring.ai.openai.chat.options.model:agnes-2.5-flash}") String springAiModel,
+            com.example.interview.service.UserAiKeyService userAiKeyService) {
         // 同步调用：连接 10s + 读超时兜底，保证闸门许可有限时间内释放。
         // P0-04：传输层换 JDK HttpClient，上游 401 时响应体不再被 HttpRetryException 吞掉。
         restClientBuilder.requestFactory(
@@ -265,8 +266,14 @@ public class AiConfig {
             log.info("AI 厂商 RPM 令牌桶已启用：{}（账户级限流 1302/429 最多退避重试 {} 次）",
                     rpmByKey, Math.max(0, rateLimitMaxRetries));
         }
-        return new FallbackChatModel(delegates, names, rateLimitKeys, rateLimiter,
-                Thread::sleep, Math.max(0, rateLimitMaxRetries));
+        // 第四批（竞品清单 #15）：包一层「按用户路由」的 ChatModel —— 配置了自持 Key 的用户
+        // 走其自有 OpenAI 兼容端点（消耗其自身额度），其余回落平台降级链。
+        // 集成点唯一：ChatClient 构建在本 Bean 之上，所有 AI 功能（Agent/求职信/故事库/定制简历/
+        // 岗位分类）自动生效。**路由异常一律回落平台模型**，本包装层不能成为 AI 的故障点。
+        return new com.example.interview.ai.SelfKeyAwareChatModel(
+                new FallbackChatModel(delegates, names, rateLimitKeys, rateLimiter,
+                        Thread::sleep, Math.max(0, rateLimitMaxRetries)),
+                userAiKeyService);
     }
 
     /**

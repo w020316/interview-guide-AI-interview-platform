@@ -107,6 +107,59 @@
       <div v-if="importNote" class="data-note" :class="'note-' + importNoteKind">{{ importNote }}</div>
     </section>
 
+    <!-- 自持 AI Key（第四批 · 竞品清单 #15） -->
+    <section class="data-section fade-in-up" data-ai-key-section>
+      <div class="section-header">
+        <h2>AI 设置（自持 Key）</h2>
+        <span class="section-note">配置你自己的 OpenAI 兼容端点后，AI 功能消耗你自己的额度，不再受平台免费额度限制</span>
+      </div>
+
+      <div v-if="!aiKeyLoading" class="data-actions ai-key-form">
+        <template v-if="aiKeyConfigured">
+          <div class="ai-key-state">
+            <span class="ai-key-dot" aria-hidden="true"></span>
+            已启用自持 Key：<code class="ai-key-masked">{{ aiKeyMasked }}</code>
+            <span class="ai-key-meta">{{ aiKeyForm.model }} @ {{ aiKeyForm.baseUrl }}</span>
+          </div>
+        </template>
+        <template v-else>
+          <div class="ai-key-state">
+            <span class="ai-key-dot off" aria-hidden="true"></span>
+            未配置 —— AI 调用使用平台内置额度（免费档，有速率限制）
+          </div>
+        </template>
+
+        <label class="ai-field"><span>端点（OpenAI 兼容，https）</span>
+          <input v-model="aiKeyForm.baseUrl" class="filter-input" placeholder="https://open.bigmodel.cn/api/paas/v4" />
+        </label>
+        <label class="ai-field"><span>模型名</span>
+          <input v-model="aiKeyForm.model" class="filter-input" placeholder="glm-4-flash" />
+        </label>
+        <label class="ai-field"><span>API Key{{ aiKeyConfigured ? '（留空表示不修改）' : '' }}</span>
+          <input v-model="aiKeyForm.apiKey" type="password" autocomplete="off" class="filter-input"
+            placeholder="sk-…" />
+        </label>
+
+        <div class="ai-key-actions">
+          <BaseButton variant="gradient" :disabled="aiKeySaving || !aiKeyForm.baseUrl || !aiKeyForm.model
+            || (!aiKeyConfigured && !aiKeyForm.apiKey)" @click="saveAiKey">
+            {{ aiKeySaving ? '保存中…' : '保存' }}
+          </BaseButton>
+          <BaseButton v-if="aiKeyConfigured" variant="ghost" :disabled="aiKeyTesting" @click="testAiKey">
+            {{ aiKeyTesting ? '测试中…' : '测试连通' }}
+          </BaseButton>
+          <BaseButton v-if="aiKeyConfigured" variant="ghost" :disabled="aiKeySaving" @click="clearAiKey">
+            清除（回到平台额度）
+          </BaseButton>
+        </div>
+        <div v-if="aiKeyNote" class="data-note" :class="'note-' + aiKeyNoteKind">{{ aiKeyNote }}</div>
+        <div class="ai-key-privacy">
+          Key 以 AES-256-GCM 加密存储，接口只回显掩码；清除后立刻回到平台内置额度。
+        </div>
+      </div>
+      <div v-else class="ai-key-state">AI 设置加载中…</div>
+    </section>
+
     <!-- 最近活动 -->
     <section class="recent-section">
       <div class="section-header">
@@ -154,7 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
@@ -187,7 +240,100 @@ interface RecentActivity {
   createdAt: string
 }
 
-onMounted(() => loadStats())
+onMounted(() => {
+  loadStats()
+  loadAiKey()
+})
+
+// ── 自持 AI Key（第四批 · 竞品清单 #15）────────────────────────────────
+const aiKeyLoading = ref(true)
+const aiKeySaving = ref(false)
+const aiKeyTesting = ref(false)
+const aiKeyConfigured = ref(false)
+const aiKeyMasked = ref('')
+const aiKeyNote = ref('')
+const aiKeyNoteKind = ref<'success' | 'error' | 'info'>('info')
+const aiKeyForm = reactive({ apiKey: '', baseUrl: '', model: '' })
+
+async function loadAiKey() {
+  aiKeyLoading.value = true
+  try {
+    const v = (await api.get('/api/me/ai-key')) as unknown as {
+      configured?: boolean; keyMasked?: string; baseUrl?: string; model?: string
+    }
+    aiKeyConfigured.value = !!v?.configured
+    aiKeyMasked.value = v?.keyMasked || ''
+    aiKeyForm.baseUrl = v?.baseUrl || ''
+    aiKeyForm.model = v?.model || ''
+    aiKeyForm.apiKey = ''
+  } catch { /* 设置加载失败不阻断页面 */ } finally {
+    aiKeyLoading.value = false
+  }
+}
+
+async function saveAiKey() {
+  if (!aiKeyForm.baseUrl || !aiKeyForm.model) return
+  if (!aiKeyForm.apiKey && !aiKeyConfigured.value) return
+  aiKeySaving.value = true
+  try {
+    const res = (await api.put('/api/me/ai-key', {
+      apiKey: aiKeyForm.apiKey || undefined,
+      baseUrl: aiKeyForm.baseUrl,
+      model: aiKeyForm.model,
+    })) as unknown as { keyMasked?: string }
+    aiKeyConfigured.value = true
+    aiKeyMasked.value = res?.keyMasked || ''
+    aiKeyNote.value = '已保存。AI 调用将使用你的自持 Key（消耗你自己的额度）'
+    aiKeyNoteKind.value = 'success'
+    await loadAiKey()
+  } catch (e: unknown) {
+    aiKeyNote.value = getErrMessage(e, '保存失败')
+    aiKeyNoteKind.value = 'error'
+  } finally {
+    aiKeySaving.value = false
+  }
+}
+
+async function testAiKey() {
+  aiKeyTesting.value = true
+  try {
+    const res = (await api.post('/api/me/ai-key/test')) as unknown as {
+      ok?: boolean; reply?: string; message?: string; latencyMs?: number
+    }
+    if (res?.ok) {
+      aiKeyNote.value = `连通正常（${res.latencyMs}ms）：${res.reply || 'OK'}`
+      aiKeyNoteKind.value = 'success'
+    } else {
+      aiKeyNote.value = `连通失败：${res?.message || '未知错误'}`
+      aiKeyNoteKind.value = 'error'
+    }
+  } catch (e: unknown) {
+    aiKeyNote.value = getErrMessage(e, '测试失败')
+    aiKeyNoteKind.value = 'error'
+  } finally {
+    aiKeyTesting.value = false
+  }
+}
+
+async function clearAiKey() {
+  try {
+    await ElMessageBox.confirm(
+      '清除后 AI 调用回到平台内置额度（免费档，有速率限制）。确认清除？',
+      '清除自持 Key', { type: 'warning' })
+  } catch { return }
+  aiKeySaving.value = true
+  try {
+    await api.delete('/api/me/ai-key')
+    aiKeyNote.value = '已清除，回到平台内置额度'
+    aiKeyNoteKind.value = 'info'
+    await loadAiKey()
+  } catch (e: unknown) {
+    aiKeyNote.value = getErrMessage(e, '清除失败')
+    aiKeyNoteKind.value = 'error'
+  } finally {
+    aiKeySaving.value = false
+  }
+}
 
 async function loadStats() {
   loading.value = true
@@ -745,6 +891,18 @@ function fmtRelative(iso: string): string {
     gap: 12px;
   }
 }
+
+/* 自持 AI Key 设置（第四批 · 竞品清单 #15） */
+.ai-key-form { display: flex; flex-direction: column; gap: 12px; }
+.ai-key-state { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--c-text-secondary); flex-wrap: wrap; }
+.ai-key-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-success); flex-shrink: 0; }
+.ai-key-dot.off { background: var(--c-text-quaternary); }
+.ai-key-masked { font-family: var(--font-mono); color: var(--c-text); }
+.ai-key-meta { color: var(--c-text-tertiary); font-size: 12px; }
+.ai-field { display: flex; flex-direction: column; gap: 4px; }
+.ai-field span { font-size: 12px; color: var(--c-text-tertiary); }
+.ai-key-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.ai-key-privacy { font-size: 12px; color: var(--c-text-quaternary); line-height: 1.6; }
 
 @media (max-width: 480px) {
   .stats-grid {

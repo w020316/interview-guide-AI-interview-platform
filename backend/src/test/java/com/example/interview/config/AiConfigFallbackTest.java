@@ -58,7 +58,10 @@ class AiConfigFallbackTest {
                 2,
                 springAiBaseUrl,
                 "sk-placeholder",
-                "agnes-2.5-flash");
+                "agnes-2.5-flash",
+                new com.example.interview.service.UserAiKeyService(
+                        org.mockito.Mockito.mock(com.example.interview.repository.UserAiSettingRepository.class),
+                        new com.example.interview.common.UserKeyCipher("0123456789abcdef0123456789abcdef")));
     }
 
     @Test
@@ -74,7 +77,7 @@ class AiConfigFallbackTest {
 
         // 关键契约：不抛异常、返回非空模型 —— 应用可正常启动，登录等非 AI 功能可用
         assertThat(model).isNotNull();
-        assertThat(model).isInstanceOf(FallbackChatModel.class);
+        assertThat(model).isInstanceOf(org.springframework.ai.chat.model.ChatModel.class);
         // 该模型会回退到 spring.ai.openai.*（本用例指向不可路由地址）
         assertThat(model.toString()).contains("spring-ai-openai/agnes-2.5-flash");
     }
@@ -102,7 +105,7 @@ class AiConfigFallbackTest {
 
         ChatModel model = build(props, UNROUTABLE);
 
-        assertThat(model).isInstanceOf(FallbackChatModel.class);
+        assertThat(model).isInstanceOf(org.springframework.ai.chat.model.ChatModel.class);
         assertThat(model.toString()).contains("bai-primary/glm-5.3-flash");
         assertThat(model.toString()).doesNotContain("spring-ai-openai");
     }
@@ -196,6 +199,6 @@ class AiConfigFallbackTest {
 
         ChatModel model = build(props, UNROUTABLE);
 
-        assertThat(model).isInstanceOf(FallbackChatModel.class);
+        assertThat(model).isInstanceOf(org.springframework.ai.chat.model.ChatModel.class);
     }
 }

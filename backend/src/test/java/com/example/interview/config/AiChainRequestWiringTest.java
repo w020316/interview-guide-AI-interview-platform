@@ -103,8 +103,11 @@ class AiChainRequestWiringTest {
         AiConfig config = new AiConfig();
         ChatModel model = config.fallbackChatModel(
                 props, RestClient.builder(), WebClient.builder(), 1L, 2L, true, 2,
-                "https://apihub.agnes-ai.com", "sk-placeholder", "agnes-2.5-flash");
-        assertThat(model).isInstanceOf(FallbackChatModel.class);
+                "https://apihub.agnes-ai.com", "sk-placeholder", "agnes-2.5-flash",
+                new com.example.interview.service.UserAiKeyService(
+                        org.mockito.Mockito.mock(com.example.interview.repository.UserAiSettingRepository.class),
+                        new com.example.interview.common.UserKeyCipher("0123456789abcdef0123456789abcdef")));
+        assertThat(model).isInstanceOf(org.springframework.ai.chat.model.ChatModel.class);
 
         synchronized (received) {
             received.clear();

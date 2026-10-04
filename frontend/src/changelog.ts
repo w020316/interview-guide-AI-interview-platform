@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.52.0'
+export const CURRENT_VERSION = '1.53.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.53.0',
+    date: '2026-10-04',
+    title: '版本 1.53.0 · 可以用你自己的 AI Key 了',
+    items: [
+      { text: '个人中心：新增「AI 设置（自持 Key）」——配置你自己的 OpenAI 兼容端点与 Key（智谱、DeepSeek 等均可）后，AI 功能将消耗你自己的额度，不再受平台免费档速率限制。支持一键连通测试、随时清除；Key 以 AES-256-GCM 加密存储，接口只回显掩码。不配置则行为与以前完全一致', level: 'user' },
+      { text: '后端：新增按用户路由的 ChatModel 包装层——配置了自持 Key 的用户走其自有 OpenAI 兼容端点，其余回落平台降级链；自持 Key 的调用失败不静默回落平台链（避免静默消耗平台额度），转为明确的 503 提示；baseUrl 强制 https 且拒绝私网地址（SSRF 防护）', level: 'tech' },
+    ],
+  },
   {
     version: '1.52.0',
     date: '2026-10-04',

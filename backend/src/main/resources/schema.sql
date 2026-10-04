@@ -217,6 +217,17 @@ CREATE TABLE IF NOT EXISTS data_import_log (
 );
 CREATE INDEX IF NOT EXISTS idx_data_import_log_user ON data_import_log(user_id);
 
+-- 第四批（v1.53.0）：用户自持 AI Key 设置
+-- api_key_cipher 为 AES-256-GCM 密文（主密钥由 JWT_SECRET 派生，见 UserKeyCipher）；
+-- 主键即 user_id（一人一套配置）；base_url 强制 https 且拒绝私网地址（SSRF 防护在服务层）
+CREATE TABLE IF NOT EXISTS user_ai_setting (
+    user_id        VARCHAR(64)  PRIMARY KEY,
+    api_key_cipher TEXT         NOT NULL,
+    base_url       VARCHAR(200) NOT NULL,
+    model          VARCHAR(100) NOT NULL,
+    updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 预置知识数据
 INSERT INTO knowledge_doc (category, title, content, source) VALUES
 ('Java 基础', 'HashMap 原理', 'HashMap 基于哈希表实现，JDK 8 后采用数组+链表+红黑树结构。', 'JavaGuide'),

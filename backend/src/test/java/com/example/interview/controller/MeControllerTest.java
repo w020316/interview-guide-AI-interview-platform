@@ -4,6 +4,7 @@ import com.example.interview.common.ConflictException;
 import com.example.interview.interceptor.RateLimitInterceptor;
 import com.example.interview.security.JwtUtil;
 import com.example.interview.service.BackupService;
+import com.example.interview.service.UserAiKeyService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +40,9 @@ class MeControllerTest {
 
     @MockBean
     private BackupService backupService;
+
+    @MockBean
+    private UserAiKeyService userAiKeyService;
 
     @MockBean
     private JwtUtil jwtUtil;
