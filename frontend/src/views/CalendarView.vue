@@ -95,6 +95,8 @@
               </span>
               <span v-if="e.interviewer" class="meta-item">· {{ e.interviewer }}</span>
             </div>
+            <!-- 面试地点多为用户手填地址；线上/远程写法与多地点串会被组件自动隐藏 -->
+            <MapOpenLink v-if="e.location" :keyword="e.location" />
             <div v-if="e.note" class="event-note">{{ e.note }}</div>
             <div v-if="linkedLabel(e)" class="event-linked">投递：{{ linkedLabel(e) }}</div>
           </div>
@@ -189,7 +191,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { isConflictError } from '../utils/httpError'
-import { BaseButton, BaseTag } from '../components'
+import { BaseButton, BaseTag, MapOpenLink } from '../components'
 import {
   WEEKDAY_LABELS, fmtDateTime, isSameDate, monthMatrix,
   statusText, statusVariant, toDatetimeLocal, toDateString,

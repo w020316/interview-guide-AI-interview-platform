@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.61.0'
+export const CURRENT_VERSION = '1.62.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.62.0',
+    date: '2026-10-07',
+    title: '版本 1.62.0 · 面试地点和岗位城市，一键送到地图里',
+    items: [
+      { text: '面试日历：日程里填了具体地点时，会多出一行「在地图中搜索」，可直接用腾讯 / 高德 / 百度地图打开', level: 'user' },
+      { text: '投递看板：岗位地点是单个城市或具体地址时，同样可以一键在地图里打开', level: 'user' },
+      { text: '「视频面试」这类线上安排、以及写着多个城市的地点不会出现地图入口——它们没有唯一位置，与其给一个点了也没结果的链接，不如不显示', level: 'user' },
+      { text: '地图入口只做跳转：不读取你的位置、不记录任何坐标，也不需要你在本平台登录任何地图账号', level: 'user' },
+    ],
+  },
   {
     version: '1.61.0',
     date: '2026-10-05',

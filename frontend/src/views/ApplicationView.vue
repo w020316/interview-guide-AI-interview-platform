@@ -157,6 +157,8 @@
             <span v-if="a.salary">{{ a.salary }}</span>
             <span v-if="a.deadline">截止 {{ a.deadline }}</span>
           </div>
+          <!-- 地点是上游给的自由文本；多城市串（如「杭州/北京/深圳」）与远程岗会被组件自动隐藏 -->
+          <MapOpenLink v-if="a.location" :keyword="a.location" />
           <div v-if="a.note" class="app-note">备注：{{ a.note }}</div>
         </div>
 
@@ -382,7 +384,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
-import { BaseButton, BaseTag } from '../components'
+import { BaseButton, BaseTag, MapOpenLink } from '../components'
 import { EMPTY } from '../utils/format'
 import { parseNotice, hasAnyField, type NoticeParse } from '../utils/noticeParse'
 import { isConflictError } from '../utils/httpError'
