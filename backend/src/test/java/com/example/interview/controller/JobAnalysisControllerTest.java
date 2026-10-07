@@ -299,5 +299,74 @@ class JobAnalysisControllerTest {
                     .andExpect(jsonPath("$.data.extracted").isString())
                     .andExpect(jsonPath("$.data.source").value("web"));
         }
+
+        // ── v1.62.1：抓到正文但一个字段都没抽出来，不得当成功下发 ──
+        // 线上实测（2026-10-07）：维基百科词条这类「正文够长但不是岗位页」能通过
+        // looksLikeJobPage 的特征校验，随后模型如实返回三字段全空，而此前这里回 code 200，
+        // 前端拿到空 JD 渲染出一屏「—」且无任何提示 —— 正是项目红线禁止的
+        // 「解析失败但 HTTP 200」的脏数据。
+
+        private void mockFetchedArticlePage() {
+            when(atsJobResolver.resolve(anyString())).thenReturn(java.util.Optional.empty());
+            when(jobPageFetcher.fetch(anyString())).thenReturn(
+                    new com.example.interview.service.job.JobPageFetcher.FetchedPage(
+                            com.example.interview.service.job.JobPageFetcher.Outcome.OK,
+                            com.example.interview.service.job.JobPageFetcher.Reason.NONE,
+                            "https://en.wikipedia.org/wiki/Artificial_intelligence",
+                            "Artificial intelligence is intelligence exhibited by machines.".repeat(60),
+                            null));
+        }
+
+        @Test
+        @DisplayName("抓到正文但三字段全空 → code 422 + reason NOT_A_JOB_PAGE")
+        void importUrl_blankExtraction_returns422() throws Exception {
+            mockFetchedArticlePage();
+            // 提示词要求「网页里没有明确写的字段一律填空字符串」，三字段全空即模型的诚实回答
+            when(jobAnalysisService.extractJobFromPage(anyString()))
+                    .thenReturn("{\"jobTitle\":\"\",\"company\":\"\",\"jobDescription\":\"\"}");
+
+            String body = objectMapper.writeValueAsString(
+                    Map.of("url", "https://en.wikipedia.org/wiki/Artificial_intelligence"));
+            mockMvc.perform(post("/api/job/import-url")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(422))
+                    .andExpect(jsonPath("$.data.reason").value("NOT_A_JOB_PAGE"))
+                    // 关键：不能回 200 —— 那会让前端以为导入成功
+                    .andExpect(jsonPath("$.data.extracted").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("抽取结果被 Markdown 围栏包裹且三字段全空 → 同样分型为不是岗位页")
+        void importUrl_fencedBlankExtraction_returns422() throws Exception {
+            mockFetchedArticlePage();
+            when(jobAnalysisService.extractJobFromPage(anyString()))
+                    .thenReturn("```json\n{\"jobTitle\":\"\",\"company\":\"\",\"jobDescription\":\"\"}\n```");
+
+            String body = objectMapper.writeValueAsString(
+                    Map.of("url", "https://en.wikipedia.org/wiki/Artificial_intelligence"));
+            mockMvc.perform(post("/api/job/import-url")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(422))
+                    .andExpect(jsonPath("$.data.reason").value("NOT_A_JOB_PAGE"));
+        }
+
+        @Test
+        @DisplayName("只要有一个字段抽出来了，就照常当成功下发（不过度拦截）")
+        void importUrl_partialExtraction_stillSucceeds() throws Exception {
+            mockFetchedArticlePage();
+            // 岗位名与公司没抽到，但正文抽到了 —— 这种情况对用户仍有价值，不能拦
+            when(jobAnalysisService.extractJobFromPage(anyString()))
+                    .thenReturn("{\"jobTitle\":\"\",\"company\":\"\",\"jobDescription\":\"负责后端开发\"}");
+
+            String body = objectMapper.writeValueAsString(
+                    Map.of("url", "https://example.com/job"));
+            mockMvc.perform(post("/api/job/import-url")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.extracted").isString());
+        }
     }
 }

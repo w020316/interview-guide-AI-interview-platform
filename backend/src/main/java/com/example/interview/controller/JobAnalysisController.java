@@ -4,6 +4,9 @@ import com.example.interview.common.Result;
 import com.example.interview.service.JobAnalysisService;
 import com.example.interview.service.job.AtsJobResolver;
 import com.example.interview.service.job.JobPageFetcher;
+import com.example.interview.util.JsonRepairUtil;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +28,9 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/job")
 public class JobAnalysisController {
+
+    /** 仅用于判断「AI 抽取结果是否三字段全空」，与业务 JSON 序列化无关 */
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Autowired
     private JobAnalysisService jobAnalysisService;
@@ -112,6 +118,20 @@ public class JobAnalysisController {
             return Result.error(500, "已抓取到网页内容，但解析岗位信息失败，请重试或改为手动粘贴");
         }
 
+        // ── 「抓到了正文，但一个字段都没抽出来」不能当成功下发（v1.62.1）──
+        // 提示词明确要求「网页里没有明确写的字段一律填空字符串」，所以三字段全空是
+        // 模型**诚实的回答**：它认为这个页面里根本没有岗位信息。而「正文够长但不是岗位页」
+        // 是真实存在的（线上实测：维基百科词条能通过 looksLikeJobPage 的特征校验）。
+        // 此前这里直接 Result.success，前端会拿到一段空 JD 并渲染出一屏「—」——
+        // 用户以为导入成功了，实际什么都没有，也没有任何错误提示。
+        // 这正是项目红线所禁的「解析失败但 HTTP 200」的脏数据，故如实分型为「不是岗位页」。
+        if (isBlankExtraction(json)) {
+            Map<String, Object> notJobPage = Map.of("reason", JobPageFetcher.Reason.NOT_A_JOB_PAGE.name());
+            return Result.error(422,
+                    "这个页面看起来不是岗位详情页，没能读到岗位信息。请确认链接指向具体岗位，或手动粘贴 JD 文本",
+                    notJobPage);
+        }
+
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("extracted", json);
         payload.put("sourceUrl", page.finalUrl());
@@ -181,5 +201,33 @@ public class JobAnalysisController {
         currentUserId();
         String result = jobAnalysisService.generateLetter(resumeText, jobDescription, type);
         return Result.success(result);
+    }
+
+    /**
+     * AI 抽取结果是否为「三个字段全空」（v1.62.1）。
+     *
+     * <p>不能只判断字符串是否为空——模型返回的是一段 JSON 文本，字段全空时它是
+     * {@code {"jobTitle":"","company":"","jobDescription":""}}，字符串本身并不为空。
+     *
+     * <p>先剥掉可能的 Markdown 代码块围栏（复用 {@link JsonRepairUtil#stripMarkdownFence}）。
+     * <b>解析不出来时返回 false</b>：那种情况交给上层既有的 500 分支，
+     * 不在这里把「解析失败」误判成「不是岗位页」。
+     */
+    private static boolean isBlankExtraction(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return true;
+        }
+        try {
+            JsonNode node = MAPPER.readTree(JsonRepairUtil.stripMarkdownFence(json));
+            return isBlank(node.path("jobTitle").asText())
+                    && isBlank(node.path("company").asText())
+                    && isBlank(node.path("jobDescription").asText());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 }

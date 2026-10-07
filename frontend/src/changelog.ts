@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.62.0'
+export const CURRENT_VERSION = '1.62.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.62.1',
+    date: '2026-10-07',
+    title: '版本 1.62.1 · 导入链接读不到岗位时，会明说而不是给你一片空白',
+    items: [
+      { text: '粘贴岗位链接导入时，如果这个页面其实不是岗位详情页（比如是一篇文章、或网站首页），以前会「安静地成功」——导入一段空白内容，让你对着空输入框发愣', level: 'user' },
+      { text: '现在会明确告诉你「这个页面看起来不是岗位详情页」，并提示你确认链接或改为手动粘贴正文', level: 'user' },
+    ],
+  },
   {
     version: '1.62.0',
     date: '2026-10-07',
