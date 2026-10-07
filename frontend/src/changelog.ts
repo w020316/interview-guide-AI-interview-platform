@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.62.1'
+export const CURRENT_VERSION = '1.63.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.63.0',
+    date: '2026-10-07',
+    title: '版本 1.63.0 · 首页重新排过版，滚动时内容一段段浮上来',
+    items: [
+      { text: '首页「三大核心能力」不再是三张一样大的卡片并排：主推的那项占更大一块并列出它具体能做什么，另两项在右侧上下排开', level: 'user' },
+      { text: '「三步完成面试准备」改用细线加序号，不再是三个彩色圆圈', level: 'user' },
+      { text: '往下滚动时，内容会一段段淡入浮起——此前是打开页面就一次性演完，你还没滚到的地方「演完了才被你看到」', level: 'user' },
+      { text: '首页数据条的数字会从 0 滚到实际值', level: 'user' },
+      { text: '如果你在系统里开启了「减少动态效果」，以上动效会自动关闭，内容直接显示', level: 'user' },
+    ],
+  },
   {
     version: '1.62.1',
     date: '2026-10-07',

@@ -11,8 +11,8 @@
       @retry="loadTodo"
     />
 
-    <!-- Hero 区：左文右卡，不对称编辑式构图 -->
-    <section class="hero">
+    <!-- Hero 区：左文右卡，不对称编辑式构图；ambient-glow 给平面背景一层极轻的径向光 -->
+    <section class="hero ambient-glow">
       <div class="hero-grid">
         <div class="hero-copy">
           <div class="hero-badge fade-in-up">
@@ -52,15 +52,16 @@
             </ul>
           </nav>
 
-          <!-- Hero 数据展示：等宽琥珀金数字，评分面板质感 -->
+          <!-- Hero 数据展示：等宽琥珀金数字，评分面板质感。
+               v-count-up 让数字从 0 滚到目标值（后缀 `+` 保留），只在进入视口时播一次 -->
           <div class="hero-stats fade-in-up" style="animation-delay: 320ms">
             <div class="stat">
-              <div class="stat-num num-display">4</div>
+              <div class="stat-num num-display" v-count-up>4</div>
               <div class="stat-label">评分维度</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat">
-              <div class="stat-num num-display">4000+</div>
+              <div class="stat-num num-display" v-count-up="1400">4000+</div>
               <div class="stat-label">招聘岗位</div>
             </div>
             <div class="stat-divider"></div>
@@ -120,54 +121,56 @@
       </div>
     </section>
 
-    <!-- 特性卡片 -->
+    <!-- 特性卡片：**不对称编辑式网格** —— 首张为「主卡」占左列整高，另两张在右列上下排列。
+         ⚠️ 刻意不用「三等分卡片行」：那是 AI 生成版式最典型的特征（redesign 反模式清单点名项）。 -->
     <section class="section">
-      <div class="section-header">
+      <div class="section-header" v-reveal>
         <h2 class="section-title">三大核心能力</h2>
         <p class="section-subtitle">从简历到面试，全链路 AI 辅助</p>
       </div>
       <div class="features">
-        <BaseCard v-for="(f, i) in features" :key="f.title"
-                  variant="feature"
-                  class="fade-in-up"
-                  :style="{ animationDelay: (i * 100) + 'ms' }">
-          <div class="feature-icon-wrap">
-            <svg class="feature-icon" viewBox="0 0 24 24" fill="none">
-              <path :d="f.iconPath" stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <h3>{{ f.title }}</h3>
-          <p>{{ f.desc }}</p>
-          <div class="feature-tags">
-            <BaseTag v-for="t in f.tags" :key="t">{{ t }}</BaseTag>
-          </div>
-        </BaseCard>
+        <div v-for="(f, i) in features" :key="f.title"
+             class="feature-slot"
+             :class="{ 'is-lead': i === 0 }"
+             v-reveal="i * 90">
+          <BaseCard variant="feature" class="feature-card">
+            <div class="feature-icon-wrap">
+              <svg class="feature-icon" viewBox="0 0 24 24" fill="none">
+                <path :d="f.iconPath" stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h3>{{ f.title }}</h3>
+            <p>{{ f.desc }}</p>
+            <ul v-if="f.points?.length" class="feature-points">
+              <li v-for="p in f.points" :key="p">{{ p }}</li>
+            </ul>
+            <div class="feature-tags">
+              <BaseTag v-for="t in f.tags" :key="t">{{ t }}</BaseTag>
+            </div>
+          </BaseCard>
+        </div>
       </div>
     </section>
 
-    <!-- 工作流程 -->
+    <!-- 工作流程：编辑式编号（顶部长细线 + 等宽序号），不用填充圆形徽章。
+         ⚠️ 序号在这里承载**真实的顺序语义**，故保留；被去掉的是「装饰性圆形数字」
+         这种通用版式（redesign 反模式清单点名项）。 -->
     <section class="section">
-      <div class="section-header">
+      <div class="section-header" v-reveal>
         <h2 class="section-title">三步完成面试准备</h2>
         <p class="section-subtitle">简洁流程，快速上手</p>
       </div>
       <div class="steps">
-        <div v-for="(s, i) in steps" :key="s.title" class="step fade-in-up"
-             :style="{ animationDelay: (i * 120) + 'ms' }">
-          <div class="step-num-wrap">
-            <div class="step-num">{{ i + 1 }}</div>
-            <div v-if="i < steps.length - 1" class="step-line"></div>
-          </div>
-          <div class="step-content">
-            <h4>{{ s.title }}</h4>
-            <p>{{ s.desc }}</p>
-          </div>
+        <div v-for="(s, i) in steps" :key="s.title" class="step" v-reveal="i * 110">
+          <div class="step-index">{{ String(i + 1).padStart(2, '0') }}</div>
+          <h4>{{ s.title }}</h4>
+          <p>{{ s.desc }}</p>
         </div>
       </div>
     </section>
 
     <!-- CTA 区 -->
-    <section class="cta-section fade-in-up">
+    <section class="cta-section" v-reveal>
       <div class="cta-card">
         <div class="cta-content">
           <h2 class="cta-title">准备好开启下一段职业旅程了吗？</h2>
@@ -190,6 +193,7 @@ import { useRouter } from 'vue-router'
 import { isLoggedIn } from '../auth'
 import api, { getErrMessage } from '../api'
 import { BaseButton, BaseCard, BaseTag } from '../components'
+import { vCountUp, vReveal } from '../utils/reveal'
 import TodoPanel from '../components/TodoPanel.vue'
 import type { TodoTodayResponse } from '../utils/todo'
 
@@ -347,12 +351,29 @@ onMounted(async () => {
   }
 })
 
-const features = [
+/** 首页特性卡数据。`points` 只有主卡用：它跨两行，需要真实内容撑起高度 */
+interface FeatureCard {
+  title: string
+  desc: string
+  tags: string[]
+  iconPath: string
+  points?: string[]
+}
+
+const features: FeatureCard[] = [
   {
     title: '简历智能分析',
     desc: 'AI 从技术匹配度、项目含金量、表述清晰度等四个维度评分，给出可执行的改进建议',
     tags: ['PDF 解析', '多维度评分', '改进建议'],
     iconPath: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6 M9 9h1',
+    // 主卡（跨两行）需要真实内容撑起高度 —— 不用装饰元素填空。
+    // 三条都对应实现里的事实：4 维度评分（hero 数据条同源）、多格式上传、
+    // v1.46.0 的截图视觉识别通道。
+    points: [
+      '技术匹配、项目含金量、表述清晰度等 4 个维度逐条打分',
+      '支持 PDF / HTML / Markdown / TXT 与纯文本粘贴',
+      '也可以直接传截图，由视觉模型识别成文字',
+    ],
   },
   {
     title: '岗位深度分析',
@@ -759,13 +780,18 @@ const steps = [
   animation: fadeInUp 0.5s var(--transition-bounce) both 0.7s;
 }
 
-/* ── 通用 Section ── */
+/* ── 通用 Section ──
+ * 留白刻意**不对称**：下边距略大于上边距，视觉重心更稳，也避免各区块「等距堆叠」的均质感。
+ */
 .section {
-  padding: 56px 0;
+  padding: 68px 0 76px;
 }
 
+/* 区块头**左对齐**（v1.63.0）：与 Hero 的左对齐编辑式构图连成一条阅读轴线。
+ * 此前居中对齐会让整页变成「每段都居中」的模板感。 */
 .section-header {
-  text-align: center;
+  text-align: left;
+  max-width: 60ch;
   margin-bottom: 40px;
 }
 
@@ -775,23 +801,71 @@ const steps = [
   color: var(--c-text);
   margin: 0 0 10px;
   letter-spacing: -0.5px;
+  text-wrap: balance;
 }
 
 .section-subtitle {
   font-size: 15px;
   color: var(--c-text-secondary);
   margin: 0;
+  text-wrap: pretty;
 }
 
-/* ── 特性卡片 ── */
+/* ── 特性卡片：不对称编辑式网格 ──
+ * 左列主卡跨两行（1.45fr），右列两张上下排列（1fr）。
+ * 这是刻意的**非对称**：打破「三等分卡片行」这种 AI 版式指纹。 */
 .features {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: 1.45fr 1fr;
+  gap: 18px;
 }
 
+.feature-slot {
+  display: flex;
+}
+
+.feature-slot :deep(.base-card) {
+  width: 100%;
+  height: 100%;
+}
+
+/* 主卡跨两行时高度由右列决定，内容短就会在底部留一大片空白，看着像没做完。
+ * 让卡片内容成为纵向弹性容器、把标签锚到底部，空白就成了刻意的呼吸而非空缺。
+ * （同类问题见 redesign 清单「卡片 CTA 未对齐底部」。） */
 .features :deep(.base-card--feature .base-card__body) {
   padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* 主卡内的要点列表：用发丝分隔线组织，替代「用装饰元素填空白」的做法 */
+.feature-points {
+  list-style: none;
+  margin: 4px 0 22px;
+  padding: 0;
+}
+
+.feature-points li {
+  padding: 11px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
+  border-top: 1px solid var(--c-border-light);
+}
+
+.feature-points li:last-child {
+  border-bottom: 1px solid var(--c-border-light);
+}
+
+/* 主卡跨两行 —— 右列两张自然上下堆叠，形成左重右轻的编辑式平衡 */
+.feature-slot.is-lead {
+  grid-row: span 2;
+}
+
+/* 主卡给更宽的留白与更大的字号，让「主次」一眼可辨 */
+.feature-slot.is-lead :deep(.base-card--feature .base-card__body) {
+  padding: 40px 36px;
 }
 
 .feature-icon-wrap {
@@ -811,11 +885,27 @@ const steps = [
   height: 22px;
 }
 
+.feature-slot.is-lead .feature-icon-wrap {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 20px;
+}
+
+.feature-slot.is-lead .feature-icon {
+  width: 28px;
+  height: 28px;
+}
+
 .features :deep(.base-card--feature h3) {
   font-size: 17px;
   font-weight: 600;
   color: var(--c-text);
   margin: 0 0 8px;
+}
+
+.feature-slot.is-lead :deep(.base-card--feature h3) {
+  font-size: 22px;
+  letter-spacing: -0.4px;
 }
 
 .features :deep(.base-card--feature p) {
@@ -825,10 +915,17 @@ const steps = [
   margin: 0 0 16px;
 }
 
+.feature-slot.is-lead :deep(.base-card--feature p) {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
 .feature-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  /* 锚到底部：主卡跨两行时高度由右列决定，标签贴着底边才不会飘在中间 */
+  margin-top: auto;
 }
 
 .features :deep(.base-card--feature:hover .base-tag) {
@@ -837,67 +934,42 @@ const steps = [
   border-color: var(--brand-primary-100);
 }
 
-/* ── 工作流程 ── */
+/* ── 工作流程：编辑式编号 ──
+ * 顶部长细线连成一条贯穿整行的规则线；序号用等宽小字 + 字距，放在内容之上。
+ * 不用填充圆形徽章 —— 那是通用模板版式。 */
 .steps {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  position: relative;
+  gap: 0;
 }
 
 .step {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  position: relative;
+  padding: 24px 32px 0 0;
+  border-top: 1px solid var(--c-border-strong);
 }
 
-.step-num-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
+.step-index {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--c-text-quaternary);
+  margin-bottom: 14px;
 }
 
-.step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--brand-primary);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1;
-}
-
-.step-line {
-  position: absolute;
-  top: 50%;
-  left: 100%;
-  width: 100%;
-  height: 1px;
-  background: var(--c-border-strong);
-  background-image: linear-gradient(to right, var(--c-border-strong) 50%, transparent 50%);
-  background-size: 10px 1px;
-  transform: translateY(-50%);
-}
-
-.step-content h4 {
-  font-size: 16px;
+.step h4 {
+  font-size: 17px;
   font-weight: 600;
   color: var(--c-text);
-  margin: 6px 0 4px;
+  margin: 0 0 8px;
 }
 
-.step-content p {
+.step p {
   font-size: 14px;
+  line-height: 1.65;
   color: var(--c-text-secondary);
   margin: 0;
-  line-height: 1.6;
+  text-wrap: pretty;
 }
 
 /* ── CTA 区 ── */
@@ -953,11 +1025,26 @@ const steps = [
   .hero-visual {
     order: 0;
   }
+  /* 平板及以下：不对称网格收成单列。
+     主卡的 `grid-row: span 2` 必须一并复位，否则单列下它会凭空占两行高度。 */
+  .features {
+    grid-template-columns: 1fr;
+  }
+  .feature-slot.is-lead {
+    grid-row: auto;
+  }
+  .feature-slot.is-lead :deep(.base-card--feature .base-card__body) {
+    padding: 30px 26px;
+  }
 }
 
 @media (max-width: 768px) {
-  .features, .steps {
+  .steps {
     grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .step {
+    padding: 20px 0 0;
   }
   /* 移动端隐藏浮动小标：卡片仅 260px，标签外挂会在 320px 视口溢出。
      （遮挡问题已由 .visual-stage 从结构上修掉，这里只是窄屏空间取舍） */

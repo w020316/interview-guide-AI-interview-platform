@@ -270,6 +270,52 @@ a:hover {
   animation: fadeIn 0.25s ease-out both;
 }
 
+/* ── 滚动驱动揭示（v1.63.0）──
+ * 由 `v-reveal` 指令在元素进入视口时加上 `.is-revealed`。
+ * ⚠️ 隐藏态**必须由 JS 加上 `.reveal` 才生效**：脚本未执行时元素不带该类，
+ * 内容照常可见。绝不能把 `opacity:0` 直接写进模板，那会让内容永久不可见。
+ * 缓动用 cubic-bezier(0.22,1,0.36,1)（先快后慢、收尾稳），比 ease 更有重量感。
+ */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.72s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.72s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+  /* 揭示完成后清掉 will-change，避免长页面残留大量合成层 */
+  will-change: auto;
+}
+
+/* ── 环境光晕（v1.63.0）──
+ * 给平面背景叠一层极轻的径向光，制造纵深，避免「纯色平铺」的廉价感。
+ * 用 `color-mix` 从品牌色派生，不引入新色相、不写死颜色值。
+ * 需要父元素 `position: relative` 且内容 `z-index` 高于它。
+ */
+.ambient-glow {
+  position: relative;
+  isolation: isolate;
+}
+
+.ambient-glow::before {
+  content: '';
+  position: absolute;
+  inset: -18% -8% auto -8%;
+  height: 68%;
+  background: radial-gradient(
+    ellipse at 32% 0%,
+    color-mix(in srgb, var(--brand-primary) 11%, transparent),
+    transparent 62%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+
 /* ── 文字工具类：去除渐变文字，改用强调色 ──
    展示级文字（登录页大标题），保留衬线并收紧字距 */
 .text-gradient,
