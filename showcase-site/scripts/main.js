@@ -222,8 +222,10 @@
       lightReader(reader);
       return;
     }
-    // Hold the "unread" state for a beat before lighting, so the visual
-    // metaphor (half-read resume) is actually perceivable on first view.
+    // Hold the "unread" state for a short beat before lighting, so the visual
+    // metaphor (half-read resume) is perceivable — but keep it snappy: the
+    // reader line is the LCP element, so a long hold delays LCP.
+    var LIGHT_DELAY = 420;
     var timer = null;
     function scheduleLight(delay) {
       if (timer) window.clearTimeout(timer);
@@ -233,7 +235,7 @@
       function (entries) {
         entries.forEach(function (entry) {
           if (entry.isIntersecting) {
-            scheduleLight(850);
+            scheduleLight(LIGHT_DELAY);
             ro.unobserve(entry.target);
           }
         });
@@ -256,7 +258,7 @@
       if (reader.classList.contains("is-lit")) return;
       var rect = reader.getBoundingClientRect();
       if (rect.top < window.innerHeight * 0.85 || rect.bottom < 0) {
-        scheduleLight(400);
+        scheduleLight(LIGHT_DELAY);
         ro.unobserve(reader);
       }
     }

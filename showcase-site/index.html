@@ -84,19 +84,19 @@
     <section class="hero" id="top" aria-labelledby="hero-title">
       <div class="wrap hero__grid">
         <div class="hero__copy">
-          <p class="eyebrow reveal" data-reveal>AI Interview Copilot</p>
+          <p class="eyebrow">AI Interview Copilot</p>
 
-          <h1 class="hero__title reveal" id="hero-title" data-reveal>
+          <h1 class="hero__title" id="hero-title">
             <span class="display-en">Read to the end.</span>
             让每一句话，<br />都被读完。
           </h1>
 
-          <p class="hero__sub reveal" data-reveal>
+          <p class="hero__sub">
             offerGo 是一个 AI 智能面试辅助平台。它从简历分析开始，用 AI 模拟面试，
             再一路陪到投递与跟进——把你做过的事，讲完整、讲清楚。
           </p>
 
-          <div class="hero__cta reveal" data-reveal>
+          <div class="hero__cta">
             <a class="btn btn--primary" href="https://offergo.pages.dev" target="_blank" rel="noopener">
               开始分析简历
               <svg class="btn__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -119,8 +119,10 @@
           </span>
         </div>
 
-        <!-- Read-to-the-end motif: a resume read only halfway -->
-        <figure class="reader reveal" data-reveal data-reader
+        <!-- Read-to-the-end motif: a resume read only halfway. The figure is NOT
+             JS-hidden (leave-first-paint intact for LCP); only its lines start
+             faded (CSS) and get lit by JS — that is the intended interaction. -->
+        <figure class="reader" data-reader
                 aria-label="一段被读了一半的简历文本示意">
           <div class="reader__head">
             <span class="reader__label">一份被读了一半的简历</span>
