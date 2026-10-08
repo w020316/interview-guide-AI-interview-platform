@@ -132,7 +132,8 @@
                 <div v-for="(d, idx) in parsed.dimensions" :key="idx" class="dim-item">
                   <div class="dim-head">
                     <span class="dim-name">{{ d.name }}</span>
-                    <span class="dim-score" :style="{ color: scoreColor(d.score) }">{{ d.score }}</span>
+                    <!-- v1.65.1：判空 —— 与 ResumeView 口径一致，缺失时显示占位符而不是空白 -->
+                    <span class="dim-score" :style="{ color: scoreColor(d.score) }">{{ d.score ?? EMPTY }}</span>
                   </div>
                   <div class="dim-bar">
                     <div class="dim-bar-fill" :style="{ width: (d.score || 0) + '%', background: scoreGradient(d.score) }"></div>

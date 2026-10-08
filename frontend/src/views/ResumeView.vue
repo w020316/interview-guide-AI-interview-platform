@@ -223,7 +223,8 @@
           <div v-for="(d, idx) in parsed.dimensions" :key="idx" class="dim-card">
             <div class="dim-head">
               <span class="dim-name">{{ d.name }}</span>
-              <span class="dim-score" :style="{ color: getScoreColor(d.score) }">{{ d.score }}分</span>
+              <!-- v1.65.1：判空 —— 原来 `{{ d.score }}分` 在 score 缺失时会渲染出一个孤零零的「分」 -->
+              <span class="dim-score" :style="{ color: getScoreColor(d.score) }">{{ d.score != null ? `${d.score}分` : EMPTY }}</span>
             </div>
             <div class="dim-bar">
               <div class="dim-bar-fill" :style="{ width: (d.score || 0) + '%', background: getScoreGradient(d.score) }"></div>

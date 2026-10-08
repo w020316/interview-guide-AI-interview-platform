@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.65.0'
+export const CURRENT_VERSION = '1.65.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.65.1',
+    date: '2026-10-08',
+    title: '版本 1.65.1 · 维度评分缺分数时不再显示一个孤零零的「分」',
+    items: [
+      { text: '简历分析的「维度评分」在个别情况下（某条维度没给出分数）会只显示一个「分」字，看着像坏掉了；现在会显示「—」', level: 'user' },
+      { text: '简历历史里同一处评分的显示口径也统一了：缺失时显示「—」，不再是一段空白', level: 'user' },
+    ],
+  },
   {
     version: '1.65.0',
     date: '2026-10-08',
