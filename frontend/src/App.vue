@@ -1210,4 +1210,34 @@ function logout() {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ── 触控目标 ≥ 44px（设计系统 §4 的硬要求）v1.66.1 ──
+ * 真机实测（Edge 1440 / 390）修复前：.theme-toggle 与 .menu-toggle 均 34×34、
+ * .user-chip 38×38、.nav-link 高 37px —— 全部低于设计系统自定的 44px。
+ * 处理方式分两档：
+ *   · 图标按钮与导航项：任何输入方式下都按 44px 给。触屏笔记本常以鼠标为主
+ *     指针（pointer: fine），只在 @media (pointer: coarse) 里补会漏掉它们。
+ *   · 纯文本内联链接（页脚版本号）：只在粗指针下抬到 44px，避免桌面页脚被撑高。
+ * 统一用 min-height 而非固定 height，文案换行时不截断内容。 */
+.theme-toggle,
+.menu-toggle {
+  width: 44px;
+  height: 44px;
+}
+
+.nav-link,
+.user-chip,
+.nav-more,
+.btn-login {
+  min-height: 44px;
+}
+
+/* 页脚版本号是纯文本内联链接，桌面加高只会无谓撑高页脚；窄屏/粗指针下抬到 44px。
+ * 条件里带上 (max-width: 767px) 是为了让它**可被视口仿真验证** ——
+ * 只写 (pointer: coarse) 时 headless / 鼠标主指针环境测不到，等于没验证。 */
+@media (pointer: coarse), (max-width: 1023px) {
+  .version-link {
+    min-height: 44px;
+  }
+}
 </style>
