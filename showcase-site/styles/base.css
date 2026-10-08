@@ -110,6 +110,12 @@ ul {
   list-style: none;
 }
 
+/* UA default margin: 1em 40px — the reader <figure>s must not be inset */
+figure,
+figcaption {
+  margin: 0;
+}
+
 /* ----- Shared layout primitives ----- */
 .wrap {
   width: 100%;
