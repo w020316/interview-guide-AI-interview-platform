@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 投递 ↔ 面试时序视图服务（v1.61.0，竞品清单 #4 reactive-resume 的做法）。
@@ -42,6 +43,21 @@ public class ApplicationTimelineService {
     public static final String KIND_APPLIED = "APPLIED";
     public static final String KIND_INTERVIEW = "INTERVIEW";
     public static final String KIND_STATUS = "STATUS";
+
+    /** 已取消的面试不计入任何统计（取消了还提示「你已安排面试」就是误导） */
+    private static final String EVENT_STATUS_CANCELLED = "CANCELLED";
+
+    /**
+     * 「面试之前」的投递状态。命中这些状态、却已关联了未取消的面试 → 视为**状态滞后**。
+     *
+     * <p>⚠️ 刻意**不含** OFFER / REJECTED / WITHDRAWN：它们是终态，
+     * 面试后走到这里**是正常的**，再提示用户「去改成面试中」反而是错的。
+     */
+    private static final Set<String> STATUS_BEFORE_INTERVIEW = Set.of(
+            JobApplicationEntity.STATUS_PLANNED,
+            JobApplicationEntity.STATUS_APPLIED,
+            JobApplicationEntity.STATUS_VIEWED,
+            JobApplicationEntity.STATUS_REPLIED);
 
     @Autowired
     private JobApplicationService applicationService;
@@ -115,9 +131,37 @@ public class ApplicationTimelineService {
         stats.put("avgDaysToInterview", average(daysToInterview));
         stats.put("medianDaysToInterview", median(daysToInterview));
 
+        // ── 状态滞后：已安排面试，但投递状态还停在面试之前（v1.65.0）──
+        // 用户在日历里安排了面试并关联了投递，看板上的状态却仍停在「已投递」：
+        // 漏斗里的「面试率」因此失真，而用户通常不会回头手动改。
+        // 这里只**如实列出**，**不擅自替用户改状态** —— 一键推进由用户自己点。
+        Map<Long, LocalDateTime> firstInterviewAt = new LinkedHashMap<>();
+        for (InterviewEventEntity e : events) {
+            if (EVENT_STATUS_CANCELLED.equals(e.getStatus())) continue;
+            JobApplicationEntity a = resolveLinked(e, appById);
+            if (a == null || !STATUS_BEFORE_INTERVIEW.contains(a.getStatus())) continue;
+            if (e.getInterviewAt() == null) continue;
+            // 同一投递关联多场面试时取最早那场：用户要判断的是「第一面是什么时候」
+            firstInterviewAt.merge(a.getId(), e.getInterviewAt(),
+                    (x, y) -> x.isBefore(y) ? x : y);
+        }
+        List<Map<String, Object>> statusLagging = new ArrayList<>();
+        for (Map.Entry<Long, LocalDateTime> en : firstInterviewAt.entrySet()) {
+            JobApplicationEntity a = appById.get(en.getKey());
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("applicationId", a.getId());
+            m.put("title", a.getTitle());
+            m.put("companyName", a.getCompanyName());
+            m.put("status", a.getStatus());
+            m.put("statusLabel", JobApplicationService.label(a.getStatus()));
+            m.put("interviewAt", en.getValue().toString());
+            statusLagging.add(m);
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("nodes", nodes);
         result.put("stats", stats);
+        result.put("statusLagging", statusLagging);
         return result;
     }
 

@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.64.1'
+export const CURRENT_VERSION = '1.65.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.65.0',
+    date: '2026-10-08',
+    title: '版本 1.65.0 · 安排了面试却忘了改状态，现在会提醒你',
+    items: [
+      { text: '你在面试日历里安排了面试、也关联了投递，但投递看板上的状态还停在「已投递」——以前只能靠自己记得回头改，现在看板会明确提示有哪几条状态没跟上', level: 'user' },
+      { text: '提示里写清是哪家公司、哪场面试、以及现在标的是什么状态，旁边给一个「标记为面试中」的按钮，点一下就同步好了', level: 'user' },
+      { text: '系统只提醒、不替你改——投递状态是你自己的记录，改不改由你决定', level: 'user' },
+      { text: '已取消的面试不会提醒；已经走到「已面试 / 已拿 Offer / 已淘汰」的也不会提醒，那些本来就是正常状态', level: 'user' },
+      { text: '不更新的话，看板顶部漏斗里的「面试率」会偏低——这也是它值得提醒的原因', level: 'user' },
+    ],
+  },
   {
     version: '1.64.1',
     date: '2026-10-08',

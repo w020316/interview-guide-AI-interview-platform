@@ -39,9 +39,39 @@ export interface TimelineStats {
   medianDaysToInterview: number | null
 }
 
+/**
+ * 状态滞后项（v1.65.0）：**已安排面试，但投递状态还停在面试之前**。
+ *
+ * <p>为什么值得单独提示：用户在日历里安排了面试并关联了投递，看板上的状态却仍停在
+ * 「已投递」—— 漏斗里的「面试率」因此失真，而用户通常不会回头手动改。
+ * 后端**只如实列出，不擅自替用户改状态**；一键推进由用户自己点。
+ */
+export interface StatusLaggingItem {
+  applicationId: number
+  title?: string | null
+  companyName?: string | null
+  status: string
+  statusLabel: string
+  /** 最早那场面试的时间（同一投递关联多场时取最早） */
+  interviewAt: string
+}
+
 export interface TimelineData {
   nodes: TimelineNode[]
   stats: TimelineStats
+  /** 可选：老版本后端不返回该字段，前端按空数组处理 */
+  statusLagging?: StatusLaggingItem[]
+}
+
+/**
+ * 状态滞后提示文案（v1.65.0）。
+ *
+ * <p>刻意把「面试时间」和「当前状态」都写进去：用户要判断的是
+ * 「这场面试是什么时候 / 我现在标的什么状态」，只给一个「状态待更新」是没用的。
+ */
+export function laggingHintText(item: StatusLaggingItem): string {
+  const who = item.companyName ? `${item.companyName} · ` : ''
+  return `${who}${item.title || '—'} 已安排面试（${timelineAtText(item.interviewAt)}），状态仍为「${item.statusLabel}」`
 }
 
 /** 节点类型展示文案 */

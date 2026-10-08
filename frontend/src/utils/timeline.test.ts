@@ -3,8 +3,10 @@ import {
   daysText,
   eventStatusText,
   kindLabel,
+  laggingHintText,
   summaryText,
   timelineAtText,
+  type StatusLaggingItem,
   type TimelineStats,
 } from './timeline'
 
@@ -112,5 +114,43 @@ describe('timelineAtText', () => {
   it('空值与非法值不抛异常', () => {
     expect(timelineAtText(null, now)).toBe('—')
     expect(timelineAtText('not-a-date', now)).toBe('not-a-date')
+  })
+})
+
+/**
+ * 状态滞后提示文案（v1.65.0）
+ *
+ * 守卫重点：提示里必须同时出现「面试时间」和「当前状态」——
+ * 只给一句「状态待更新」，用户没法判断要不要点。
+ */
+describe('laggingHintText', () => {
+  function item(partial: Partial<StatusLaggingItem> = {}): StatusLaggingItem {
+    return {
+      applicationId: 1,
+      title: 'Java 后端',
+      companyName: '腾讯',
+      status: 'APPLIED',
+      statusLabel: '已投递',
+      interviewAt: '2026-09-12T14:00',
+      ...partial,
+    }
+  }
+
+  it('同时给出面试时间与当前状态', () => {
+    const text = laggingHintText(item())
+    expect(text).toContain('腾讯')
+    expect(text).toContain('Java 后端')
+    expect(text).toContain('09-12')      // 面试时间
+    expect(text).toContain('已投递')      // 当前状态
+  })
+
+  it('公司名缺失时不留下孤零零的分隔符', () => {
+    const text = laggingHintText(item({ companyName: null }))
+    expect(text).not.toContain('·')
+    expect(text).toContain('Java 后端')
+  })
+
+  it('标题缺失时用占位符而不是空白', () => {
+    expect(laggingHintText(item({ title: null }))).toContain('—')
   })
 })

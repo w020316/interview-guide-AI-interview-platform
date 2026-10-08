@@ -253,4 +253,81 @@ class ApplicationTimelineServiceTest {
                 LocalDateTime.of(2026, 10, 1, 0, 0),
                 LocalDateTime.of(2026, 10, 2, 0, 0))).isEqualTo(1.0);
     }
+
+    // ═════════ 状态滞后（v1.65.0）：已安排面试，但投递状态还停在面试之前 ═════════
+    // 目的不是「加个提示」，而是**让看板漏斗不再失真**：安排了面试却没改状态，
+    // 「面试率」就会偏低，而用户通常不会回头手动改。
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> lagging(Map<String, Object> result) {
+        return (List<Map<String, Object>>) result.get("statusLagging");
+    }
+
+    @Test
+    @DisplayName("状态滞后：已投递 + 有关联面试 → 列出，并给出**最早**那场面试时间")
+    void statusLagging_appliedWithInterview_isListed() {
+        when(applicationService.listByUser(USER)).thenReturn(List.of(
+                app(1L, JobApplicationEntity.STATUS_APPLIED, LocalDateTime.of(2026, 9, 1, 10, 0))));
+        when(eventService.listByUser(USER)).thenReturn(List.of(
+                event(10L, 1L, LocalDateTime.of(2026, 9, 20, 14, 0), "一面"),
+                event(11L, 1L, LocalDateTime.of(2026, 9, 12, 14, 0), "初筛")));
+
+        List<Map<String, Object>> lag = lagging(service.timeline(USER));
+
+        assertThat(lag).hasSize(1);
+        assertThat(lag.get(0)).containsEntry("applicationId", 1L)
+                .containsEntry("status", JobApplicationEntity.STATUS_APPLIED)
+                .containsEntry("companyName", "腾讯");
+        // 同一投递关联多场面试时取**最早**那场：用户要判断的是「第一面是什么时候」
+        assertThat(lag.get(0).get("interviewAt")).isEqualTo("2026-09-12T14:00");
+    }
+
+    @Test
+    @DisplayName("状态滞后：已面试 / Offer / 已淘汰 → 不列（面试后走到终态是正常的）")
+    void statusLagging_advancedOrTerminalStatus_notListed() {
+        when(applicationService.listByUser(USER)).thenReturn(List.of(
+                app(1L, JobApplicationEntity.STATUS_INTERVIEW, LocalDateTime.of(2026, 9, 1, 10, 0)),
+                app(2L, JobApplicationEntity.STATUS_OFFER, LocalDateTime.of(2026, 9, 1, 10, 0)),
+                app(3L, JobApplicationEntity.STATUS_REJECTED, LocalDateTime.of(2026, 9, 1, 10, 0)),
+                app(4L, JobApplicationEntity.STATUS_WITHDRAWN, LocalDateTime.of(2026, 9, 1, 10, 0))));
+        when(eventService.listByUser(USER)).thenReturn(List.of(
+                event(10L, 1L, LocalDateTime.of(2026, 9, 20, 14, 0), "一面"),
+                event(11L, 2L, LocalDateTime.of(2026, 9, 21, 14, 0), "二面"),
+                event(12L, 3L, LocalDateTime.of(2026, 9, 22, 14, 0), "终面"),
+                event(13L, 4L, LocalDateTime.of(2026, 9, 23, 14, 0), "笔试")));
+
+        assertThat(lagging(service.timeline(USER))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("状态滞后：面试已取消 → 不列（取消了还提示「你已安排面试」是误导）")
+    void statusLagging_cancelledInterview_notListed() {
+        when(applicationService.listByUser(USER)).thenReturn(List.of(
+                app(1L, JobApplicationEntity.STATUS_APPLIED, LocalDateTime.of(2026, 9, 1, 10, 0))));
+        InterviewEventEntity cancelled = event(10L, 1L, LocalDateTime.of(2026, 9, 20, 14, 0), "一面");
+        cancelled.setStatus("CANCELLED");
+        when(eventService.listByUser(USER)).thenReturn(List.of(cancelled));
+
+        assertThat(lagging(service.timeline(USER))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("状态滞后：面试未关联投递 → 不列（没有可推进的对象）")
+    void statusLagging_unlinkedInterview_notListed() {
+        when(applicationService.listByUser(USER)).thenReturn(List.of(
+                app(1L, JobApplicationEntity.STATUS_APPLIED, LocalDateTime.of(2026, 9, 1, 10, 0))));
+        when(eventService.listByUser(USER)).thenReturn(List.of(
+                event(10L, null, LocalDateTime.of(2026, 9, 20, 14, 0), "宣讲会")));
+
+        assertThat(lagging(service.timeline(USER))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("状态滞后：无滞后时返回**空列表**而不是 null（前端不必再判空）")
+    void statusLagging_none_returnsEmptyList() {
+        when(applicationService.listByUser(USER)).thenReturn(List.of());
+        when(eventService.listByUser(USER)).thenReturn(List.of());
+
+        assertThat(lagging(service.timeline(USER))).isNotNull().isEmpty();
+    }
 }

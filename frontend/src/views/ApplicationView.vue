@@ -66,6 +66,29 @@
         </template>
       </div>
 
+      <!-- 状态滞后提示（v1.65.0）：已安排面试，但投递状态还停在面试之前。
+           ⚠️ 只**提示 + 给一键操作**，绝不擅自替用户改状态 —— 状态是用户的数据。
+           不给提示的后果：看板漏斗里的「面试率」偏低，而用户通常不会回头手动改。 -->
+      <div v-if="timeline.statusLagging?.length" class="tl-lagging">
+        <p class="tl-lagging-head">
+          有 <b>{{ timeline.statusLagging.length }}</b> 条投递已安排面试，状态还停在面试之前 ——
+          不更新的话，上面的「面试率」会偏低
+        </p>
+        <ul class="tl-lagging-list">
+          <li v-for="it in timeline.statusLagging" :key="it.applicationId" class="tl-lagging-item">
+            <span class="tl-lagging-text">{{ laggingHintText(it) }}</span>
+            <button
+              type="button"
+              class="mini-btn primary"
+              :disabled="busyId === it.applicationId"
+              @click="advanceToInterview(it)"
+            >
+              标记为面试中
+            </button>
+          </li>
+        </ul>
+      </div>
+
       <ol class="tl-list">
         <li v-for="(n, i) in timeline.nodes" :key="`${n.kind}-${n.eventId ?? n.applicationId}-${i}`" class="tl-node">
           <div class="tl-rail" :class="`tl-rail-${n.kind.toLowerCase()}`" aria-hidden="true"></div>
@@ -399,8 +422,10 @@ import {
   daysText,
   eventStatusText,
   kindLabel,
+  laggingHintText,
   summaryText,
   timelineAtText,
+  type StatusLaggingItem,
   type TimelineData,
 } from '../utils/timeline'
 import {
@@ -541,6 +566,25 @@ async function onStatusChange(a: Application, ev: Event) {
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '更新状态失败'))
     ;(ev.target as HTMLSelectElement).value = a.status
+  } finally {
+    busyId.value = null
+  }
+}
+
+/**
+ * 一键把「状态滞后」的投递推进到「面试中」（v1.65.0）。
+ *
+ * <p>⚠️ 必须由用户**主动点击**触发：状态是用户的数据，系统只提示、不代改。
+ * 后端也只列出滞后项、不自动推进，两边口径一致。
+ */
+async function advanceToInterview(it: StatusLaggingItem) {
+  busyId.value = it.applicationId
+  try {
+    await api.post(`/api/application/${it.applicationId}/status`, { status: 'INTERVIEW' })
+    ElMessage.success(`已更新为「${statusLabel('INTERVIEW')}」`)
+    await load()
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '更新状态失败'))
   } finally {
     busyId.value = null
   }
@@ -950,6 +994,20 @@ function actionVariant(action: string) {
 .tl-summary { font-size: 13px; color: var(--c-text-secondary); line-height: 1.7; margin: 0 0 8px; }
 .tl-legend { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--c-text-tertiary); margin-bottom: 14px; }
 .tl-unlinked { color: var(--c-warning); }
+
+/* 状态滞后提示（v1.65.0）：用琥珀色 —— 语义是「需要注意」而非「出错了」，
+ * 用危险色会让人以为数据坏了。整块走语义令牌，暗色下自动跟随。 */
+.tl-lagging {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--c-warning-light);
+  border: 1px solid var(--c-warning-border);
+}
+.tl-lagging-head { margin: 0 0 10px; font-size: 13px; line-height: 1.6; color: var(--c-text-secondary); }
+.tl-lagging-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tl-lagging-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tl-lagging-text { font-size: 13px; line-height: 1.6; color: var(--c-text); }
 
 .tl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
 .tl-node { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
