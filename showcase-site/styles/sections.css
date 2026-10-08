@@ -412,7 +412,7 @@ html[data-theme="dark"] .theme-toggle .icon-moon {
   border-top: 1px solid var(--c-border-light);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
-  color: var(--c-text-faint);
+  color: var(--c-text-muted);
   letter-spacing: 0.03em;
 }
 .card__rules {
@@ -582,9 +582,9 @@ html[data-theme="dark"] .cta {
   gap: var(--sp-5);
   margin-top: var(--sp-6);
 }
-.cta .btn--accent {
-  /* Accent amber budget: only the single primary CTA highlight */
-  color: var(--c-text);
+.cta .eyebrow--accent {
+  /* Amber on the dark CTA surface must be a bright, readable amber */
+  color: var(--c-accent-bright);
 }
 .cta__link {
   color: var(--c-on-dark);
@@ -622,8 +622,8 @@ html[data-theme="dark"] .cta {
   opacity: 1;
   color: var(--c-on-dark);
 }
-.reader--done .reader__line.is-lit {
-  color: var(--c-accent);
+.cta .reader--done .reader__line.is-lit {
+  color: var(--c-accent-bright);
 }
 
 /* ---------------- Footer ---------------- */

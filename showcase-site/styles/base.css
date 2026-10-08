@@ -198,7 +198,7 @@ ul {
 
 .btn--accent {
   background: var(--c-accent);
-  color: var(--c-on-primary);
+  color: var(--c-on-accent);
 }
 .btn--accent:hover {
   background: var(--c-accent-hover);
