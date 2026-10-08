@@ -548,6 +548,13 @@ html[data-theme="dark"] .theme-toggle .icon-moon {
 .eng__row dd.is-ok {
   color: var(--c-success);
 }
+/* Source attribution for the CI figures above — same treatment as .trust__note */
+.eng__source {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--c-text-faint);
+  letter-spacing: 0.02em;
+}
 
 /* ---------------- CTA (read-to-the-end terminal state) ---------------- */
 .cta {

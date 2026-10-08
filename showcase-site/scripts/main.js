@@ -194,6 +194,12 @@
 
   counters.forEach(function (el) {
     el.setAttribute("data-counted", "0");
+    // The HTML ships the REAL value so the no-JS fallback tells the truth.
+    // Here we reset to zero so the count-up can animate from 0.
+    var dec = parseInt(el.getAttribute("data-count-decimals") || "0", 10);
+    var pre = el.getAttribute("data-count-prefix") || "";
+    var suf = el.getAttribute("data-count-suffix") || "";
+    el.textContent = pre + (0).toFixed(dec) + suf;
   });
   makeCountObserver();
 

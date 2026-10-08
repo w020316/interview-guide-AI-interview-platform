@@ -135,9 +135,6 @@ ul {
   font-weight: 400; /* Instrument Serif has a single weight */
   font-style: normal;
 }
-.display-en em {
-  font-style: italic;
-}
 
 .num {
   font-family: var(--font-mono);
