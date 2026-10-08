@@ -3,6 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Theme is resolved synchronously BEFORE the stylesheets paint, so the
+       first frame is already correct (no light->dark flash / FOUC). Logic and
+       the storage key mirror scripts/main.js (THEME_KEY = "offergo-theme"). -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("offergo-theme");
+        if (t !== "light" && t !== "dark") {
+          t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) { /* localStorage may be blocked (private mode) — keep default */ }
+    })();
+  </script>
   <title>offerGo — AI 智能面试辅助平台</title>
   <meta name="description" content="offerGo 是一个 AI 智能面试辅助平台：从简历分析、AI 模拟面试到投递跟进，帮你把求职这件事说清楚、做扎实。" />
   <meta name="theme-color" content="#0f766e" />
