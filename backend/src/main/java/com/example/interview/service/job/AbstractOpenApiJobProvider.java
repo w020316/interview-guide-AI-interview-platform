@@ -56,8 +56,16 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
      *
      * <p>v1.45.0 起由 {@code private} 放开为 {@code protected}：子类清洗自己的正文时
      * 必须用同一个上限，否则不同源的描述长度会不一致。
+     *
+     * <p><b>v1.64.0 由 1200 提到 6000</b>：线上抽样发现外部源 JD 的入库长度**中位数正好是 1200**
+     * （Arbeitnow / RemoteOK / Himalayas / Jobicy 四源一致，Jobicy 更是每条都恰好 1200）
+     * —— 说明不是数据碰巧，而是全被这个常量截断了。真实 JD 常见 2000~5000 字，
+     * 而「任职要求」通常写在「岗位职责」之后，截断会把**后半段整段丢掉**，
+     * 而「JD 拆解 / 差距诊断」正是要拿要求去比对简历。
+     *
+     * <p>列类型是 {@code TEXT}（PostgreSQL 上限 1GB），**1200 从来不是数据库约束**。
      */
-    protected static final int DESC_MAX_LEN = 1200;
+    protected static final int DESC_MAX_LEN = 6000;
 
     /**
      * 公开 API 数据源的最小刷新间隔：6 小时。

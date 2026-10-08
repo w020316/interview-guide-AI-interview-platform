@@ -105,15 +105,33 @@ class JobAnalysisServiceTest {
         }
 
         @Test
-        @DisplayName("JD 超长时截断到 1200 字")
+        @DisplayName("超长 JD 仍会截断（判据：结尾不在 prompt 里）")
         void analyze_longJd_truncatedInPrompt() {
-            String longJd = "X".repeat(1500);
+            // ⚠️ 判据必须是「JD 的结尾不见了」，不能是「prompt 里出现了 ...」——
+            // 提示词模板本身就含省略号，按省略号判断会得出错误结论。
+            String longJd = "X".repeat(20000) + "这段结尾不应出现在提示词里";
 
             service.analyzeJobDescription(longJd);
 
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
             verify(chatClientRequestSpec).user(promptCaptor.capture());
-            assertThat(promptCaptor.getValue()).contains("...");
+            assertThat(promptCaptor.getValue()).doesNotContain("这段结尾不应出现在提示词里");
+        }
+
+        @Test
+        @DisplayName("常见长度的 JD（约 2000 字）必须完整进 prompt —— 任职要求通常在后半段")
+        void analyze_typicalJd_notTruncated() {
+            // v1.64.0 回归：原上限 1200 会把 2000 字的 JD 截掉 40%，
+            // 而「任职要求」通常写在「岗位职责」之后 —— 被截掉的正是要分析的部分。
+            String jd = "任职要求：熟悉 Java 与分布式系统。".repeat(125) + "末尾：熟悉 Kubernetes 与可观测性。";
+            assertThat(jd.length()).isGreaterThan(1900);
+
+            service.analyzeJobDescription(jd);
+
+            ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+            verify(chatClientRequestSpec).user(promptCaptor.capture());
+            // 结尾还在 = 整段都进去了，没有被腰斩
+            assertThat(promptCaptor.getValue()).contains("末尾：熟悉 Kubernetes 与可观测性。");
         }
     }
 
@@ -135,19 +153,21 @@ class JobAnalysisServiceTest {
         }
 
         @Test
-        @DisplayName("简历和 JD 均超长时截断")
+        @DisplayName("简历和 JD 均超长时都会被截断（判据：结尾不在 prompt 里）")
         void gap_longInputs_truncatedInPrompt() {
-            String longResume = "R".repeat(1500);
-            String longJd = "J".repeat(1500);
+            // ⚠️ 原实现是「数 prompt 里的点号个数 ≥6（= 两处省略号）」，
+            // 这依赖提示词模板自身的标点，且与上限数值耦合 —— v1.64.0 调上限后直接失效。
+            // 现改为「结尾标记是否还在」，与模板和上限都无关。
+            String longResume = "R".repeat(20000) + "简历结尾标记";
+            String longJd = "J".repeat(20000) + "JD结尾标记";
 
             service.diagnoseGap(longResume, longJd);
 
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
             verify(chatClientRequestSpec).user(promptCaptor.capture());
-            // 截断标记应出现至少两次（简历 + JD）
             String prompt = promptCaptor.getValue();
-            long truncationCount = prompt.chars().filter(c -> c == '.').count();
-            assertThat(truncationCount).isGreaterThanOrEqualTo(6); // "..." 出现两次 = 6 个点
+            assertThat(prompt).doesNotContain("简历结尾标记");
+            assertThat(prompt).doesNotContain("JD结尾标记");
         }
     }
 

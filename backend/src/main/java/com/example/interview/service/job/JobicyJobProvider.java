@@ -72,7 +72,7 @@ public class JobicyJobProvider extends AbstractOpenApiJobProvider {
                     "SOCIAL",
                     null,   // 上游无截止信息 → 留空
                     clip(text(node, "url"), LEN_URL),
-                    plainText(text(node, "jobDescription", "jobExcerpt"), 1200),
+                    plainText(text(node, "jobDescription", "jobExcerpt"), DESC_MAX_LEN),
                     null,
                     clip(tagsOf(node), LEN_TAGS)
             ));

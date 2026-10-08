@@ -43,25 +43,30 @@ class PromptSanitizerTest {
     class Truncation {
 
         @Test
-        @DisplayName("超长输入截断至 2000 字符")
+        @DisplayName("超长输入截断至全局兜底上限")
         void truncateLongInput() {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < 3000; i++) {
-                sb.append("a");
-            }
-            String result = PromptSanitizer.sanitize(sb.toString());
+            // ⚠️ 不写死上限数值：写成 MAX_INPUT_LENGTH 才不会被调上限时误报
+            String input = "a".repeat(PromptSanitizer.MAX_INPUT_LENGTH + 1000);
+            String result = PromptSanitizer.sanitize(input);
             assertEquals(PromptSanitizer.MAX_INPUT_LENGTH, result.length());
         }
 
         @Test
-        @DisplayName("恰好 2000 字符不截断")
+        @DisplayName("恰好等于上限时不截断")
         void exactLength() {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < 2000; i++) {
-                sb.append("a");
-            }
-            String result = PromptSanitizer.sanitize(sb.toString());
-            assertEquals(2000, result.length());
+            String input = "a".repeat(PromptSanitizer.MAX_INPUT_LENGTH);
+            String result = PromptSanitizer.sanitize(input);
+            assertEquals(PromptSanitizer.MAX_INPUT_LENGTH, result.length());
+        }
+
+        @Test
+        @DisplayName("常见长度的 JD（4000 字）不得被全局兜底截断 —— 兜底必须高于所有服务级上限")
+        void typicalJdLength_notTruncatedByGlobalCap() {
+            // v1.64.0 回归：原全局上限 2000 会**静默压掉** JD 分析的 4000 服务级上限，
+            // 表现为「改了服务级上限却毫无效果、且没有任何日志」。
+            // 这条锁住「全局兜底 ≥ 服务级上限」这条纪律。
+            String jd = "任".repeat(4000);
+            assertEquals(4000, PromptSanitizer.sanitize(jd).length());
         }
     }
 

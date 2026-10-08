@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.63.2'
+export const CURRENT_VERSION = '1.64.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.64.0',
+    date: '2026-10-08',
+    title: '版本 1.64.0 · 岗位描述和简历不再被截掉后半段',
+    items: [
+      { text: '粘贴较长的岗位描述或简历时，此前只有前面一小段会被真正读到，后面的内容（往往是「任职要求」「项目经验」这些关键部分）被悄悄丢掉了，界面也不会提示你', level: 'user' },
+      { text: '现在能读到的内容大幅增加：岗位描述从约 1200 字提到 4000 字，简历从 800 字提到 3000 字，分析与差距诊断的结果会更贴合你贴的原文', level: 'user' },
+      { text: '招聘广场里来自公开接口的岗位描述，此前被截断在 1200 字，现在完整保留到 6000 字，岗位详情里能看到更完整的职责与要求', level: 'user' },
+    ],
+  },
   {
     version: '1.63.2',
     date: '2026-10-08',

@@ -74,7 +74,7 @@ public class HimalayasJobProvider extends AbstractOpenApiJobProvider {
                     // 上游给了到期时间就用它；**没给就留空**（v1.57.0：不再按发帖日推算假日期）
                     expiry,
                     clip(text(node, "applicationLink", "guid"), LEN_URL),
-                    plainText(text(node, "description", "excerpt"), 1200),
+                    plainText(text(node, "description", "excerpt"), DESC_MAX_LEN),
                     null,
                     clip(tagsOf(node), LEN_TAGS)
             ));

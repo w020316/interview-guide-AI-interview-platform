@@ -359,8 +359,10 @@ class ResumeAnalysisServiceTest {
     void generateOptimizedResume_longInputs_truncatedAndGenerated() {
         stubCacheMiss();
         stubChatClient("# 截断后仍正常生成");
-        String longResume = "项目经验内容。".repeat(200); // 1200 字符 > MAX_RESUME_LEN(800)
-        String longAnalysis = "建议内容。".repeat(200);     // 1000 字符 > 800
+        // ⚠️ 长度只断言「超过上限」，不写死上限数值（v1.64.0 上限由 800 提到 3000，
+        // 原注释里的 800 已失效；写死数值会让调上限时测试注释与实现脱节）
+        String longResume = "项目经验内容。".repeat(600); // 4200 字符，超过 MAX_RESUME_LEN
+        String longAnalysis = "建议内容。".repeat(200);   // 1000 字符，超过分析结果的 800 上限
 
         String result = service.generateOptimizedResume(USER_ID, longResume, JOB, longAnalysis);
 
