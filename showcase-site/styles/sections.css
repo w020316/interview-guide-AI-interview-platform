@@ -214,6 +214,50 @@ html[data-theme="dark"] .theme-toggle .icon-moon {
   100% { transform: translateX(100%); }
 }
 
+/* --- Hero entrance ---
+   CSS-driven so the first frame animates WITHOUT JS. An IO-based .reveal would
+   hold these at opacity:0 until a callback fires (excluding them from LCP →
+   delayed LCP); a keyframe animation starts on first paint, so the entrance
+   plays AND LCP stays early. Only transform / opacity are animated. */
+@keyframes heroIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+/* The reader figure only slides (no opacity): its lines are already faded to
+   12% by the motif and must stay painted from the first frame, otherwise the
+   figure animation would hide them and push LCP out to the 420ms light-up. */
+@keyframes heroSlide {
+  from { transform: translateY(14px); }
+  to   { transform: none; }
+}
+.hero__copy > .eyebrow,
+.hero__title,
+.hero__sub,
+.hero__cta,
+.hero .scroll-hint {
+  animation: heroIn var(--dur-reveal) var(--ease) both;
+}
+.hero .reader {
+  animation: heroSlide var(--dur-reveal) var(--ease) both;
+}
+.hero__copy > .eyebrow { animation-delay: 0ms; }
+.hero__title           { animation-delay: 60ms; }
+.hero__sub             { animation-delay: 140ms; }
+.hero__cta             { animation-delay: 200ms; }
+.hero .scroll-hint     { animation-delay: 300ms; }
+.hero .reader          { animation-delay: 120ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__copy > .eyebrow,
+  .hero__title,
+  .hero__sub,
+  .hero__cta,
+  .hero .scroll-hint,
+  .hero .reader {
+    animation: none;
+  }
+}
+
 /* --- Read-to-the-end motif --- */
 .reader {
   position: relative;
