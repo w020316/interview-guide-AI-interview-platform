@@ -8,7 +8,7 @@
     <!-- ── 第一步：经历挖掘 ── -->
     <section class="card">
       <div class="step-head">
-        <span class="step-no">1</span>
+        <span class="step-index">1</span>
         <div>
           <div class="step-title">讲讲你真实做过的事</div>
           <div class="step-sub">越具体越好：你遇到什么问题、做了什么、结果怎样、有没有数字。口语化就行，不用写成简历。</div>
@@ -85,7 +85,7 @@
     <!-- ── 第二步：岗位节奏计划 ── -->
     <section class="card">
       <div class="step-head">
-        <span class="step-no">2</span>
+        <span class="step-index">2</span>
         <div>
           <div class="step-title">有节奏地找岗位并投递</div>
           <div class="step-sub">给出目标岗位，得到「为什么适合 / 差距在哪 / 30 天补什么 case / 适合什么赛道」。</div>
@@ -173,7 +173,7 @@
     <!-- ── 第三步：面试故事库 ── -->
     <section class="card">
       <div class="step-head">
-        <span class="step-no">3</span>
+        <span class="step-index">3</span>
         <div>
           <div class="step-title">面试故事库：面试不是背答案，是经得起追问</div>
           <div class="step-sub">把真实经历整理成 STAR 故事存入故事库；练习时「先回答，再追问，再复盘」，并用六项质检自查。</div>
@@ -552,8 +552,20 @@ async function doFollowUp(s: StoryItem) {
 .card { background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 20px 22px; margin-bottom: 16px; }
 .card h2 { font-family: var(--font-title); font-size: 19px; font-weight: 700; color: var(--c-text); margin: 0 0 16px; }
 
-.step-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
-.step-no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--brand-primary); color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+/* 编辑式编号（v1.63.1）：与首页 HomeView 的 .step-index 统一为同一形态 ——
+ * 等宽小字 + 字距，**不再用填充圆形数字徽章**（DESIGN.md §3 明令禁止的「装饰性圆形数字」）。
+ * 同一个「步骤」概念此前在首页与求职诊断里是两套形态，这是本轮最刺眼的一致性缺口。
+ * 这里不额外加顶部长细线：步骤已在卡片内，再加一条会与卡片描边重复。 */
+.step-head { margin-bottom: 14px; }
+.step-index {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--c-text-quaternary);
+  margin-bottom: 10px;
+}
 .step-title { font-size: 16px; font-weight: 600; color: var(--c-text); }
 .step-sub { font-size: 13px; color: var(--c-text-tertiary); line-height: 1.6; margin-top: 2px; }
 

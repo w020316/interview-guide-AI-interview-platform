@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.63.0'
+export const CURRENT_VERSION = '1.63.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.63.1',
+    date: '2026-10-08',
+    title: '版本 1.63.1 · 暗色模式下有些文字看不见，修好了',
+    items: [
+      { text: '暗色模式：招聘广场的岗位公司名与筛选框、智能体的对话气泡，此前会出现「浅底浅字」看不清的情况，现已修正', level: 'user' },
+      { text: '求职诊断的三步序号、投递看板与智能体的空状态图标，改为与全站一致的样式（不再用彩色圆圈和彩色 emoji）', level: 'user' },
+      { text: '招聘广场的岗位卡片现在可以用键盘打开：Tab 选中后按回车即可进入，并会显示清晰的焦点框', level: 'user' },
+    ],
+  },
   {
     version: '1.63.0',
     date: '2026-10-07',

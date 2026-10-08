@@ -1076,7 +1076,7 @@ function formatTime(t?: string) {
   padding: 12px 14px;
   border-radius: var(--radius-md, 10px);
   background: var(--c-warning-light, #fdf6ec);
-  color: var(--c-warning-text, #b88230);
+  color: var(--c-warning);
   font-size: 13px;
   line-height: 1.6;
 }

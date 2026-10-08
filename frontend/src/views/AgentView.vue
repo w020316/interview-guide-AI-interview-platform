@@ -34,7 +34,12 @@
         <div ref="chatBox" class="chat-box">
           <!-- 欢迎语 + 推荐提问 -->
           <div v-if="messages.length === 0" class="welcome">
-            <div class="welcome-icon">🤖</div>
+            <div class="welcome-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                      stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
             <h3>你好，我是你的求职智能体</h3>
             <p>我可以调用平台能力帮你：搜索岗位、解答面试知识、分析薄弱点、查看面试日程</p>
             <div class="suggest-grid">
@@ -490,14 +495,24 @@ onMounted(() => {
   min-height: 420px;
 }
 
+/* 欢迎区改为左对齐（v1.63.1）：它是「标题 + 说明 + 建议网格」的内容块，
+ * 标题居中而下方网格左对齐会互相打架；左对齐也与全站的编辑式阅读轴线一致。
+ * 图标由 emoji 换成内联 SVG —— emoji 配色不受主题控制，且与全站 SVG 图标体系割裂。 */
 .welcome {
-  text-align: center;
+  text-align: left;
   padding: 40px 20px;
 }
 
 .welcome-icon {
-  font-size: 44px;
-  margin-bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--brand-primary-50);
+  border: 1px solid var(--brand-primary-100);
+  margin-bottom: 14px;
 }
 
 .welcome h3 {
@@ -573,7 +588,7 @@ onMounted(() => {
   border-radius: 12px;
   font-size: 14px;
   line-height: 1.7;
-  background: var(--input-bg, #f5f5f5);
+  background: var(--c-bg-alt);
   color: var(--c-text);
   overflow-wrap: break-word;
 }

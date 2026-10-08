@@ -243,3 +243,60 @@ describe('设计系统防回退守卫', () => {
       .toEqual([])
   })
 })
+
+/* ───────────── CSS 变量定义完整性守卫（v1.63.1）───────────── */
+
+/**
+ * ── 为什么需要它 ────────────────────────────────────────────────────
+ * v1.63.1 走查发现：`--input-bg` 与 `--text-secondary` **全站从未定义**，
+ * 而用法写成 `var(--token, #浅色)`。暗色主题下底色仍是近白，文字却是 `--c-text`
+ * （暗色下=近白）→ **文字直接看不见**。
+ *
+ * 为什么原有的 hex 门禁没拦住：`stripCommentsAndVarFallbacks()` 会把整个 `var(...)`
+ * **连同 fallback 一起剥掉**，所以 `var(--未定义, #f5f5f5)` 里的写死 hex 逃过了扫描。
+ * 换句话说，「变量缺失时回退到写死的浅色」这条路径本身就是事故成因，不能放行。
+ *
+ * 扫描范围取 `SCAN_EXT`（.vue/.css）——导出用的 HTML 模板在 .ts 里，不参与主题切换。
+ */
+
+/** 运行时通过内联 `:style` 注入的变量 —— 不在 variables.css 里定义是**正确**的。每条都要写理由。 */
+const RUNTIME_INJECTED_VARS: Array<{ name: string; reason: string }> = [
+  { name: '--w', reason: '进度条宽度：HomeView 用 :style 逐行注入，值随数据变化，无法预定义' },
+  { name: '--score-color', reason: '评分色：JobAnalysisView 用 :style 按分数档位注入' },
+]
+
+describe('CSS 变量定义完整性（v1.63.1）', () => {
+  it('所有被引用的 CSS 变量都必须在 styles/variables.css 中定义', () => {
+    const defined = new Set<string>()
+    for (const line of fs.readFileSync(path.join(SRC, 'styles', 'variables.css'), 'utf8').split('\n')) {
+      for (const m of line.matchAll(/(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1])
+    }
+
+    const exempt = new Set(RUNTIME_INJECTED_VARS.map((v) => v.name))
+    const missing: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, SCAN_EXT)) {
+      const r = rel(file)
+      scanned++
+      for (const [i, line] of fs.readFileSync(file, 'utf8').split('\n').entries()) {
+        for (const m of line.matchAll(/var\((--[a-zA-Z0-9_-]+)/g)) {
+          const name = m[1]
+          if (defined.has(name) || exempt.has(name)) continue
+          missing.push(`${r}:${i + 1}  未定义 ${name}   ${line.trim()}`)
+        }
+      }
+    }
+
+    // ── 扫描范围自检 ──
+    // 路径写错时扫描结果为空 → 守卫会**静默失效**（你以为有保护，实际没有），
+    // 这比没有守卫更危险。所以必须断言「确实扫到了足够多的文件」。
+    expect(scanned, '扫描范围异常：文件数过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(fs.existsSync(path.join(SRC, 'views', 'HomeView.vue')), '扫描根目录可能不对').toBe(true)
+
+    expect(
+      missing,
+      `以下 CSS 变量被引用但从未定义 —— 暗色下会回退到写死的浅色，导致文字/边框不可见：\n${missing.join('\n')}`,
+    ).toEqual([])
+  })
+})

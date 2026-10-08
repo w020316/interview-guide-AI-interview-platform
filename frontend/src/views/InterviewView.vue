@@ -1836,7 +1836,7 @@ onUnmounted(() => {
 .stream-box :deep(blockquote) {
   margin: 6px 0 10px;
   padding: 2px 12px;
-  border-left: 3px solid var(--c-primary-soft);
+  border-left: 3px solid var(--brand-primary-200);
   color: var(--c-text-secondary);
 }
 

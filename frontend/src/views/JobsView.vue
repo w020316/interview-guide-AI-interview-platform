@@ -138,7 +138,18 @@
 
     <!-- 岗位列表 -->
     <div v-else class="job-list fade-in-up">
-      <div v-for="job in displayJobs" :key="job.id" class="job-card" @click="showDetail(job)">
+      <!-- 岗位卡是可点区域 → 必须键盘可达：role + tabindex + Enter/Space + 可见焦点环。
+           此前只有 @click，键盘用户打不开岗位详情，也没有任何焦点反馈。 -->
+      <div
+        v-for="job in displayJobs"
+        :key="job.id"
+        class="job-card"
+        role="button"
+        tabindex="0"
+        @click="showDetail(job)"
+        @keydown.enter="showDetail(job)"
+        @keydown.space.prevent="showDetail(job)"
+      >
         <div class="job-card-main">
           <div class="job-card-header">
             <span class="job-title">{{ job.title }}</span>
@@ -886,7 +897,7 @@ onMounted(() => {
   padding: 9px 12px;
   border: 1px solid var(--c-border);
   border-radius: 10px;
-  background: var(--input-bg, #fafafa);
+  background: var(--c-bg-alt);
   color: var(--c-text);
   font-size: 14px;
   outline: none;
@@ -997,6 +1008,12 @@ onMounted(() => {
   transition: box-shadow 0.2s, transform 0.2s;
 }
 
+/* 键盘焦点环：可点卡片必须可见焦点（可访问性要求，非可选） */
+.job-card:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
 .job-card:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   transform: translateY(-2px);
@@ -1030,7 +1047,7 @@ onMounted(() => {
 .job-company {
   margin-top: 4px;
   font-size: 14px;
-  color: var(--text-secondary, #666);
+  color: var(--c-text-secondary);
 }
 
 .job-meta {
@@ -1039,7 +1056,7 @@ onMounted(() => {
   gap: 14px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: var(--text-secondary, #777);
+  color: var(--c-text-tertiary);
 }
 
 .job-tags {
@@ -1218,7 +1235,7 @@ onMounted(() => {
   gap: 14px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: var(--text-secondary, #777);
+  color: var(--c-text-tertiary);
 }
 
 .detail-block {
@@ -1235,7 +1252,7 @@ onMounted(() => {
   white-space: pre-wrap;
   line-height: 1.7;
   font-size: 14px;
-  color: var(--text-secondary, #555);
+  color: var(--c-text-secondary);
 }
 
 .detail-footer {
