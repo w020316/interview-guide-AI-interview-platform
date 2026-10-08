@@ -73,7 +73,8 @@
   --c-on-primary: #f0fdfa;
   --c-on-accent: #f0fdfa;      /* on #b45309 ~ 4.80:1 (accent button text) */
   --c-on-dark: #f5f5f4;
-  --c-on-dark-muted: #a8a29e;
+  --c-on-dark-muted: #a8a29e;         /* on near-black #1c1917 ~ 7.8:1 */
+  --c-on-dark-muted-strong: #cfcac5;  /* on deep-teal #134e4a (light CTA) ~ 5.8:1 */
   --c-accent-bright: #fcd34d;  /* readable amber on dark green #134e4a ~ 6.7:1 */
 
   /* Semantic */
@@ -183,7 +184,8 @@ html[data-theme="dark"] {
   --c-on-primary: #04231f;
   --c-on-accent: #04231f;      /* on #f59e0b ~ 7.78:1 (accent button text) */
   --c-on-dark: #f5f5f4;
-  --c-on-dark-muted: #a8a29e;
+  --c-on-dark-muted: #a8a29e;         /* on near-black #1c1917 ~ 7.8:1 */
+  --c-on-dark-muted-strong: #a8a29e;  /* dark CTA bg is near-black → same value */
   --c-accent-bright: #f59e0b;  /* readable amber on #1c1917 ~ 7:1 */
 
   --c-success: #4ade80;

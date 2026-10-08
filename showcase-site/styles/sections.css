@@ -622,7 +622,7 @@ html[data-theme="dark"] .cta {
 }
 .cta__sub {
   margin-top: var(--sp-4);
-  color: var(--c-on-dark-muted);
+  color: var(--c-on-dark-muted-strong);
   font-size: var(--fs-lg);
   max-width: 44ch;
 }
@@ -662,7 +662,7 @@ html[data-theme="dark"] .cta {
   box-shadow: none;
 }
 .reader--done .reader__label {
-  color: var(--c-on-dark-muted);
+  color: var(--c-on-dark-muted-strong);
 }
 .reader--done .reader__status {
   color: var(--c-on-dark);
