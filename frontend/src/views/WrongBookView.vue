@@ -189,7 +189,7 @@ function difficultyText(d: string) {
 .radio-row { display: flex; gap: 8px; }
 .radio-chip { padding: 5px 12px; font-size: 12px; font-weight: 500; color: var(--c-text-tertiary); background: var(--c-bg-alt); border: 1px solid var(--c-border); border-radius: 999px; cursor: pointer; transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast); }
 .radio-chip:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
-.radio-chip.active { background: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
+.radio-chip.active { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--c-on-primary); }
 .filter-note { margin-left: auto; font-size: 12px; color: var(--c-text-tertiary); }
 
 .list { display: flex; flex-direction: column; gap: 12px; }

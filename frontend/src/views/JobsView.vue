@@ -821,7 +821,7 @@ onMounted(() => {
 .filter-chips button.active {
   background: var(--brand-primary);
   border-color: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 .tab-count {
@@ -998,7 +998,7 @@ onMounted(() => {
 }
 
 .source-chip.active {
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border-color: var(--brand-primary);
   font-weight: 600;
@@ -1154,12 +1154,12 @@ onMounted(() => {
 
 .apply-btn:hover {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 .apply-btn.primary {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 .loading-state {

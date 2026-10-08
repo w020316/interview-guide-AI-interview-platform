@@ -579,7 +579,7 @@ onMounted(() => {
 
 .msg-row.user .msg-avatar {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 .msg-bubble {
@@ -595,7 +595,7 @@ onMounted(() => {
 
 .msg-row.user .msg-bubble {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 .msg-bubble.streaming::after {

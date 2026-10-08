@@ -1289,7 +1289,7 @@ onUnmounted(() => {
 
 .count-stepper button:hover:not(:disabled) {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 .count-stepper button:disabled {
@@ -1352,7 +1352,7 @@ onUnmounted(() => {
 .pref-btn.active {
   background: var(--brand-primary);
   border-color: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
   font-weight: 600;
 }
 .focus-note {
@@ -1413,7 +1413,7 @@ onUnmounted(() => {
 .gen-step.done .gen-dot {
   border-color: var(--brand-primary);
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 .gen-step.active .gen-dot {
   border-color: var(--brand-primary);

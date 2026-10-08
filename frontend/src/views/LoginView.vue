@@ -436,7 +436,7 @@ async function handleRegister() {
   position: relative;
   z-index: 2;
   padding: 48px;
-  color: #fff;
+  color: var(--c-on-primary);
   max-width: 460px;
 }
 
@@ -457,7 +457,7 @@ async function handleRegister() {
   border-radius: var(--radius-md);
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.7);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 /* mobile-brand 在白底卡片中：深绿边框 + 深绿图标 */
@@ -477,7 +477,7 @@ async function handleRegister() {
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.2px;
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 /* aside-title：衬线字体，编辑风 */
@@ -488,22 +488,22 @@ async function handleRegister() {
   line-height: 1.2;
   letter-spacing: -0.5px;
   margin: 0 0 20px;
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 /* text-gradient-static 在深绿背景上改为浅白色 */
 .aside-title .text-gradient-static {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--c-on-primary);
   font-family: var(--font-display);
   font-weight: 600;
   background: none;
-  -webkit-text-fill-color: rgba(255, 255, 255, 0.92);
+  -webkit-text-fill-color: var(--c-on-primary);
 }
 
 .aside-desc {
   font-size: 15px;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--c-on-primary);
   margin: 0 0 36px;
 }
 
@@ -512,13 +512,13 @@ async function handleRegister() {
   list-style: disc;
   padding-left: 20px;
   margin: 0 0 48px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--c-on-primary);
 }
 
 .aside-features li {
   padding: 10px 0;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--c-on-primary);
 }
 
 /* aside-stats：白色文字 + 半透明背景 */
@@ -542,14 +542,14 @@ async function handleRegister() {
   font-variant-numeric: tabular-nums;
   font-size: 22px;
   font-weight: 700;
-  color: #fff;
+  color: var(--c-on-primary);
   line-height: 1;
   margin-bottom: 4px;
 }
 
 .aside-stat-label {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--c-on-primary);
 }
 
 /* ── 右侧表单区：暖米白背景 ── */
@@ -829,7 +829,7 @@ async function handleRegister() {
   padding: 12px;
   font-size: 15px;
   font-weight: 600;
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md);

@@ -529,7 +529,7 @@ const summaryText = computed(() => {
 }
 .compare-toggle:hover {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 .compare-bar {
   display: flex;
@@ -560,7 +560,7 @@ const summaryText = computed(() => {
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 .compare-btn.primary {
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border-color: var(--brand-primary);
 }

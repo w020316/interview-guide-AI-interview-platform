@@ -98,7 +98,7 @@ function handleClick(ev: MouseEvent) {
 /* 变体 */
 .base-btn--primary {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 .base-btn--primary:hover:not(:disabled) {
   background: var(--brand-primary-hover);
@@ -129,7 +129,7 @@ function handleClick(ev: MouseEvent) {
 /* CTA：白底反色，用于品牌色背景上的行动召唤（HomeView CTA 卡片） */
 .base-btn--cta {
   background: #fff;
-  color: var(--brand-primary);
+  color: var(--c-brand-ink);
   box-shadow: var(--shadow-md);
 }
 .base-btn--cta:hover:not(:disabled) {

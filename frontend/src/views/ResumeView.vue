@@ -1276,7 +1276,7 @@ function formatDate() {
 }
 
 .btn-pick {
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border: 1px solid var(--brand-primary);
 }
@@ -1551,7 +1551,7 @@ function formatDate() {
   font-size: 14px;
   font-weight: 600;
   font-family: var(--font-sans);
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md);
@@ -1829,7 +1829,7 @@ function formatDate() {
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md);
@@ -1920,7 +1920,7 @@ function formatDate() {
 
 .optimize-tabs button.active {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 .optimize-downloads {

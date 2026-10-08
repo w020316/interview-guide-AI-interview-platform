@@ -473,7 +473,7 @@ function logout() {
   height: 36px;
   border-radius: var(--radius-md);
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
   transition: background var(--transition-fast);
 }
 
@@ -650,7 +650,7 @@ function logout() {
 .dd-item:hover .dd-ico,
 .dd-item.active .dd-ico {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 .dd-text {
@@ -819,7 +819,7 @@ function logout() {
   height: 28px;
   border-radius: 50%;
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -869,7 +869,7 @@ function logout() {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border: 1px solid var(--brand-primary);
   border-radius: var(--radius-md);
@@ -1062,7 +1062,7 @@ function logout() {
 
 .version-link:hover {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 /* 未读更新小红点（v1.34.1 UX P2-3）：以轻量提示替代首访自动弹窗 */

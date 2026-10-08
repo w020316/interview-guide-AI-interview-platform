@@ -320,3 +320,106 @@ describe('transition 必须指明属性（v1.64.1）', () => {
       .toEqual([])
   })
 })
+
+describe('品牌色底上的内容色必须随主题翻转（v1.66.0）', () => {
+  // 背景：暗色主题把 --brand-primary 由 #0f766e 提亮为 #14b8a6。
+  // 写死的白字压在上面只剩 2.49:1 —— 既不过 AA 正文 4.5，也不过大字 3.0。
+  // v1.66.0 修了 45 处（含登录页左侧品牌面板的子元素）。
+  // 正确做法：文字用 var(--c-on-primary)（浅色=#fff，暗色=#062e29 → 5.90:1）。
+  //
+  // ⚠️ 本守卫刻意**不**覆盖 var(--brand-gradient)：暗色主题把它覆盖为**深色**渐变，
+  //    其上的白字在两种主题下都成立。也**不**覆盖 -50/-100/-light 浅色调。
+  const SOLID_BG = /background(?:-color)?:\s*var\(--brand-primary(?:-(?:hover|active))?\)/i
+  const WHITE_FG = /(?:^|[;\s])(?:color|-webkit-text-fill-color):\s*(?:#fff(?:fff)?|white|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,[^)]*\))(?![\w-])/i
+
+  it('实色品牌底（含其后代规则）上不得写死白字', () => {
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, SCAN_EXT)) {
+      const r = rel(file)
+      const raw = fs.readFileSync(file, 'utf8')
+      scanned++
+
+      // 收集本文件中「自己就是品牌实色底」的选择器（取逗号分隔的每一段）。
+      const brandSelectors: string[] = []
+      for (const m of raw.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (SOLID_BG.test(m[2])) {
+          for (const part of m[1].split(',')) {
+            const sel = part.trim()
+            if (sel) brandSelectors.push(sel)
+          }
+        }
+      }
+
+      for (const m of raw.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const sel = m[1].trim().replace(/\s+/g, ' ')
+        const body = m[2]
+        // 判据只针对「文字色」，去掉 background 声明避免自我命中
+        const fgOnly = body.replace(/background[^;]*;/gi, '').replace(/border[^;]*;/gi, '')
+        if (!WHITE_FG.test(fgOnly)) continue
+
+        const sameRule = SOLID_BG.test(body)
+        // 子元素形态：父规则带品牌底，子规则写白字（LoginView 的 .auth-aside 就是这种）
+        const inherits = brandSelectors.some((b) => sel.startsWith(b + ' ') || sel.startsWith(b + '>') || sel.startsWith(b + ':'))
+        if (!sameRule && !inherits) continue
+
+        const line = raw.slice(0, m.index).split('\n').length
+        bad.push(`${r}:${line}  ${sel.slice(0, 70)}`)
+      }
+    }
+
+    expect(scanned, '扫描范围异常：文件数过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(bad, `品牌实色底（或其子元素）上的文字请改用 var(--c-on-primary)（随主题翻转），不要写死白字：\n${bad.join('\n')}`)
+      .toEqual([])
+  })
+
+  // ⚠️ 已知盲区（如实记录，勿误以为全覆盖）：
+  // 上面的守卫靠「选择器字面前缀」判断父子关系，因此**只能**覆盖两类形态——
+  //   ① 同一条规则里既有品牌实色底又有白字；
+  //   ② CSS 选择器字面就写成后代（`.auth-aside .aside-title`）。
+  // 而 LoginView 的 `.auth-aside` → `.aside-title` 是**靠 DOM 嵌套**形成的父子关系，
+  // 选择器里并不表达，静态扫描看不见（v1.66.0 就是靠真机渲染才发现的）。
+  // 该类形态请以真机双主题对比度实测兜底。
+
+  it('--c-on-primary 在两种主题下对 --brand-primary 都必须 ≥ 4.5:1', () => {
+    // 把「令牌已定义」升级为「令牌可被证明可读」：任何人改动任一端的取值，
+    // 只要配出来的对比度不过 AA，这里就会红。
+    const css = fs.readFileSync(path.join(SRC, 'styles', 'variables.css'), 'utf8')
+
+    const lightBlock = css.slice(css.indexOf(':root'), css.indexOf('[data-theme='))
+    const darkBlock = css.slice(css.indexOf('[data-theme='))
+    const grab = (block: string, name: string) => {
+      const m = block.match(new RegExp(`${name}\\s*:\\s*(#[0-9a-fA-F]{6})`))
+      return m ? m[1] : null
+    }
+    const hexToRgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+    const lum = (rgb: number[]) =>
+      rgb
+        .map((v) => {
+          const c = v / 255
+          return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+        })
+        .reduce((a, v, i) => a + [0.2126, 0.7152, 0.0722][i] * v, 0)
+    const contrast = (a: string, b: string) => {
+      const la = lum(hexToRgb(a))
+      const lb = lum(hexToRgb(b))
+      return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+    }
+
+    for (const [themeName, block] of [
+      ['light', lightBlock],
+      ['dark', darkBlock],
+    ] as const) {
+      const brand = grab(block, '--brand-primary')
+      const onBrand = grab(block, '--c-on-primary')
+      expect(brand, `${themeName} 主题缺少 --brand-primary`).toBeTruthy()
+      expect(onBrand, `${themeName} 主题缺少 --c-on-primary`).toBeTruthy()
+      const ratio = contrast(brand as string, onBrand as string)
+      expect(
+        ratio >= 4.5,
+        `${themeName} 主题：--c-on-primary(${onBrand}) 压 --brand-primary(${brand}) 只有 ${ratio.toFixed(2)}:1，需 ≥ 4.5:1`,
+      ).toBe(true)
+    }
+  })
+})

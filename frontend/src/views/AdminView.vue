@@ -817,7 +817,7 @@ onMounted(() => {
   font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md);
@@ -897,7 +897,7 @@ onMounted(() => {
   padding: 1px 6px;
   font-size: 11px;
   font-weight: 600;
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border-radius: var(--radius-full);
   text-align: center;

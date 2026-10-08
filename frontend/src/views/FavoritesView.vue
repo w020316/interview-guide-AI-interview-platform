@@ -507,10 +507,10 @@ select.input { appearance: auto; background: var(--c-bg); }
 .jp-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 .jp-chip { padding: 5px 12px; font-size: 12.5px; color: var(--c-text-secondary); background: var(--c-bg-alt); border: 1px solid transparent; border-radius: var(--radius-full); cursor: pointer; }
 .jp-chip:hover { color: var(--brand-primary); border-color: var(--brand-primary-200); }
-.jp-chip.active { color: #fff; background: var(--brand-primary); border-color: var(--brand-primary); font-weight: 600; }
+.jp-chip.active { color: var(--c-on-primary); background: var(--brand-primary); border-color: var(--brand-primary); font-weight: 600; }
 .jp-count { margin-left: 5px; opacity: 0.85; font-size: 11px; }
 .jp-compare-btn { padding: 7px 14px; font-size: 13px; border: 1px solid var(--brand-primary); color: var(--brand-primary); background: transparent; border-radius: var(--radius-md); cursor: pointer; }
-.jp-compare-btn:hover:not(:disabled) { background: var(--brand-primary); color: #fff; }
+.jp-compare-btn:hover:not(:disabled) { background: var(--brand-primary); color: var(--c-on-primary); }
 .jp-compare-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .jp-list { display: flex; flex-direction: column; gap: 10px; }
 .jp-card { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--c-border-light); border-radius: var(--radius-md); }
@@ -522,7 +522,7 @@ select.input { appearance: auto; background: var(--c-bg); }
 .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .seg-btn { padding: 4px 10px; font-size: 12px; color: var(--c-text-secondary); background: var(--c-bg-alt); border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; }
 .seg-btn:hover:not(:disabled) { color: var(--brand-primary); border-color: var(--brand-primary-200); }
-.seg-btn.active { color: #fff; background: var(--brand-primary); border-color: var(--brand-primary); font-weight: 600; }
+.seg-btn.active { color: var(--c-on-primary); background: var(--brand-primary); border-color: var(--brand-primary); font-weight: 600; }
 .seg-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .seg-clear { color: var(--c-text-quaternary); }
 

@@ -418,7 +418,7 @@ onMounted(load)
 .cal-nav { width: 32px; height: 32px; border-radius: var(--radius-md); border: 1px solid var(--c-border); background: transparent; color: var(--c-text-secondary); font-size: 18px; line-height: 1; cursor: pointer; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); }
 .cal-nav:hover { color: var(--brand-primary); border-color: var(--brand-primary); background: var(--brand-primary-light); }
 .cal-today { margin-left: auto; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--brand-primary); background: var(--brand-primary-light); border: 1px solid var(--brand-primary-200); border-radius: 999px; cursor: pointer; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); }
-.cal-today:hover { background: var(--brand-primary); color: #fff; }
+.cal-today:hover { background: var(--brand-primary); color: var(--c-on-primary); }
 
 .week-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
 .week-label { text-align: center; font-size: 12px; font-weight: 600; color: var(--c-text-tertiary); padding: 4px 0; }
@@ -428,7 +428,7 @@ onMounted(load)
 .day-cell { min-height: 84px; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 3px; background: var(--c-bg-alt); border: 1px solid var(--c-border-light); border-radius: var(--radius-md); cursor: pointer; text-align: left; transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast); }
 .day-cell:hover { border-color: var(--brand-primary-200); }
 .day-cell.is-out { opacity: 0.4; background: transparent; }
-.day-cell.is-today .day-num { background: var(--brand-primary); color: #fff; }
+.day-cell.is-today .day-num { background: var(--brand-primary); color: var(--c-on-primary); }
 .day-cell.is-selected { border-color: var(--brand-primary); box-shadow: 0 0 0 1px var(--brand-primary); }
 .day-num { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 12px; color: var(--c-text-secondary); flex-shrink: 0; }
 .day-events { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }

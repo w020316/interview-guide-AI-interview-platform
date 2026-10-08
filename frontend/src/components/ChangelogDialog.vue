@@ -185,7 +185,7 @@ onMounted(() => {
   height: 48px;
   border-radius: var(--radius-md);
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--c-on-primary);
   flex-shrink: 0;
 }
 
@@ -364,7 +364,7 @@ onMounted(() => {
   padding: 9px 24px;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--c-on-primary);
   background: var(--brand-primary);
   border: none;
   border-radius: var(--radius-md);

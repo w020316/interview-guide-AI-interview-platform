@@ -21,6 +21,16 @@
   --brand-primary-50: #f0fdfa;
   --brand-primary-100: #ccfbf1;
   --brand-primary-200: #99f6e4;
+  /* 压在「实色品牌底」上的内容色。
+   * ⚠️ 必须随主题翻转：浅色主题品牌底是深墨绿 #0f766e（白字 5.39:1），
+   * 而暗色主题把品牌色提亮成 #14b8a6 —— 白字压在上面只有 2.49:1，
+   * 既不过 WCAG AA 正文 4.5 也不过大字 3.0。暗色下必须改用深色字。
+   * 凡 background 为 var(--brand-primary[-hover|-active]) 的规则，文字一律用它。 */
+  --c-on-primary: #ffffff;
+  /* 与主题无关的「品牌墨绿墨迹」：只用于**背景固定为浅色**的场景
+   * （如白底反色 CTA 按钮）。暗色下品牌色会提亮，若用 --brand-primary
+   * 就会在固定白底上退化成 2.49:1，故此处刻意不翻转。 */
+  --c-brand-ink: #0f766e;
   --brand-accent: #c2410c;            /* 赭石橙，用于强调点缀 */
   --brand-accent-hover: #9a3412;
   --brand-accent-light: #fff7ed;
@@ -482,6 +492,9 @@ p {
   --brand-primary-50: #0e2e2b;
   --brand-primary-100: #16423d;
   --brand-primary-200: #1e554f;
+  /* 暗色下品牌色提亮为 #14b8a6，压在上面的内容必须转为深色：
+   * #062e29 on #14b8a6 = 5.90:1（对比白字的 2.49:1）。 */
+  --c-on-primary: #062e29;
   --brand-gradient: linear-gradient(135deg, #0f766e 0%, #0b2321 100%);
   --brand-gradient-soft: linear-gradient(135deg, #12322e 0%, #211d1a 100%);
   --brand-glow: 0 4px 14px rgba(20, 184, 166, 0.18);

@@ -1054,8 +1054,8 @@ function actionVariant(action: string) {
 .mini-btn { padding: 6px 12px; font-size: 13px; border: 1px solid var(--c-border-strong); background: var(--c-surface); color: var(--c-text-secondary); border-radius: var(--radius-md); cursor: pointer; text-decoration: none; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); }
 .mini-btn:hover:not(:disabled) { border-color: var(--brand-primary); color: var(--brand-primary); }
 .mini-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.mini-btn.primary { background: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
-.mini-btn.primary:hover:not(:disabled) { background: var(--brand-primary-hover); color: #fff; }
+.mini-btn.primary { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--c-on-primary); }
+.mini-btn.primary:hover:not(:disabled) { background: var(--brand-primary-hover); color: var(--c-on-primary); }
 .mini-btn.danger:hover:not(:disabled) { border-color: var(--c-danger); color: var(--c-danger); }
 .mini-select { padding: 6px 8px; font-size: 13px; border: 1px solid var(--c-border-strong); border-radius: var(--radius-md); background: var(--c-surface); color: var(--c-text-secondary); cursor: pointer; }
 
