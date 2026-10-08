@@ -140,6 +140,18 @@ Windows 回退宋体、Android 回退默认衬线 —— 小字号下笔画发�
     正文行长需控制在 65~75 字符内，窄列反而更易读，不是漂移。
 - 页面级标题**统一 `font-size: 28px`**（此前 26 与 28px 混用）。
 
+**切换控件的三种 idiom（v1.64.1 定死，别再造第四种）**
+
+| 语义 | 形态 | 类名 | 用在哪 |
+|---|---|---|---|
+| **模式切换**（互斥、无计数） | 分段控件：`inline-flex` 底槽 + `--c-bg-alt` 底 + 4px padding，选中项白底 | `.tab-switch` | `ResumeView`、`JobAnalysisView`、`KnowledgeView` |
+| **带计数的筛选** | 独立胶囊按钮：`flex` + `gap`，选中项品牌色填充 | `.filter-chips` | `JobsView` 招聘类型行 |
+| **登录 / 注册** | 下划线 tab：`flex` + `border-bottom`，选中项下划线 | `.tab-switch`（登录页内） | `LoginView` |
+
+⚠️ **为什么前两种不合并**：它们**语义不同**，长得一样反而错。
+`ResumeView` 的模式切换与 `JobsView` 的筛选行此前**共用 `.tab-switch` 这一个类名却各写一套样式**，
+看代码像「同一个组件被写歪了」—— 实际是命名掩盖了语义差异。v1.64.1 已按语义改名。
+
 **可点区域的键盘可达性**
 - 任何 `@click` 的非 `<button>` 元素都必须补
   `role="button"` + `tabindex="0"` + `@keydown.enter` + `@keydown.space.prevent` + `:focus-visible` 焦点环。

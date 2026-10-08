@@ -300,3 +300,23 @@ describe('CSS 变量定义完整性（v1.63.1）', () => {
     ).toEqual([])
   })
 })
+
+describe('transition 必须指明属性（v1.64.1）', () => {
+  it('不得使用 transition: all', () => {
+    // `transition: all` 会动画化**所有**可动画属性，包括你没打算动的那些
+    // （布局属性被动画化会触发重排，长列表上表现为卡顿）。
+    // v1.64.1 全仓清了 57 处，用这条守住不再写回来。
+    const bad: string[] = []
+    let scanned = 0
+    for (const file of walkExt(SRC, SCAN_EXT)) {
+      const r = rel(file)
+      scanned++
+      for (const [i, line] of fs.readFileSync(file, 'utf8').split('\n').entries()) {
+        if (/transition:\s*all\b/.test(line)) bad.push(`${r}:${i + 1}  ${line.trim()}`)
+      }
+    }
+    expect(scanned, '扫描范围异常：文件数过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(bad, `transition: all 请改为指明属性（如 color / background-color / box-shadow / transform）：\n${bad.join('\n')}`)
+      .toEqual([])
+  })
+})

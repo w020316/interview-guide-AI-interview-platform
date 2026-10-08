@@ -1246,7 +1246,7 @@ onUnmounted(() => {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   resize: vertical;
 }
 
@@ -1281,7 +1281,7 @@ onUnmounted(() => {
   font-size: 18px;
   color: var(--c-text);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1342,7 +1342,7 @@ onUnmounted(() => {
   border: 1px solid var(--c-border);
   border-radius: 999px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   font-family: var(--font-sans);
 }
 .pref-btn:hover {
@@ -1408,7 +1408,7 @@ onUnmounted(() => {
   justify-content: center;
   flex-shrink: 0;
   color: var(--brand-primary);
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 .gen-step.done .gen-dot {
   border-color: var(--brand-primary);
@@ -1502,7 +1502,7 @@ onUnmounted(() => {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
   display: inline-flex;
   align-items: center;
@@ -1528,7 +1528,7 @@ onUnmounted(() => {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
 }
 
@@ -1546,7 +1546,7 @@ onUnmounted(() => {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1895,7 +1895,7 @@ onUnmounted(() => {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   resize: vertical;
   line-height: 1.6;
 }

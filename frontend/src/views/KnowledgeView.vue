@@ -520,7 +520,7 @@ function formatTime(t?: string) {
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   font-family: inherit;
 }
 
@@ -568,7 +568,7 @@ function formatTime(t?: string) {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   resize: vertical;
 }
 
@@ -592,7 +592,7 @@ function formatTime(t?: string) {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   box-shadow: var(--shadow-brand);
   font-family: inherit;
 }
@@ -617,7 +617,7 @@ function formatTime(t?: string) {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   display: inline-flex;
   align-items: center;
   gap: 6px;

@@ -1056,7 +1056,7 @@ function logout() {
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   letter-spacing: 0.2px;
 }
 
@@ -1093,7 +1093,7 @@ function logout() {
   border: 1px solid var(--c-border);
   border-radius: 999px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   letter-spacing: 0.2px;
 }
 

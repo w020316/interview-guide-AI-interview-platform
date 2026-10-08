@@ -68,6 +68,16 @@ class PromptSanitizerTest {
             String jd = "任".repeat(4000);
             assertEquals(4000, PromptSanitizer.sanitize(jd).length());
         }
+
+        @Test
+        @DisplayName("岗位正文入库上限（6000 字）也不得被全局兜底截断")
+        void jobDescriptionLength_notTruncatedByGlobalCap() {
+            // 对应 AbstractOpenApiJobProvider.DESC_MAX_LEN = 6000。
+            // 用**行为**断言而不是去读那个常量：常量是 protected、跨包取不到，
+            // 而「抄一份数值进来」正是本轮在清理的那种写法。
+            String s = "岗".repeat(6000);
+            assertEquals(6000, PromptSanitizer.sanitize(s).length());
+        }
     }
 
     @Nested

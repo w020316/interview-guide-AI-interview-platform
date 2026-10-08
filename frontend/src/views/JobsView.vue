@@ -5,8 +5,13 @@
       <p>聚合主流招聘平台与公开招聘数据源，全时段全行业，智能分类、多条件筛选，直通官方申请入口</p>
     </header>
 
-    <!-- 招聘类型 Tab -->
-    <div class="tab-switch">
+    <!-- 招聘类型筛选行（v1.64.1 由 .tab-switch 改名为 .filter-chips）
+         ⚠️ 它与 ResumeView 的 `.tab-switch` 是**两种不同语义的组件**，不该长得一样：
+         这里是「带计数的筛选行」（推荐/收藏…每个都显示条数），
+         那里是「模式切换」（上传/导入/粘贴，互斥且无计数）。
+         此前两者共用同一个类名却各写一套样式，看代码像是「同一个组件被写歪了」——
+         实际是命名掩盖了语义差异。 -->
+    <div class="filter-chips">
       <button
         v-for="t in recruitTabs"
         :key="t.value"
@@ -795,14 +800,14 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 
-.tab-switch {
+.filter-chips {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
-.tab-switch button {
+.filter-chips button {
   padding: 8px 18px;
   border: 1px solid var(--c-border);
   border-radius: 999px;
@@ -810,10 +815,10 @@ onMounted(() => {
   cursor: pointer;
   font-size: 14px;
   color: var(--c-text);
-  transition: all 0.2s;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
-.tab-switch button.active {
+.filter-chips button.active {
   background: var(--brand-primary);
   border-color: var(--brand-primary);
   color: #fff;
@@ -880,7 +885,7 @@ onMounted(() => {
   background: transparent;
   color: var(--c-text-secondary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 .fav-btn:hover {
   color: var(--c-danger);
@@ -983,7 +988,7 @@ onMounted(() => {
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -1144,7 +1149,7 @@ onMounted(() => {
   font-size: 13px;
   text-decoration: none;
   white-space: nowrap;
-  transition: all 0.2s;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .apply-btn:hover {

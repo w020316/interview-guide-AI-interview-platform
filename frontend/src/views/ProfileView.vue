@@ -556,7 +556,7 @@ function fmtRelative(iso: string): string {
   display: flex;
   align-items: center;
   gap: 14px;
-  transition: all var(--transition-base);
+  transition: color var(--transition-base), background-color var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base), opacity var(--transition-base);
   box-shadow: var(--shadow-xs);
 }
 

@@ -524,7 +524,7 @@ const summaryText = computed(() => {
   border: 1px solid var(--brand-primary);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 .compare-toggle:hover {
   background: var(--brand-primary);
@@ -556,7 +556,7 @@ const summaryText = computed(() => {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 .compare-btn.primary {
   color: #fff;
@@ -580,7 +580,7 @@ const summaryText = computed(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 .pick-dot.on {
   border-color: var(--brand-primary);
@@ -753,7 +753,7 @@ const summaryText = computed(() => {
   border: 1px solid var(--c-border-light);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: color var(--transition-base), background-color var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base), opacity var(--transition-base);
   box-shadow: var(--shadow-xs);
 }
 
@@ -922,7 +922,7 @@ const summaryText = computed(() => {
   cursor: pointer;
   color: var(--c-text-secondary);
   font-size: 20px;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .modal-close:hover {
@@ -989,7 +989,7 @@ const summaryText = computed(() => {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .failed-btn:hover {
@@ -1212,6 +1212,6 @@ const summaryText = computed(() => {
   }
 }
 
-.retry-btn { padding: 8px 20px; border: 1px solid var(--c-accent); background: transparent; color: var(--c-accent); border-radius: var(--radius-md); cursor: pointer; font-size: 14px; transition: all 0.2s; }
+.retry-btn { padding: 8px 20px; border: 1px solid var(--c-accent); background: transparent; color: var(--c-accent); border-radius: var(--radius-md); cursor: pointer; font-size: 14px; transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s; }
 .retry-btn:hover { background: var(--c-accent-soft); }
 </style>

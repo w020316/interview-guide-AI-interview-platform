@@ -94,6 +94,16 @@ describe('isMappableLocation', () => {
       expect(isMappableLocation(t), `真实单城市应上图: ${t}`).toBe(true)
     }
   })
+
+  it('含「集团」的真实地点仍能上图 —— 这是「不收录裸词『集团』」的取证依据', () => {
+    // 背景：残余假阳性里有「全国铁路局集团公司」，看似补一个「集团」就能清掉。
+    // 但种子数据里这三个是**真实单点地点**，加裸词「集团」会把它们一起误杀：
+    // 用 1 条残余换 3 个真实地点被隐藏，收益远小于代价。
+    // 这条测试把该决定锁住，防止后人「顺手补个集团」。
+    for (const t of ['上海电影集团', '中国出版集团', '中国建材集团']) {
+      expect(isMappableLocation(t), `真实地点被误杀: ${t}`).toBe(true)
+    }
+  })
 })
 
 describe('buildMapSearchUrl', () => {

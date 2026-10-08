@@ -562,7 +562,7 @@ function gapStatusClass(status: string): string {
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .tab-switch button.active {
@@ -601,7 +601,7 @@ function gapStatusClass(status: string): string {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   resize: vertical;
   line-height: 1.6;
   box-sizing: border-box;
@@ -731,7 +731,7 @@ function gapStatusClass(status: string): string {
   border: 1px solid var(--brand-primary-100);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .btn-upload-resume:hover {
@@ -758,7 +758,7 @@ function gapStatusClass(status: string): string {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .btn-clear-resume:hover {
@@ -785,7 +785,7 @@ function gapStatusClass(status: string): string {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
   display: inline-flex;
   align-items: center;
@@ -811,7 +811,7 @@ function gapStatusClass(status: string): string {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .btn-ghost:hover {
@@ -1129,7 +1129,7 @@ function gapStatusClass(status: string): string {
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .letter-type-switch button.active {

@@ -543,7 +543,7 @@ onMounted(() => {
   color: var(--c-text);
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s;
   text-align: left;
 }
 

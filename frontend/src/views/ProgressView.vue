@@ -502,7 +502,7 @@ onMounted(async () => {
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 .dim-switch button.active {
   background: var(--c-surface);

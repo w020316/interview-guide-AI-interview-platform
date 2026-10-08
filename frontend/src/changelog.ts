@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.64.0'
+export const CURRENT_VERSION = '1.64.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.64.1',
+    date: '2026-10-08',
+    title: '版本 1.64.1 · 切换控件按用途区分，过渡只动该动的属性',
+    items: [
+      { text: '招聘广场的岗位类型筛选（推荐 / 收藏…）与简历页的「上传 / 导入 / 粘贴」切换，此前用的是同一个样式名但长得不一样，让人以为其中一处写歪了；现已按各自用途区分清楚，两种形态都是刻意的', level: 'user' },
+      { text: '全站按钮与卡片的悬停、按下过渡，改为只动该动的属性（颜色、阴影、位移），不再连带动画无关属性，减少了不必要的重绘', level: 'user' },
+      { text: '给这两件事都加了防回退检查，避免以后又被写回去', level: 'user' },
+    ],
+  },
   {
     version: '1.64.0',
     date: '2026-10-08',

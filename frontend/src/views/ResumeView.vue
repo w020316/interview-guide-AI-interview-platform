@@ -755,7 +755,11 @@ function formatDate() {
   margin: 0;
 }
 
-/* ── Tab 切换 ── */
+/* ── Tab 切换（模式切换型）──
+ * ⚠️ 与 JobsView 的 `.filter-chips` 是**两种不同语义**，刻意长得不一样：
+ * 这里是「模式切换」（上传 / 导入 / 粘贴，互斥、无计数）→ 分段控件；
+ * 那里是「带计数的筛选行」→ 独立胶囊按钮。
+ * v1.64.1 之前两者共用 `.tab-switch` 这个类名，看代码像同一组件被写歪了 —— 已改名区分。 */
 .tab-switch {
   display: inline-flex;
   background: var(--c-bg-alt);
@@ -773,7 +777,7 @@ function formatDate() {
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .tab-switch button.active {
@@ -793,7 +797,7 @@ function formatDate() {
   border: 2px dashed var(--c-border);
   border-radius: var(--radius-lg);
   padding: 40px 20px;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   background: var(--c-surface);
 }
 
@@ -850,7 +854,7 @@ function formatDate() {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   outline: none;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   resize: vertical;
 }
 
@@ -1221,7 +1225,7 @@ function formatDate() {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
   display: inline-flex;
   align-items: center;
@@ -1301,7 +1305,7 @@ function formatDate() {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
   display: inline-flex;
   align-items: center;
@@ -1551,7 +1555,7 @@ function formatDate() {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
 }
 .btn-to-interview:hover:not(:disabled) {
@@ -1829,7 +1833,7 @@ function formatDate() {
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -1910,7 +1914,7 @@ function formatDate() {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .optimize-tabs button.active {
@@ -1936,7 +1940,7 @@ function formatDate() {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
 
 .btn-download:hover {

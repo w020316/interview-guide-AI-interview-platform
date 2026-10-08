@@ -66,7 +66,7 @@ function handleClick(ev: MouseEvent) {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   white-space: nowrap;
   user-select: none;
   line-height: 1.5;
