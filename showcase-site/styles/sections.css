@@ -58,6 +58,10 @@
   font-size: var(--fs-2xl);
   letter-spacing: -0.01em;
   color: var(--c-text);
+  transition: transform var(--dur-fast) var(--ease);
+}
+.brand:active {
+  transform: scale(0.98);
 }
 .brand__mark {
   color: var(--c-primary);
@@ -75,7 +79,8 @@
   font-weight: 500;
   color: var(--c-text-muted);
   padding: var(--sp-2) 0;
-  transition: color var(--dur-fast) var(--ease);
+  transition: color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
 }
 .nav__link::after {
   content: "";
@@ -94,6 +99,9 @@
 }
 .nav__link:hover::after {
   transform: scaleX(1);
+}
+.nav__link:active {
+  transform: scale(0.98);
 }
 
 .nav__actions {
@@ -283,6 +291,8 @@ html[data-theme="dark"] .theme-toggle .icon-moon {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--c-text-faint);
+  /* Allow the label to shrink/wrap instead of squeezing the status pill */
+  min-width: 0;
 }
 .reader__status {
   font-family: var(--font-mono);
@@ -293,6 +303,9 @@ html[data-theme="dark"] .theme-toggle .icon-moon {
   background: var(--c-tint-bg);
   border-radius: var(--radius-pill);
   padding: 2px var(--sp-3);
+  /* Keep the pill on a single line; never let it wrap or be compressed */
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .reader__body {
   display: flex;
@@ -442,6 +455,10 @@ html[data-theme="dark"] .theme-toggle .icon-moon {
   font-size: var(--fs-xl);
   font-weight: 700;
 }
+/* Lead card carries more weight: 24 / 18 = 1.33 hierarchy over its desc */
+.card--lead .card__title {
+  font-size: var(--fs-2xl);
+}
 .card__desc {
   color: var(--c-text-muted);
   font-size: var(--fs-base);
@@ -462,6 +479,12 @@ html[data-theme="dark"] .theme-toggle .icon-moon {
 .card__rules {
   display: grid;
   gap: var(--sp-3);
+}
+/* Lead card is tall (2×2); let the rules list absorb the free height and
+   distribute it between rows, so the slack reads as rhythm instead of a hole. */
+.card--lead .card__rules {
+  flex: 1 1 auto;
+  align-content: space-between;
 }
 .card__rule {
   display: grid;
@@ -644,6 +667,10 @@ html[data-theme="dark"] .cta {
   align-items: center;
   gap: var(--sp-2);
   min-height: 44px;
+  transition: transform var(--dur-fast) var(--ease);
+}
+.cta__link:active {
+  transform: scale(0.98);
 }
 .cta__link:hover {
   text-decoration: underline;
@@ -708,10 +735,14 @@ html[data-theme="dark"] .cta {
   color: var(--c-text-muted);
 }
 .footer__links a {
-  transition: color var(--dur-fast) var(--ease);
+  transition: color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
 }
 .footer__links a:hover {
   color: var(--c-primary);
+}
+.footer__links a:active {
+  transform: scale(0.98);
 }
 .footer__meta {
   margin-top: var(--sp-5);

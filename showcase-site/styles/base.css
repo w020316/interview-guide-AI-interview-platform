@@ -283,6 +283,18 @@ input:focus-visible {
 .section {
   padding-bottom: clamp(4.5rem, 10vw, 9rem);
 }
+/* Vary the rhythm so sections don't read as an evenly-spaced stack.
+   Invariant: upper padding must always stay < lower padding.
+   - #workflow (single thin row of 4 steps): tighter on both sides
+   - #start (closing CTA): more generous, ceremonial lead-in */
+#workflow {
+  padding-top: clamp(3rem, 8vw, 6rem);
+  padding-bottom: clamp(4rem, 9vw, 7rem);
+}
+#start {
+  padding-top: clamp(4rem, 10vw, 8rem);
+  padding-bottom: clamp(4.5rem, 10vw, 9rem);
+}
 
 .section__head {
   display: flex;
