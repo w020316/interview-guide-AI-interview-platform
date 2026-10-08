@@ -993,13 +993,21 @@ function actionVariant(action: string) {
 .app-note { margin-top: 8px; font-size: 13px; color: var(--c-text-secondary); line-height: 1.6; }
 .app-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--c-border-light); }
 
-.mini-btn { padding: 6px 12px; font-size: 13px; border: 1px solid var(--c-border-strong); background: var(--c-surface); color: var(--c-text-secondary); border-radius: var(--radius-md); cursor: pointer; text-decoration: none; transition: all var(--transition-fast); }
+.mini-btn { padding: 6px 12px; font-size: 13px; border: 1px solid var(--c-border-strong); background: var(--c-surface); color: var(--c-text-secondary); border-radius: var(--radius-md); cursor: pointer; text-decoration: none; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); }
 .mini-btn:hover:not(:disabled) { border-color: var(--brand-primary); color: var(--brand-primary); }
 .mini-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .mini-btn.primary { background: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
 .mini-btn.primary:hover:not(:disabled) { background: var(--brand-primary-hover); color: #fff; }
 .mini-btn.danger:hover:not(:disabled) { border-color: var(--c-danger); color: var(--c-danger); }
 .mini-select { padding: 6px 8px; font-size: 13px; border: 1px solid var(--c-border-strong); border-radius: var(--radius-md); background: var(--c-surface); color: var(--c-text-secondary); cursor: pointer; }
+
+/* ── 触控目标 ≥44px（v1.63.2）──
+ * 移动端 `.mini-btn` / `.mini-select` 只有 ~29px 高，手指容易点错。
+ * 与 CalendarView 同理：放大实际尺寸而非伪元素扩热区（这些控件在卡片操作行里是相邻的）。 */
+@media (max-width: 768px) {
+  .mini-btn,
+  .mini-select { min-height: 44px; padding: 11px 14px; }
+}
 
 .tailored-hint { margin-top: 10px; font-size: 12px; color: var(--c-text-tertiary); }
 .link-btn { background: transparent; border: none; color: var(--brand-primary); font-size: 12px; cursor: pointer; padding: 0; }

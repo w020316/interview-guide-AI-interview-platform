@@ -397,7 +397,7 @@ onMounted(load)
 </script>
 
 <style scoped>
-.calendar-page { max-width: 980px; margin: 0 auto; }
+.calendar-page { max-width: 1080px; margin: 0 auto; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: 28px; font-weight: 700; color: var(--c-text); margin: 0 0 6px; letter-spacing: -0.5px; }
 .page-header p { font-size: 14px; color: var(--c-text-secondary); margin: 0; }
@@ -415,9 +415,9 @@ onMounted(load)
 .cal-card { background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); padding: 18px 20px 20px; box-shadow: var(--shadow-sm); }
 .cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .cal-title { font-family: var(--font-title); font-size: 18px; font-weight: 600; color: var(--c-text); flex: 1; text-align: center; }
-.cal-nav { width: 32px; height: 32px; border-radius: var(--radius-md); border: 1px solid var(--c-border); background: transparent; color: var(--c-text-secondary); font-size: 18px; line-height: 1; cursor: pointer; transition: all var(--transition-fast); }
+.cal-nav { width: 32px; height: 32px; border-radius: var(--radius-md); border: 1px solid var(--c-border); background: transparent; color: var(--c-text-secondary); font-size: 18px; line-height: 1; cursor: pointer; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); }
 .cal-nav:hover { color: var(--brand-primary); border-color: var(--brand-primary); background: var(--brand-primary-light); }
-.cal-today { margin-left: auto; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--brand-primary); background: var(--brand-primary-light); border: 1px solid var(--brand-primary-200); border-radius: 999px; cursor: pointer; transition: all var(--transition-fast); }
+.cal-today { margin-left: auto; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--brand-primary); background: var(--brand-primary-light); border: 1px solid var(--brand-primary-200); border-radius: 999px; cursor: pointer; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); }
 .cal-today:hover { background: var(--brand-primary); color: #fff; }
 
 .week-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
@@ -457,7 +457,7 @@ onMounted(load)
 .event-note { font-size: 12px; color: var(--c-text-secondary); margin-top: 4px; white-space: pre-wrap; }
 .event-linked { font-size: 12px; color: var(--brand-primary); margin-top: 4px; }
 .event-actions { display: flex; gap: 4px; align-items: flex-start; }
-.icon-btn { width: 28px; height: 28px; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: transparent; color: var(--c-text-secondary); cursor: pointer; transition: all var(--transition-fast); font-size: 13px; }
+.icon-btn { width: 28px; height: 28px; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: transparent; color: var(--c-text-secondary); cursor: pointer; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); font-size: 13px; }
 .icon-btn:hover { color: var(--brand-primary); border-color: var(--brand-primary); background: var(--brand-primary-light); }
 .icon-btn.danger:hover { color: var(--c-danger); border-color: var(--c-danger); background: var(--c-danger-light); }
 
@@ -466,7 +466,7 @@ onMounted(load)
 
 /* 弹窗 */
 .modal-mask { position: fixed; inset: 0; z-index: var(--z-modal); background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; padding: 20px; }
-.modal { width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; background: var(--c-surface); border-radius: var(--radius-lg); padding: 26px; box-shadow: var(--shadow-md); }
+.modal { width: 100%; max-width: 520px; max-height: 90vh; max-height: 90dvh; overflow-y: auto; background: var(--c-surface); border-radius: var(--radius-lg); padding: 26px; box-shadow: var(--shadow-md); }
 .modal-title { font-family: var(--font-title); font-size: 20px; font-weight: 600; color: var(--c-text); margin: 0 0 18px; }
 .event-form { display: flex; flex-direction: column; gap: 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
@@ -487,5 +487,16 @@ onMounted(load)
   .day-cell { position: relative; }
   .field-row { grid-template-columns: 1fr; }
   .stats-row { gap: 18px; }
+}
+
+/* ── 触控目标 ≥44px（v1.63.2）──
+ * 移动端没有 hover，28px 的图标按钮手指很容易点错。
+ * ⚠️ 这里**放大实际尺寸**，而不是用伪元素扩热区：`.icon-btn` 三个按钮（完成/编辑/删除）
+ * 在同一事件行里是**相邻**的，用伪元素把热区扩到 44px 会让它们互相重叠、抢彼此的点击。
+ * 放大实际尺寸会让布局自然重排，不会重叠。桌面端保持紧凑。 */
+@media (max-width: 768px) {
+  .icon-btn,
+  .cal-nav { width: 44px; height: 44px; }
+  .cal-today { min-height: 44px; padding: 10px 18px; }
 }
 </style>

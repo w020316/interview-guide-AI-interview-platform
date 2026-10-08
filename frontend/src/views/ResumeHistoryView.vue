@@ -1208,6 +1208,7 @@ const summaryText = computed(() => {
   }
   .modal {
     max-height: 90vh;
+    max-height: 90dvh;
   }
 }
 

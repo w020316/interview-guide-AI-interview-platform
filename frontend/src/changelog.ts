@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.63.1'
+export const CURRENT_VERSION = '1.63.2'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.63.2',
+    date: '2026-10-08',
+    title: '版本 1.63.2 · 手机上的按钮更好点了，页面宽度也统一了',
+    items: [
+      { text: '手机上：面试日历的「上一月 / 下一月 / 今天」，以及每条日程的完成、编辑、删除按钮；投递看板的「前往投递 / 定制简历 / 移除」——都从约 28px 放大到 44px，手指不容易点错了', level: 'user' },
+      { text: '页面内容宽度统一：招聘广场、面试日历、智能体现在是同一宽度，换页时不再忽宽忽窄（简历页保留较窄的阅读宽度，长行不好读）', level: 'user' },
+      { text: '招聘广场岗位卡上的地点、学历、经验图标，由彩色 emoji 换成与全站一致的线性图标', level: 'user' },
+      { text: '各页标题字号统一了', level: 'user' },
+      { text: '手机上弹出窗口的高度按「可见区域」计算，地址栏收起/展开时不再被裁掉', level: 'user' },
+    ],
+  },
   {
     version: '1.63.1',
     date: '2026-10-08',

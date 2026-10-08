@@ -385,13 +385,13 @@ onMounted(() => {
 
 <style scoped>
 .agent-page {
-  max-width: 1180px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 32px 20px 40px;
 }
 
 .page-header h1 {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   margin-bottom: 8px;
 }

@@ -400,6 +400,7 @@ async function handleRegister() {
 .auth-page {
   display: flex;
   min-height: calc(100vh - 64px);
+  min-height: calc(100dvh - 64px);
   margin: -32px -24px;
   /* 抵消父容器 padding，让 auth-page 占满 */
 }

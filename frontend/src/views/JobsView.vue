@@ -157,9 +157,29 @@
           </div>
           <div class="job-company">{{ job.companyName }}</div>
           <div class="job-meta">
-            <span v-if="job.location" class="meta-item">📍 {{ job.location }}</span>
-            <span v-if="job.degree" class="meta-item">🎓 {{ job.degree }}</span>
-            <span v-if="job.experience" class="meta-item">💼 {{ job.experience }}</span>
+            <!-- v1.63.2：元信息图标由 emoji 改为内联 SVG —— emoji 的配色与字重不受主题控制，
+                 与全站 SVG 图标体系割裂（DESIGN.md §1「禁止 emoji 当功能图标」）。 -->
+            <span v-if="job.location" class="meta-item">
+              <svg class="meta-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              {{ job.location }}
+            </span>
+            <span v-if="job.degree" class="meta-item">
+              <svg class="meta-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M22 10 12 5 2 10l10 5 10-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M6 12v5c0 1 2.7 2 6 2s6-1 6-2v-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              {{ job.degree }}
+            </span>
+            <span v-if="job.experience" class="meta-item">
+              <svg class="meta-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              {{ job.experience }}
+            </span>
           </div>
           <div class="job-tags">
             <span v-if="matchInfo(job)" class="tag tag-match">匹配 {{ matchInfo(job)?.matchScore ?? 0 }} 分</span>
@@ -765,7 +785,7 @@ onMounted(() => {
 }
 
 .page-header h1 {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   margin-bottom: 8px;
 }
@@ -1057,6 +1077,19 @@ onMounted(() => {
   flex-wrap: wrap;
   font-size: 13px;
   color: var(--c-text-tertiary);
+}
+
+/* 元信息条目：图标与文字横向对齐（图标改 SVG 后需要显式对齐） */
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meta-icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
 }
 
 .job-tags {
