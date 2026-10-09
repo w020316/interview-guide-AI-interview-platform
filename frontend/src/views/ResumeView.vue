@@ -113,7 +113,16 @@
                 {{ COPY_LINK_LABEL }}
               </button>
               <!-- 复制失败时必须把地址渲染出来，否则「请长按下方链接」指向一个不存在的元素 -->
-              <code v-if="copyFailed" class="ex-url" @click="copyFilehelper">
+              <!-- F-04：保留 <code>（长按选中的唯一交互），按 DESIGN.md 5.5 补键盘可达属性 -->
+              <code
+                v-if="copyFailed"
+                class="ex-url"
+                role="button"
+                tabindex="0"
+                @click="copyFilehelper"
+                @keydown.enter="copyFilehelper"
+                @keydown.space.prevent="copyFilehelper"
+              >
                 https://filehelper.weixin.qq.com/
               </code>
             </div>
@@ -1101,6 +1110,11 @@ function formatDate() {
   user-select: all;
   -webkit-user-select: all;
   cursor: text;
+}
+/* F-04：键盘可达的可见焦点环 */
+.ex-url:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
 }
 
 /* 各 App 取件说明（v1.46.0）。
