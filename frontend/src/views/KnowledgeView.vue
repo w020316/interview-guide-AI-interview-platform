@@ -327,6 +327,8 @@ const ratePercent = computed(() => {
 /** 已等待秒数（仅用于等待提示，不影响请求） */
 const askElapsedSec = ref(0)
 let askTimer: number | undefined
+/** F-05：请求序号——只应用最新一次请求的响应，丢弃乱序返回的旧响应 */
+let askSeq = 0
 
 function startAskTimer() {
   stopAskTimer()
@@ -349,16 +351,22 @@ async function ask() {
   // 用户无法判断「在正常处理」还是「卡住了」。补充实时已等待秒数与预期区间，
   // 降低等待焦虑；与其他 AI 视图（简历/岗位分析）的等待文案风格保持一致。
   startAskTimer()
+  // F-05：记录本次请求序号；网络抖动下若旧请求后返回，其响应会被丢弃，避免覆盖新结果
+  const seq = ++askSeq
   try {
     const data = await api.post('/api/knowledge/ask',
       { question: question.value },
       { timeout: AI_TIMEOUT }) as unknown as string
+    if (seq !== askSeq) return
     answer.value = data || '(空回答)'
   } catch (e: unknown) {
+    if (seq !== askSeq) return
     ElMessage.error(getErrMessage(e, '问答失败'))
   } finally {
-    stopAskTimer()
-    loading.value = false
+    if (seq === askSeq) {
+      stopAskTimer()
+      loading.value = false
+    }
   }
 }
 
