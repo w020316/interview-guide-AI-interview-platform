@@ -244,7 +244,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import renderMarkdown from '../utils/markdown'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
@@ -410,6 +410,11 @@ async function loadRagStatus() {
 }
 
 onMounted(loadRagStatus)
+
+// F-02：提问等待计时器（最长 180s）此前只在 ask() 的 finally 停止——若用户在请求
+// 返回前切走路由，组件卸载后 setInterval 会一直空转、持续写 askElapsedSec。
+// 卸载时兜底清理，杜绝定时器泄漏。
+onUnmounted(stopAskTimer)
 
 function switchTab(t: Tab) {
   tab.value = t
