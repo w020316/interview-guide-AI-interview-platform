@@ -26,7 +26,7 @@
 
     <!-- ══════════ 数据总览 ══════════ -->
     <section v-show="activeTab === 'overview'" class="panel">
-      <div class="cards">
+      <div class="cards" v-if="!overviewError">
         <div v-for="c in overviewCards" :key="c.label" class="stat-card" :class="c.tone">
           <div class="stat-value">{{ c.value }}</div>
           <div class="stat-label">{{ c.label }}</div>
@@ -39,6 +39,16 @@
         <span v-if="refreshResult" class="badge-ok">
           本次：新增 {{ refreshResult.inserted }} · 更新 {{ refreshResult.updated }} · 下架 {{ refreshResult.expired }}
         </span>
+      </div>
+
+      <!-- 总览加载失败：区分「服务不可用」与「暂无数据」（此前失败会退化为后者，误导运维） -->
+      <div v-if="overviewError" class="overview-error" role="alert">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>数据总览加载失败，可能是后端正在启动或网络异常</p>
+        <button class="btn-retry" type="button" @click="fetchOverview">重新加载</button>
       </div>
 
       <!-- 数据源告警横幅（v1.38.0）：某个源被上游停用或网络不可达时，
@@ -62,7 +72,7 @@
         <button class="alert-action" @click="switchTab('sources')">查看数据源</button>
       </div>
 
-      <div class="chart-grid">
+      <div class="chart-grid" v-if="!overviewError">
         <!-- 数据源分布 -->
         <div class="chart-card">
           <h3>数据源分布 <span class="chart-hint">按有效岗位数排序</span></h3>
@@ -114,7 +124,7 @@
       </div>
 
       <!-- 近 7 天趋势 -->
-      <div class="chart-card full">
+      <div class="chart-card full" v-if="!overviewError">
         <h3>近 7 天新增趋势</h3>
         <div class="trend-legend">
           <span><i class="dot jobs" />新增岗位</span>
@@ -416,6 +426,7 @@ const OVERSEAS_MARKERS = ['RemoteOK', 'Remotive', 'Arbeitnow']
 
 const activeTab = ref<TabKey>('overview')
 const overview = ref<Overview | null>(null)
+const overviewError = ref(false)
 const refreshing = ref(false)
 const refreshResult = ref<RefreshResult | null>(null)
 
@@ -598,7 +609,10 @@ function switchTab(k: TabKey) {
 async function fetchOverview() {
   try {
     overview.value = (await api.get('/api/admin/overview')) as unknown as Overview
+    overviewError.value = false
   } catch (e) {
+    // 记录失败态：否则图表会退化为「暂无岗位数据」空态，把「服务不可用」呈现为「没有数据」
+    overviewError.value = true
     ElMessage.error(getErrMessage(e, '获取总览失败'))
   }
 }
@@ -915,6 +929,35 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
+}
+
+.overview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+  margin-top: 16px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  color: var(--c-warning);
+  text-align: center;
+}
+
+.overview-error p {
+  color: var(--c-text-secondary);
+  margin: 0;
+}
+
+.overview-error .btn-retry {
+  padding: 8px 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--brand-primary);
+  background: var(--brand-primary);
+  color: var(--c-on-primary);
+  cursor: pointer;
+  font-size: 14px;
 }
 
 .stat-card {
@@ -1568,5 +1611,13 @@ onMounted(() => {
   .trend-chart { height: 110px; }
   .trend-bar { width: 8px; }
   .trend-num { display: none; }
+  /* 窄屏下 5 个页签横滑时末项不可见且无提示 → 改为换行，全部可见可点 */
+  .admin-tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .admin-tabs .tab-btn {
+    flex: 1 1 auto;
+  }
 }
 </style>
