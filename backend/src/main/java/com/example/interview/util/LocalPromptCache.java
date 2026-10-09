@@ -1,6 +1,5 @@
 package com.example.interview.util;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -35,22 +34,31 @@ public final class LocalPromptCache {
     private record Entry(String value, long expireAtMillis) {
     }
 
-    private final Map<String, Entry> store;
+    /** 容量上限（access-order 淘汰阈值） */
+    private final int capacity;
+
+    /**
+     * 访问序 LRU 存储。
+     *
+     * <p>B-09：此前用 {@code Collections.synchronizedMap} 包装。但 access-order 的 {@code get()}
+     * 会**结构性修改**链表（把命中项移到尾部），而 {@code synchronizedMap} 的锁只覆盖单次方法调用——
+     * 一旦将来出现「遍历 + 读取」的复合操作就会抛 {@link java.util.ConcurrentModificationException}。
+     * 现改为裸 {@code LinkedHashMap} + 显式 {@code synchronized(store)}：所有访问共用同一把锁，
+     * 复合操作可在锁内安全进行。**外部不要直接迭代本 map**，需要遍历时在锁内取快照。
+     */
+    private final Map<String, Entry> store = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Entry> eldest) {
+            return size() > capacity;
+        }
+    };
 
     /** 命中/未命中计数（供日志与测试观察） */
     private final AtomicLong hits = new AtomicLong();
     private final AtomicLong misses = new AtomicLong();
 
     public LocalPromptCache(int maxEntries) {
-        int cap = maxEntries > 0 ? maxEntries : 500;
-        // accessOrder = true 实现 LRU：get 会把条目移到尾部，超容量时淘汰最久未访问的头节点
-        this.store = Collections.synchronizedMap(
-                new LinkedHashMap<String, Entry>(16, 0.75f, true) {
-                    @Override
-                    protected boolean removeEldestEntry(Map.Entry<String, Entry> eldest) {
-                        return size() > cap;
-                    }
-                });
+        this.capacity = maxEntries > 0 ? maxEntries : 500;
     }
 
     /**
@@ -62,18 +70,20 @@ public final class LocalPromptCache {
         if (key == null) {
             return null;
         }
-        Entry e = store.get(key);
-        if (e == null) {
-            misses.incrementAndGet();
-            return null;
+        synchronized (store) {
+            Entry e = store.get(key);
+            if (e == null) {
+                misses.incrementAndGet();
+                return null;
+            }
+            if (System.currentTimeMillis() > e.expireAtMillis()) {
+                store.remove(key);
+                misses.incrementAndGet();
+                return null;
+            }
+            hits.incrementAndGet();
+            return e.value();
         }
-        if (System.currentTimeMillis() > e.expireAtMillis()) {
-            store.remove(key);
-            misses.incrementAndGet();
-            return null;
-        }
-        hits.incrementAndGet();
-        return e.value();
     }
 
     /**
@@ -85,12 +95,16 @@ public final class LocalPromptCache {
         if (key == null || value == null || ttlMillis <= 0) {
             return;
         }
-        store.put(key, new Entry(value, System.currentTimeMillis() + ttlMillis));
+        synchronized (store) {
+            store.put(key, new Entry(value, System.currentTimeMillis() + ttlMillis));
+        }
     }
 
     /** 当前条目数（测试观察用） */
     public int size() {
-        return store.size();
+        synchronized (store) {
+            return store.size();
+        }
     }
 
     /** 命中次数（测试观察用） */
@@ -105,6 +119,8 @@ public final class LocalPromptCache {
 
     /** 清空（测试用） */
     public void clear() {
-        store.clear();
+        synchronized (store) {
+            store.clear();
+        }
     }
 }
