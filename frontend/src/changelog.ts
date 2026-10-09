@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.65.1'
+export const CURRENT_VERSION = '1.66.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.0',
+    date: '2026-10-10',
+    title: '版本 1.66.0 · 加入投递计划后可直接跳转看板，界面图标与状态更一致',
+    items: [
+      { text: '岗位详情里点「加入投递计划」后，按钮会变成「已加入投递计划」，旁边多出一个「查看投递看板」按钮，点一下就去看进度，不用自己再找入口', level: 'user' },
+      { text: '岗位详情底部的两个按钮主次更清楚：官方申请入口是主按钮，加入投递计划是次按钮，不再两个都像主操作', level: 'user' },
+      { text: '模拟面试生成题目时的提示，从「约 2-3 分钟」改为更贴近实际的「通常 20 秒至 2 分钟」', level: 'user' },
+      { text: '学习中心的入口卡片在数据没加载完时，数字会显示「—」而不是「0」，避免误以为你没有错题或收藏', level: 'user' },
+      { text: '管理后台数据总览加载失败时，会明确提示「加载失败」并给出重试，不再笼统显示成「暂无数据」', level: 'user' },
+    ],
+  },
   {
     version: '1.65.1',
     date: '2026-10-08',
