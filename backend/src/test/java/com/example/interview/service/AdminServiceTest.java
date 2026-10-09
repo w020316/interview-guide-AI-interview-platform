@@ -363,7 +363,7 @@ class AdminServiceTest {
         assertThat(userBanRegistry.isBanned(7L)).isFalse();
 
         // ② 名单内只剩一个可用管理员（id=7）→ 任何请求者都禁不掉，避免管理后台永久锁死
-        when(userRepository.findAll()).thenReturn(List.of(
+        when(userRepository.findByLowerUsernameIn(any())).thenReturn(List.of(
                 UserEntity.builder().id(7L).username("小吴同学").build()));
         assertThatThrownBy(() -> service.banUser(7L, 99L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -373,7 +373,7 @@ class AdminServiceTest {
         // ③ 名单内有第二个可用管理员时放行（保护不应变成「管理员永远禁不掉」）
         org.springframework.test.util.ReflectionTestUtils.setField(
                 service, "adminUsernames", "小吴同学,小张同学");
-        when(userRepository.findAll()).thenReturn(List.of(
+        when(userRepository.findByLowerUsernameIn(any())).thenReturn(List.of(
                 UserEntity.builder().id(7L).username("小吴同学").build(),
                 UserEntity.builder().id(8L).username("小张同学").build()));
         service.banUser(8L, 99L);

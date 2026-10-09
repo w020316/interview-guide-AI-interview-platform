@@ -439,14 +439,14 @@ public class AdminService {
     /**
      * 统计「名单内且当前未被禁用」的管理员数量。
      *
-     * 仅在目标命中管理员名单时才被调用（封禁本身是低频管理操作），
-     * 因此直接全表扫描换取实现简单 —— 不为一次性判定新增仓储查询。
+     * 仅在目标命中管理员名单时才被调用（封禁本身是低频管理操作）。
+     * B-11：改为 DB 侧按 lower(username) IN (...) 精确查询，取代此前的 findAll() 全表扫描
+     * （避免随用户量增长把全部用户实体拉进内存）。
      */
     private long countAvailableAdmins() {
         Set<String> names = configuredAdminNames();
         if (names.isEmpty()) return 0;
-        return userRepository.findAll().stream()
-                .filter(u -> u.getUsername() != null && names.contains(u.getUsername().toLowerCase(Locale.ROOT)))
+        return userRepository.findByLowerUsernameIn(names).stream()
                 .filter(u -> !userBanRegistry.isBanned(u.getId()))
                 .count();
     }
