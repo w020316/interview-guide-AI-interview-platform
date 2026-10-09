@@ -151,6 +151,13 @@ public class InterviewController {
         return auth.getPrincipal().toString();
     }
 
+    /** 取消仍在调度的心跳任务（holder 可能为空——心跳尚未建立时已断开/超时） */
+    private static void cancelHeartbeat(java.util.concurrent.ScheduledFuture<?>[] holder) {
+        if (holder[0] != null) {
+            holder[0].cancel(false);
+        }
+    }
+
     /**
      * Prompt 注入防御：委托 {@link PromptSanitizer#sanitize(String)}
      * v1.9 起统一使用工具类，消除 9 处重复 private 方法
@@ -323,6 +330,8 @@ public class InterviewController {
         AtomicBoolean heartbeatRunning = new AtomicBoolean(false);
         // 保存 Disposable 以便客户端断开时取消订阅，防止资源泄漏
         final Disposable[] disposableHolder = new Disposable[1];
+        // 心跳 future 句柄：客户端断开/超时/错误时需取消，否则 15s 周期任务在调度池中空跑
+        final java.util.concurrent.ScheduledFuture<?>[] heartbeatHolder = new java.util.concurrent.ScheduledFuture<?>[1];
 
         // 双层并发令牌：全局上限 + 每用户上限，超出则返回错误事件
         String userId = currentUserId();
@@ -347,6 +356,7 @@ public class InterviewController {
         // 可用许可只增不减，SSE 并发上限逐渐失效
         emitter.onCompletion(() -> {
             heartbeatRunning.set(false);
+            cancelHeartbeat(heartbeatHolder);
             sseGuard.release(userId);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
@@ -354,6 +364,7 @@ public class InterviewController {
         });
         emitter.onTimeout(() -> {
             heartbeatRunning.set(false);
+            cancelHeartbeat(heartbeatHolder);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -361,6 +372,7 @@ public class InterviewController {
         });
         emitter.onError(e -> {
             heartbeatRunning.set(false);
+            cancelHeartbeat(heartbeatHolder);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -381,6 +393,7 @@ public class InterviewController {
                         heartbeatRunning.set(false);
                     }
                 }, 15, 15, TimeUnit.SECONDS);
+                heartbeatHolder[0] = heartbeatFuture;
 
                 // 构建 prompt：精简，聚焦问题本身，加快响应；用户输入经 sanitize 防注入
                 String safeQuestion = sanitizePromptInput(question);
