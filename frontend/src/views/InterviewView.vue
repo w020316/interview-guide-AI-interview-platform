@@ -346,7 +346,7 @@ const loading = ref(false)
 
 // ── 生成分步进度（v1.23.2 优化①）──
 /** 生成流程各阶段文案，genStep 取值 1-4 对应数组下标 0-3 */
-const GEN_STEPS = ['连接后端服务', '分析历史成绩', 'AI 生成题目（约 2-3 分钟）', '保存题目'] as const
+const GEN_STEPS = ['连接后端服务', '分析历史成绩', 'AI 生成题目（通常 20 秒 – 2 分钟）', '保存题目'] as const
 const genStep = ref(0)
 const genElapsed = ref(0)
 /** AI 生成阶段的感知进度条：渐近逼近 95%，完成后置 100 */

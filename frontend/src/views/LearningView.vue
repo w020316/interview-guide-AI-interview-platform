@@ -19,7 +19,7 @@
           <p>规划面试与准备节点，掌控求职节奏</p>
         </div>
         <div class="module-stat">
-          <span class="stat-num num-display">{{ calCount }}</span>
+          <span class="stat-num num-display">{{ loading ? '—' : calCount }}</span>
           <span class="stat-label">日程</span>
         </div>
         <span class="module-arrow" aria-hidden="true">→</span>
@@ -38,7 +38,7 @@
           <p>回顾低分题目，重点突破薄弱题型</p>
         </div>
         <div class="module-stat">
-          <span class="stat-num num-display">{{ wrongCount }}</span>
+          <span class="stat-num num-display">{{ loading ? '—' : wrongCount }}</span>
           <span class="stat-label">错题</span>
         </div>
         <span class="module-arrow" aria-hidden="true">→</span>
@@ -57,7 +57,7 @@
           <p>集中回看重点题目与高频考点</p>
         </div>
         <div class="module-stat">
-          <span class="stat-num num-display">{{ favCount }}</span>
+          <span class="stat-num num-display">{{ loading ? '—' : favCount }}</span>
           <span class="stat-label">收藏</span>
         </div>
         <span class="module-arrow" aria-hidden="true">→</span>
@@ -75,7 +75,7 @@
           <p>用数据看见每一次进步的轨迹</p>
         </div>
         <div class="module-stat">
-          <span class="stat-num num-display">{{ trendCount }}</span>
+          <span class="stat-num num-display">{{ loading ? '—' : trendCount }}</span>
           <span class="stat-label">场次</span>
         </div>
         <span class="module-arrow" aria-hidden="true">→</span>
@@ -107,6 +107,8 @@ const calCount = ref(0)
 const wrongCount = ref(0)
 const favCount = ref(0)
 const trendCount = ref(0)
+/** 计数未就绪时显示 —，避免把「加载中」读成「你没有数据」 */
+const loading = ref(true)
 
 function safeLen(arr: unknown): number {
   return Array.isArray(arr) ? arr.length : 0
@@ -128,6 +130,8 @@ onMounted(async () => {
     trendCount.value = safeLen(trend)
   } catch {
     // 静默降级，统计失败不影响页面可用性
+  } finally {
+    loading.value = false
   }
 })
 </script>
