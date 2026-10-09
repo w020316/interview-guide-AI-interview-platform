@@ -197,7 +197,7 @@ class AgentToolsTest {
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .title("Java 后端").companyName("字节跳动").location("北京")
                 .salary("30k-50k").applyUrl("https://jobs.bytedance.com").build();
-        when(jobAgentService.activeJobs()).thenReturn(List.of(job));
+        when(jobAgentService.activeJobsMatchingSkills(any())).thenReturn(List.of(job));
         when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of(
                 new com.example.interview.service.job.JobMatchService.MatchResult(job, 80, List.of("java", "spring"), List.of())));
         String out = newTools().matchResumeJobs("熟悉Java和Spring，本科");
@@ -213,7 +213,7 @@ class AgentToolsTest {
     @Test
     @DisplayName("matchResumeJobs：无匹配岗位给出引导")
     void matchResumeJobsNoHit() {
-        when(jobAgentService.activeJobs()).thenReturn(List.of());
+        when(jobAgentService.activeJobsMatchingSkills(any())).thenReturn(List.of());
         when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of());
         String out = newTools().matchResumeJobs("熟悉Java，本科");
         assertThat(out).contains("暂未找到与这份简历吻合的岗位");
@@ -574,7 +574,7 @@ class AgentToolsTest {
     @Test
     @DisplayName("matchResumeJobs：匹配服务异常时返回降级文案")
     void matchResumeJobs_error() {
-        when(jobAgentService.activeJobs()).thenReturn(List.of());
+        when(jobAgentService.activeJobsMatchingSkills(any())).thenReturn(List.of());
         when(jobMatchService.match(anyString(), any(), anyInt())).thenThrow(new RuntimeException("boom"));
         assertThat(newTools().matchResumeJobs("熟悉Java")).contains("简历匹配暂时不可用");
     }
@@ -584,7 +584,7 @@ class AgentToolsTest {
     void matchResumeJobs_nullFieldFallbacks() {
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .title("Java 后端").companyName("某公司").build();
-        when(jobAgentService.activeJobs()).thenReturn(List.of(job));
+        when(jobAgentService.activeJobsMatchingSkills(any())).thenReturn(List.of(job));
         when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of(
                 new com.example.interview.service.job.JobMatchService.MatchResult(job, 60, List.of("java"), List.of())));
         String out = newTools().matchResumeJobs("熟悉Java");
@@ -728,7 +728,7 @@ class AgentToolsTest {
     void dispatch_matchResumeJobs() {
         var job = com.example.interview.entity.JobPostingEntity.builder()
                 .title("Java 后端").companyName("某公司").build();
-        when(jobAgentService.activeJobs()).thenReturn(List.of(job));
+        when(jobAgentService.activeJobsMatchingSkills(any())).thenReturn(List.of(job));
         when(jobMatchService.match(anyString(), any(), anyInt())).thenReturn(List.of(
                 new com.example.interview.service.job.JobMatchService.MatchResult(job, 75, List.of("java"), List.of())));
 

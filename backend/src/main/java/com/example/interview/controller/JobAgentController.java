@@ -7,6 +7,7 @@ import com.example.interview.entity.JobPostingEntity;
 import com.example.interview.service.JobFavoriteService;
 import com.example.interview.service.job.JobAgentService;
 import com.example.interview.service.job.JobMatchService;
+import com.example.interview.util.RequestFieldUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
@@ -44,6 +45,9 @@ public class JobAgentController {
     private final JobAgentService jobAgentService;
     private final JobFavoriteService jobFavoriteService;
     private final JobMatchService jobMatchService;
+
+    /** 简历匹配请求的文本长度上限（B-15），与 CareerController 同口径 */
+    private static final int MAX_RESUME_TEXT_LEN = 20000;
 
     /** 手动刷新按用户限流：防止反复触发昂贵的第三方抓取（v1.31.4 B-10） */
     private final com.example.interview.util.PerUserRateLimiter refreshLimiter =
@@ -196,9 +200,20 @@ public class JobAgentController {
         if (resumeText.isBlank()) {
             return Result.error(400, "请提供简历内容");
         }
-        int limit = req.get("limit") != null ? Integer.parseInt(req.get("limit").toString()) : 10;
+        // B-15：简历文本长度上限，防止超大 body 放大匹配开销（与 CareerController 同口径）
+        if (resumeText.length() > MAX_RESUME_TEXT_LEN) {
+            return Result.error(400, "简历内容过长（上限 " + MAX_RESUME_TEXT_LEN + " 字），请精简后重试");
+        }
+        // B-04：limit 此前用 Integer.parseInt 直接解析——非数字抛 NumberFormatException → 500，
+        // 且无上下界（传 100000 会放大匹配开销）。改用 RequestFieldUtil 校验并钳制到 [1,50]。
+        var limitField = RequestFieldUtil.number(req, "limit");
+        if (limitField.hasTypeError()) {
+            return Result.error(400, RequestFieldUtil.numberTypeError("limit"));
+        }
+        int limit = limitField.value() == null ? 10 : Math.max(1, Math.min(50, limitField.value().intValue()));
 
-        var matched = jobMatchService.match(resumeText, jobAgentService.activeJobs(), limit);
+        var matched = jobMatchService.match(resumeText, jobAgentService.activeJobsMatchingSkills(
+                jobMatchService.extractSkills(resumeText)), limit);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", matched.size());
         result.put("topSkills", jobMatchService.extractSkills(resumeText));

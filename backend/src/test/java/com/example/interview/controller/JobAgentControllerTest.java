@@ -343,7 +343,7 @@ class JobAgentControllerTest {
     void resumeMatch_valid_returnsMatches() throws Exception {
         JobPostingEntity job = JobPostingEntity.builder()
                 .id(1L).title("Java 后端工程师").companyName("阿里巴巴").active(true).build();
-        when(jobAgentService.activeJobs()).thenReturn(List.of(job));
+        when(jobAgentService.activeJobsMatchingSkills(any())).thenReturn(List.of(job));
         when(jobMatchService.match(anyString(), anyList(), anyInt()))
                 .thenReturn(List.of(new JobMatchService.MatchResult(job, 85, List.of("java"), List.of("kafka"))));
         when(jobMatchService.extractSkills("熟悉 Java 与 Spring"))

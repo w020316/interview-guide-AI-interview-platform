@@ -478,6 +478,42 @@ public class JobAgentService {
     }
 
     /**
+     * 按技能词预筛有效岗位（B-05，v1.65.x）。
+     *
+     * <p><b>为什么需要它</b>：简历匹配此前把**全部**有效岗位（13 源聚合，可达数千～上万条）
+     * 载入内存再逐条打分，每次匹配都全量加载。而 {@code JobMatchService.match} 对
+     * 「零技能命中」的岗位本就 {@code continue} 丢弃——因此在 DB 侧按简历技能缩小候选集，
+     * **结果集与全量匹配完全一致**，却把候选量从「全表」降到「含相关技能的岗位」。
+     *
+     * <p>匹配口径与 {@code JobMatchService.SKILL_MATCHERS} 对齐（对 title/tags/description/
+     * requirements 做大小写不敏感子串）：DB 侧只要**足够宽松**即可（宁多勿漏），
+     * 精确的词边界判定仍由内存匹配负责，不会改变最终得分。
+     *
+     * @param skills 简历技能画像（小写）；为空则退回全量（调用方保证非空，此分支仅兜底）
+     */
+    public List<JobPostingEntity> activeJobsMatchingSkills(java.util.Collection<String> skills) {
+        if (skills == null || skills.isEmpty()) {
+            return activeJobs();
+        }
+        var spec = org.springframework.data.jpa.domain.Specification
+                .<JobPostingEntity>where((root, query, cb) -> cb.isTrue(root.get("active")));
+        for (String raw : skills) {
+            if (isBlank(raw)) {
+                continue;
+            }
+            // DB 侧只做「至少出现该技能子串」的宽松过滤；精确词边界留给内存匹配。
+            // 技能画像来自 SKILL 词表（纯字母/中文），无 LIKE 通配符，escapeLike 仍是防御性写法。
+            String pattern = "%" + escapeLike(raw.trim().toLowerCase()) + "%";
+            spec = spec.or((root, query, cb) -> cb.or(
+                    cb.like(cb.lower(root.get("title")), pattern, '\\'),
+                    cb.like(cb.lower(root.get("tags")), pattern, '\\'),
+                    cb.like(cb.lower(root.get("description")), pattern, '\\'),
+                    cb.like(cb.lower(root.get("requirements")), pattern, '\\')));
+        }
+        return repository.findAll(spec);
+    }
+
+    /**
      * 有效岗位总数（v1.38.0）。
      *
      * <p>供智能体在「没找到」时如实说明库里究竟有多少岗位，用户据此能判断

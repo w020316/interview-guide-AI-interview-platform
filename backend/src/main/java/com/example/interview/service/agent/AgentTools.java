@@ -450,7 +450,9 @@ public class AgentTools {
         }
         try {
             List<com.example.interview.service.job.JobMatchService.MatchResult> matched =
-                    jobMatchService.match(resumeText.trim(), jobAgentService.activeJobs(), 8);
+                    jobMatchService.match(resumeText.trim(),
+                            jobAgentService.activeJobsMatchingSkills(jobMatchService.extractSkills(resumeText.trim())),
+                            8);
             if (matched.isEmpty()) {
                 return "暂未找到与这份简历吻合的岗位。可补充更多技术栈/项目关键词（如：并发/微服务/前端/Vue），或让我联网搜索更多岗位。";
             }
