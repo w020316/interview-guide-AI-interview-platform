@@ -38,11 +38,20 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     /** 清理间隔（毫秒） */
     private static final long CLEANUP_INTERVAL_MS = 5 * 60 * 1000L;
-    private volatile long lastCleanupTime = System.currentTimeMillis();
+    private final java.util.concurrent.atomic.AtomicLong lastCleanupTime =
+            new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis());
 
     /** Bucket 过期时间（30 分钟无访问则清理） */
     private static final long BUCKET_EXPIRE_MS = 30 * 60 * 1000L;
 
+    /**
+     * 取（或惰性创建）IP 对应的限流桶。
+     *
+     * <p>B-12：桶容量取「建桶时」的 {@code perMinuteLimit} 快照。该配置在进程启动时经
+     * {@code @Value} 注入且不在运行期变更，故快照等价于当前值；如将来需要动态改限流阈值，
+     * 应改为在桶中记录 epoch 并在读取时比对。{@code lastAccess} 与 {@code buckets} 两次写入
+     * 非原子，但两者均为 {@link ConcurrentHashMap}，清理线程即便漏删也会在下一轮补删，最终一致。
+     */
     private Bucket resolveBucket(String ip) {
         cleanupIfNeeded();
         lastAccess.put(ip, System.currentTimeMillis());
@@ -60,10 +69,14 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     /** 定期清理过期的 Bucket，防止内存泄漏 */
     private void cleanupIfNeeded() {
         long now = System.currentTimeMillis();
-        if (now - lastCleanupTime < CLEANUP_INTERVAL_MS) {
+        long last = lastCleanupTime.get();
+        if (now - last < CLEANUP_INTERVAL_MS) {
             return;
         }
-        lastCleanupTime = now;
+        // B-12：CAS 抢占清理权——并发请求下只允许一个线程执行清理，避免重复遍历
+        if (!lastCleanupTime.compareAndSet(last, now)) {
+            return;
+        }
         lastAccess.entrySet().removeIf(entry -> {
             if (now - entry.getValue() > BUCKET_EXPIRE_MS) {
                 buckets.remove(entry.getKey());

@@ -425,6 +425,28 @@ class JobAgentServiceTest {
     }
 
     @Test
+    @DisplayName("activeJobsMatchingSkills (B-05): DB 侧按技能预筛，仅返回含该技能的 active 岗位")
+    void activeJobsMatchingSkills_prefiltersInDb() {
+        // 含 java 技能的岗位
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("j1").title("Java 后端").companyName("C")
+                .description("熟悉 Spring/Redis").active(true).build());
+        // 不含命中的岗位
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("j2").title("前端工程师").companyName("C")
+                .description("熟悉 Vue/React").active(true).build());
+        // 含 java 但已下架
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("j3").title("Java 开发").companyName("C")
+                .description("Java").active(false).build());
+
+        List<JobPostingEntity> jobs = newH2Service(List.of())
+                .activeJobsMatchingSkills(List.of("java"));
+
+        assertThat(jobs).extracting(JobPostingEntity::getExternalId).containsExactly("j1");
+    }
+
+    @Test
     @DisplayName("enabledPlatforms: 仅收集 isEnabled 的平台名")
     void enabledPlatforms_returnsEnabledOnly() {
         JobAgentService service = newH2Service(List.of(
