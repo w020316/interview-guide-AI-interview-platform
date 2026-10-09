@@ -3,6 +3,7 @@ package com.example.interview.service;
 import com.example.interview.common.UserKeyCipher;
 import com.example.interview.entity.UserAiSettingEntity;
 import com.example.interview.repository.UserAiSettingRepository;
+import com.example.interview.util.SsrUrlValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -117,6 +118,13 @@ public class UserAiKeyService {
             }
         } catch (Exception e) {
             return "baseUrl 无法解析有效主机";
+        }
+        // B-06：上面的基础判定弱于 SsrUrlValidator——未拦 CGNAT 100.64.0.0/10、阿里云元数据
+        // 100.100.100.200、IPv6 ULA fc00::/7，且 getByName 只解析首个 IP（多 A 记录可绕过）。
+        // 复用统一校验器覆盖上述网段并校验全部解析 IP。文案沿用「不允许指向内网/保留地址」，
+        // 以兼容既有测试与前端提示。
+        if (!SsrUrlValidator.validate(b).ok) {
+            return "baseUrl 不允许指向内网/保留地址";
         }
         if (model == null || model.isBlank()) {
             return "model 不能为空";

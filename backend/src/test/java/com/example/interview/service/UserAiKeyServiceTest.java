@@ -56,6 +56,17 @@ class UserAiKeyServiceTest {
     }
 
     @Test
+    @DisplayName("validate：CGNAT / 云元数据 地址被拒（B-06 复用 SsrUrlValidator 的强化校验）")
+    void validate_blocksCgnatAndMetadata() {
+        // CGNAT 100.64.0.0/10：Java 标准方法不识别，此前可绕过
+        assertThat(UserAiKeyService.validate("sk-abcdefghijklmnopqrstuvwxyz", "https://100.64.0.1/", "gpt-x"))
+                .contains("不允许指向内网/保留地址");
+        // 阿里云元数据（位于 CGNAT 段）
+        assertThat(UserAiKeyService.validate("sk-abcdefghijklmnopqrstuvwxyz", "https://100.100.100.200/", "gpt-x"))
+                .contains("不允许指向内网/保留地址");
+    }
+
+    @Test
     @DisplayName("save：合法输入 → 密文可解回原值，不落明文")
     void save_encrypts() {
         when(repository.findById("u1")).thenReturn(Optional.empty());
