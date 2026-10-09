@@ -427,6 +427,8 @@ onMounted(load)
 .day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .day-cell { min-height: 84px; padding: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 3px; background: var(--c-bg-alt); border: 1px solid var(--c-border-light); border-radius: var(--radius-md); cursor: pointer; text-align: left; transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast); }
 .day-cell:hover { border-color: var(--brand-primary-200); }
+/* F-03：日格已是原生 <button>（键盘可达），补可见焦点环，键盘用户才能看清当前焦点 */
+.day-cell:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
 .day-cell.is-out { opacity: 0.4; background: transparent; }
 .day-cell.is-today .day-num { background: var(--brand-primary); color: var(--c-on-primary); }
 .day-cell.is-selected { border-color: var(--brand-primary); box-shadow: 0 0 0 1px var(--brand-primary); }
