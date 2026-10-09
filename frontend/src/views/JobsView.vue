@@ -25,7 +25,12 @@
 
     <!-- 收藏岗位截止提醒横幅（v1.23.3：收藏岗位 7 天内截止时站内提醒） -->
     <div v-if="remindJobs.length && !favoriteMode" class="ddl-banner" role="status">
-      <span class="ddl-banner-icon">⏰</span>
+      <span class="ddl-banner-icon" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M12 8v4l3 3 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
       <span class="ddl-banner-text">
         {{ remindJobs.length }} 个收藏岗位将于 {{ remindJobs[0].daysLeft === 0 ? '今天' : `${remindJobs[0].daysLeft} 天内` }}截止
         <template v-if="remindJobs.length > 1">（最近：{{ remindJobs[0].title }} · {{ remindJobs[0].companyName }}）</template>
@@ -129,14 +134,24 @@
 
     <!-- 错误态（与空态区分：加载失败可重试） -->
     <div v-else-if="loadError" class="empty-state">
-      <div class="empty-icon">⚠️</div>
+      <div class="empty-icon warn" aria-hidden="true">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+          <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
       <p>岗位数据加载失败，可能是后端正在冷启动，请稍后重试</p>
       <BaseButton variant="gradient" @click="fetchJobs">重新加载</BaseButton>
     </div>
 
     <!-- 空态 -->
     <div v-else-if="displayJobs.length === 0" class="empty-state">
-      <div class="empty-icon">🔍</div>
+      <div class="empty-icon" aria-hidden="true">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+          <path d="M21 21l-5.2-5.2 M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
       <p v-if="favoriteMode">暂无收藏岗位，在岗位卡片上点击 ♥ 收藏感兴趣的岗位，截止前会在此提醒</p>
       <p v-else>暂无匹配的岗位，试试调整筛选条件或刷新数据</p>
     </div>
@@ -307,14 +322,6 @@
           </div>
         </div>
         <div class="detail-footer">
-          <button
-            class="apply-btn"
-            :disabled="planning"
-            :title="'加入投递台账，跟踪投递状态与回复（不代替你投递）'"
-            @click="addToPlan(detail)"
-          >
-            {{ planning ? '加入中…' : '加入投递计划' }}
-          </button>
           <a
             v-if="detail.applyUrl"
             :href="detail.applyUrl"
@@ -324,6 +331,23 @@
           >
             前往官方申请入口 →
           </a>
+          <button
+            class="apply-btn"
+            :class="{ done: addedPlanIds.has(detail.id) }"
+            :disabled="planning || addedPlanIds.has(detail.id)"
+            :title="'加入投递台账，跟踪投递状态与回复（不代替你投递）'"
+            @click="addToPlan(detail)"
+          >
+            {{ planning ? '加入中…' : (addedPlanIds.has(detail.id) ? '已加入投递计划' : '加入投递计划') }}
+          </button>
+          <button
+            v-if="addedPlanIds.has(detail.id)"
+            class="apply-btn ghost"
+            type="button"
+            @click="goBoard"
+          >
+            查看投递看板 →
+          </button>
         </div>
       </div>
     </div>
@@ -332,6 +356,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
@@ -426,6 +451,9 @@ const total = ref(0)
 const page = ref(0)
 const pageSize = 10
 const detail = ref<JobPosting | null>(null)
+/** 本会话内已加入投递计划的岗位 id：用于成功后给出「查看投递看板」入口 */
+const addedPlanIds = ref<Set<number>>(new Set())
+const router = useRouter()
 
 const recruitType = ref('AUTUMN')
 const keyword = ref('')
@@ -562,12 +590,18 @@ async function addToPlan(job: JobPosting) {
   planning.value = true
   try {
     await api.post('/api/application/draft', { jobId: job.id })
+    addedPlanIds.value.add(job.id)
     ElMessage.success('已加入投递计划，可在「投递看板」跟踪进度')
   } catch (e) {
     ElMessage.error(getErrMessage(e, '加入投递计划失败'))
   } finally {
     planning.value = false
   }
+}
+
+/** 从岗位详情跳到投递看板 */
+function goBoard() {
+  router.push('/applications')
 }
 
 function tagList(tags: string | null): string[] {  if (!tags) return []
@@ -1162,6 +1196,20 @@ onMounted(() => {
   color: var(--c-on-primary);
 }
 
+/* 已加入投递计划：收敛为完成态，不再可点 */
+.apply-btn.done {
+  border-color: var(--c-border-strong);
+  color: var(--c-text-tertiary);
+  background: var(--c-bg-alt);
+  cursor: default;
+}
+
+/* 加入成功后的次要引导入口 */
+.apply-btn.ghost {
+  border-color: var(--c-border-strong);
+  color: var(--c-text-secondary);
+}
+
 .loading-state {
   text-align: center;
   padding: 60px 0;
@@ -1191,8 +1239,14 @@ onMounted(() => {
 }
 
 .empty-icon {
-  font-size: 40px;
+  display: flex;
+  justify-content: center;
+  color: var(--c-text-tertiary);
   margin-bottom: 12px;
+}
+
+.empty-icon.warn {
+  color: var(--c-warning);
 }
 
 .pagination {
