@@ -65,6 +65,22 @@ public class InterviewSessionService {
     }
 
     /**
+     * 仅取 sessionId → jobDescription 映射（B-10，供错题总结拼「题目 → 岗位」）。
+     * 走投影查询，避免把会话实体全部列拉进内存。
+     */
+    public Map<String, String> sessionJobDescriptions(String userId) {
+        Map<String, String> map = new HashMap<>();
+        for (var p : sessionRepository.findSessionIdAndJobByUserId(userId)) {
+            if (p.getSessionId() != null) {
+                // 重复 sessionId 保留第一个（与旧实现 Collectors.toMap(merge=(a,b)->a) 语义一致）
+                map.putIfAbsent(p.getSessionId(),
+                        p.getJobDescription() != null ? p.getJobDescription() : "未指定岗位");
+            }
+        }
+        return map;
+    }
+
+    /**
      * 通过 sessionId 获取会话详情
      */
     public InterviewSessionEntity getBySessionId(String sessionId) {

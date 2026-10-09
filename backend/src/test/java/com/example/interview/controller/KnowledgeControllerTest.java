@@ -1,7 +1,6 @@
 package com.example.interview.controller;
 
 import com.example.interview.entity.InterviewQuestionEntity;
-import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.interceptor.RateLimitInterceptor;
 import com.example.interview.security.JwtUtil;
 import com.example.interview.service.InterviewSessionService;
@@ -325,8 +324,8 @@ class KnowledgeControllerTest {
                     .evaluationScore(50).build();
             when(sessionService.listWrongQuestionsByUser(USER_ID, 60))
                     .thenReturn(List.of(q));
-            when(sessionService.listByUser(USER_ID))
-                    .thenReturn(List.of());
+            when(sessionService.sessionJobDescriptions(USER_ID))
+                    .thenReturn(Map.of());
 
             mockMvc.perform(get("/api/knowledge/wrong-questions")
                             .param("threshold", "60"))
@@ -503,10 +502,8 @@ class KnowledgeControllerTest {
         void wrongQuestions_nullJobDescription_returnsPlaceholder() throws Exception {
             InterviewQuestionEntity q = InterviewQuestionEntity.builder()
                     .id(1L).sessionId("s1").question("Q").evaluationScore(40).build();
-            InterviewSessionEntity session = InterviewSessionEntity.builder()
-                    .sessionId("s1").userId(USER_ID).jobDescription(null).build();
             when(sessionService.listWrongQuestionsByUser(USER_ID, 60)).thenReturn(List.of(q));
-            when(sessionService.listByUser(USER_ID)).thenReturn(List.of(session));
+            when(sessionService.sessionJobDescriptions(USER_ID)).thenReturn(Map.of("s1", "未指定岗位"));
 
             mockMvc.perform(get("/api/knowledge/wrong-questions"))
                     .andExpect(status().isOk())
@@ -519,10 +516,8 @@ class KnowledgeControllerTest {
         void wrongQuestions_withJobDescription_returnsIt() throws Exception {
             InterviewQuestionEntity q = InterviewQuestionEntity.builder()
                     .id(1L).sessionId("s1").question("Q").evaluationScore(40).build();
-            InterviewSessionEntity session = InterviewSessionEntity.builder()
-                    .sessionId("s1").userId(USER_ID).jobDescription("Java 后端").build();
             when(sessionService.listWrongQuestionsByUser(USER_ID, 60)).thenReturn(List.of(q));
-            when(sessionService.listByUser(USER_ID)).thenReturn(List.of(session));
+            when(sessionService.sessionJobDescriptions(USER_ID)).thenReturn(Map.of("s1", "Java 后端"));
 
             mockMvc.perform(get("/api/knowledge/wrong-questions"))
                     .andExpect(status().isOk())
@@ -536,7 +531,7 @@ class KnowledgeControllerTest {
             InterviewQuestionEntity q = InterviewQuestionEntity.builder()
                     .id(1L).sessionId("ghost-session").question("Q").evaluationScore(40).build();
             when(sessionService.listWrongQuestionsByUser(USER_ID, 60)).thenReturn(List.of(q));
-            when(sessionService.listByUser(USER_ID)).thenReturn(List.of());
+            when(sessionService.sessionJobDescriptions(USER_ID)).thenReturn(Map.of());
 
             mockMvc.perform(get("/api/knowledge/wrong-questions"))
                     .andExpect(status().isOk())
@@ -545,16 +540,15 @@ class KnowledgeControllerTest {
         }
 
         @Test
-        @DisplayName("重复 sessionId 的会话冲突时保留第一个岗位描述（merge 函数）")
-        void wrongQuestions_duplicateSessionId_mergeKeepsFirst() throws Exception {
+        @DisplayName("多会话时按 sessionId 正确取到对应岗位描述")
+        void wrongQuestions_mappedJobDescription_returnsIt() throws Exception {
             InterviewQuestionEntity q = InterviewQuestionEntity.builder()
                     .id(1L).sessionId("s1").question("Q").evaluationScore(40).build();
-            InterviewSessionEntity first = InterviewSessionEntity.builder()
-                    .sessionId("s1").userId(USER_ID).jobDescription("Java 后端").build();
-            InterviewSessionEntity duplicate = InterviewSessionEntity.builder()
-                    .sessionId("s1").userId(USER_ID).jobDescription("Go 后端").build();
             when(sessionService.listWrongQuestionsByUser(USER_ID, 60)).thenReturn(List.of(q));
-            when(sessionService.listByUser(USER_ID)).thenReturn(List.of(first, duplicate));
+            // B-10：去重（保留首个）现由 service 的 sessionJobDescriptions 负责，
+            // 此处只验证 controller 能正确按 sessionId 取到岗位描述
+            when(sessionService.sessionJobDescriptions(USER_ID))
+                    .thenReturn(Map.of("s1", "Java 后端", "s2", "Go 后端"));
 
             mockMvc.perform(get("/api/knowledge/wrong-questions"))
                     .andExpect(status().isOk())

@@ -2,7 +2,6 @@ package com.example.interview.controller;
 
 import com.example.interview.common.Result;
 import com.example.interview.entity.InterviewQuestionEntity;
-import com.example.interview.entity.InterviewSessionEntity;
 import com.example.interview.service.InterviewSessionService;
 import com.example.interview.service.RagSearchService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,6 +34,9 @@ public class KnowledgeController {
      */
     @Autowired(required = false) private com.example.interview.service.RagHealthTracker ragHealthTracker;
 
+    /** 单条知识文档的字符上限（B-08），与 batchImport 的 8KB/条口径一致 */
+    private static final int MAX_DOC_CHARS = 8192;
+
     /** 从 SecurityContext 获取当前登录用户 ID（JWT subject） */
     private String currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -63,12 +65,20 @@ public class KnowledgeController {
 
     @Operation(summary = "导入知识文档（简单模式，按用户隔离）")
     @PostMapping("/import")
-    public Result<String> importKnowledge(@RequestBody Map<String, List<String>> request) {        List<String> documents = request.get("documents");
+    public Result<String> importKnowledge(@RequestBody Map<String, List<String>> request) {
+        List<String> documents = request.get("documents");
         if (documents == null || documents.isEmpty()) return Result.error(400, "文档列表不能为空");
         // 限制单次导入数量，防止滥用
         if (documents.size() > 100) return Result.error(400, "单次最多导入 100 条文档");
-        int imported = ragSearchService.importKnowledge(documents, currentUserId());
-        return Result.success("成功导入 " + imported + " 条文档（请求 " + documents.size() + " 条）");
+        // B-08：与 batchImport 的 8KB/条一致地截断单条文档，防止超大文本直送 embedding
+        List<String> safeDocs = new ArrayList<>(documents.size());
+        for (String doc : documents) {
+            if (doc == null || doc.isBlank()) continue;
+            safeDocs.add(doc.length() > MAX_DOC_CHARS ? doc.substring(0, MAX_DOC_CHARS) : doc);
+        }
+        if (safeDocs.isEmpty()) return Result.error(400, "文档列表不能为空");
+        int imported = ragSearchService.importKnowledge(safeDocs, currentUserId());
+        return Result.success("成功导入 " + imported + " 条文档（请求 " + safeDocs.size() + " 条）");
     }
 
     /**
@@ -80,9 +90,16 @@ public class KnowledgeController {
     @PostMapping("/import/batch")
     public Result<Map<String, Object>> batchImport(@RequestBody Map<String, Object> request) {
         String category = (String) request.getOrDefault("category", "通用");
+        // B-14：区分「缺失」与「类型错误」——缺失给「不能为空」，类型错误给「必须是数组」，
+        // 避免 chunks 传数字等非 List 时抛 ClassCastException→500。
+        Object chunksRaw = request.get("chunks");
+        if (chunksRaw == null) return Result.error(400, "chunks 不能为空");
+        if (!(chunksRaw instanceof List<?> rawChunks)) {
+            return Result.error(400, "chunks 必须是字符串数组");
+        }
         @SuppressWarnings("unchecked")
-        List<String> chunks = (List<String>) request.get("chunks");
-        if (chunks == null || chunks.isEmpty()) return Result.error(400, "chunks 不能为空");
+        List<String> chunks = (List<String>) rawChunks;
+        if (chunks.isEmpty()) return Result.error(400, "chunks 不能为空");
         // 限制单次导入数量
         if (chunks.size() > 100) return Result.error(400, "单次最多导入 100 个分块");
 
@@ -165,13 +182,9 @@ public class KnowledgeController {
         String userId = currentUserId();
         List<InterviewQuestionEntity> wrong = sessionService.listWrongQuestionsByUser(userId, threshold);
 
-        // 查询关联会话，构建 sessionId -> jobDescription 映射
-        List<InterviewSessionEntity> sessions = sessionService.listByUser(userId);
-        Map<String, String> sessionJobMap = sessions.stream()
-                .collect(Collectors.toMap(
-                        InterviewSessionEntity::getSessionId,
-                        s -> s.getJobDescription() != null ? s.getJobDescription() : "未指定岗位",
-                        (a, b) -> a));
+        // 查询关联会话的岗位描述（B-10）：走 (sessionId, jobDescription) 投影查询，
+        // 不把会话实体全部列拉进内存
+        Map<String, String> sessionJobMap = sessionService.sessionJobDescriptions(userId);
 
         // 组装返回：题目 + 岗位
         List<Map<String, Object>> items = wrong.stream().map(q -> {
