@@ -495,8 +495,11 @@ public class JobAgentService {
         if (skills == null || skills.isEmpty()) {
             return activeJobs();
         }
-        var spec = org.springframework.data.jpa.domain.Specification
-                .<JobPostingEntity>where((root, query, cb) -> cb.isTrue(root.get("active")));
+        // 先收集每个技能一个「四列 OR」谓词，再整体 OR 成技能组，最后与 active 做 AND。
+        // ⚠️ 若直接在 active 谓词上反复 .or(...)，左结合会变成 active OR skill1 OR skill2 ——
+        // 那会把「已下架但命中技能」的岗位也带出来（active 条件被 OR 短路掉）。
+        java.util.List<org.springframework.data.jpa.domain.Specification<JobPostingEntity>> skillSpecs =
+                new java.util.ArrayList<>();
         for (String raw : skills) {
             if (isBlank(raw)) {
                 continue;
@@ -504,13 +507,22 @@ public class JobAgentService {
             // DB 侧只做「至少出现该技能子串」的宽松过滤；精确词边界留给内存匹配。
             // 技能画像来自 SKILL 词表（纯字母/中文），无 LIKE 通配符，escapeLike 仍是防御性写法。
             String pattern = "%" + escapeLike(raw.trim().toLowerCase()) + "%";
-            spec = spec.or((root, query, cb) -> cb.or(
+            skillSpecs.add((root, query, cb) -> cb.or(
                     cb.like(cb.lower(root.get("title")), pattern, '\\'),
                     cb.like(cb.lower(root.get("tags")), pattern, '\\'),
                     cb.like(cb.lower(root.get("description")), pattern, '\\'),
                     cb.like(cb.lower(root.get("requirements")), pattern, '\\')));
         }
-        return repository.findAll(spec);
+        if (skillSpecs.isEmpty()) {
+            return activeJobs();
+        }
+        var skillGroup = skillSpecs.get(0);
+        for (int i = 1; i < skillSpecs.size(); i++) {
+            skillGroup = skillGroup.or(skillSpecs.get(i));
+        }
+        var active = org.springframework.data.jpa.domain.Specification
+                .<JobPostingEntity>where((root, query, cb) -> cb.isTrue(root.get("active")));
+        return repository.findAll(active.and(skillGroup));
     }
 
     /**
