@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
@@ -70,11 +71,25 @@ public class ResumeImageOcrService {
     @Value("${app.ai.vision.model:glm-4v-flash}")
     private String model;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = buildRestTemplate();
     private final ObjectMapper objectMapper;
 
     public ResumeImageOcrService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+    }
+
+    /**
+     * 带连接/读超时的 RestTemplate。
+     *
+     * <p><b>为什么必须设超时</b>：本调用在 {@link AiConcurrencyGuard} 闸门内执行（全局仅 5 个许可），
+     * 默认的 {@code new RestTemplate()} 无任何超时——上游建连后挂起会让该请求**无限期占用一个许可**，
+     * 数个挂起即可拖垮全站 AI 功能。90s 读超时远大于实测的 ~4s 识别耗时，只兜底真正的挂起。
+     */
+    private static RestTemplate buildRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10_000);
+        factory.setReadTimeout(90_000);
+        return new RestTemplate(factory);
     }
 
     /** 识别结果：文本 + 是否被上游输出上限截断 */
