@@ -46,14 +46,30 @@
             :class="{ done: it.achieved, manual: !!it.manualKey }"
           >
             <button v-if="it.manualKey" type="button" class="ri-btn" @click="toggleManual(it.manualKey)">
-              <span class="ri-check" aria-hidden="true">{{ it.achieved ? '✅' : '⬜' }}</span>
+              <span class="ri-check" aria-hidden="true">
+                <svg v-if="it.achieved" width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </span>
               <span class="ri-dim">{{ it.dimension }}</span>
               <span class="ri-label">{{ it.label }}</span>
               <span class="ri-evidence">{{ it.evidence }}</span>
               <span class="ri-toggle-hint">自述</span>
             </button>
             <div v-else class="ri-row">
-              <span class="ri-check" aria-hidden="true">{{ it.achieved ? '✅' : '⬜' }}</span>
+              <span class="ri-check" aria-hidden="true">
+                <svg v-if="it.achieved" width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </span>
               <span class="ri-dim">{{ it.dimension }}</span>
               <span class="ri-label">{{ it.label }}</span>
               <span class="ri-evidence">{{ it.evidence }}</span>
@@ -622,7 +638,7 @@ onMounted(async () => {
   transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 .ri-btn:hover { border-color: var(--brand-primary); background: var(--brand-primary-50); }
-.ri-check { flex-shrink: 0; font-size: 13px; }
+.ri-check { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--c-text-quaternary); }
 .ri-dim {
   flex-shrink: 0;
   font-size: 11.5px;
@@ -633,6 +649,7 @@ onMounted(async () => {
 }
 .ri-label { font-size: 13px; color: var(--c-text); }
 .readiness-item.done .ri-label { color: var(--c-text-secondary); }
+.readiness-item.done .ri-check { color: var(--brand-primary); }
 .ri-evidence {
   margin-left: auto;
   flex-shrink: 0;

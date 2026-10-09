@@ -23,7 +23,12 @@
 
     <!-- 空状态 -->
     <div v-if="!loading && loadError" class="empty-state fade-in">
-      <div class="empty-icon">⚠️</div>
+      <div class="empty-icon warn" aria-hidden="true">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
       <div class="empty-title">加载失败</div>
       <div class="empty-desc">简历历史加载失败，请检查网络后重试</div>
       <button class="retry-btn" @click="loadResumes">重新加载</button>
@@ -75,7 +80,13 @@
           <div class="card-title">{{ getPreview(r) }}</div>
           <div class="card-meta">
             <span class="meta-tag">{{ r.targetJob || '未指定岗位' }}</span>
-            <span class="meta-time">🕒 {{ fmtDate(r.createdAt) }}</span>
+            <span class="meta-time">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 8v4l3 3 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              {{ fmtDate(r.createdAt) }}
+            </span>
           </div>
         </div>
         <div class="card-action">
@@ -720,9 +731,10 @@ const summaryText = computed(() => {
 }
 
 .empty-icon {
-  font-size: 56px;
+  display: flex;
+  justify-content: center;
   margin-bottom: 16px;
-  opacity: 0.6;
+  color: var(--c-warning);
 }
 
 .empty-title {
@@ -838,6 +850,9 @@ const summaryText = computed(() => {
 .meta-time {
   font-size: 12px;
   color: var(--c-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .card-action {

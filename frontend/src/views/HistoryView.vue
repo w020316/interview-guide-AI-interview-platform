@@ -19,7 +19,12 @@
 
     <!-- 空状态 -->
     <div v-else-if="loadError" class="empty-state fade-in">
-      <div class="empty-icon">⚠️</div>
+      <div class="empty-icon warn" aria-hidden="true">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
       <div class="empty-title">加载失败</div>
       <div class="empty-desc">历史记录加载失败，请检查网络后重试</div>
       <button class="retry-btn" @click="loadHistory">重新加载</button>
@@ -47,7 +52,12 @@
             <div class="session-title">{{ s.jobDescription || '未指定岗位' }}</div>
             <div class="session-meta">
               <span class="meta-item">
-                <span class="meta-icon">🕒</span>
+                <span class="meta-icon" aria-hidden="true">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 8v4l3 3 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
                 {{ fmtDate(s.createdAt) }}
               </span>
               <span class="status-badge" :class="statusClass(s.status)">{{ statusText(s.status) }}</span>
@@ -285,9 +295,10 @@ function statusText(status: string) {
 }
 
 .empty-icon {
-  font-size: 56px;
+  display: flex;
+  justify-content: center;
   margin-bottom: 16px;
-  opacity: 0.6;
+  color: var(--c-warning);
 }
 
 .empty-title {

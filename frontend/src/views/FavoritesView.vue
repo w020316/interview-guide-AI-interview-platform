@@ -125,7 +125,12 @@
 
     <!-- 空状态 -->
     <div v-else-if="loadError" class="empty-state fade-in">
-      <div class="empty-icon">⚠️</div>
+      <div class="empty-icon warn" aria-hidden="true">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
       <div class="empty-title">加载失败</div>
       <div class="empty-desc">收藏列表加载失败，请检查网络后重试</div>
       <button class="retry-btn" @click="load">重新加载</button>
@@ -179,7 +184,11 @@
       <div class="jc-card">
         <div class="jc-head">
           <div class="jc-title">岗位对比（{{ compareItems.length }}）</div>
-          <button class="jc-close" @click="compareOpen = false">✕</button>
+          <button class="jc-close" @click="compareOpen = false" aria-label="关闭">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M18 6L6 18 M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         </div>
         <div class="jc-table">
           <div class="jc-row jc-row-head">
@@ -475,7 +484,7 @@ function fmtDate(dt?: string) {
 @keyframes skeleton-loading { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 .empty-state { text-align: center; padding: 64px 24px; background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
-.empty-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.5; }
+.empty-icon { display: flex; justify-content: center; margin-bottom: 16px; color: var(--c-warning); }
 .empty-title { font-size: 18px; font-weight: 600; color: var(--c-text); margin-bottom: 6px; }
 .empty-desc { font-size: 14px; color: var(--c-text-tertiary); margin-bottom: 24px; }
 
@@ -531,7 +540,7 @@ select.input { appearance: auto; background: var(--c-bg); }
 .jc-card { background: var(--c-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); width: 100%; max-width: 880px; max-height: 86vh; overflow: auto; padding: 20px 22px; }
 .jc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .jc-title { font-family: var(--font-title); font-size: 17px; font-weight: 700; color: var(--c-text); }
-.jc-close { background: transparent; border: none; font-size: 16px; color: var(--c-text-tertiary); cursor: pointer; }
+.jc-close { display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--c-text-tertiary); cursor: pointer; }
 .jc-table { border: 1px solid var(--c-border-light); border-radius: var(--radius-md); overflow: hidden; }
 .jc-row { display: flex; border-bottom: 1px solid var(--c-border-light); }
 .jc-row:last-child { border-bottom: none; }

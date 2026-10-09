@@ -39,7 +39,13 @@
         <span class="funnel-item accent">Offer <b>{{ funnel.offer || 0 }}</b></span>
       </div>
       <div v-if="followUps.length" class="followup">
-        <div class="followup-title">⚠️ {{ followUps.length }} 条需要跟进（超过 7 天无回复，或已到跟进时间）</div>
+        <div class="followup-title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          {{ followUps.length }} 条需要跟进（超过 7 天无回复，或已到跟进时间）
+        </div>
         <div v-for="f in followUps" :key="f.id" class="followup-row">
           <span class="fu-title">{{ f.title }}</span>
           <span class="fu-company">{{ f.companyName }}</span>
@@ -225,7 +231,7 @@
       <div class="modal">
         <div class="modal-head">
           <div class="modal-title">定制简历 · {{ tailorTarget.title }}</div>
-          <button class="modal-close" @click="tailorTarget = null">✕</button>
+          <button class="modal-close" @click="tailorTarget = null" aria-label="关闭"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6L6 18 M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
 
         <template v-if="!tailorResult">
@@ -276,7 +282,7 @@
       <div class="modal">
         <div class="modal-head">
           <div class="modal-title">粘贴投递通知 · 识别状态</div>
-          <button class="modal-close" @click="noticeOpen = false">✕</button>
+          <button class="modal-close" @click="noticeOpen = false" aria-label="关闭"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6L6 18 M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="modal-sub">
           把邮件 / 站内信原文粘贴进来，本地识别「公司 / 岗位 / 阶段 / 时间」。
@@ -341,7 +347,7 @@
       <div class="modal modal-wide">
         <div class="modal-head">
           <div class="modal-title">从表格导入投递记录</div>
-          <button class="modal-close" @click="importOpen = false">✕</button>
+          <button class="modal-close" @click="importOpen = false" aria-label="关闭"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6L6 18 M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="modal-sub">
           支持 <b>.xlsx / .xls / .csv / .tsv</b>，单次最多 {{ MAX_IMPORT_ROWS }} 行。
@@ -966,7 +972,7 @@ function actionVariant(action: string) {
 .funnel-arrow { color: var(--c-text-quaternary); }
 
 .followup { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--c-border); }
-.followup-title { font-size: 13px; font-weight: 600; color: var(--c-warning); margin-bottom: 8px; }
+.followup-title { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--c-warning); margin-bottom: 8px; }
 .followup-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; font-size: 13px; }
 .fu-title { font-weight: 500; color: var(--c-text); }
 .fu-company { color: var(--c-text-tertiary); }
@@ -1086,7 +1092,7 @@ function actionVariant(action: string) {
 .modal { background: var(--c-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); width: 100%; max-width: 680px; max-height: 86vh; overflow-y: auto; padding: 20px 22px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .modal-title { font-family: var(--font-title); font-size: 17px; font-weight: 700; color: var(--c-text); }
-.modal-close { background: transparent; border: none; font-size: 16px; color: var(--c-text-tertiary); cursor: pointer; }
+.modal-close { display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--c-text-tertiary); cursor: pointer; }
 .modal-sub { font-size: 13px; color: var(--c-text-tertiary); line-height: 1.6; margin-bottom: 12px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
 
