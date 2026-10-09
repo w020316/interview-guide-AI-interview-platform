@@ -2,6 +2,7 @@ package com.example.interview.ai;
 
 import com.example.interview.common.BusinessException;
 import com.example.interview.service.UserAiKeyService;
+import com.example.interview.util.HashUtil;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -10,8 +11,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import reactor.core.publisher.Flux;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 按用户路由的 ChatModel（第四批 · 竞品清单 #15 用户自持 AI Key）。
@@ -32,8 +34,28 @@ public class SelfKeyAwareChatModel implements ChatModel {
 
     private final ChatModel platformModel;
     private final UserAiKeyService userAiKeyService;
-    /** 每用户（+配置指纹）一个 OpenAI 兼容客户端；变更配置即换新实例，量级 = 用户数 */
-    private final Map<String, ChatModel> userModels = new ConcurrentHashMap<>();
+    /**
+     * 每用户一个 OpenAI 兼容客户端，键为 {@code userId}、值为「配置指纹 + 客户端」。
+     * 用户改 Key/端点/模型时指纹变化即重建实例，旧实例随之被淘汰。
+     *
+     * <p><b>安全与内存</b>：旧实现以 {@code userId|baseUrl|model|apiKey} 为键（含<b>明文 Key</b>）
+     * 且永不淘汰——改配置即新增条目，明文 Key 常驻堆内存。现改为
+     * ①键内<b>绝不含明文 Key</b>（指纹只取 {@link HashUtil#sha256Short} 摘要）；
+     * ②有界 LRU（上限 {@value #MAX_CACHED_USERS}），防止无界膨胀。
+     */
+    private final Map<String, CachedModel> userModels =
+            Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, CachedModel> eldest) {
+                    return size() > MAX_CACHED_USERS;
+                }
+            });
+
+    /** 客户端缓存上限（LRU 淘汰）。量级应远大于同时在线的「自持 Key」用户数，仅作安全兜底。 */
+    private static final int MAX_CACHED_USERS = 512;
+
+    /** 缓存条目：配置指纹（不含明文 Key）+ 构建好的客户端。 */
+    private record CachedModel(String fingerprint, ChatModel model) {}
 
     public SelfKeyAwareChatModel(ChatModel platformModel, UserAiKeyService userAiKeyService) {
         this.platformModel = platformModel;
@@ -70,13 +92,33 @@ public class SelfKeyAwareChatModel implements ChatModel {
                 return null;
             }
             return userAiKeyService.settingOf(userId)
-                    .map(s -> userModels.computeIfAbsent(
-                            userId + "|" + s.baseUrl() + "|" + s.model() + "|" + s.apiKey(),
-                            k -> buildUserModel(s)))
+                    .map(s -> modelFor(userId, s))
                     .orElse(null);
         } catch (Exception e) {
             // 路由判定本身的异常绝不外抛：回落平台链
             return null;
+        }
+    }
+
+    /**
+     * 取（或重建）该用户自持配置对应的 ChatModel。
+     *
+     * <p>用 {@code synchronized(userModels)} 手工同步而非 {@code computeIfAbsent}：
+     * access-order 的 {@link LinkedHashMap} 在 {@code computeIfAbsent} 内部会因访问而重排节点
+     * （结构性修改），触发 {@link java.util.ConcurrentModificationException}。手工同步后
+     * 「读旧值 → 比对指纹 → 写新值」在同一把锁内完成，安全。
+     */
+    private ChatModel modelFor(String userId, UserAiKeyService.Setting s) {
+        String fingerprint = HashUtil.sha256Short(
+                s.baseUrl() + "|" + s.model() + "|" + s.apiKey());
+        synchronized (userModels) {
+            CachedModel cached = userModels.get(userId);
+            if (cached != null && cached.fingerprint().equals(fingerprint)) {
+                return cached.model();
+            }
+            ChatModel built = buildUserModel(s);
+            userModels.put(userId, new CachedModel(fingerprint, built));
+            return built;
         }
     }
 
