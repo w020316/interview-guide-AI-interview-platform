@@ -1,5 +1,6 @@
 package com.example.interview.service.job;
 
+import com.example.interview.util.SsrUrlValidator;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -312,12 +313,19 @@ public class WebJobSearcherService {
     // ---------- 辅助 ----------
 
     private Document fetch(String url) {
+        // B-07：与 JobPageFetcher 对齐——先过 SSRF 校验（当前 URL 全为硬编码公开站点，
+        // 此校验为纵深防御：若将来支持用户自定义源，可直接拦住内网/元数据地址），
+        // 且 followRedirects(false) 防止「跟随 302 跳转到内网」绕过校验。
+        if (!SsrUrlValidator.validate(url).ok) {
+            log.warn("拒绝抓取未通过 SSRF 校验的地址：{}", url);
+            return null;
+        }
         try {
             return Jsoup.connect(url)
                     .userAgent(UA)
                     .timeout(READ_TIMEOUT_MS)
                     .header("Accept-Language", "zh-CN,zh;q=0.9")
-                    .followRedirects(true)
+                    .followRedirects(false)
                     .ignoreHttpErrors(true)
                     .get();
         } catch (SocketTimeoutException e) {
