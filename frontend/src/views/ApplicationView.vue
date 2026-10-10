@@ -954,7 +954,7 @@ function actionVariant(action: string) {
 </script>
 
 <style scoped>
-.app-page { max-width: 960px; margin: 0 auto; }
+.app-page { max-width: 1080px; margin: 0 auto; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: 28px; font-weight: 700; color: var(--c-text); margin: 0 0 6px; letter-spacing: -0.5px; }
 .page-header p { font-size: 14px; color: var(--c-text-secondary); margin: 0; line-height: 1.7; }

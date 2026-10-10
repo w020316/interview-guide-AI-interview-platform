@@ -183,7 +183,7 @@ function difficultyText(d: string) {
 </script>
 
 <style scoped>
-.book-page { max-width: 860px; margin: 0 auto; }
+.book-page { max-width: 900px; margin: 0 auto; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: 28px; font-weight: 700; color: var(--c-text); margin: 0 0 6px; letter-spacing: -0.5px; }
 .page-header p { font-size: 14px; color: var(--c-text-secondary); margin: 0; }

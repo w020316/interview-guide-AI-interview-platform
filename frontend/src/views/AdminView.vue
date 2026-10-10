@@ -793,7 +793,7 @@ onMounted(() => {
 
 <style scoped>
 .admin-page {
-  max-width: 1180px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 4px 0 32px;
 }

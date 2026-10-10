@@ -518,7 +518,7 @@ function fmtRelative(iso: string): string {
 
 <style scoped>
 .profile-page {
-  max-width: 1100px;
+  max-width: 1080px;
   margin: 0 auto;
 }
 
