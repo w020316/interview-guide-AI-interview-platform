@@ -562,6 +562,36 @@ class JobAgentServiceTest {
                 .containsExactly("valid", "open", "expired");
     }
 
+    @Test
+    @DisplayName("search: hideExpired=true 排除已截止、保留在招与长期有效（N2 默认隐藏已截止）")
+    void search_hideExpiredExcludesOnlyExpired() {
+        LocalDate today = LocalDate.now();
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("expired").title("已截止岗位").companyName("A")
+                .deadline(today.minusDays(1)).active(true).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("valid").title("在招岗位").companyName("B")
+                .deadline(today.plusDays(30)).active(true).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("open").title("长期有效岗位").companyName("C")
+                .active(true).build());
+
+        JobAgentService service = newH2Service(List.of());
+
+        // hideExpired=true：排除已截止，保留在招与「长期有效」。
+        // total 必须同时收窄 —— 这正是在**查询层**过滤（而非前端逐页隐藏）的意义：
+        // 若前端隐藏，「共 3 条」而实际可见 2 条，用户会以为分页少了数据。
+        Page<JobPostingEntity> hidden =
+                service.search(null, null, null, null, null, null, null, null, null, true, 0, 10);
+        assertThat(hidden.getTotalElements()).isEqualTo(2);
+        assertThat(hidden.getContent()).extracting(JobPostingEntity::getExternalId)
+                .containsExactlyInAnyOrder("valid", "open");
+
+        // hideExpired=false（旧签名默认）：已截止仍在结果中，保持既有调用方行为不变
+        assertThat(service.search(null, null, null, null, null, null, null, null, null, false, 0, 10)
+                .getTotalElements()).isEqualTo(3);
+    }
+
     // ─────────────────── meta：筛选面板聚合（真实查询） ───────────────────
 
     @Test

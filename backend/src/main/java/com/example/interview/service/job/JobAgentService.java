@@ -311,6 +311,23 @@ public class JobAgentService {
                                          String location, String recruitType, String source,
                                          String degree, String experience, Boolean overseas,
                                          int page, int size) {
+        return search(keyword, industry, jobType, location, recruitType, source, degree, experience,
+                overseas, false, page, size);
+    }
+
+    /**
+     * 岗位检索（N2 · 默认隐藏已截止）。
+     *
+     * @param hideExpired true 时排除**已截止**岗位（deadline 非空且早于今天）；
+     *                    保留「长期有效」（deadline 为空）与在招岗位。
+     *                    过滤放在查询层而非前端逐页隐藏 —— 后端把已截止沉到最后，
+     *                    前端隐藏会让「共 N 条」与实际可见条数对不上。
+     *                    默认 false，保持既有调用方（智能体工具等）行为不变。
+     */
+    public Page<JobPostingEntity> search(String keyword, String industry, String jobType,
+                                         String location, String recruitType, String source,
+                                         String degree, String experience, Boolean overseas,
+                                         boolean hideExpired, int page, int size) {
         var spec = org.springframework.data.jpa.domain.Specification.where(emptySpec());
         if (!isBlank(keyword)) {
             // 转义 LIKE 通配符（% _ \），避免用户输入破坏精确匹配语义
@@ -356,6 +373,15 @@ public class JobAgentService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("experience"), experience.trim()));
         }
         spec = spec.and((root, query, cb) -> cb.isTrue(root.get("active")));
+        // N2（默认隐藏已截止）：排除 deadline 非空且早于今天的岗位，
+        // 保留「长期有效」（deadline 为空）与在招（deadline ≥ 今天）。
+        // 放在查询层做，避免前端逐页隐藏导致「共 N 条」与实际可见条数对不上。
+        LocalDate today = LocalDate.now();
+        if (hideExpired) {
+            spec = spec.and((root, query, cb) -> cb.or(
+                    cb.isNull(root.get("deadline")),
+                    cb.greaterThanOrEqualTo(root.get("deadline"), today)));
+        }
         // 排序（Y-03）：分三段，**已截止的岗位沉到最后**——
         //   ① 在招（deadline ≥ 今天）：最前
         //   ② 无截止日期（持续招聘）：居中
@@ -368,7 +394,6 @@ public class JobAgentService {
         //   query.orderBy(CASE...)；且 SimpleJpaRepository 对**带 Sort 的 Pageable**会在
         //   spec 求值之后用 Pageable 的排序整体覆盖 query.orderBy，故这里给 Pageable
         //   传 unsorted，把排序全部交给 Specification。
-        LocalDate today = LocalDate.now();
         spec = spec.and((root, query, cb) -> {
             // count 查询的结果类型是 Long，带 order by 无意义（部分方言还会报错）；
             // 仅当结果类型就是岗位实体时才注入排序。

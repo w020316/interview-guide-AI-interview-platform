@@ -127,6 +127,9 @@ public class JobAgentController {
             @RequestParam(required = false) String experience,
             // v1.38.0：海外/远程分栏——true 仅海外源、false 仅国内源、缺省不限
             @RequestParam(required = false) Boolean overseas,
+            // N2：默认隐藏已截止——true 排除已截止岗位（保留「长期有效」与在招）；
+            // 前端默认传 true，此处默认 false 以保持既有调用方行为不变
+            @RequestParam(required = false, defaultValue = "false") boolean hideExpired,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "10") int size) {
         // P2-04：先做关键词白名单校验，避免请求被边缘 WAF 拦下后前端拿不到任何可解释信息
@@ -154,7 +157,7 @@ public class JobAgentController {
         String normalizedRecruitType = (rt == null) ? recruitType : rt.name();
         Page<JobPostingEntity> result = jobAgentService.search(
                 keyword, industry, jobType, location, normalizedRecruitType, source, degree, experience,
-                overseas, page, size);
+                overseas, hideExpired, page, size);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("total", result.getTotalElements());
         data.put("page", result.getNumber());

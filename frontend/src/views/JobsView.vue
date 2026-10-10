@@ -75,6 +75,10 @@
         <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="applyFilters">
           搜索
         </BaseButton>
+        <label class="hide-expired-toggle" :title="hideExpired ? '已隐藏已截止岗位，取消勾选可查看' : '当前显示全部岗位（含已截止）'">
+          <input type="checkbox" v-model="hideExpired" @change="toggleHideExpired" />
+          <span>隐藏已截止</span>
+        </label>
         <BaseButton variant="ghost" @click="matchOpen = !matchOpen">
           {{ matchOpen ? '收起匹配' : '简历匹配推荐' }}
         </BaseButton>
@@ -492,6 +496,8 @@ const location = ref('')
 const source = ref('')
 const degree = ref('')
 const experience = ref('')
+/** N2：默认隐藏已截止（true）—— 关闭后显示已截止岗位（后端仍将其排在最后） */
+const hideExpired = ref(true)
 
 const meta = ref<JobsMeta>({
   industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null,
@@ -553,9 +559,20 @@ function exitMatch() {
 /** 收藏岗位截止 7 天内的提醒列表（横幅数据源） */
 const remindJobs = computed(() => favList.value.filter((f) => f.remind))
 
+/** N2：岗位是否已截止（deadline 非空且已过今天）。「长期有效」(deadline 为空) 不算已截止。 */
+function isExpiredJob(job: Pick<JobPosting, 'deadline'>): boolean {
+  const f = jobFreshness(job.deadline)
+  return f.daysLeft !== null && f.daysLeft < 0
+}
+
 /** 收藏模式渲染快照卡片；普通模式渲染搜索结果 */
 const displayJobs = computed<JobPosting[]>(() => {
-  if (matchActive.value && matched.value.length) return matched.value.map((m) => m.job)
+  if (matchActive.value && matched.value.length) {
+    // 普通列表的「已截止」过滤在后端查询层做（否则分页「共 N 条」会对不上）；
+    // 匹配结果不分页，故在此即时过滤，让开关在匹配态下同样生效。
+    const list = matched.value.map((m) => m.job)
+    return hideExpired.value ? list.filter((j) => !isExpiredJob(j)) : list
+  }
   if (!favoriteMode.value) return jobs.value
   return favList.value.map((f) => ({
     id: f.jobId,
@@ -667,6 +684,8 @@ async function fetchJobs() {
         location: location.value || undefined,
         recruitType: toQueryRecruitType(recruitType.value),
         overseas: isOverseasTab,
+        // N2：默认隐藏已截止（后端在查询层排除，保证「共 N 条」与实际一致）
+        hideExpired: hideExpired.value,
         source: source.value || undefined,
         degree: degree.value || undefined,
         experience: experience.value || undefined,
@@ -706,6 +725,11 @@ async function fetchMeta() {
 function applyFilters() {
   page.value = 0
   fetchJobs()
+}
+
+/** N2：切换「隐藏已截止」——匹配模式下由 displayJobs 即时过滤，无需重新请求 */
+function toggleHideExpired() {
+  if (!matchActive.value) applyFilters()
 }
 
 /* ── 数据来源快捷筛选（v1.37.0）──
@@ -997,6 +1021,25 @@ onMounted(() => {
 
 .filter-input.search {
   flex: 2;
+}
+
+/* N2：「隐藏已截止」开关（默认勾选） */
+.hide-expired-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.hide-expired-toggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand-primary);
+  cursor: pointer;
 }
 
 .location-row {

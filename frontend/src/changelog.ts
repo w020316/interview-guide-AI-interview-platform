@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.9'
+export const CURRENT_VERSION = '1.66.10'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.10',
+    date: '2026-10-10',
+    title: '版本 1.66.10 · 招聘广场默认隐藏「已截止」岗位，先看到能投的',
+    items: [
+      { text: '招聘广场现在默认不显示已截止的岗位，并新增「隐藏已截止」开关（默认勾选）；取消勾选可查看全部岗位（已截止的仍排在最后）。此前已截止的岗位会占着列表尾部，翻页时容易点到投不了的岗位', level: 'user' },
+      { text: '过滤在后端查询层完成（而不是前端逐页隐藏）——保证「共 N 条」与实际可见条数一致，不会出现翻到最后一页却是空的', level: 'tech' },
+      { text: '岗位列表已具备的排序不变：在招 → 长期有效 → 已截止沉底；简历匹配结果按匹配分降序', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.9',
     date: '2026-10-10',

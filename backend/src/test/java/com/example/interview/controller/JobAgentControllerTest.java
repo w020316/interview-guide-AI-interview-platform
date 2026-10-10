@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -114,7 +115,7 @@ class JobAgentControllerTest {
         JobPostingEntity job = JobPostingEntity.builder()
                 .id(1L).platform("内置精选").externalId("e1")
                 .title("Java 后端工程师").companyName("阿里巴巴").active(true).build();
-        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+        when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(job), PageRequest.of(0, 10), 25));
 
         mockMvc.perform(get("/api/jobs")
@@ -134,7 +135,7 @@ class JobAgentControllerTest {
     @DisplayName("GET /api/jobs: overseas 分栏参数透传到检索（v1.38.0 海外远程 Tab）")
     void list_passesOverseasFlag() throws Exception {
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), anyInt(), anyInt()))
+                any(), anyBoolean(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/api/jobs").param("overseas", "true"))
@@ -142,7 +143,7 @@ class JobAgentControllerTest {
 
         // 参数名/顺序写错会让「海外远程」分栏静默返回国内岗位，这里锁住透传
         verify(jobAgentService).search(any(), any(), any(), any(), any(), any(), any(), any(),
-                eq(Boolean.TRUE), anyInt(), anyInt());
+                eq(Boolean.TRUE), anyBoolean(), anyInt(), anyInt());
     }
 
     @Test
@@ -164,7 +165,7 @@ class JobAgentControllerTest {
         }
 
         verify(jobAgentService, never()).search(any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), anyInt(), anyInt());
+                any(), any(), anyBoolean(), anyInt(), anyInt());
     }
 
     @Test
@@ -193,7 +194,7 @@ class JobAgentControllerTest {
     @DisplayName("GET /api/jobs: 合法 recruitType（含小写）与空值都放行")
     void list_acceptsValidRecruitType() throws Exception {
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), anyInt(), anyInt()))
+                any(), anyBoolean(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         for (String ok : new String[]{"AUTUMN", "spring", "PART_TIME", "", "  "}) {
@@ -207,7 +208,7 @@ class JobAgentControllerTest {
     @DisplayName("GET /api/jobs: 小写 recruitType 归一为规范 code 后再查询（收口①：放行就必须真能查到）")
     void list_normalizesRecruitTypeToCanonicalCode() throws Exception {
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), anyInt(), anyInt()))
+                any(), anyBoolean(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         // 小写 spring 被校验放行，但底层 cb.equal 大小写敏感——必须归一为 "SPRING"，
@@ -216,27 +217,27 @@ class JobAgentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
         verify(jobAgentService).search(any(), any(), any(), any(), eq("SPRING"), any(), any(),
-                any(), any(), anyInt(), anyInt());
+                any(), any(), anyBoolean(), anyInt(), anyInt());
 
         // 空串表示「不限」，必须原样透传（不得被改成 null，避免动到既有语义）
         org.mockito.Mockito.clearInvocations(jobAgentService);
         mockMvc.perform(get("/api/jobs").param("recruitType", ""))
                 .andExpect(status().isOk());
         verify(jobAgentService).search(any(), any(), any(), any(), eq(""), any(), any(),
-                any(), any(), anyInt(), anyInt());
+                any(), any(), anyBoolean(), anyInt(), anyInt());
     }
 
     @Test
     @DisplayName("GET /api/jobs: 缺失 recruitType 时透传 null，语义为「不限」（不变式）")
     void list_missingRecruitType_passesNull() throws Exception {
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), anyInt(), anyInt()))
+                any(), anyBoolean(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/api/jobs"))
                 .andExpect(status().isOk());
         verify(jobAgentService).search(any(), any(), any(), any(),
-                org.mockito.ArgumentMatchers.isNull(), any(), any(), any(), any(), anyInt(), anyInt());
+                org.mockito.ArgumentMatchers.isNull(), any(), any(), any(), any(), anyBoolean(), anyInt(), anyInt());
     }
 
     @Test
@@ -255,7 +256,7 @@ class JobAgentControllerTest {
     @DisplayName("GET /api/jobs: size 超过上限仍被钳制而非报错（要得太多是有明确意图的）")
     void list_clampsHugeSize() throws Exception {
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), anyInt(), anyInt()))
+                any(), anyBoolean(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/api/jobs").param("size", "99999"))
@@ -267,7 +268,7 @@ class JobAgentControllerTest {
     @DisplayName("GET /api/jobs: C++ / C# / node.js 等真实技术关键词不被白名单误伤")
     void list_allowsCommonTechSymbols() throws Exception {
         when(jobAgentService.search(any(), any(), any(), any(), any(), any(), any(), any(),
-                any(), anyInt(), anyInt()))
+                any(), anyBoolean(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
 
         for (String kw : List.of("C++", "C#", "node.js", "Java/Python", "前端 开发", "Vue3.0")) {
