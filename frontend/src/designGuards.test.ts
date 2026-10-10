@@ -468,3 +468,126 @@ describe('不得写死白色边框（v1.66.1 · R10-F09）', () => {
     ).toEqual([])
   })
 })
+
+/* ───────────── 禁 emoji / 字符当功能图标（v1.66.2 · R10-U3-06 / U3-08）───────────── */
+
+/**
+ * ── 为什么需要它 ────────────────────────────────────────────────────
+ * DESIGN.md §5.5 定死「图标一律内联 SVG，禁止 emoji 当功能图标」：
+ * emoji 配色不受主题控制（暗色下突兀），且与全站 SVG 图标体系割裂。
+ * 这条约定**代码审查看不出来** —— 一个 📍 混在一堆 <span> 里毫无违和，
+ * 只有真机双主题对比才暴露。v1.66.2 在岗位详情元信息（📍🎓💼🏢）、
+ * 学习中心空态与简历解析告警（✓ ⚠）等处清出 7 个字符图标，故固化成门禁。
+ *
+ * ── 判据（已用真实代码全量校准：修完后命中数为 0）──────────────────
+ * · **只扫 `<template>` 区段**：图标只出现在模板里；script / 注释 /
+ *   CSS `content: '★'` 不参与（它们够不着主题，也不是功能图标）。
+ * · **先剥 HTML 注释**（替换为等长空白、保留换行）：注释里的 ⚠️ 是给人看的说明。
+ * · **剥掉 `aria-hidden="true"` 元素的文本**：已主动对读屏隐藏的字符图标
+ *   （ReportPanel 的 ★、ResumeHistoryView 的 ⚠）视为装饰，**放行**。
+ * · **命中集**：`\p{Extended_Pictographic}`（emoji 及其同族符号，含 © ♥）
+ *   ∪ 勾/叉类文本符号 `✓ ✔ ✗ ✘ ✕ ✖`（文本呈现，但同为「字符当图标」）。
+ * · **只报「独立成图标」的命中**：若该字符所在**文本段**（去掉 `{{ }}` 插值后）
+ *   除它以外还有实义文字，判为「正文里的符号」（如 JobsView 的 ♥、App.vue 的 ©），
+ *   **不报** —— 正文中的符号是修辞，不是功能图标。
+ *
+ * ⚠️ 已知盲区（如实记录）：`<button>🗑 删除</button>` 这类「图标 + 字面标签」
+ *    同处一个文本段的形态会被判为正文而漏报（当前代码库无此形态）。
+ *    该类请以真机走查兜底。
+ */
+
+/** emoji 及其同族符号 + 勾/叉类文本符号 */
+const CHAR_ICON = /[\p{Extended_Pictographic}✓✔✗✘✕✖]/u
+const CHAR_ICON_G = /[\p{Extended_Pictographic}✓✔✗✘✕✖]/gu
+/** 空元素 / 自闭合：不参与 aria-hidden 的「入栈-出栈」配对 */
+const VOID_ELEMENTS = new Set([
+  'br', 'hr', 'img', 'input', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr',
+])
+
+/** 取 SFC 的根 `<template>` 区段（含嵌套 `<template v-if>`）；无模板返回 null */
+function extractTemplateBlock(raw: string): string | null {
+  const start = raw.indexOf('<template')
+  const end = raw.lastIndexOf('</template>')
+  if (start === -1 || end === -1 || end < start) return null
+  return raw.slice(start, end + '</template>'.length)
+}
+
+/** 把 HTML 注释替换为等长空白（保留换行，行号不漂移） */
+function blankHtmlComments(s: string): string {
+  return s.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '))
+}
+
+/** 把 `aria-hidden="true"` 元素的文本替换为空白（保留换行），装饰性字符图标因此放行 */
+function blankAriaHiddenText(tpl: string): string {
+  const parts = tpl.split(/(<[^>]*>)/)
+  const stack: Array<{ name: string; hidden: boolean }> = []
+  let hiddenDepth = 0
+  const out: string[] = []
+  for (const tok of parts) {
+    if (tok.startsWith('<')) {
+      const m = /^<\s*(\/?)\s*([a-zA-Z][\w-]*)/.exec(tok)
+      if (!m) {
+        out.push(tok)
+        continue
+      }
+      const name = m[2].toLowerCase()
+      if (m[1] === '/') {
+        for (let i = stack.length - 1; i >= 0; i--) {
+          if (stack[i].name === name) {
+            if (stack[i].hidden) hiddenDepth--
+            stack.splice(i, 1)
+            break
+          }
+        }
+      } else if (!/\/>\s*$/.test(tok) && !VOID_ELEMENTS.has(name)) {
+        const hidden = /aria-hidden\s*=\s*"true"/.test(tok)
+        stack.push({ name, hidden })
+        if (hidden) hiddenDepth++
+      }
+      out.push(tok)
+    } else {
+      out.push(hiddenDepth > 0 ? tok.replace(/[^\n]/g, ' ') : tok)
+    }
+  }
+  return out.join('')
+}
+
+describe('禁 emoji / 字符当功能图标（v1.66.2 · R10-U3-06/U3-08）', () => {
+  it('模板里不得把 emoji / 字符当功能图标（应用内联 SVG）', () => {
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, new Set(['.vue']))) {
+      const tpl0 = extractTemplateBlock(fs.readFileSync(file, 'utf8'))
+      if (tpl0 == null) continue
+      scanned++
+      const r = rel(file)
+      const tpl = blankAriaHiddenText(blankHtmlComments(tpl0))
+
+      // 按标签切出「文本段」，逐段判定（`<[^>]*>` 可跨行，兼容多行标签）
+      const tagRe = /<[^>]*>/g
+      let pos = 0
+      for (;;) {
+        tagRe.lastIndex = pos
+        const t = tagRe.exec(tpl)
+        const seg = t ? tpl.slice(pos, t.index) : tpl.slice(pos)
+        const offset = pos
+        const text = seg.replace(/\{\{[\s\S]*?\}\}/g, '') // 去掉插值，只留字面文本
+        // 命中字符图标、且该文本段除它以外无实义文字 → 判为「独立成图标」
+        if (CHAR_ICON.test(text) && !/\S/.test(text.replace(CHAR_ICON_G, ''))) {
+          const line = tpl.slice(0, offset).split('\n').length
+          bad.push(`${r}:${line}  ${seg.trim().slice(0, 90)}`)
+        }
+        if (!t) break
+        pos = t.index + t[0].length
+      }
+    }
+
+    expect(scanned, '扫描范围异常：模板数过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(
+      bad,
+      `不要把 emoji / 字符当功能图标（DESIGN.md §5.5）：请改用内联 SVG` +
+        `（stroke="currentColor" + stroke-width="2" + stroke-linecap/linejoin="round"，装饰性加 aria-hidden="true"）：\n${bad.join('\n')}`,
+    ).toEqual([])
+  })
+})
