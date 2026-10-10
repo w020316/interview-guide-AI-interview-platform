@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.4'
+export const CURRENT_VERSION = '1.66.5'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.5',
+    date: '2026-10-10',
+    title: '版本 1.66.5 · 卡片与标签的圆角统一到一套取值，界面细节更整齐',
+    items: [
+      { text: '界面里卡片、标签、按钮的圆角统一到设计规范的一套取值 —— 此前同一个界面里混用了 2 / 4 / 6 / 10 / 14 像素等好几种圆角，现在收敛成整齐的一套', level: 'user' },
+      { text: '清理了 16 处「令牌已定义却仍写死浅色兜底」的写法：这类兜底永远不会生效，但一旦令牌被改名就会在暗色主题下静默变成浅色块（正是此前修过的那类看不见文字的问题）', level: 'tech' },
+      { text: '新增两条设计守卫：圆角必须走 --radius-* 令牌；var() 引用的令牌已定义时不得再写兜底值', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.4',
     date: '2026-10-10',
