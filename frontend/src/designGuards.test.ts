@@ -671,3 +671,75 @@ describe('页面级标题字号统一 28px（v1.66.3 · DESIGN.md §5）', () =>
     ).toEqual([])
   })
 })
+
+describe('圆角必须走令牌（v1.66.5 · R10-D09）', () => {
+  it('业务文件里的 border-radius 只能用 var(--radius-*) 或 50%', () => {
+    // 为什么需要它：`--radius-xs/sm/md/lg/xl/2xl/full` 是圆角的唯一来源，
+    // 但全仓曾散落 68 处写死值（10px / 14px / 6px / 4px / 2px，以及 999px ——
+    // 后者本就是 `--radius-full`）。写死值绕过令牌，改令牌时不会跟着变，
+    // 且「999px 与 --radius-full 并存」让同一个胶囊有两种写法。
+    // v1.66.5 已全部收敛，用这条守住不再写回来。
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, SCAN_EXT)) {
+      const r = rel(file)
+      if (r.endsWith('styles/variables.css')) continue
+      scanned++
+      for (const [i, line] of fs.readFileSync(file, 'utf8').split('\n').entries()) {
+        for (const m of line.matchAll(/border-radius\s*:\s*([^;{}]+)/g)) {
+          for (const tok of m[1].trim().split(/\s+/)) {
+            if (tok === '0' || tok === '50%' || /^var\(--radius-[a-z0-9-]+\)$/.test(tok)) continue
+            bad.push(`${r}:${i + 1}  非令牌圆角 ${tok}   ${line.trim().slice(0, 90)}`)
+          }
+        }
+      }
+    }
+
+    expect(scanned, '扫描范围异常：文件数过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(
+      bad,
+      '圆角必须用 --radius-*（定义见 styles/variables.css；圆形用 50%，直角用 0）。' +
+        '不要写死 px，也不要用 999px 代替 --radius-full：\n' +
+        bad.join('\n'),
+    ).toEqual([])
+  })
+})
+
+describe('不得保留死兜底 var(--已定义令牌, 兜底值)（v1.66.5）', () => {
+  it('令牌已在 variables.css 定义时，var() 不得再写兜底值', () => {
+    // 为什么需要它：`var(--c-warning-light, #fdf6ec)` 这种写法里，令牌**已经定义**，
+    // 兜底永远不会生效 —— 它是**死代码**，却把「写死的浅色」留在了源码里。
+    // 一旦令牌被改名/删除，兜底会静默接管：暗色主题下就是 v1.63.1 那类
+    // 「浅底深字贴在深色页面上」的缺陷（当时实测 1.05:1，完全看不见）。
+    // 既有的「变量定义完整性」守卫只查「引用了未定义的变量」，查不到这种「已定义 + 死兜底」，
+    // 所以单列一条。v1.66.5 已清 16 处。
+    const defined = new Set<string>()
+    for (const line of fs.readFileSync(path.join(SRC, 'styles', 'variables.css'), 'utf8').split('\n')) {
+      for (const m of line.matchAll(/(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1])
+    }
+
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, SCAN_EXT)) {
+      const r = rel(file)
+      if (r.endsWith('styles/variables.css')) continue
+      scanned++
+      for (const [i, line] of fs.readFileSync(file, 'utf8').split('\n').entries()) {
+        for (const m of line.matchAll(/var\((--[a-zA-Z0-9_-]+)\s*,/g)) {
+          if (!defined.has(m[1])) continue
+          bad.push(`${r}:${i + 1}  ${m[1]} 已有定义，兜底是死代码   ${line.trim().slice(0, 90)}`)
+        }
+      }
+    }
+
+    expect(scanned, '扫描范围异常：文件数过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(
+      bad,
+      '这些 var() 的令牌都已定义，兜底值永不生效 —— 请直接删掉兜底（`var(--x)`）。' +
+        '保留写死颜色的兜底，会在令牌被改名时静默生效，暗色下会破版：\n' +
+        bad.join('\n'),
+    ).toEqual([])
+  })
+})
