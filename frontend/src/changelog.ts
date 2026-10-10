@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.7'
+export const CURRENT_VERSION = '1.66.8'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.8',
+    date: '2026-10-10',
+    title: '版本 1.66.8 · 各页面的内容宽度统一了，跨页面切换时不再左右跳',
+    items: [
+      { text: '招聘广场、模拟面试、学习中心、个人中心、投递看板、错题本、收藏、首页等页面的内容宽度统一到规范的两档（宽页面 1080 / 阅读列 900）—— 此前同一个应用里并存 8 种宽度，跨页面切换时内容会左右「跳一下」', level: 'user' },
+      { text: '新增守卫：页面容器与宽布局的宽度只能取 900 / 1080（外壳 1280）—— 这套宽度此前已手工收敛过一次、之后又漂了回去，现在用门禁锁住', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.7',
     date: '2026-10-10',
