@@ -356,15 +356,34 @@ public class JobAgentService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("experience"), experience.trim()));
         }
         spec = spec.and((root, query, cb) -> cb.isTrue(root.get("active")));
-        // 排序：临期优先（截止日期升序），**无截止日期的排最后**，再按更新时间倒序。
-        // ⚠️ v1.57.0 显式加 nullsLast()：此前只用 Order.asc("deadline")，
-        // 而 NULL 的排序位置**依方言而定**（PostgreSQL ASC 默认 NULLS LAST，
-        // H2 默认 NULLS FIRST）→ 本地与生产结果不一致；且 v1.57.0 起
-        // deadline 为 null 成为常态（不再编造截止日），必须显式声明意图。
-        var pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50),
-                org.springframework.data.domain.Sort.by(
-                        org.springframework.data.domain.Sort.Order.asc("deadline").nullsLast(),
-                        org.springframework.data.domain.Sort.Order.desc("updatedAt")));
+        // 排序（Y-03）：分三段，**已截止的岗位沉到最后**——
+        //   ① 在招（deadline ≥ 今天）：最前
+        //   ② 无截止日期（持续招聘）：居中
+        //   ③ 已截止（deadline < 今天）：沉底
+        //   段内再按截止日期升序（临期优先），最后按更新时间倒序。
+        // ⚠️ 为什么把排序从 Pageable 挪进 Specification：
+        //   原实现是 `Order.asc("deadline").nullsLast()`，即**越早越靠前**——
+        //   于是「2026-09-30 已过期」会排到「2026-12-31 在招」之前（这正是 Y-03 的线上表现）。
+        //   而「已截止沉底」无法用 Sort.Order 表达（属性排序写不了 CASE），只能用
+        //   query.orderBy(CASE...)；且 SimpleJpaRepository 对**带 Sort 的 Pageable**会在
+        //   spec 求值之后用 Pageable 的排序整体覆盖 query.orderBy，故这里给 Pageable
+        //   传 unsorted，把排序全部交给 Specification。
+        LocalDate today = LocalDate.now();
+        spec = spec.and((root, query, cb) -> {
+            // count 查询的结果类型是 Long，带 order by 无意义（部分方言还会报错）；
+            // 仅当结果类型就是岗位实体时才注入排序。
+            if (query.getResultType() == JobPostingEntity.class) {
+                query.orderBy(
+                        cb.asc(cb.selectCase()
+                                .when(cb.lessThan(root.get("deadline"), today), 2) // 已截止 → 沉底
+                                .when(cb.isNull(root.get("deadline")), 1)          // 无截止日期 → 居中
+                                .otherwise(0)),                                    // 在招 → 最前
+                        cb.asc(root.get("deadline")),
+                        cb.desc(root.get("updatedAt")));
+            }
+            return cb.conjunction();
+        });
+        var pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 50));
         return repository.findAll(spec, pageable);
     }
 

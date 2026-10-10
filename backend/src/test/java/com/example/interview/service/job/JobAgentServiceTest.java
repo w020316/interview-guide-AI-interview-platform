@@ -20,6 +20,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -533,6 +534,32 @@ class JobAgentServiceTest {
         // 完全不匹配的条件
         assertThat(service.search(null, "教育", null, null, null, null, null, null, 0, 10).getTotalElements())
                 .isZero();
+    }
+
+    @Test
+    @DisplayName("search: 已截止岗位沉底，不排在未截止岗位之前（Y-03 回归守卫）")
+    void search_expiredJobsRankAfterActiveOnes() {
+        // 背景（Y-03）：原排序 `Order.asc(\"deadline\").nullsLast()` 是「越早越靠前」，
+        // 于是「2026-09-30 已过期」会排到「2026-12-31 在招」之前 —— 首屏先看到投不了的岗位。
+        // 本用例在修复前应当是**红的**（旧序为 [expired, valid, open]）。
+        LocalDate today = LocalDate.now();
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("expired").title("已截止岗位").companyName("A")
+                .deadline(today.minusDays(10)).active(true).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("valid").title("在招岗位").companyName("B")
+                .deadline(today.plusDays(30)).active(true).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("open").title("持续招聘岗位").companyName("C")
+                .active(true).build());
+
+        List<JobPostingEntity> jobs = newH2Service(List.of())
+                .search(null, null, null, null, null, null, null, null, null, 0, 10)
+                .getContent();
+
+        // 在招(0) → 无截止日期(1) → 已截止(2)：已截止的岗位必须排在所有未截止岗位之后
+        assertThat(jobs).extracting(JobPostingEntity::getExternalId)
+                .containsExactly("valid", "open", "expired");
     }
 
     // ─────────────────── meta：筛选面板聚合（真实查询） ───────────────────
