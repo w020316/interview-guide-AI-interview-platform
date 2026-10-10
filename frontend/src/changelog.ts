@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.3'
+export const CURRENT_VERSION = '1.66.4'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.4',
+    date: '2026-10-10',
+    title: '版本 1.66.4 · 有新版本时会在页面顶部提示，一键刷新即可用上最新版',
+    items: [
+      { text: '页面顶部现在会提示「有新版本可用」并给出「立即刷新」按钮 —— 此前更新入口只在页脚，很容易被忽略，浏览器于是长期停留在旧版本', level: 'user' },
+      { text: '提示只提醒、不自动刷新，不会打断正在进行的模拟面试作答', level: 'user' },
+      { text: '新版本横幅与离线横幅位置一致；两主题下的配色由既有的对比度门禁保证可读', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.3',
     date: '2026-10-10',
