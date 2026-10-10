@@ -23,8 +23,8 @@
 
     <!-- 空状态 -->
     <div v-if="!loading && loadError" class="empty-state fade-in">
-      <div class="empty-icon warn" aria-hidden="true">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+      <div class="empty-icon-wrap is-warn" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -34,10 +34,10 @@
       <button class="retry-btn" @click="loadResumes">重新加载</button>
     </div>
     <div v-else-if="!loading && !resumes.length" class="empty-state fade-in">
-      <div class="empty-icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+      <div class="empty-icon-wrap">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6"
-            stroke="var(--c-text-quaternary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
       <div class="empty-title">暂无简历分析记录</div>
@@ -728,13 +728,6 @@ const summaryText = computed(() => {
   border: 1px solid var(--c-border-light);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xs);
-}
-
-.empty-icon {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 16px;
-  color: var(--c-warning);
 }
 
 .empty-title {

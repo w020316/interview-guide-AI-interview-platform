@@ -39,8 +39,8 @@
 
     <!-- 空状态 -->
     <div v-else-if="loadError" class="empty-state fade-in">
-      <div class="empty-icon warn" aria-hidden="true">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+      <div class="empty-icon-wrap is-warn" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -50,8 +50,8 @@
       <button class="retry-btn" @click="load">重新加载</button>
     </div>
     <div v-else-if="!items.length" class="empty-state fade-in">
-      <div class="empty-icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <div class="empty-icon-wrap">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
             stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -222,7 +222,6 @@ function difficultyText(d: string) {
 @keyframes skeleton-loading { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 .empty-state { text-align: center; padding: 64px 24px; background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
-.empty-icon { display: flex; justify-content: center; margin-bottom: 16px; color: var(--c-warning); }
 .empty-title { font-size: 18px; font-weight: 600; color: var(--c-text); margin-bottom: 6px; }
 .empty-desc { font-size: 14px; color: var(--c-text-tertiary); margin-bottom: 24px; }
 

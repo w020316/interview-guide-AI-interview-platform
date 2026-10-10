@@ -582,3 +582,25 @@ p {
   background: var(--brand-primary-200);
   color: #0b2321;
 }
+
+/* ── 空态图标容器（R10-D04/D05）──
+ * 规范：空态图标统一为「44×44 圆角方块 + 品牌浅底 + 品牌浅描边」，与首页
+ * `.feature-icon-wrap` 同形态；错误态用 danger 浅底（已登记的语义例外）。
+ * 用 display:flex + width + margin:0 auto 自居中，不依赖父级是否 text-align:center。 */
+.empty-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
+  border-radius: var(--radius-md);
+  background: var(--brand-primary-50);
+  border: 1px solid var(--brand-primary-100);
+  color: var(--brand-primary);
+}
+.empty-icon-wrap.is-warn {
+  background: var(--c-danger-light);
+  border-color: var(--c-danger-border);
+  color: var(--c-danger);
+}

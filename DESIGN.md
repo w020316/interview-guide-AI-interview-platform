@@ -132,8 +132,12 @@ Windows 回退宋体、Android 回退默认衬线 —— 小字号下笔画发�
 - **一句话空态**（如「还没有投递记录」+ 一个 CTA）：**可以居中**，这是通用惯例。
 - **内容块型空态**（标题 + 说明 + 建议网格，如智能体欢迎区）：**左对齐** ——
   居中标题配左对齐网格会互相打架。
-- 图标用 32~44px 圆角方块容器 + `--brand-primary-50` 底 + `--brand-primary-100` 描边
-  （与首页 `.feature-icon-wrap` 同一形态）。
+- 空态图标统一用全局类 **`.empty-icon-wrap`**（44×44 圆角方块 + `--brand-primary-50` 底 +
+  `--brand-primary-100` 描边 + 品牌色图标，与首页 `.feature-icon-wrap` 同一形态）；
+  **不要自建 `*-empty-icon` / `*-empty__icon` 类** —— 已加门禁（`designGuards.test.ts`，v1.66.13）。
+- **已登记例外**：**错误态**（如加载失败、请求失败）空态图标用 `.empty-icon-wrap.is-warn`
+  （`--c-danger-light` 底 / `--c-danger-border` 描边 / `--c-danger` 图标）；
+  **中性空态（无数据）一律品牌色**，不得用 warning / success 等非品牌色。
 
 **容器宽度与页面标题字号**
 - **两档容器宽度，不要各页随手取值**（v1.63.2 收敛，此前 900 / 980 / 1080 / 1180 四种并存）：

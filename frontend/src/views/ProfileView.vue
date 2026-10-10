@@ -192,10 +192,10 @@
       </div>
 
       <div v-else-if="!loading" class="empty-state">
-        <div class="empty-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+        <div class="empty-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2 M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2 M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2 M9 12h6 M9 16h4"
-              stroke="var(--c-text-quaternary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
         <div class="empty-title">暂无活动记录</div>
@@ -800,12 +800,6 @@ function fmtRelative(iso: string): string {
 .empty-state {
   text-align: center;
   padding: 48px 24px;
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.6;
 }
 
 .empty-title {

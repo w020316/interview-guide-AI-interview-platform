@@ -839,3 +839,96 @@ describe('断点白名单（v1.66.9 · R10-D10）', () => {
     ).toEqual([])
   })
 })
+
+/* ───────────── 空态图标容器类名必须统一为 .empty-icon-wrap（v1.66.13 · R10-D04/D05）───────────── */
+
+/**
+ * ── 为什么需要它 ────────────────────────────────────────────────────
+ * DESIGN.md §5.5 定死「空态图标统一为 44×44 圆角方块容器」，即全局类
+ * `.empty-icon-wrap`（唯一定义在 styles/variables.css，错误态加 `.is-warn`）。
+ *
+ * 但空态散落在十余个文件里，每个文件过去都**各自自建**了一份容器类：
+ *   · 8 个视图各有一份 `.empty-icon`（scoped）
+ *   · ProgressView 的 `.readiness-empty-icon`
+ *   · TodoPanel 的 `.todo-empty-icon`
+ *   · EmptyChart 的 `.empty-chart__icon`
+ * v1.66.13（R10-D04/D05）一次性把这些自建类统一到 `.empty-icon-wrap`，共 12 文件 18 处。
+ *
+ * 「没有门禁的规范必然重新漂移」在本项目已被反复验证（容器宽度、断点、圆角……）。
+ * 空态本轮一次就清出 **3 个**自建类，正是「无门禁 → 漂移」的又一实证，故固化成门禁。
+ *
+ * ── 判据（已用真实代码全量校准：修完后命中数为 0）──────────────────
+ * · 只扫 `views/**` 与 `components/**` 下的 .vue（空态所在范围，当前 32 个文件）；
+ * · 先去掉 CSS 注释与 HTML 注释（注释里提到旧类名不算违规；等长空白、行号不漂移）；
+ * · 取「类名 token」的两个来源 —— 模板 `class="…"` / `:class="…"` 字面量，
+ *   以及 `<style>` 块里的 `.选择器`；
+ * · **判违规**：token 同时含 `empty` 与 `icon`（大小写不敏感）且不是 `empty-icon-wrap`。
+ *   修饰类 `is-warn` 是独立 token，不含 empty+icon，天然不受影响。
+ *
+ * ⚠️ 已知盲区（如实记录，勿误以为全覆盖）：
+ *   · `:class="\`...\`"`（反引号模板串）里的类名不参与扫描（当前代码库无此形态）；
+ *   · 通过 JS 运行时 `className += '…'` 拼出来的类名静态扫描看不见。
+ *   该类请以真机走查兜底。
+ */
+/** 空态图标容器的唯一允许类名（DESIGN.md §5.5） */
+const EMPTY_ICON_ALLOWED = new Set(['empty-icon-wrap'])
+/** 含 `empty` 与 `icon` 两个词片段 */
+const EMPTY_ICON_TOKEN = /empty/i
+
+/** 取出文本里所有「类名 token」及其在文本中的偏移（用于精确行号） */
+function pickClassTokens(text: string): Array<{ token: string; index: number }> {
+  const out: Array<{ token: string; index: number }> = []
+  // ① 模板属性 class="…" / :class="…"（静态类与绑定值的字面量）
+  for (const m of text.matchAll(/(?::?class)\s*=\s*"([^"]*)"/g)) {
+    const val = m[1]
+    const base = m.index + m[0].indexOf('"') + 1
+    for (const t of val.matchAll(/[A-Za-z0-9_-]+/g)) out.push({ token: t[0], index: base + t.index })
+  }
+  // ② <style> 块里的 .选择器（只取点号后以字母/下划线/连字符起始的名字）
+  for (const sm of text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
+    const inner = sm[1]
+    const innerStart = sm.index + sm[0].indexOf(inner)
+    for (const t of inner.matchAll(/\.(-?[_A-Za-z][\w-]*)/g)) out.push({ token: t[1], index: innerStart + t.index })
+  }
+  return out
+}
+
+describe('空态图标类名必须统一为 .empty-icon-wrap（v1.66.13 · R10-D04/D05）', () => {
+  it('views/** 与 components/** 中不得自建 *-empty-icon 类名', () => {
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, new Set(['.vue']))) {
+      const r = rel(file)
+      if (!(r.startsWith('views/') || r.startsWith('components/'))) continue
+      scanned++
+
+      // 去 CSS 注释（等长空白、保留换行）与 HTML 注释
+      const stripped = blankHtmlComments(
+        fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')),
+      )
+
+      for (const { token, index } of pickClassTokens(stripped)) {
+        if (!EMPTY_ICON_TOKEN.test(token) || !/icon/i.test(token)) continue
+        if (EMPTY_ICON_ALLOWED.has(token)) continue
+        const line = stripped.slice(0, index).split('\n').length
+        bad.push(`${r}:${line}  自建空态图标类 .${token}`)
+      }
+    }
+
+    // ── 扫描范围自检 ──
+    // 路径写错时扫描结果为空 → 守卫会**静默失效**（你以为有保护，实际没有）。
+    // 当前 views/** + components/** 共 32 个 .vue，据此设下界证明扫描确实覆盖到了文件。
+    expect(scanned, '扫描范围异常：文件数过少，守卫可能已静默失效').toBeGreaterThan(25)
+    expect(
+      fs.existsSync(path.join(SRC, 'components', 'EmptyChart.vue')),
+      '扫描根目录可能不对（未找到 components/EmptyChart.vue）',
+    ).toBe(true)
+
+    expect(
+      bad,
+      '空态图标请统一用全局 .empty-icon-wrap（DESIGN.md §5.5），不要自建 *-empty-icon / empty-icon：\n' +
+        bad.join('\n'),
+    ).toEqual([])
+  })
+})

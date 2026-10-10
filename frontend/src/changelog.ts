@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.12'
+export const CURRENT_VERSION = '1.66.13'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.13',
+    date: '2026-10-10',
+    title: '版本 1.66.13 · 空状态图标统一成品牌色小方块，全站长得一样了',
+    items: [
+      { text: '全站的「空状态」图标（还没有收藏、暂无记录、加载失败等）统一成同一种形态：44×44 的圆角小方块 + 品牌浅底 + 品牌描边，图标居中。此前各页各写一套（尺寸 32/40/48 不等、有的圆有的方、颜色有灰有绿有黄），同一个应用里能数出七八种样子', level: 'user' },
+      { text: '「加载失败」这类**错误态**统一走红色系（此前有的是琥珀色警告色），与「暂无数据」区分开；「暂无数据」一律品牌色', level: 'user' },
+      { text: '新增守卫：禁止自建 `*-empty-icon` 类名，空态图标只能用全局 `.empty-icon-wrap` —— 本次一次就清出 3 个自建类（ProgressView / TodoPanel / EmptyChart），没有门禁必然再漂', level: 'tech' },
+      { text: '规则与例外已登记进 `DESIGN.md`：中性空态一律品牌色，错误态用 `is-warn`（danger 系）', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.12',
     date: '2026-10-10',

@@ -138,8 +138,8 @@
 
     <!-- 错误态（与空态区分：加载失败可重试） -->
     <div v-else-if="loadError" class="empty-state">
-      <div class="empty-icon warn" aria-hidden="true">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+      <div class="empty-icon-wrap is-warn" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -150,8 +150,8 @@
 
     <!-- 空态 -->
     <div v-else-if="displayJobs.length === 0" class="empty-state">
-      <div class="empty-icon" aria-hidden="true">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+      <div class="empty-icon-wrap" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path d="M21 21l-5.2-5.2 M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -1308,17 +1308,6 @@ onMounted(() => {
   text-align: center;
   padding: 60px 0;
   color: var(--c-text-secondary);
-}
-
-.empty-icon {
-  display: flex;
-  justify-content: center;
-  color: var(--c-text-tertiary);
-  margin-bottom: 12px;
-}
-
-.empty-icon.warn {
-  color: var(--c-warning);
 }
 
 .pagination {

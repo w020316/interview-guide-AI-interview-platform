@@ -15,10 +15,10 @@
 
       <!-- 空态（R3）：不得出现「C 级」「0/14」等任何看起来像真实评估结果的文案 -->
       <div v-else-if="!readiness.hasData" class="readiness-empty" data-readiness-empty>
-        <div class="readiness-empty-icon" aria-hidden="true">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+        <div class="empty-icon-wrap" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2 M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2 M9 12h6 M9 16h4"
-              stroke="var(--brand-primary)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
         <p class="readiness-empty-title">尚未开始准备</p>
@@ -668,16 +668,6 @@ onMounted(async () => {
 .readiness-rule { margin: 16px 0 0; font-size: 12px; color: var(--c-text-tertiary); }
 
 .readiness-empty { text-align: center; padding: 22px 16px 14px; }
-.readiness-empty-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--brand-primary-50);
-  margin-bottom: 12px;
-}
 .readiness-empty-title {
   margin: 0 0 6px;
   font-family: var(--font-title);

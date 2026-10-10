@@ -59,10 +59,10 @@
 
       <!-- 空态：中性提示 + 建议动作（不显示任何「0 条」计数） -->
       <div v-else class="todo-empty" data-todo-empty>
-        <div class="todo-empty-icon" aria-hidden="true">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+        <div class="empty-icon-wrap" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path d="M9 11l3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
-              stroke="var(--brand-primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
         <p class="todo-empty-title">今天没有待处理事项</p>
@@ -406,17 +406,6 @@ function go(path: string) {
 .todo-empty {
   text-align: center;
   padding: 26px 16px 18px;
-}
-
-.todo-empty-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--brand-primary-50);
-  margin-bottom: 12px;
 }
 
 .todo-empty-title {

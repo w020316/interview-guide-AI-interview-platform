@@ -1,14 +1,16 @@
 <template>
   <div class="empty-chart">
-    <svg class="empty-chart__icon" width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M3 3v18h18 M8 17V9 M13 17V5 M18 17v-7"
-        stroke="var(--c-text-quaternary)"
-        stroke-width="1.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    </svg>
+    <div class="empty-icon-wrap" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path
+          d="M3 3v18h18 M8 17V9 M13 17V5 M18 17v-7"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </div>
     <p class="empty-chart__text">{{ text }}</p>
     <button
       v-if="actionText"
@@ -55,8 +57,10 @@ const emit = defineEmits<{ (e: 'action'): void }>()
   text-align: center;
 }
 
-.empty-chart__icon {
-  opacity: 0.75;
+/* 该父容器是 flex+gap:10px，容器自带的 margin-bottom:16px 会叠加成 26px；
+   这里让「图标→文字」与其余 17 处一致为 16px（10+6），文字→按钮仍走 gap */
+.empty-chart .empty-icon-wrap {
+  margin-bottom: 6px;
 }
 
 .empty-chart__text {
