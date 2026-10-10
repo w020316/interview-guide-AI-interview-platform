@@ -591,3 +591,83 @@ describe('禁 emoji / 字符当功能图标（v1.66.2 · R10-U3-06/U3-08）', ()
     ).toEqual([])
   })
 })
+
+describe('可点非按钮元素必须键盘可达（v1.66.3 · DESIGN.md §5）', () => {
+  it('role="button" + tabindex="0" 的元素必须同时具备 @keydown.enter 与 @keydown.space', () => {
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, new Set(['.vue']))) {
+      const tpl0 = extractTemplateBlock(fs.readFileSync(file, 'utf8'))
+      if (tpl0 == null) continue
+      scanned++
+      const r = rel(file)
+      const tpl = blankHtmlComments(tpl0)
+
+      const tagRe = /<[^>]*\btabindex="0"[^>]*>/g
+      let m: RegExpExecArray | null
+      while ((m = tagRe.exec(tpl)) !== null) {
+        const el = m[0]
+        if (!/role="button"/.test(el)) continue
+        const missing: string[] = []
+        if (!/@keydown\.enter/.test(el)) missing.push('@keydown.enter')
+        if (!/@keydown\.space/.test(el)) missing.push('@keydown.space.prevent')
+        if (missing.length) {
+          const line = tpl.slice(0, m.index).split('\n').length
+          bad.push(`${r}:${line}  缺 ${missing.join(' + ')}  →  ${el.replace(/\s+/g, ' ').slice(0, 110)}`)
+        }
+      }
+    }
+
+    expect(scanned, '扫描范围异常：模板数过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(
+      bad,
+      '任何 @click 的非 <button> 元素都必须补 role="button" + tabindex="0" + @keydown.enter + @keydown.space.prevent + :focus-visible（DESIGN.md §5，可访问性要求，不是可选）：\n' +
+        bad.join('\n'),
+    ).toEqual([])
+  })
+})
+
+describe('页面级标题字号统一 28px（v1.66.3 · DESIGN.md §5）', () => {
+  it('媒体查询外的 .page-header h1 / .admin-header h1 必须是 28px', () => {
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, new Set(['.vue']))) {
+      const src = fs.readFileSync(file, 'utf8')
+      const r = rel(file)
+      for (const sm of src.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
+        const css = sm[1].replace(/\/\*[\s\S]*?\*\//g, '')
+        // 按大括号配平切顶层规则；@media/@supports/@layer 整块跳过
+        // （移动端媒体查询内允许降级字号，故只约束媒体查询外的声明）
+        let i = 0
+        while (i < css.length) {
+          const b = css.indexOf('{', i)
+          if (b === -1) break
+          const sel = css.slice(i, b).trim()
+          let j = b + 1
+          let depth = 1
+          while (j < css.length && depth > 0) {
+            if (css[j] === '{') depth++
+            else if (css[j] === '}') depth--
+            j++
+          }
+          const body = css.slice(b + 1, j - 1)
+          if (!/^@(media|supports|layer)/.test(sel) && /\.(page-header|admin-header)\s+h1\s*$/.test(sel)) {
+            scanned++
+            const fm = body.match(/font-size:\s*([^;]+)/)
+            const v = fm ? fm[1].trim() : '(未声明)'
+            if (v !== '28px') bad.push(`${r}  ${sel} -> ${v}`)
+          }
+          i = j
+        }
+      }
+    }
+
+    expect(scanned, '扫描范围异常：页面级 h1 规则过少，守卫可能已静默失效').toBeGreaterThan(10)
+    expect(
+      bad,
+      '页面级标题统一 font-size: 28px（DESIGN.md §5；移动端媒体查询内允许降级）：\n' + bad.join('\n'),
+    ).toEqual([])
+  })
+})
