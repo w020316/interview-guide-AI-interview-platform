@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.15'
+export const CURRENT_VERSION = '1.66.16'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.16',
+    date: '2026-10-10',
+    title: '版本 1.66.16 · 修「AI 设置」三个输入框完全没有样式的问题',
+    items: [
+      { text: '个人中心的「AI 设置（自持 Key）」卡片里，端点 / 模型名 / API Key 三个输入框此前**没有任何样式**——看起来像没做完的裸框，手机上也极难点中。根因是它们用了一个**属于另一个页面**的样式类（跨组件不生效，是个「死类」）。现改用全站统一的输入框组件，外观与其它表单一致', level: 'user' },
+      { text: '实现：ProfileView 的 3 处裸 `<input class="filter-input">` → 设计系统 `BaseInput`（md 尺寸高 45px，同时满足触控 ≥44px 契约）；并清掉那个跨组件死类（该文件里 `filter-input` 现 0 命中）', level: 'tech' },
+      { text: '过程亮点：本轮「补 import」出现过一次漏落盘，被 QA 的**运行时渲染探针**在提交前拦下（`Failed to resolve component: BaseInput`——单测/类型检查/构建四条全绿也照样漏）。已就「给未 import 的组件加门禁」产出实测方案', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.15',
     date: '2026-10-10',

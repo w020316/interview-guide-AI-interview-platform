@@ -134,13 +134,13 @@
         </template>
 
         <label class="ai-field"><span>端点（OpenAI 兼容，https）</span>
-          <input v-model="aiKeyForm.baseUrl" class="filter-input" placeholder="https://open.bigmodel.cn/api/paas/v4" />
+          <BaseInput v-model="aiKeyForm.baseUrl" block placeholder="https://open.bigmodel.cn/api/paas/v4" />
         </label>
         <label class="ai-field"><span>模型名</span>
-          <input v-model="aiKeyForm.model" class="filter-input" placeholder="glm-4-flash" />
+          <BaseInput v-model="aiKeyForm.model" block placeholder="glm-4-flash" />
         </label>
         <label class="ai-field"><span>API Key{{ aiKeyConfigured ? '（留空表示不修改）' : '' }}</span>
-          <input v-model="aiKeyForm.apiKey" type="password" autocomplete="off" class="filter-input"
+          <BaseInput v-model="aiKeyForm.apiKey" type="password" autocomplete="off" block
             placeholder="sk-…" />
         </label>
 
@@ -231,7 +231,7 @@ import {
   type ImportDryRunResult,
   type ImportMode,
 } from '../utils/backup'
-import { BaseButton } from '../components'
+import { BaseButton, BaseInput } from '../components'
 
 const router = useRouter()
 const stats = ref<any>(null)
