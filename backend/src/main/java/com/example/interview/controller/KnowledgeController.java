@@ -4,8 +4,10 @@ import com.example.interview.common.Result;
 import com.example.interview.entity.InterviewQuestionEntity;
 import com.example.interview.service.InterviewSessionService;
 import com.example.interview.service.RagSearchService;
+import com.example.interview.util.TextUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -21,6 +23,7 @@ import java.util.stream.Collectors;
  * - RAG 检索/问答/导入
  * - 关联模拟面试：错题总结、题目汇总
  */
+@Slf4j
 @Tag(name = "知识库", description = "RAG 检索、问答、批量导入、错题总结、题目汇总")
 @RestController
 @RequestMapping("/api/knowledge")
@@ -71,10 +74,24 @@ public class KnowledgeController {
         // 限制单次导入数量，防止滥用
         if (documents.size() > 100) return Result.error(400, "单次最多导入 100 条文档");
         // B-08：与 batchImport 的 8KB/条一致地截断单条文档，防止超大文本直送 embedding
+        // R10-04：截断必须**可见**（记 WARN）——「静默生效的上限」是本项目反复复发的缺陷模式，
+        //          否则用户看到「成功导入 N 条」却不知道内容已被砍掉。
+        // R10-F06：用 TextUtil.truncate 而非 String.substring —— 后者按 UTF-16 码元切，
+        //          可能截在 emoji/生僻字的代理对中间，产生孤立 surrogate（坏字符）。
         List<String> safeDocs = new ArrayList<>(documents.size());
+        int truncatedCount = 0;
         for (String doc : documents) {
             if (doc == null || doc.isBlank()) continue;
-            safeDocs.add(doc.length() > MAX_DOC_CHARS ? doc.substring(0, MAX_DOC_CHARS) : doc);
+            if (doc.length() > MAX_DOC_CHARS) {
+                truncatedCount++;
+                safeDocs.add(TextUtil.truncate(doc, MAX_DOC_CHARS, ""));
+            } else {
+                safeDocs.add(doc);
+            }
+        }
+        if (truncatedCount > 0) {
+            log.warn("知识导入：{} 条文档超过 {} 字上限，已截断后入库（userId={}）",
+                    truncatedCount, MAX_DOC_CHARS, currentUserId());
         }
         if (safeDocs.isEmpty()) return Result.error(400, "文档列表不能为空");
         int imported = ragSearchService.importKnowledge(safeDocs, currentUserId());
@@ -97,6 +114,14 @@ public class KnowledgeController {
         if (!(chunksRaw instanceof List<?> rawChunks)) {
             return Result.error(400, "chunks 必须是字符串数组");
         }
+        // R10-03：上面只校验了**外层容器**类型。泛型擦除让下面的 (List<String>) 强转不做任何检查，
+        // 若元素是数字/对象（如 {"chunks":[1,2]}），后续 for-each 的隐式强转会抛
+        // ClassCastException → HTTP 500（项目惯例应为 400）。故逐个校验元素类型。
+        for (Object c : rawChunks) {
+            if (!(c instanceof String)) {
+                return Result.error(400, "chunks 必须是字符串数组");
+            }
+        }
         @SuppressWarnings("unchecked")
         List<String> chunks = (List<String>) rawChunks;
         if (chunks.isEmpty()) return Result.error(400, "chunks 不能为空");
@@ -108,7 +133,8 @@ public class KnowledgeController {
         for (String chunk : chunks) {
             if (chunk == null || chunk.isBlank()) continue;
             // 限制单个分块大小（8KB），防止超大文本拖慢向量化
-            String safeChunk = chunk.length() > 8192 ? chunk.substring(0, 8192) : chunk;
+            // R10-F06：同 importKnowledge，用 TextUtil.truncate 避免截断代理对产生坏字符
+            String safeChunk = chunk.length() > 8192 ? TextUtil.truncate(chunk, 8192, "") : chunk;
             docs.add(Document.builder()
                     .id(UUID.randomUUID().toString())
                     .text(safeChunk)

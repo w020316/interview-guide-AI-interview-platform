@@ -260,6 +260,19 @@ class KnowledgeControllerTest {
         }
 
         @Test
+        @DisplayName("chunks 元素非字符串返回 400（R10-03：泛型擦除使强转不做检查，元素类型须逐个校验）")
+        void batchImport_nonStringElements_returns400() throws Exception {
+            String body = objectMapper.writeValueAsString(Map.of("chunks", List.of(1, 2)));
+
+            mockMvc.perform(post("/api/knowledge/import/batch")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("chunks 必须是字符串数组"));
+        }
+
+        @Test
         @DisplayName("chunks 超过 100 返回 400")
         void batchImport_over100Chunks_returns400() throws Exception {
             List<String> chunks = java.util.stream.Stream.generate(() -> "chunk").limit(101).toList();
