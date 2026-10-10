@@ -151,8 +151,22 @@ public class InterviewController {
         return auth.getPrincipal().toString();
     }
 
-    /** 取消仍在调度的心跳任务（holder 可能为空——心跳尚未建立时已断开/超时） */
-    private static void cancelHeartbeat(java.util.concurrent.ScheduledFuture<?>[] holder) {
+    /**
+     * 取消仍在调度的心跳任务，并标记「客户端已离开」。
+     *
+     * <p>⚠️ v1.66.1（R10-02）：此前只取消 holder 里的 future。但 {@code heartbeatHolder[0]}
+     * 是在**异步任务体内**才被赋值的，而三个回调在 {@code submit} 之前就已注册 —— 若客户端在
+     * executor 任务真正开跑前断开（线程池排队时完全可能），此处拿到的是 {@code null}，
+     * 取消变成空操作；随后任务仍会 {@code scheduleAtFixedRate} 出一个**无人取消的 15s 周期任务**，
+     * 永久驻留调度池（任务体内只是 {@code return} 空转，**不会自我取消**）。
+     * 这正是 B-03 想根治的同一类泄漏。
+     *
+     * <p>现在改为「双保险」：① 置 {@code clientGone} 标志，任务体在调度前与每次触发时都自检；
+     * ② 能取消就顺手取消。
+     */
+    private static void cancelHeartbeat(java.util.concurrent.ScheduledFuture<?>[] holder,
+                                        java.util.concurrent.atomic.AtomicBoolean clientGone) {
+        clientGone.set(true);
         if (holder[0] != null) {
             holder[0].cancel(false);
         }
@@ -332,6 +346,9 @@ public class InterviewController {
         final Disposable[] disposableHolder = new Disposable[1];
         // 心跳 future 句柄：客户端断开/超时/错误时需取消，否则 15s 周期任务在调度池中空跑
         final java.util.concurrent.ScheduledFuture<?>[] heartbeatHolder = new java.util.concurrent.ScheduledFuture<?>[1];
+        // R10-02：「客户端已离开」标志。回调在 submit 之前注册，而 holder 在任务体内才赋值——
+        // 中间窗口内 cancel 是空操作。故用独立标志让异步任务在调度前先自检。
+        final java.util.concurrent.atomic.AtomicBoolean clientGone = new java.util.concurrent.atomic.AtomicBoolean(false);
 
         // 双层并发令牌：全局上限 + 每用户上限，超出则返回错误事件
         String userId = currentUserId();
@@ -356,7 +373,7 @@ public class InterviewController {
         // 可用许可只增不减，SSE 并发上限逐渐失效
         emitter.onCompletion(() -> {
             heartbeatRunning.set(false);
-            cancelHeartbeat(heartbeatHolder);
+            cancelHeartbeat(heartbeatHolder, clientGone);
             sseGuard.release(userId);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
@@ -364,7 +381,7 @@ public class InterviewController {
         });
         emitter.onTimeout(() -> {
             heartbeatRunning.set(false);
-            cancelHeartbeat(heartbeatHolder);
+            cancelHeartbeat(heartbeatHolder, clientGone);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -372,7 +389,7 @@ public class InterviewController {
         });
         emitter.onError(e -> {
             heartbeatRunning.set(false);
-            cancelHeartbeat(heartbeatHolder);
+            cancelHeartbeat(heartbeatHolder, clientGone);
             if (disposableHolder[0] != null && !disposableHolder[0].isDisposed()) {
                 disposableHolder[0].dispose();
             }
@@ -380,13 +397,26 @@ public class InterviewController {
 
         sseExecutor.submit(() -> {
             try {
+                // R10-02：客户端可能在任务真正开跑前就断开了（回调已置 clientGone）——
+                // 此时绝不能再置 heartbeatRunning=true 或起心跳，否则会留下无人取消的周期任务
+                if (clientGone.get()) {
+                    return;
+                }
                 // 立即发送开始事件，给前端即时反馈
                 emitter.send(SseEmitter.event().name("start").data(""));
                 heartbeatRunning.set(true);
 
                 // 启动心跳：每 15s 发送注释行，防止代理超时
                 var heartbeatFuture = heartbeat.scheduleAtFixedRate(() -> {
-                    if (!heartbeatRunning.get()) return;
+                    // R10-02：自检——一旦已停止（客户端离开 / 发送失败），**自行取消**，不再空转。
+                    // 此前只 `return`，任务会永远留在调度池里每 15s 触发一次。
+                    if (!heartbeatRunning.get()) {
+                        var self = heartbeatHolder[0];
+                        if (self != null) {
+                            self.cancel(false);
+                        }
+                        return;
+                    }
                     try {
                         emitter.send(SseEmitter.event().comment("ping"));
                     } catch (IOException e) {
