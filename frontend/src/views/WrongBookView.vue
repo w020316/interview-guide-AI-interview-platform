@@ -16,11 +16,10 @@
     <!-- 阈值筛选 -->
     <section class="filter-bar fade-in-up">
       <span class="filter-label">错题阈值：</span>
-      <div class="radio-row">
+      <div class="filter-chips">
         <button
           v-for="t in [50, 60, 70]"
           :key="t"
-          class="radio-chip"
           :class="{ active: threshold === t }"
           @click="threshold = t"
         >
@@ -191,10 +190,13 @@ function difficultyText(d: string) {
 
 .filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); padding: 14px 18px; margin-bottom: 18px; box-shadow: var(--shadow-sm); }
 .filter-label { font-size: 13px; color: var(--c-text-secondary); }
-.radio-row { display: flex; gap: 8px; }
-.radio-chip { padding: 5px 12px; font-size: 12px; font-weight: 500; color: var(--c-text-tertiary); background: var(--c-bg-alt); border: 1px solid var(--c-border); border-radius: 999px; cursor: pointer; transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast); }
-.radio-chip:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
-.radio-chip.active { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--c-on-primary); }
+/* 切换控件 · 独立胶囊按钮（DESIGN.md §5「带计数的筛选」idiom）
+ * v1.66.3：由 .radio-row / .radio-chip 收敛而来 —— 此前是第 4 种写法，
+ * 与 JobsView 的 .filter-chips 同形态却各起一名，命名掩盖了「同一 idiom」。 */
+.filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-chips button { padding: 8px 18px; font-size: 14px; color: var(--c-text); background: transparent; border: 1px solid var(--c-border); border-radius: 999px; cursor: pointer; transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast); }
+.filter-chips button:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
+.filter-chips button.active { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--c-on-primary); }
 .filter-note { margin-left: auto; font-size: 12px; color: var(--c-text-tertiary); }
 
 .list { display: flex; flex-direction: column; gap: 12px; }
