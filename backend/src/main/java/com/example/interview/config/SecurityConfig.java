@@ -95,8 +95,13 @@ public class SecurityConfig {
                     "/swagger-ui.html", "/swagger-ui/**",
                     "/v3/api-docs/**", "/v3/api-docs"
                 ).permitAll()
-                // Actuator 健康检查公开（prometheus/metrics 需认证）
+                // Actuator 健康检查公开（info 轻量；其余需认证）
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                // R10-F02（v1.66.1）：/actuator/metrics 暴露 JVM / HTTP / 缓存 / SSE 水位等
+                // **运营内部指标**，只对管理员开放。此前是 authenticated() —— 任何已登录的
+                // 普通用户都能读到这些数据（对终端用户无任何价值，只增加信息暴露面）。
+                // ⚠️ 这是对 v1.13.0「metrics 需认证」这一约定的**收紧**，SecurityConfigTest 已同步。
+                .requestMatchers("/actuator/metrics", "/actuator/metrics/**").hasRole("ADMIN")
                 .requestMatchers("/actuator/**").authenticated()
                 // 其他所有接口需认证
                 .anyRequest().authenticated()

@@ -36,7 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <ul>
  *   <li>/api/info 公开访问（permitAll）</li>
  *   <li>/actuator/health、/actuator/info 公开（permitAll）</li>
- *   <li>/actuator/metrics 及其他 /actuator/** 需认证</li>
+ *   <li>/actuator/metrics 需 <b>ROLE_ADMIN</b>（v1.66.1 起；此前只需认证），
+ *       其余 /actuator/** 需认证</li>
  *   <li>其余 /api/** 需认证，未认证返回 401 + JSON（自定义 authenticationEntryPoint）</li>
  *   <li>JwtAuthFilter 正确解析 Bearer token 并写入 SecurityContext</li>
  * </ul>
@@ -211,6 +212,35 @@ class SecurityConfigTest {
         void protectedApi_noAuthHeader_returns401() throws Exception {
             mockMvc.perform(get("/api/test-secure"))
                     .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("R10-F02：已登录普通用户访问 /actuator/metrics 返回 403（v1.66.1 收紧为仅管理员）")
+        void actuatorMetrics_withUserRole_returns403() throws Exception {
+            when(jwtUtil.isValid(anyString())).thenReturn(true);
+            when(jwtUtil.extractUserId(anyString())).thenReturn("1");
+            when(jwtUtil.extractRole(anyString())).thenReturn("ROLE_USER");
+
+            mockMvc.perform(get("/actuator/metrics")
+                            .header("Authorization", "Bearer user-token"))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("R10-F02：管理员访问 /actuator/metrics 不被拒绝（不是 401/403）")
+        void actuatorMetrics_withAdminRole_notRejected() throws Exception {
+            when(jwtUtil.isValid(anyString())).thenReturn(true);
+            when(jwtUtil.extractUserId(anyString())).thenReturn("4");
+            when(jwtUtil.extractRole(anyString())).thenReturn("ROLE_ADMIN");
+
+            mockMvc.perform(get("/actuator/metrics")
+                            .header("Authorization", "Bearer admin-token"))
+                    .andExpect(result -> {
+                        int s = result.getResponse().getStatus();
+                        if (s == 401 || s == 403) {
+                            throw new AssertionError("/actuator/metrics 对管理员不应返回 " + s);
+                        }
+                    });
         }
     }
 
