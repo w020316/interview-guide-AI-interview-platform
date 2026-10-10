@@ -26,7 +26,11 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>键已含 userId（调用方保证），不会跨用户串扰。</li>
  * </ul>
  *
- * <p>线程安全：内部用 {@code synchronizedMap} 包装访问序 LRU（LinkedHashMap accessOrder=true）。
+ * <p>线程安全（v1.66.1 · B-09 收口）：内部是裸 {@code LinkedHashMap}（accessOrder=true）
+ * + **显式 {@code synchronized(store)}**。此前用 {@code Collections.synchronizedMap} 包装，
+ * 但它的锁只覆盖单次方法调用，而访问序 {@code get()} 本身就会**结构性重排链表** ——
+ * 一旦出现「遍历 + 读取」的复合操作即抛 {@link java.util.ConcurrentModificationException}。
+ * **外部不要直接迭代该 map**，需要遍历时在锁内取快照。
  */
 public final class LocalPromptCache {
 
