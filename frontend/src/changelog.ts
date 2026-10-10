@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.6'
+export const CURRENT_VERSION = '1.66.7'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.7',
+    date: '2026-10-10',
+    title: '版本 1.66.7 · 修正「未完成面试」提示：只提示真正能继续的面试',
+    items: [
+      { text: '上一版新增的「继续作答」入口，此前可能指向一个还没有题目的会话 —— 点进去只会提示「暂无题目」再弹回来。现在只提示真正能继续的面试', level: 'user' },
+      { text: '判定「可继续」不再只看会话状态，还会确认该会话确实有题目（真实站点验证时发现存在「进行中但没有题目」的会话）', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.6',
     date: '2026-10-10',
