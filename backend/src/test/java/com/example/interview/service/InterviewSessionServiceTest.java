@@ -56,6 +56,25 @@ class InterviewSessionServiceTest {
     }
 
     @Test
+    @DisplayName("sessionJobDescriptions (R10-05): 走两列投影；同 sessionId 保留首个；null 岗位回填「未指定岗位」")
+    void sessionJobDescriptions_projectsAndFillsDefault() {
+        var p1 = mock(InterviewSessionRepository.SessionJobProjection.class);
+        when(p1.getSessionId()).thenReturn("s1");
+        when(p1.getJobDescription()).thenReturn(null);      // 岗位为 null → 回填默认文案
+        var p2 = mock(InterviewSessionRepository.SessionJobProjection.class);
+        when(p2.getSessionId()).thenReturn("s1");           // 同 sessionId 重复 → 保留首个
+        when(p2.getJobDescription()).thenReturn("Java 后端");
+        var p3 = mock(InterviewSessionRepository.SessionJobProjection.class);
+        when(p3.getSessionId()).thenReturn("s2");
+        when(p3.getJobDescription()).thenReturn("前端");
+        when(sessionRepository.findSessionIdAndJobByUserId("user1")).thenReturn(List.of(p1, p2, p3));
+
+        Map<String, String> map = service.sessionJobDescriptions("user1");
+
+        assertThat(map).containsEntry("s1", "未指定岗位").containsEntry("s2", "前端").hasSize(2);
+    }
+
+    @Test
     @DisplayName("listByUser: 应按用户查询历史")
     void listByUser_shouldReturnList() {
         when(sessionRepository.findByUserIdOrderByCreatedAtDesc("user1"))
