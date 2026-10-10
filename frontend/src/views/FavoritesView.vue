@@ -153,7 +153,7 @@
         共 {{ items.length }} 道收藏 · 点击卡片展开参考答案
       </div>
       <div v-for="f in items" :key="f.id" class="fav-card fade-in-up">
-        <div class="fav-head" role="button" tabindex="0" @click="toggleOpen(f.id)" @keydown.enter="toggleOpen(f.id)">
+        <div class="fav-head" role="button" tabindex="0" @click="toggleOpen(f.id)" @keydown.enter="toggleOpen(f.id)" @keydown.space.prevent="toggleOpen(f.id)">
           <div class="fav-title">{{ f.question }}</div>
           <div class="fav-tags">
             <BaseTag v-if="f.category" variant="info" size="sm">{{ f.category }}</BaseTag>
