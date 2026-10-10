@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.1'
+export const CURRENT_VERSION = '1.66.2'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.2',
+    date: '2026-10-10',
+    title: '版本 1.66.2 · 招聘广场不再把已截止的岗位排在前面，生成题目耗时提示也更一致',
+    items: [
+      { text: '招聘广场里，已经过了截止日期的岗位不再排在还在招的岗位前面 —— 以前首屏可能先看到投不了的岗位，现在已截止的会沉到最后', level: 'user' },
+      { text: '模拟面试生成题目时的耗时提示前后统一了：进度步骤与下方说明此前一处写「20 秒至 2 分钟」、一处写「2-3 分钟」，同屏自相矛盾，现在都按「通常 20 秒至 2 分钟」', level: 'user' },
+      { text: '岗位详情里的地点、学历、经验、行业，以及学习中心空态、简历解析告警等处的图标，从各平台不一的 emoji 换成了统一的内联图标，暗色模式下不再突兀，与全站风格一致', level: 'user' },
+    ],
+  },
   {
     version: '1.66.1',
     date: '2026-10-10',
