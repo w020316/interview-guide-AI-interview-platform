@@ -10,6 +10,25 @@
         <span>当前处于离线状态，部分功能暂不可用</span>
       </div>
 
+      <!-- 新版本横幅（v1.66.4）：更新入口此前只在页脚，用户几乎看不到 ——
+           实测有用户跨 4 个版本仍卡在旧包上（PWA prompt 模式的更新必须由用户触发，
+           但「藏在页脚的入口」等于没有）。提到顶部与离线横幅同域，仍需主动点击才刷新，
+           不违反「绝不静默刷新、不打断作答」的既有约定。 -->
+      <div v-if="needRefresh" class="update-banner" role="status" aria-live="polite">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M20.5 12a8.5 8.5 0 1 1-2.5-6 M20.5 3.5v5h-5"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>有新版本可用</span>
+        <button class="update-banner-action" @click="applyUpdate">立即刷新</button>
+        <button class="update-banner-close" aria-label="稍后再说" @click="dismissUpdate">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12 M18 6L6 18" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
       <!-- 顶部导航栏 -->
       <header ref="navRef" class="navbar" :class="{ scrolled }">
         <div class="nav-inner">
@@ -283,7 +302,7 @@ import { CURRENT_VERSION } from './changelog'
 import { theme, toggleTheme as toggle } from './theme'
 import { ICONS, primaryNav, toolNav, buildMobileGroups } from './navigation'
 import type { NavItem } from './navigation'
-import { needRefresh, isOnline, applyUpdate } from './utils/pwa'
+import { needRefresh, isOnline, applyUpdate, dismissUpdate } from './utils/pwa'
 
 const router = useRouter()
 const route = useRoute()
@@ -1135,6 +1154,61 @@ function logout() {
   color: var(--c-warning, inherit);
   background: var(--c-bg-alt);
   border-bottom: 1px solid var(--c-border-light);
+}
+
+/* ── PWA：新版本横幅（v1.66.4）──
+ * 为什么要有它：`.update-link` 只在页脚，实测有用户跨 4 个版本仍卡在旧包上
+ * （服务端已是最新，但 PWA prompt 模式的更新必须由用户触发，而入口看不见）。
+ * 因此把「有新版本」提到顶部与离线横幅同域 —— 仍只提示、不静默刷新。
+ * 配色走品牌色底 + --c-on-primary（两主题对比度均由既有门禁锁定 ≥4.5:1）。 */
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 7px 16px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--c-on-primary);
+  background: var(--brand-primary);
+}
+
+.update-banner-action {
+  padding: 3px 12px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--brand-primary);
+  background: var(--c-on-primary);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.update-banner-action:hover {
+  opacity: 0.88;
+}
+
+.update-banner-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--c-on-primary);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity var(--transition-fast);
+}
+
+.update-banner-close:hover {
+  opacity: 1;
 }
 
 /* ── 页面切换动画 ── */
