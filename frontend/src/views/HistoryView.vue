@@ -64,6 +64,11 @@
             </div>
           </div>
           <div class="session-actions">
+            <!-- N1 断点续面：仅「进行中」的会话给「继续作答」——
+                 此前这里只有「查看题目 / 复盘报告」，未完成的面试没有回到答题现场的入口 -->
+            <BaseButton v-if="isResumableSession(s.status)" variant="gradient" size="sm" @click.stop="resumeInterview(s)">
+              继续作答
+            </BaseButton>
             <BaseButton variant="ghost" size="sm" :loading="loadingId === s.sessionId" @click.stop="loadQuestions(s.sessionId)">
               {{ qMap[s.sessionId] ? '收起' : '查看题目' }}
             </BaseButton>
@@ -115,12 +120,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
 import ReportPanel from '../components/ReportPanel.vue'
 import { EMPTY } from '../utils/format'
+import { isResumableSession } from '../utils/interviewResume'
 import type { ReportEvalInput } from '../utils/reportView'
+
+const router = useRouter()
 
 interface Session {
   sessionId: string
@@ -235,6 +244,11 @@ function fmtDate(dt: string) {
   const d = new Date(dt)
   if (isNaN(d.getTime())) return EMPTY
   return d.toLocaleString('zh-CN', { hour12: false })
+}
+
+/** N1 断点续面：跳到面试页并从该会话的断点继续（InterviewView 读 ?sessionId= 后自动定位到第一道未作答的题） */
+function resumeInterview(s: Session) {
+  router.push({ path: '/interview', query: { sessionId: s.sessionId } })
 }
 
 function statusClass(status: string) {

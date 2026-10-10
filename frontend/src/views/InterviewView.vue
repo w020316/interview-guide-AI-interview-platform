@@ -7,6 +7,17 @@
 
     <!-- Step 1: 创建会话 -->
     <div v-if="!sessionId" class="setup-card fade-in-up">
+      <!-- N1 断点续面：设置页提示「有未完成的面试」。
+           此前只能从「面试历史」回看题目与复盘报告，**没有回到答题现场的入口**，
+           用户会以为未完成的面试只能作废。 -->
+      <div v-if="ongoingSession" class="resume-note" role="status">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 8v4l3 3 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>{{ ongoingLabel }}</span>
+        <button class="resume-note-action" @click="goResume">继续作答</button>
+      </div>
       <div class="form-grid">
         <div class="field-row">
           <label>目标岗位</label>
@@ -275,6 +286,7 @@ import { createSpeechRecorder, isSpeechSupported } from '../utils/speech'
 import { compareWithHistory, suggestNextTarget } from '../utils/reportCompare'
 import { nextGenProgress } from '../utils/genProgress'
 import { EMPTY } from '../utils/format'
+import { firstUnansweredIndex, isResumableSession } from '../utils/interviewResume'
 import { buildReportView, buildScopeText, findDim, type ReportCompareView, type ReportEvalInput } from '../utils/reportView'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 import ReportPanel from '../components/ReportPanel.vue'
@@ -468,8 +480,48 @@ onMounted(() => {
     const q = { ...route.query }
     delete q.sessionId
     router.replace({ path: '/interview', query: q }).catch(() => {})
+  } else {
+    // N1：没指定会话时，看看有没有未完成的面试可以直接继续
+    loadOngoingSession()
   }
 })
+
+/**
+ * N1 断点续面：设置页的「未完成面试」提示。
+ *
+ * <p>为什么需要它：此前只能从「面试历史」回看题目与复盘报告，**没有回到答题现场的入口**，
+ * 用户会以为未完成的面试只能作废。
+ *
+ * <p>失败静默 —— 这只是附加信息，不该因为一个列表接口失败就打扰用户或阻塞开始面试。
+ */
+const ongoingSession = ref<{ sessionId: string; jobDescription: string } | null>(null)
+
+async function loadOngoingSession() {
+  try {
+    const list = (await api.get('/api/session/list')) as unknown as Array<{
+      sessionId: string
+      jobDescription?: string
+      status?: string
+    }>
+    const found = (Array.isArray(list) ? list : []).find((s) => isResumableSession(s.status))
+    ongoingSession.value = found
+      ? { sessionId: found.sessionId, jobDescription: found.jobDescription || '' }
+      : null
+  } catch {
+    ongoingSession.value = null
+  }
+}
+
+const ongoingLabel = computed(() => {
+  const s = ongoingSession.value
+  if (!s) return ''
+  return `你有一次未完成的面试${s.jobDescription ? `（${s.jobDescription}）` : ''}`
+})
+
+function goResume() {
+  const s = ongoingSession.value
+  if (s) resumeSession(s.sessionId)
+}
 
 /** 载入一个已存在会话的题目集并进入答题（不复用旧回答，从头作答） */
 async function resumeSession(targetId: string) {
@@ -490,15 +542,22 @@ async function resumeSession(targetId: string) {
     }
     sessionId.value = targetId
     questions.value = qs
-    qIndex.value = 0
+    // N1 断点续面：从「第一道未作答的题」继续，而不是永远从第 1 题重来。
+    // 边界（跳题 / 全部答完 / 0 分算已答）由 utils/interviewResume 的单测锁定。
+    qIndex.value = firstUnansweredIndex(qs)
     if (meta?.jobDescription) {
       jobDesc.value = meta.jobDescription
     }
     // P2-26：记录该会话「此前已作答」的题数。复盘报告的 sessionEvals 是页面级状态，
     // 只统计本次新作答，若不把会话累计数一并展示，报告会显得「丢了题」
     //（实测：服务端 4 题、其中 2 题早有得分，报告却写「基于本次 1 道作答」）。
-    historyAnsweredCount.value = qs.filter((q) => typeof q.evaluationScore === 'number').length
-    ElMessage.success(`已载入 ${qs.length} 道题，开始面试！`)
+    const answered = qs.filter((q) => typeof q.evaluationScore === 'number').length
+    historyAnsweredCount.value = answered
+    ElMessage.success(
+      answered > 0 && answered < qs.length
+        ? `已载入 ${qs.length} 道题，从第 ${qIndex.value + 1} 题继续（前 ${answered} 题已作答）`
+        : `已载入 ${qs.length} 道题，开始面试！`,
+    )
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '载入面试失败'))
     router.replace('/interview')
@@ -1216,6 +1275,38 @@ onUnmounted(() => {
   border-radius: var(--radius-lg);
   padding: 32px;
   box-shadow: var(--shadow-sm);
+}
+
+/* N1 断点续面：设置页的「未完成面试」提示条（失败时整条不渲染） */
+.resume-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--c-text);
+  background: var(--brand-primary-50);
+  border: 1px solid var(--brand-primary-200);
+  border-radius: var(--radius-md);
+}
+
+.resume-note-action {
+  margin-left: auto;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-on-primary);
+  background: var(--brand-primary);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.resume-note-action:hover {
+  opacity: 0.9;
 }
 
 .form-grid {
