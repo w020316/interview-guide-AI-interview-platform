@@ -627,9 +627,9 @@ async function doFollowUp(s: StoryItem) {
 .apply-advice { background: var(--brand-primary-light); border: 1px solid var(--c-border-light); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 16px; }
 .advice-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .advice-score { font-family: var(--font-mono); font-size: 22px; font-weight: 700; }
-.advice-score.good { color: var(--c-success, #15803d); }
+.advice-score.good { color: var(--c-success); }
 .advice-score.mid { color: var(--c-warning); }
-.advice-score.low { color: var(--c-danger, #dc2626); }
+.advice-score.low { color: var(--c-danger); }
 .advice-section { font-size: 13px; line-height: 1.7; color: var(--c-text-secondary); margin-bottom: 6px; }
 .advice-label { font-weight: 600; color: var(--c-text); }
 .advice-note { font-size: 12px; color: var(--c-text-quaternary); margin-top: 6px; }
@@ -639,7 +639,7 @@ async function doFollowUp(s: StoryItem) {
 .story-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .story-title { font-size: 15px; font-weight: 700; color: var(--c-text); }
 .story-actions { display: flex; gap: 14px; }
-.link-btn.danger { color: var(--c-danger, #dc2626); }
+.link-btn.danger { color: var(--c-danger); }
 .story-grid { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 8px; }
 .story-item { font-size: 13px; line-height: 1.7; color: var(--c-text-secondary); display: flex; gap: 8px; align-items: baseline; }
 .s-tag { flex: none; width: 34px; font-size: 11px; font-weight: 600; text-align: center; padding: 1px 0; border-radius: var(--radius-sm); background: var(--brand-primary-50); color: var(--brand-primary); }

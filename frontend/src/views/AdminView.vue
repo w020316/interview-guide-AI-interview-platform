@@ -1274,7 +1274,7 @@ onMounted(() => {
 .legend i {
   width: 9px;
   height: 9px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
 
@@ -1299,7 +1299,7 @@ onMounted(() => {
   display: inline-block;
   width: 9px;
   height: 9px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   margin-right: 6px;
 }
 
@@ -1334,7 +1334,7 @@ onMounted(() => {
 
 .trend-bar {
   width: 12px;
-  border-radius: 3px 3px 0 0;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
   transition: height var(--transition-base);
 }
 

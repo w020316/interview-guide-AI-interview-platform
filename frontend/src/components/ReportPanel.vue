@@ -225,7 +225,7 @@ function clampPct(v: number) {
   color: var(--c-text-secondary);
   width: 32px;
   height: 32px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font-size: 14px;
   cursor: pointer;
   display: inline-flex;
@@ -293,13 +293,13 @@ function clampPct(v: number) {
 .dim-bar {
   height: 6px;
   background: var(--brand-primary-50);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
   margin-bottom: 10px;
 }
 .dim-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   transition: width 0.6s ease;
 }
 .dim-row {
@@ -338,7 +338,7 @@ function clampPct(v: number) {
   font-size: 12px;
   font-weight: 600;
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   color: #fff;
 }
 .compare-badge.improved { background: var(--score-excellent); }
@@ -380,7 +380,7 @@ function clampPct(v: number) {
 .rq-index {
   width: 20px;
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--brand-primary-light);
   color: var(--brand-primary);
   font-size: 12px;

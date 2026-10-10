@@ -919,7 +919,7 @@ function logout() {
 .menu-toggle span {
   display: block;
   height: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--c-text-secondary);
   transition: transform var(--transition-fast), opacity var(--transition-fast);
 }
@@ -1073,7 +1073,7 @@ function logout() {
   color: var(--brand-primary);
   background: var(--brand-primary-light);
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   cursor: pointer;
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   letter-spacing: 0.2px;
@@ -1092,8 +1092,8 @@ function logout() {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--c-danger, #f56c6c);
-  box-shadow: 0 0 0 1.5px var(--c-bg, #fff);
+  background: var(--c-danger);
+  box-shadow: 0 0 0 1.5px var(--c-bg);
 }
 
 /* ── PWA：新版本提示（第三批 D）── */
@@ -1107,10 +1107,10 @@ function logout() {
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 600;
-  color: var(--c-warning, inherit);
+  color: var(--c-warning);
   background: var(--c-bg-alt);
   border: 1px solid var(--c-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   cursor: pointer;
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   letter-spacing: 0.2px;
@@ -1151,7 +1151,7 @@ function logout() {
   font-family: var(--font-sans);
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--c-warning, inherit);
+  color: var(--c-warning);
   background: var(--c-bg-alt);
   border-bottom: 1px solid var(--c-border-light);
 }
@@ -1182,7 +1182,7 @@ function logout() {
   color: var(--brand-primary);
   background: var(--c-on-primary);
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   cursor: pointer;
   transition: opacity var(--transition-fast);
 }

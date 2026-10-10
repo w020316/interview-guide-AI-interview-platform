@@ -672,8 +672,8 @@ function gapStatusClass(status: string): string {
   font-size: 12px;
   line-height: 1.6;
   color: var(--c-text-secondary);
-  background: var(--c-warning-light, rgba(255, 176, 32, 0.1));
-  border: 1px solid var(--c-warning-border, rgba(255, 176, 32, 0.3));
+  background: var(--c-warning-light);
+  border: 1px solid var(--c-warning-border);
   border-radius: var(--radius-sm);
 }
 
@@ -915,7 +915,7 @@ function gapStatusClass(status: string): string {
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   letter-spacing: 0.3px;
   border: 1px solid transparent;
 }

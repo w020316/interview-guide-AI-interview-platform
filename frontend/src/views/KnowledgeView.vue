@@ -828,7 +828,7 @@ function formatTime(t?: string) {
   padding: 3px 10px;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   letter-spacing: 0.3px;
   border: 1px solid transparent;
 }
@@ -986,14 +986,14 @@ function formatTime(t?: string) {
 .rate-bar {
   height: 8px;
   background: var(--brand-primary-50);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
 }
 
 .rate-fill {
   height: 100%;
   background: var(--brand-primary);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   transition: width 0.6s ease;
 }
 
@@ -1038,14 +1038,14 @@ function formatTime(t?: string) {
 .group-bar {
   height: 6px;
   background: var(--c-bg-alt);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
   margin-bottom: 4px;
 }
 
 .group-bar-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   transition: width 0.6s ease;
 }
 
@@ -1093,8 +1093,8 @@ function formatTime(t?: string) {
   gap: 8px;
   margin: 0 0 16px;
   padding: 12px 14px;
-  border-radius: var(--radius-md, 10px);
-  background: var(--c-warning-light, #fdf6ec);
+  border-radius: var(--radius-md);
+  background: var(--c-warning-light);
   color: var(--c-warning);
   font-size: 13px;
   line-height: 1.6;

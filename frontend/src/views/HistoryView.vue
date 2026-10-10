@@ -438,7 +438,7 @@ function statusText(status: string) {
   padding: 2px 10px;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 }
 
 .status-success {
@@ -540,7 +540,7 @@ function statusText(status: string) {
   color: var(--c-accent);
   background: var(--c-accent-soft);
   border: 1px solid var(--c-accent-line);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 }
 
 /* ── 按钮（已迁移至 BaseButton，保留响应式） ── */

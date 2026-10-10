@@ -873,7 +873,7 @@ onMounted(() => {
 .filter-chips button {
   padding: 8px 18px;
   border: 1px solid var(--c-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: transparent;
   cursor: pointer;
   font-size: 14px;
@@ -944,7 +944,7 @@ onMounted(() => {
   width: 30px;
   height: 30px;
   border: 1px solid var(--c-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--c-text-secondary);
   cursor: pointer;
@@ -964,7 +964,7 @@ onMounted(() => {
 .filter-card {
   background: var(--c-surface);
   border: 1px solid var(--c-border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 16px;
   margin-bottom: 20px;
   display: flex;
@@ -984,7 +984,7 @@ onMounted(() => {
   min-width: 130px;
   padding: 9px 12px;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--c-bg-alt);
   color: var(--c-text);
   font-size: 14px;
@@ -1011,7 +1011,7 @@ onMounted(() => {
 .refresh-btn {
   padding: 8px 14px;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--c-text);
   cursor: pointer;
@@ -1090,7 +1090,7 @@ onMounted(() => {
   gap: 16px;
   background: var(--c-surface);
   border: 1px solid var(--c-border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 18px 20px;
   cursor: pointer;
   transition: box-shadow 0.2s, transform 0.2s;
@@ -1169,7 +1169,7 @@ onMounted(() => {
 
 .tag {
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font-size: 12px;
   background: var(--brand-primary-50);
   color: var(--brand-primary); /* I3：标签回归品牌色 */
@@ -1206,7 +1206,7 @@ onMounted(() => {
 
 .apply-btn {
   padding: 7px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--brand-primary);
   color: var(--brand-primary);
   font-size: 13px;
@@ -1289,7 +1289,7 @@ onMounted(() => {
 .pagination button {
   padding: 8px 18px;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--c-text);
   cursor: pointer;
@@ -1319,7 +1319,7 @@ onMounted(() => {
 .modal-card {
   position: relative;
   background: var(--c-surface);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   max-width: 640px;
   width: 100%;
   max-height: 82vh;
@@ -1426,7 +1426,7 @@ onMounted(() => {
 .match-panel { flex-direction: column; align-items: stretch; gap: 8px; }
 .match-panel .filter-input.ta { resize: vertical; min-height: 68px; line-height: 1.6; font-family: inherit; }
 .match-actions { display: flex; gap: 8px; align-items: center; }
-.tag-match { color: var(--brand-primary, #0d7377); border-color: var(--brand-primary, #0d7377); font-weight: 600; }
+.tag-match { color: var(--brand-primary); border-color: var(--brand-primary); font-weight: 600; }
 .tag-skill { color: var(--c-info); border-color: var(--c-info); }
 /* 短板：信息性弱化展示（不用警示色——「缺」是待补项，不是错误） */
 .tag-miss { color: var(--c-text-tertiary); border-color: var(--c-border); background: transparent; }
@@ -1445,7 +1445,7 @@ onMounted(() => {
 .trust-warn {
   margin: 12px 0 0;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--c-warning-light);
   color: var(--c-text-secondary);
   font-size: 12.5px;

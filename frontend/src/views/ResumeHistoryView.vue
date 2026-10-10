@@ -586,7 +586,7 @@ const summaryText = computed(() => {
 .pick-dot {
   width: 22px;
   height: 22px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 2px solid var(--c-border);
   display: inline-flex;
   align-items: center;
@@ -622,7 +622,7 @@ const summaryText = computed(() => {
   color: var(--c-text-tertiary);
   background: var(--c-surface);
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   margin-bottom: 6px;
 }
 .cmp-tag.b {
@@ -655,7 +655,7 @@ const summaryText = computed(() => {
   font-size: 20px;
   font-weight: 800;
   padding: 8px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   white-space: nowrap;
 }
 .cmp-arrow.up { color: var(--c-success); background: var(--c-success-light); }

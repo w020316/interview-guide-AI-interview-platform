@@ -417,7 +417,7 @@ onMounted(load)
 .cal-title { font-family: var(--font-title); font-size: 18px; font-weight: 600; color: var(--c-text); flex: 1; text-align: center; }
 .cal-nav { width: 32px; height: 32px; border-radius: var(--radius-md); border: 1px solid var(--c-border); background: transparent; color: var(--c-text-secondary); font-size: 18px; line-height: 1; cursor: pointer; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); }
 .cal-nav:hover { color: var(--brand-primary); border-color: var(--brand-primary); background: var(--brand-primary-light); }
-.cal-today { margin-left: auto; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--brand-primary); background: var(--brand-primary-light); border: 1px solid var(--brand-primary-200); border-radius: 999px; cursor: pointer; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); }
+.cal-today { margin-left: auto; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--brand-primary); background: var(--brand-primary-light); border: 1px solid var(--brand-primary-200); border-radius: var(--radius-full); cursor: pointer; transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast); }
 .cal-today:hover { background: var(--brand-primary); color: var(--c-on-primary); }
 
 .week-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
@@ -434,7 +434,7 @@ onMounted(load)
 .day-cell.is-selected { border-color: var(--brand-primary); box-shadow: 0 0 0 1px var(--brand-primary); }
 .day-num { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 12px; color: var(--c-text-secondary); flex-shrink: 0; }
 .day-events { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-.mini-event { font-size: 10px; line-height: 1.3; padding: 1px 4px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-event { font-size: 10px; line-height: 1.3; padding: 1px 4px; border-radius: var(--radius-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-event.ev-待面试 { background: var(--c-info-light); color: var(--c-info); }
 .mini-event.ev-已完成 { background: var(--c-success-light); color: var(--c-success); }
 .mini-event.ev-已取消 { background: var(--c-danger-light); color: var(--c-danger); text-decoration: line-through; }

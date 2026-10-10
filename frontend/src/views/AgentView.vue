@@ -434,7 +434,7 @@ onMounted(() => {
   gap: 6px;
   padding: 10px 12px;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 13px;
   background: var(--c-surface);
@@ -482,7 +482,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--c-border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--c-surface);
   overflow: hidden;
 }
@@ -538,7 +538,7 @@ onMounted(() => {
 .suggest-btn {
   padding: 10px 14px;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--c-surface-elevated); /* I2：暗色下不再白底白字 */
   color: var(--c-text);
   font-size: 13px;
@@ -585,7 +585,7 @@ onMounted(() => {
 .msg-bubble {
   max-width: 76%;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 14px;
   line-height: 1.7;
   background: var(--c-bg-alt);
@@ -627,7 +627,7 @@ onMounted(() => {
 .md-content :deep(code) {
   background: rgba(0, 0, 0, 0.06);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: 13px;
 }
 
@@ -668,7 +668,7 @@ onMounted(() => {
   flex: 1;
   resize: none;
   border: 1px solid var(--c-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   font-size: 14px;
   font-family: inherit;

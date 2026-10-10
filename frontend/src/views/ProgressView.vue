@@ -506,7 +506,7 @@ onMounted(async () => {
   display: inline-flex;
   gap: 4px;
   background: var(--c-bg-alt);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 4px;
 }
 .dim-switch button {
@@ -516,7 +516,7 @@ onMounted(async () => {
   color: var(--c-text-secondary);
   background: transparent;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   cursor: pointer;
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }
@@ -561,8 +561,8 @@ onMounted(async () => {
 .dim-score { font-size: 13px; color: var(--c-text-secondary); }
 .dim-score .num-display { font-size: 15px; }
 .dim-count { font-size: 12px; color: var(--c-text-tertiary); }
-.dim-track { height: 8px; background: var(--c-bg-alt); border-radius: 999px; overflow: hidden; }
-.dim-fill { height: 100%; background: var(--brand-primary); border-radius: 999px; min-width: 4px; transition: width var(--transition-base); }
+.dim-track { height: 8px; background: var(--c-bg-alt); border-radius: var(--radius-full); overflow: hidden; }
+.dim-fill { height: 100%; background: var(--brand-primary); border-radius: var(--radius-full); min-width: 4px; transition: width var(--transition-base); }
 .dim-fill.is-mid { background: var(--c-warning); }
 .dim-fill.is-low { background: var(--c-danger); }
 .dim-fill.is-empty { min-width: 0; background: var(--c-border); }

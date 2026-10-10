@@ -1346,7 +1346,7 @@ onUnmounted(() => {
   color: var(--c-text-secondary);
   background: var(--c-surface);
   border: 1px solid var(--c-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   cursor: pointer;
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
   font-family: var(--font-sans);
@@ -1407,7 +1407,7 @@ onUnmounted(() => {
 .gen-dot {
   width: 18px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 2px solid var(--c-border);
   display: inline-flex;
   align-items: center;
@@ -1427,7 +1427,7 @@ onUnmounted(() => {
 .gen-dot-inner {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--c-border);
 }
 .gen-dot-inner.pulse {
@@ -1448,13 +1448,13 @@ onUnmounted(() => {
 .gen-bar {
   height: 6px;
   background: var(--brand-primary-50);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
 }
 .gen-bar-fill {
   height: 100%;
   background: var(--brand-gradient);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   transition: width 1s linear;
 }
 .gen-tip {
@@ -1483,7 +1483,7 @@ onUnmounted(() => {
 .rec-dot {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--c-danger);
   display: inline-block;
   margin-right: 6px;
@@ -1665,14 +1665,14 @@ onUnmounted(() => {
 .progress-bar {
   height: 8px;
   background: var(--brand-primary-50);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
   background: var(--brand-primary);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   transition: width 0.4s ease;
 }
 
@@ -1698,7 +1698,7 @@ onUnmounted(() => {
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   letter-spacing: 0.3px;
 }
 
@@ -1850,7 +1850,7 @@ onUnmounted(() => {
 .stream-box :deep(code) {
   background: var(--c-bg-alt);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-family: var(--font-mono);
   font-size: 13px;
 }
@@ -1975,21 +1975,21 @@ onUnmounted(() => {
 }
 .attach-hint {
   font-size: 12px;
-  color: var(--c-text-secondary, #888);
+  color: var(--c-text-secondary);
 }
 .attach-preview {
   width: 64px;
   height: 64px;
   object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--c-border-light, #e5e5e5);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--c-border-light);
 }
 .attach-remove {
   width: 20px;
   height: 20px;
   border-radius: 50%;
   border: none;
-  background: var(--c-danger, #e11d48);
+  background: var(--c-danger);
   color: #fff;
   font-size: 13px;
   line-height: 1;

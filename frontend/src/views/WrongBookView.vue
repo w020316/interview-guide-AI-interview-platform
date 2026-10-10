@@ -194,7 +194,7 @@ function difficultyText(d: string) {
  * v1.66.3：由 .radio-row / .radio-chip 收敛而来 —— 此前是第 4 种写法，
  * 与 JobsView 的 .filter-chips 同形态却各起一名，命名掩盖了「同一 idiom」。 */
 .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.filter-chips button { padding: 8px 18px; font-size: 14px; color: var(--c-text); background: transparent; border: 1px solid var(--c-border); border-radius: 999px; cursor: pointer; transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast); }
+.filter-chips button { padding: 8px 18px; font-size: 14px; color: var(--c-text); background: transparent; border: 1px solid var(--c-border); border-radius: var(--radius-full); cursor: pointer; transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast); }
 .filter-chips button:hover { border-color: var(--brand-primary); color: var(--brand-primary); }
 .filter-chips button.active { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--c-on-primary); }
 .filter-note { margin-left: auto; font-size: 12px; color: var(--c-text-tertiary); }

@@ -218,7 +218,7 @@ onMounted(() => {
   font-weight: 600;
   color: var(--brand-primary);
   background: var(--brand-primary-light);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   letter-spacing: 0.3px;
 }
 

@@ -1439,7 +1439,7 @@ function formatDate() {
 }
 .skeleton-bar {
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
 }
 .skeleton-hint {
   text-align: center;
@@ -1646,14 +1646,14 @@ function formatDate() {
 .dim-bar {
   height: 6px;
   background: var(--c-bg-alt);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
   margin-bottom: 10px;
 }
 
 .dim-bar-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   transition: width 0.6s ease;
 }
 
@@ -1692,7 +1692,7 @@ function formatDate() {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 700;
 }
@@ -1938,7 +1938,7 @@ function formatDate() {
   color: var(--c-text-secondary);
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
 }

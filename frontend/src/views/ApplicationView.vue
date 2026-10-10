@@ -1030,7 +1030,7 @@ function actionVariant(action: string) {
 }
 /* 用形状 + 颜色双重区分：投递=实心方绿，面试=实心圆琥珀。
    只靠颜色区分对色觉障碍用户不可用。 */
-.tl-rail-applied::before { background: var(--c-success); border-radius: 2px; }
+.tl-rail-applied::before { background: var(--c-success); border-radius: var(--radius-xs); }
 .tl-rail-interview::before { background: var(--c-warning); }
 .tl-rail-status::before { background: var(--c-info); }
 

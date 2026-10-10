@@ -466,7 +466,7 @@ const steps = [
   background: var(--c-accent-line);
   opacity: 0.5;
   z-index: -1;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 .hero-subtitle {
@@ -707,7 +707,7 @@ const steps = [
 .v-bar {
   flex: 1;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: var(--brand-primary-50);
   overflow: hidden;
 }
@@ -716,7 +716,7 @@ const steps = [
   display: block;
   height: 100%;
   width: var(--w, 80%);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: var(--brand-primary);
 }
 
