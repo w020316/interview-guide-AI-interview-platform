@@ -811,7 +811,7 @@ onMounted(() => {
 .admin-header h1 {
   margin: 0 0 6px;
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
   color: var(--c-text);
   letter-spacing: -0.5px;
@@ -971,7 +971,7 @@ onMounted(() => {
 }
 
 .stat-value {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 28px;
   font-weight: 700;
   line-height: 1.1;
