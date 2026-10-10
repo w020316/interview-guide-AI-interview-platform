@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.11'
+export const CURRENT_VERSION = '1.66.12'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.12',
+    date: '2026-10-10',
+    title: '版本 1.66.12 · 投递看板告诉你「下一步做什么」，跟进消息一键复制',
+    items: [
+      { text: '投递看板的「待跟进」现在会针对每条投递说清「为什么 + 下一步」——例如「已投递 12 天无回复 → 主动跟进一次」，并代拟好一段可直接发送的跟进消息，点「复制跟进消息」粘贴即可（系统只给素材，不替你发）', level: 'user' },
+      { text: '建议按状态与时间给出：待投递 → 尽快投；已投递 ≥7 天 → 可跟进一次；≥14 天 → 建议同时把精力分给别的岗位；对方已回复 → 尽快回信；面试后 ≥3 天 → 致谢并询问结果；收到 Offer → 确认回复截止与入职材料。已淘汰 / 已放弃不再提示', level: 'user' },
+      { text: '纯本地规则（utils/followUpAdvice.ts），零网络零 AI；新增 13 条单测覆盖各分支与时间边界（7 / 14 天）', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.11',
     date: '2026-10-10',

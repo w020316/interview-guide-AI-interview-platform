@@ -38,19 +38,29 @@
         <span class="funnel-arrow">→</span>
         <span class="funnel-item accent">Offer <b>{{ funnel.offer || 0 }}</b></span>
       </div>
-      <div v-if="followUps.length" class="followup">
+      <div v-if="followUpItems.length" class="followup">
         <div class="followup-title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          {{ followUps.length }} 条需要跟进（超过 7 天无回复，或已到跟进时间）
+          {{ followUpItems.length }} 条建议跟进
         </div>
-        <div v-for="f in followUps" :key="f.id" class="followup-row">
-          <span class="fu-title">{{ f.title }}</span>
-          <span class="fu-company">{{ f.companyName }}</span>
-          <span class="fu-status">{{ statusLabel(f.status) }}</span>
-          <a v-if="f.applyUrl" :href="f.applyUrl" target="_blank" rel="noopener noreferrer" class="fu-link">去催一下 →</a>
+        <div v-for="it in followUpItems" :key="it.app.id" class="followup-row">
+          <div class="fu-head">
+            <span class="fu-title">{{ it.app.title }}</span>
+            <span class="fu-company">{{ it.app.companyName }}</span>
+            <span class="fu-status">{{ statusLabel(it.app.status) }}</span>
+          </div>
+          <div class="fu-advice" :class="{ 'is-high': it.advice.urgency === 'high' }">
+            <span class="fu-reason">{{ it.advice.reason }}</span>
+            <span class="fu-arrow" aria-hidden="true">→</span>
+            <span class="fu-action">{{ it.advice.action }}</span>
+          </div>
+          <div class="fu-actions">
+            <button v-if="it.advice.message" class="fu-copy" @click="copyAdvice(it.advice.message)">复制跟进消息</button>
+            <a v-if="it.app.applyUrl" :href="it.app.applyUrl" target="_blank" rel="noopener noreferrer" class="fu-link">去投递页 →</a>
+          </div>
         </div>
       </div>
     </section>
@@ -423,6 +433,8 @@ import { BaseButton, BaseTag, MapOpenLink } from '../components'
 import { EMPTY } from '../utils/format'
 import { parseNotice, hasAnyField, type NoticeParse } from '../utils/noticeParse'
 import { isConflictError } from '../utils/httpError'
+import { followUpAdvice, type FollowUpAdvice } from '../utils/followUpAdvice'
+import { copyText } from '../utils/appLaunch'
 import { formatRate, type ChannelStat } from '../utils/channelStats'
 import {
   daysText,
@@ -507,6 +519,26 @@ const tailoring = ref(false)
 const tailorResult = ref<TailoredResult | null>(null)
 
 const total = computed(() => items.value.length)
+
+/**
+ * 待跟进 → 跟进建议（N4）。
+ *
+ * 后端只给出「谁需要跟进」，这里按 **状态 + 时间** 补上「为什么 + 下一步 + 一条可直接发的消息」。
+ * 已结束的投递（已淘汰 / 已放弃）没有建议，会被直接过滤掉。
+ */
+const followUpItems = computed<Array<{ app: Application; advice: FollowUpAdvice }>>(() =>
+  followUps.value.flatMap((app) => {
+    const advice = followUpAdvice(app)
+    return advice ? [{ app, advice }] : []
+  }),
+)
+
+/** 复制代拟的跟进消息：投递是用户的对外行为，系统只给素材、不代发 */
+async function copyAdvice(text: string): Promise<void> {
+  const ok = await copyText(text)
+  if (ok) ElMessage.success('跟进消息已复制，可直接粘贴发送')
+  else ElMessage.warning('复制失败，请手动选择文本复制')
+}
 
 onMounted(load)
 
@@ -973,9 +1005,19 @@ function actionVariant(action: string) {
 
 .followup { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--c-border); }
 .followup-title { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--c-warning); margin-bottom: 8px; }
-.followup-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; font-size: 13px; }
+.followup-row { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; font-size: 13px; border-top: 1px solid var(--c-border-light); }
+.followup-row:first-of-type { border-top: none; padding-top: 2px; }
+.fu-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fu-title { font-weight: 500; color: var(--c-text); }
 .fu-company { color: var(--c-text-tertiary); }
+.fu-advice { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--c-text-secondary); }
+.fu-advice.is-high { color: var(--c-warning); }
+.fu-reason { flex: none; }
+.fu-arrow { color: var(--c-text-quaternary); }
+.fu-action { font-weight: 500; }
+.fu-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fu-copy { padding: 3px 10px; font-family: var(--font-sans); font-size: 12px; color: var(--brand-primary); background: transparent; border: 1px solid var(--brand-primary); border-radius: var(--radius-full); cursor: pointer; transition: background-color var(--transition-fast), color var(--transition-fast); }
+.fu-copy:hover { background: var(--brand-primary); color: var(--c-on-primary); }
 
 /* 渠道效果表：窄屏用容器内横向滚动，避免整页横向溢出 */
 .channel-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -1071,6 +1113,8 @@ function actionVariant(action: string) {
 @media (max-width: 768px) {
   .mini-btn,
   .mini-select { min-height: 44px; padding: 11px 14px; }
+  /* N4：「复制跟进消息」同为窄屏下的关键操作，一并抬到 44px */
+  .fu-copy { min-height: 44px; padding: 11px 14px; }
 }
 
 .tailored-hint { margin-top: 10px; font-size: 12px; color: var(--c-text-tertiary); }
