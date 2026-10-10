@@ -50,7 +50,7 @@
           <span class="fu-title">{{ f.title }}</span>
           <span class="fu-company">{{ f.companyName }}</span>
           <span class="fu-status">{{ statusLabel(f.status) }}</span>
-          <a v-if="f.applyUrl" :href="f.applyUrl" target="_blank" rel="noopener" class="fu-link">去催一下 →</a>
+          <a v-if="f.applyUrl" :href="f.applyUrl" target="_blank" rel="noopener noreferrer" class="fu-link">去催一下 →</a>
         </div>
       </div>
     </section>
@@ -117,7 +117,7 @@
             </div>
             <div v-else-if="n.channel" class="tl-meta">
               <span>渠道：{{ n.channel }}</span>
-              <a v-if="n.applyUrl" :href="n.applyUrl" target="_blank" rel="noopener" class="tl-link">前往投递 →</a>
+              <a v-if="n.applyUrl" :href="n.applyUrl" target="_blank" rel="noopener noreferrer" class="tl-link">前往投递 →</a>
             </div>
             <div v-if="n.note" class="tl-note">{{ n.note }}</div>
           </div>
@@ -198,7 +198,7 @@
         </div>
 
         <div class="app-actions">
-          <a v-if="a.applyUrl" :href="a.applyUrl" target="_blank" rel="noopener" class="mini-btn">前往投递</a>
+          <a v-if="a.applyUrl" :href="a.applyUrl" target="_blank" rel="noopener noreferrer" class="mini-btn">前往投递</a>
           <button
             v-if="a.status === 'PLANNED'"
             class="mini-btn primary"
