@@ -142,7 +142,12 @@
       </template>
 
       <div v-else class="empty-state">
-        <div class="empty-icon">✓</div>
+        <div class="empty-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div class="empty-text">暂无错题，继续加油！</div>
         <div class="empty-hint">完成模拟面试后，评分低于阈值的题目会自动汇总到这里</div>
       </div>
@@ -1057,7 +1062,7 @@ function formatTime(t?: string) {
 }
 
 .empty-icon {
-  font-size: 48px;
+  /* 图标已改为内联 SVG（尺寸写在其 width/height 上），颜色经 color→currentColor 继承 */
   margin-bottom: 12px;
   color: var(--c-success);
 }

@@ -190,7 +190,12 @@
     <!-- 分析结果 -->
     <div v-if="result && !loading" class="result-section fade-in-up">
       <div v-if="parseError" class="parse-warning">
-        <span class="warning-icon">⚠</span>
+        <span class="warning-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
         <span>{{ parseError }}</span>
       </div>
 
@@ -247,7 +252,12 @@
       <div class="analysis-grid">
         <div class="analysis-card strengths">
           <div class="card-head">
-            <span class="card-icon strengths-icon">✓</span>
+            <span class="card-icon strengths-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
             <h4>核心优势</h4>
           </div>
           <ul v-if="parsed.strengths?.length" class="analysis-list">
