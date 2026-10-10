@@ -212,11 +212,13 @@ public class JobAgentController {
         }
         int limit = limitField.value() == null ? 10 : Math.max(1, Math.min(50, limitField.value().intValue()));
 
-        var matched = jobMatchService.match(resumeText, jobAgentService.activeJobsMatchingSkills(
-                jobMatchService.extractSkills(resumeText)), limit);
+        // R10-07：技能画像只提取一次。extractSkills 内部要遍历整个 SKILL_MATCHERS 词表，
+        // 此前调了两次（一次进预筛、一次填 topSkills），纯属重复计算。
+        var skills = jobMatchService.extractSkills(resumeText);
+        var matched = jobMatchService.match(resumeText, jobAgentService.activeJobsMatchingSkills(skills), limit);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", matched.size());
-        result.put("topSkills", jobMatchService.extractSkills(resumeText));
+        result.put("topSkills", skills);
         List<Map<String, Object>> items = matched.stream().map(m -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("job", m.job());
