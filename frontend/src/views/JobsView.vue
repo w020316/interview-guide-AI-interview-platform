@@ -262,7 +262,11 @@
     <!-- 岗位详情弹窗 -->
     <div v-if="detail" class="modal-mask" @click.self="detail = null">
       <div class="modal-card">
-        <button class="modal-close" @click="detail = null">×</button>
+        <button class="modal-close" aria-label="关闭" @click="detail = null">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M18 6L6 18 M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
         <h2 class="detail-title">{{ detail.title }}</h2>
         <div class="detail-sub">{{ detail.companyName }} · {{ detail.salary || '面议' }}</div>
         <div class="detail-meta">
@@ -1302,6 +1306,10 @@ onMounted(() => {
   position: absolute;
   top: 14px;
   right: 16px;
+  /* R10-F13：emoji「×」换成内联 SVG 后需显式居中（原先靠 font-size 排版） */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 24px;
   border: none;
   background: none;
