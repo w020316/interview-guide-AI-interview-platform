@@ -287,6 +287,9 @@
 
       <!-- 版本更新弹窗 -->
       <ChangelogDialog v-model:visible="showChangelog" @unread-change="hasUnreadChangelog = $event" />
+
+      <!-- 全局 AI 任务中心（N3）：进行中 / 完成通知，常驻右下角，视图零改动 -->
+      <AiTaskCenter />
     </div>
   </el-config-provider>
 </template>
@@ -298,6 +301,7 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { authState, clearAuth, isAdmin } from './auth'
 import api from './api'
 import ChangelogDialog from './components/ChangelogDialog.vue'
+import AiTaskCenter from './components/AiTaskCenter.vue'
 import { CURRENT_VERSION } from './changelog'
 import { theme, toggleTheme as toggle } from './theme'
 import { ICONS, primaryNav, toolNav, buildMobileGroups } from './navigation'

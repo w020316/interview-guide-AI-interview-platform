@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.10'
+export const CURRENT_VERSION = '1.66.11'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.11',
+    date: '2026-10-10',
+    title: '版本 1.66.11 · AI 处理中可离开页面，完成后右下角通知你',
+    items: [
+      { text: 'AI 出题、作答评分、简历分析、岗位分析等长耗时操作（通常 7–19 秒，偶尔更久）现在会在右下角显示「进行中 + 已用秒数」；你可以直接切去别的页面继续做事，处理完成后右下角给出通知，点「去看看」即可回到结果页', level: 'user' },
+      { text: '实现方式：在 api 拦截器层按 URL 统一托管 AI 任务（utils/aiTasks.ts + components/AiTaskCenter.vue），各视图零改动；智能体对话 / RAG 问答等高频就地交互不纳入，避免通知刷屏', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.10',
     date: '2026-10-10',

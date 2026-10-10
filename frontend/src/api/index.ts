@@ -2,6 +2,7 @@ import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { clearAuth, isTokenValid } from '../auth'
 import { apiBaseUrl } from './baseUrl'
 import { ensureAwake } from '../utils/backendWake'
+import { finishAiTask, startAiTask } from '../utils/aiTasks'
 
 /**
  * 后端 API 统一封装
@@ -213,6 +214,9 @@ api.interceptors.request.use((config) => {
   if (isAuthRequest(config.url)) {
     config.timeout = AUTH_TIMEOUT
   }
+  // N3：托管长耗时 AI 任务（全局任务中心据此展示「进行中 / 已完成」，视图零改动）
+  const aiTaskId = startAiTask(config.url)
+  if (aiTaskId) (config as { __aiTaskId?: string }).__aiTaskId = aiTaskId
   return config
 })
 
@@ -224,23 +228,30 @@ function currentRelativeUrl(): string {
 // 响应拦截器：统一处理返回结构和 401 跳登录
 api.interceptors.response.use(
   (response) => {
+    const aiTaskId = (response.config as { __aiTaskId?: string } | undefined)?.__aiTaskId
     const data = response.data
     // 防御：如果返回的是 HTML（SPA fallback），说明 API 代理未生效
     // 注意：data 可能为 null/undefined，需用安全转换
     if (typeof data === 'string' && (data.trim().startsWith('<!DOCTYPE') || data.includes('<html'))) {
+      finishAiTask(aiTaskId, false, 'API 不可达')
       return Promise.reject(new Error('API 不可达：收到 HTML 响应，请检查反向代理配置或后端部署状态'))
     }
     // 后端 Result<T> 结构：{code, message, data}
     if (data && typeof data.code !== 'undefined') {
       if (data.code === 200 || data.code === 0) {
+        finishAiTask(aiTaskId, true)
         return data.data
       }
+      finishAiTask(aiTaskId, false, data.message || '请求失败')
       return Promise.reject(new Error(data.message || '请求失败'))
     }
+    finishAiTask(aiTaskId, true)
     return data
   },
   async (error) => {
     const cfg = error.config as (InternalAxiosRequestConfig & { url?: string; __retried?: boolean }) | undefined
+    // N3：失败也要收口 AI 任务（否则任务中心会一直显示「进行中」）
+    const aiTaskId = (cfg as { __aiTaskId?: string } | undefined)?.__aiTaskId
     const url = cfg?.url || ''
     const method = String(cfg?.method || 'get').toLowerCase()
 
@@ -258,6 +269,7 @@ api.interceptors.response.use(
         clearAuth()
         window.location.href = '/login?redirect=' + encodeURIComponent(currentRelativeUrl())
       }
+      finishAiTask(aiTaskId, false, '登录已过期')
       return Promise.reject(error)
     }
 
@@ -272,6 +284,7 @@ api.interceptors.response.use(
         // 无业务体的 403：通常是应用之外的安全网关拦截页（HTML），给出可操作说明
         error.message = '请求被安全策略拦截，请修改输入内容后重试'
       }
+      finishAiTask(aiTaskId, false, error.message)
       return Promise.reject(error)
     }
 
@@ -333,6 +346,7 @@ api.interceptors.response.use(
         '请求未收到响应：请检查网络后重试；若输入包含特殊符号（如引号、分号），可能是被安全策略拦截，请先修改输入'
     }
 
+    finishAiTask(aiTaskId, false, error.message)
     return Promise.reject(error)
   }
 )
