@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.5'
+export const CURRENT_VERSION = '1.66.6'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.6',
+    date: '2026-10-10',
+    title: '版本 1.66.6 · 未完成的面试可以从断点继续，不用从头再来',
+    items: [
+      { text: '面试历史里，「进行中」的会话新增「继续作答」按钮，可以直接回到答题现场', level: 'user' },
+      { text: '从断点继续：会直接跳到第一道还没作答的题 —— 此前无论从哪个入口恢复，都会回到第 1 题、已答过的题要重答一遍', level: 'user' },
+      { text: '面试设置页若发现你有未完成的面试，会在顶部提示并提供「继续作答」入口 —— 此前未完成的面试在界面上无处可去', level: 'user' },
+      { text: '断点定位与「可继续」判定抽成纯函数并加单测（覆盖跳题、全部答完、0 分算已答等边界）', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.5',
     date: '2026-10-10',
