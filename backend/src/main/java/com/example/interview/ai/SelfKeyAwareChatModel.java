@@ -94,8 +94,12 @@ public class SelfKeyAwareChatModel implements ChatModel {
             return userAiKeyService.settingOf(userId)
                     .map(s -> modelFor(userId, s))
                     .orElse(null);
+        } catch (BusinessException e) {
+            // R10-F03：**配置本身损坏**（如解密失败）必须让用户知道，不能当成「未配置」静默回落平台链
+            // ——否则用户以为在用自己的 Key，实际每轮都在消耗平台额度。
+            throw e;
         } catch (Exception e) {
-            // 路由判定本身的异常绝不外抛：回落平台链
+            // 路由判定本身的异常（无认证上下文/反射类失败等）绝不外抛：回落平台链
             return null;
         }
     }
@@ -122,11 +126,20 @@ public class SelfKeyAwareChatModel implements ChatModel {
         }
     }
 
-    /** 用用户的自持配置构建 OpenAI 兼容客户端（与 AiConfig 的构造保持一致） */
+    /**
+     * 用用户的自持配置构建 OpenAI 兼容客户端（与 AiConfig 的构造保持一致）。
+     *
+     * <p><b>必须注入带超时的 restClientBuilder</b>（v1.66.1 · R10-F01）：不注入时 Spring AI 退回
+     * 的默认 RestClient **不设任何连接/读超时**，而这里的 {@code baseUrl} 是用户运行期填写的
+     * 任意公网地址。一旦指向「能建连但永不响应」的地址，调用会无限期挂起并**长期占用
+     * {@link AiConcurrencyGuard} 的全局许可（仅 5 个）** → 单个用户即可打满全站 AI 功能。
+     * 与 B-02（OCR 无超时占用许可）同类，故统一走 {@link AiRestClients}。
+     */
     private static ChatModel buildUserModel(UserAiKeyService.Setting s) {
         var api = org.springframework.ai.openai.api.OpenAiApi.builder()
                 .baseUrl(s.baseUrl())
                 .apiKey(s.apiKey())
+                .restClientBuilder(com.example.interview.util.AiRestClients.withTimeouts())
                 .build();
         return org.springframework.ai.openai.OpenAiChatModel.builder()
                 .openAiApi(api)

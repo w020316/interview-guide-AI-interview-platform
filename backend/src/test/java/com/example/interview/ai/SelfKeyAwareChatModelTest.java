@@ -89,4 +89,30 @@ class SelfKeyAwareChatModelTest {
                 .hasMessageContaining("自持 AI Key 调用失败");
         verify(platformModel, never()).call(any(Prompt.class));
     }
+
+    @Test
+    @DisplayName("R10-F03：配置损坏（解密失败）→ 明确抛业务异常，绝不静默回落平台链")
+    void call_brokenConfig_doesNotSilentlyFallBack() {
+        // 此前 settingOf 把「解密失败」当成「未配置」返回 empty → 路由判定为「没有自持 Key」
+        // → 静默走平台链，用户以为在用自己的 Key，实际每轮都在消耗平台额度。
+        when(userAiKeyService.settingOf("u1")).thenThrow(new BusinessException(
+                "自持 AI Key 解密失败（可能是服务端密钥已更换），请到「个人中心 → AI 设置」重新保存一次 Key"));
+        var model = new SelfKeyAwareChatModel(platformModel, userAiKeyService);
+
+        assertThatThrownBy(() -> model.call(new Prompt("hi")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("解密失败");
+        verify(platformModel, never()).call(any(Prompt.class));
+    }
+
+    @Test
+    @DisplayName("路由判定自身的异常（非配置问题）仍回落平台链 —— 不能让内部故障打断 AI 功能")
+    void call_routingFailure_stillFallsBack() {
+        when(userAiKeyService.settingOf("u1")).thenThrow(new IllegalStateException("数据库抖动"));
+        var model = new SelfKeyAwareChatModel(platformModel, userAiKeyService);
+
+        model.call(new Prompt("hi"));
+
+        verify(platformModel).call(any(Prompt.class));
+    }
 }

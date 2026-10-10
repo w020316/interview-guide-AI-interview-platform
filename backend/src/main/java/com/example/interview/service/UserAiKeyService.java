@@ -42,16 +42,28 @@ public class UserAiKeyService {
         this.cipher = cipher;
     }
 
-    /** 解密后的完整配置；未配置/解密失败返回 empty（解密失败视为配置失效，提示重新设置） */
+    /**
+     * 解密后的完整配置；**未配置**返回 empty。
+     *
+     * <p>⚠️ v1.66.1（R10-F03）：**解密失败不再返回 empty**。此前解密失败按「未配置」处理 →
+     * 上层 {@code SelfKeyAwareChatModel} 判定为「用户没有自持 Key」→ **静默回落平台链**，
+     * 于是用户以为在用自己的 Key，实际每轮都在消耗平台额度，且**配置坏了永远不会被告知**。
+     * 这与该功能的设计约定（「自持 Key 失败必须明确 503，不回落平台链」）直接冲突。
+     * 现在改为抛 {@link com.example.interview.common.BusinessException}，
+     * 由上层原样透出 503 文案，提示用户重新保存 Key。
+     *
+     * <p>「未配置」（无记录）与「配置损坏」（有记录但解不开）是**两种不同事实**，必须区分。
+     */
     public Optional<Setting> settingOf(String userId) {
-        return repository.findById(userId).flatMap(e -> {
+        return repository.findById(userId).map(e -> {
             try {
-                return Optional.of(new Setting(cipher.decrypt(e.getApiKeyCipher()),
-                        e.getBaseUrl(), e.getModel()));
+                return new Setting(cipher.decrypt(e.getApiKeyCipher()),
+                        e.getBaseUrl(), e.getModel());
             } catch (Exception ex) {
-                // 主密钥变更/密文损坏：按「未配置」处理并告警 —— 不能让一条坏记录拖垮 AI 调用
-                log.error("用户自持 AI Key 解密失败（已按未配置处理）userId={}", userId);
-                return Optional.empty();
+                // 主密钥变更/密文损坏：明确报错，绝不静默回落平台链
+                log.error("用户自持 AI Key 解密失败（将明确报错，不回落平台链）userId={}", userId);
+                throw new com.example.interview.common.BusinessException(
+                        "自持 AI Key 解密失败（可能是服务端密钥已更换），请到「个人中心 → AI 设置」重新保存一次 Key", ex);
             }
         });
     }
@@ -149,8 +161,12 @@ public class UserAiKeyService {
                 .orElseThrow(() -> new IllegalArgumentException("尚未配置自持 AI Key"));
         long t0 = System.currentTimeMillis();
         try {
+            // R10-F01：必须带超时。连通性测试打的是用户填写的任意公网地址，
+            // 无超时时「能建连但永不响应」的地址会让该请求永久挂起（并占用请求线程）。
             var api = org.springframework.ai.openai.api.OpenAiApi.builder()
-                    .baseUrl(s.baseUrl()).apiKey(s.apiKey()).build();
+                    .baseUrl(s.baseUrl()).apiKey(s.apiKey())
+                    .restClientBuilder(com.example.interview.util.AiRestClients.withTimeouts())
+                    .build();
             var model = org.springframework.ai.openai.OpenAiChatModel.builder()
                     .openAiApi(api)
                     .defaultOptions(org.springframework.ai.openai.OpenAiChatOptions.builder()

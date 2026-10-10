@@ -91,6 +91,29 @@ class UserAiKeyServiceTest {
     }
 
     @Test
+    @DisplayName("settingOf (R10-F03)：解密失败必须抛业务异常，不得当成「未配置」静默回落平台链")
+    void settingOf_decryptFailure_throwsInsteadOfEmpty() {
+        when(repository.findById("u1")).thenReturn(Optional.of(UserAiSettingEntity.builder()
+                .userId("u1")
+                .apiKeyCipher("这不是合法的密文")   // 解不开 → 必须报错
+                .baseUrl("https://api.x.com")
+                .model("gpt-x")
+                .build()));
+
+        assertThatThrownBy(() -> service.settingOf("u1"))
+                .isInstanceOf(com.example.interview.common.BusinessException.class)
+                .hasMessageContaining("解密失败");
+    }
+
+    @Test
+    @DisplayName("settingOf：未配置（无记录）仍返回 empty —— 「未配置」与「配置损坏」是两种事实")
+    void settingOf_notConfigured_returnsEmpty() {
+        when(repository.findById("u1")).thenReturn(Optional.empty());
+
+        assertThat(service.settingOf("u1")).isEmpty();
+    }
+
+    @Test
     @DisplayName("viewOf：掩码不泄露完整 Key")
     void view_masksKey() {
         when(repository.findById("u1")).thenReturn(Optional.empty());
