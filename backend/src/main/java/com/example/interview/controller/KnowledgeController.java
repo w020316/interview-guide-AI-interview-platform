@@ -130,16 +130,26 @@ public class KnowledgeController {
 
         String userId = currentUserId();
         List<Document> docs = new ArrayList<>();
+        int truncatedChunks = 0;
         for (String chunk : chunks) {
             if (chunk == null || chunk.isBlank()) continue;
             // 限制单个分块大小（8KB），防止超大文本拖慢向量化
             // R10-F06：同 importKnowledge，用 TextUtil.truncate 避免截断代理对产生坏字符
-            String safeChunk = chunk.length() > 8192 ? TextUtil.truncate(chunk, 8192, "") : chunk;
+            String safeChunk = chunk;
+            if (chunk.length() > 8192) {
+                truncatedChunks++;
+                safeChunk = TextUtil.truncate(chunk, 8192, "");
+            }
             docs.add(Document.builder()
                     .id(UUID.randomUUID().toString())
                     .text(safeChunk)
                     .metadata(Map.of("category", category, "source", "batch-import", "userId", userId))
                     .build());
+        }
+        // R10-04：与 importKnowledge 同口径——截断必须可见，不能静默
+        if (truncatedChunks > 0) {
+            log.warn("知识分块导入：{} 个分块超过 8192 字上限，已截断后向量化（userId={}）",
+                    truncatedChunks, userId);
         }
         // P1-04：经统一入库入口，受 maxDocuments 容量计数保护（此前直接 add 绕过保护，
         // 生产内存向量库会被批量导入撑爆）
