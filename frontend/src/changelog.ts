@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.8'
+export const CURRENT_VERSION = '1.66.9'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.9',
+    date: '2026-10-10',
+    title: '版本 1.66.9 · 中等宽度下页面更早切成单列，各页表现统一',
+    items: [
+      { text: '招聘情报、学习中心的双列布局与管理后台图表区，在中等宽度（平板竖屏 / 窄窗口）下会更早地收成单列；此前各页的切换宽度不一致（720 / 900 / 600），同一档位在不同页面表现不同', level: 'user' },
+      { text: '断点收敛到登记的标准档：720→768、900→960、600→640（均为「折叠更早发生」的保守方向，不引入横向溢出）', level: 'tech' },
+      { text: '新增守卫：@media 断点只能取登记档位 {480,640,768,960,1023,1180}，min-width 只取 {1024}；断点此前无门禁，正是「9 种断点并存」的根因', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.8',
     date: '2026-10-10',

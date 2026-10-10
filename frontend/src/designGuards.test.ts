@@ -801,3 +801,41 @@ describe('容器宽度只有两档 + 外壳（v1.66.8 · R10-D01）', () => {
     ).toEqual([])
   })
 })
+
+describe('断点白名单（v1.66.9 · R10-D10）', () => {
+  it('@media 的 max-width / min-width 只能取登记档位', () => {
+    // 背景：DESIGN.md §3 定死「3 档布局断点 + 内容驱动子断点（须登记）」。
+    // 但代码曾漂出 9 种断点（1180/1023/960/900/768/720/640/600/480），
+    // 其中 720 / 900 / 600 属未登记漂移 —— 根因就是**断点无门禁**。
+    // 本轮已按 §4.1 裁定收敛：720→768、900→960、600→640（均为「折叠更早发生」的保守方向），
+    // 并把 640 / 480 正式登记。用这条守住不再新增未登记档位。
+    const MAX_OK = new Set([480, 640, 768, 960, 1023, 1180])
+    const MIN_OK = new Set([1024])
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, SCAN_EXT)) {
+      const r = rel(file)
+      const src = fs.readFileSync(file, 'utf8')
+      for (const mq of src.matchAll(/@media([^{]*)\{/g)) {
+        const prelude = mq[1]
+        const line = src.slice(0, mq.index).split('\n').length
+        for (const w of prelude.matchAll(/\((min|max)-width\s*:\s*([0-9]+)px\)/g)) {
+          scanned++
+          const kind = w[1]
+          const v = parseInt(w[2], 10)
+          const ok = kind === 'max' ? MAX_OK.has(v) : MIN_OK.has(v)
+          if (!ok) bad.push(`${r}:${line}  ${kind}-width: ${v}px`)
+        }
+      }
+    }
+
+    expect(scanned, '扫描范围异常：@media 断点过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(
+      bad,
+      '断点只能取登记档位：布局 3 档（1024 / 768–1023 / 767）+ 子断点 {480, 640, 768, 960, 1023, 1180}。' +
+        '新增断点必须先登记进 DESIGN.md §3，否则算漂移：\n' +
+        bad.join('\n'),
+    ).toEqual([])
+  })
+})

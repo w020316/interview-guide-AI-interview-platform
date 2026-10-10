@@ -1592,7 +1592,8 @@ onMounted(() => {
 }
 
 /* ── 响应式 ── */
-@media (max-width: 900px) {
+/* R10-D10：900 → 960（最近标准档；与导航折叠档 960 对齐） */
+@media (max-width: 960px) {
   .chart-grid {
     grid-template-columns: 1fr;
   }
@@ -1608,7 +1609,8 @@ onMounted(() => {
   }
 }
 
-@media (max-width: 600px) {
+/* R10-D10：600 → 640（最近标准档「紧凑」档） */
+@media (max-width: 640px) {
   .stat-value { font-size: 24px; }
   .trend-chart { height: 110px; }
   .trend-bar { width: 8px; }

@@ -597,7 +597,8 @@ async function doFollowUp(s: StoryItem) {
 .layer-text { font-size: 13px; line-height: 1.7; color: var(--c-text-secondary); display: flex; flex-wrap: wrap; gap: 6px; }
 
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+/* R10-D10：720 → 768（最近标准档；折叠更早发生，方向更保守） */
+@media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
 .mini-block { margin-bottom: 16px; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .plain-list { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.8; color: var(--c-text-secondary); }
@@ -609,7 +610,8 @@ async function doFollowUp(s: StoryItem) {
 .gap-action { color: var(--c-text-tertiary); }
 
 .week-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-@media (max-width: 720px) { .week-grid { grid-template-columns: 1fr; } }
+/* R10-D10：720 → 768（同上） */
+@media (max-width: 768px) { .week-grid { grid-template-columns: 1fr; } }
 .week-card { border: 1px solid var(--c-border-light); border-radius: var(--radius-md); padding: 12px 14px; background: var(--c-bg-soft); }
 .week-title { font-size: 13px; font-weight: 700; color: var(--brand-primary); margin-bottom: 4px; }
 .week-focus { font-size: 13px; color: var(--c-text); font-weight: 500; margin-bottom: 6px; }
