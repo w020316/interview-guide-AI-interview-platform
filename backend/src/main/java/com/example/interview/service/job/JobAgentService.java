@@ -483,11 +483,17 @@ public class JobAgentService {
      * <p><b>为什么需要它</b>：简历匹配此前把**全部**有效岗位（13 源聚合，可达数千～上万条）
      * 载入内存再逐条打分，每次匹配都全量加载。而 {@code JobMatchService.match} 对
      * 「零技能命中」的岗位本就 {@code continue} 丢弃——因此在 DB 侧按简历技能缩小候选集，
-     * **结果集与全量匹配完全一致**，却把候选量从「全表」降到「含相关技能的岗位」。
+     * **结果集与全量匹配一致**，却把候选量从「全表」降到「含相关技能的岗位」。
      *
-     * <p>匹配口径与 {@code JobMatchService.SKILL_MATCHERS} 对齐（对 title/tags/description/
-     * requirements 做大小写不敏感子串）：DB 侧只要**足够宽松**即可（宁多勿漏），
-     * 精确的词边界判定仍由内存匹配负责，不会改变最终得分。
+     * <p>⚠️ v1.66.1（R10-01）：**字段集合必须与 {@code JobMatchService.concat(job)} 完全对齐**，
+     * 否则「技能只出现在被漏掉的那个字段」的岗位会被预筛**静默丢弃**，结果集不再等价。
+     * `concat` 拼接的是 title / tags / description / requirements / **jobType** 五个字段，
+     * 此前这里只覆盖了前四个，**漏了 `jobType`** —— 而 `jobType` 是真实填充的字段
+     * （`HttpJobPlatformAdapter` 读 `jobType/category/positionType`；Arbeitnow/Himalayas/HN
+     * 各自 `jobTypeOf()`；`JobClassifyService` 还会用 AI 生成），完全可能承载「Java 开发」这类技能词。
+     *
+     * <p>匹配口径与 {@code JobMatchService.SKILL_MATCHERS} 对齐（大小写不敏感子串）：DB 侧只要
+     * **足够宽松**即可（宁多勿漏），精确的词边界判定仍由内存匹配负责，不会改变最终得分。
      *
      * @param skills 简历技能画像（小写）；为空则退回全量（调用方保证非空，此分支仅兜底）
      */
@@ -495,7 +501,7 @@ public class JobAgentService {
         if (skills == null || skills.isEmpty()) {
             return activeJobs();
         }
-        // 先收集每个技能一个「四列 OR」谓词，再整体 OR 成技能组，最后与 active 做 AND。
+        // 先收集每个技能一个「五列 OR」谓词，再整体 OR 成技能组，最后与 active 做 AND。
         // ⚠️ 若直接在 active 谓词上反复 .or(...)，左结合会变成 active OR skill1 OR skill2 ——
         // 那会把「已下架但命中技能」的岗位也带出来（active 条件被 OR 短路掉）。
         java.util.List<org.springframework.data.jpa.domain.Specification<JobPostingEntity>> skillSpecs =
@@ -511,7 +517,9 @@ public class JobAgentService {
                     cb.like(cb.lower(root.get("title")), pattern, '\\'),
                     cb.like(cb.lower(root.get("tags")), pattern, '\\'),
                     cb.like(cb.lower(root.get("description")), pattern, '\\'),
-                    cb.like(cb.lower(root.get("requirements")), pattern, '\\')));
+                    cb.like(cb.lower(root.get("requirements")), pattern, '\\'),
+                    // R10-01：jobType 也在 JobMatchService.concat 的拼接范围内，漏掉会导致结果集不等价
+                    cb.like(cb.lower(root.get("jobType")), pattern, '\\')));
         }
         if (skillSpecs.isEmpty()) {
             return activeJobs();

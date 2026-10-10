@@ -447,6 +447,26 @@ class JobAgentServiceTest {
     }
 
     @Test
+    @DisplayName("activeJobsMatchingSkills (R10-01): 技能仅出现在 jobType 的岗位也必须返回（字段集须与 concat 对齐）")
+    void activeJobsMatchingSkills_coversJobTypeField() {
+        // 标题/描述/标签/要求都不含技能词，只有 jobType 含技能词。
+        // JobMatchService.concat(job) 会拼 jobType，故该岗位在全量匹配中能命中；
+        // 预筛若漏掉 jobType，就会把它静默丢弃 —— 结果集不再等价（这是 R10-01 的回归守卫）。
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("t1").title("后端工程师").companyName("C")
+                .jobType("Java 开发").description("负责服务端研发").active(true).build());
+        // 对照组：任何字段都不含技能词 → 不应被返回
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("t2").title("视觉设计师").companyName("C")
+                .jobType("设计").description("负责品牌视觉").active(true).build());
+
+        List<JobPostingEntity> jobs = newH2Service(List.of())
+                .activeJobsMatchingSkills(List.of("java"));
+
+        assertThat(jobs).extracting(JobPostingEntity::getExternalId).containsExactly("t1");
+    }
+
+    @Test
     @DisplayName("enabledPlatforms: 仅收集 isEnabled 的平台名")
     void enabledPlatforms_returnsEnabledOnly() {
         JobAgentService service = newH2Service(List.of(
