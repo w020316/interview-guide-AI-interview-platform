@@ -852,8 +852,10 @@ onMounted(() => {
 .spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  /* R10-F09：随主题翻转。写死白在暗色下（品牌色提亮为 #14b8a6）仅 2.49:1，
+     低于 WCAG 1.4.11 非文本对比 3:1；改用继承的 currentColor（= --c-on-primary）。 */
+  border: 2px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }

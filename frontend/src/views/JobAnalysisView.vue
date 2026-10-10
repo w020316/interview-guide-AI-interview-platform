@@ -828,8 +828,9 @@ function gapStatusClass(status: string): string {
 .spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  /* R10-F09：随主题翻转（同 AdminView 的 .spinner） */
+  border: 2px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }

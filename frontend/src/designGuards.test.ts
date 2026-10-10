@@ -423,3 +423,48 @@ describe('品牌色底上的内容色必须随主题翻转（v1.66.0）', () => 
     }
   })
 })
+
+describe('不得写死白色边框（v1.66.1 · R10-F09）', () => {
+  // 背景：v1.66.0 把 45 处「品牌实色底上的写死白字」改成了 var(--c-on-primary)，
+  // 但那条守卫只扫 `color` / `-webkit-text-fill-color`，**漏了 border**。
+  // 真机漏网 7 处：6 个视图的 `.spinner`（写死 `border-top-color: #fff`）+
+  // LoginView 的 `border: 1px solid rgba(255,255,255,0.7)`（透明按钮的唯一轮廓）。
+  // 暗色下 --brand-primary 提亮为 #14b8a6，白边只剩 2.49:1，
+  // 低于 WCAG 1.4.11「非文本对比 3:1」—— 加载圈与按钮轮廓都看不清。
+  //
+  // ⚠️ 判据刻意收窄，避免误杀装饰性分隔线（已用真实代码全量校准，修完后命中数为 0）：
+  //   · 命中「实色白」：#fff / #ffffff / white / rgb(255,255,255) / rgba(255,255,255,1)
+  //   · 或命中 alpha ≥ 0.5 的白色（视为「标识控件轮廓」）
+  //   · alpha < 0.5 的白色判为装饰（如 LoginView 的 0.15 分隔线），**不报**
+  const WHITE_BORDER =
+    /border[^;:]*:\s*[^;]*?(?:#fff\b|#ffffff\b|(?<![\w-])white(?![\w-])|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*(?:0?\.[5-9]\d*|1(?:\.0+)?)\s*\))/i
+
+  it('源码中不得出现写死的白色边框（应改用 currentColor / var(--c-on-primary)）', () => {
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, SCAN_EXT)) {
+      const r = rel(file)
+      const raw = fs.readFileSync(file, 'utf8')
+      scanned++
+
+      for (const m of raw.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        // 只看边框声明，去掉 background 等以免自我命中
+        const borderDecls = m[2]
+          .split(';')
+          .filter((d) => /^\s*border/.test(d))
+          .join(';')
+        if (!borderDecls || !WHITE_BORDER.test(borderDecls)) continue
+
+        const line = raw.slice(0, m.index).split('\n').length
+        bad.push(`${r}:${line}  ${m[1].trim().replace(/\s+/g, ' ').slice(0, 70)}`)
+      }
+    }
+
+    expect(scanned, '扫描范围异常：文件数过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(
+      bad,
+      `不要写死白色边框（暗色下品牌色提亮会让它低于 3:1），请用 currentColor 或 var(--c-on-primary)：\n${bad.join('\n')}`,
+    ).toEqual([])
+  })
+})

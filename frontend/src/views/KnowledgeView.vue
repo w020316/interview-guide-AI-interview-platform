@@ -657,8 +657,9 @@ function formatTime(t?: string) {
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  /* R10-F09：随主题翻转（同 AdminView 的 .spinner） */
+  border: 2px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
