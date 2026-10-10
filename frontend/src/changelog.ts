@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.0'
+export const CURRENT_VERSION = '1.66.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.1',
+    date: '2026-10-10',
+    title: '版本 1.66.1 · 暗色模式下加载圈与按钮轮廓看得清了，几处提示也更准确',
+    items: [
+      { text: '暗色模式下，按钮里的加载小圈、以及半透明按钮的描边，不再压在同色底上几乎看不见', level: 'user' },
+      { text: '学习中心的统计在加载失败时会显示「—」，不再显示成「0」，避免误以为你没有错题或收藏', level: 'user' },
+      { text: '岗位详情弹窗右上角的关闭按钮补上了读屏说明，用键盘或读屏操作也能明确知道它的作用', level: 'user' },
+      { text: '点「前往官方申请入口」跳去第三方招聘网站时，不再把本站地址一起带过去', level: 'user' },
+      { text: '在「个人中心 → AI 设置」里保存的自定义 Key 如果已失效，现在会直接提示你重新设置，而不是悄悄改用平台额度', level: 'user' },
+    ],
+  },
   {
     version: '1.66.0',
     date: '2026-10-10',
