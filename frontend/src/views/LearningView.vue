@@ -19,7 +19,7 @@
           <p>规划面试与准备节点，掌控求职节奏</p>
         </div>
         <div class="module-stat">
-          <span class="stat-num num-display">{{ loading ? '—' : calCount }}</span>
+          <span class="stat-num num-display">{{ loading || loadFailed ? '—' : calCount }}</span>
           <span class="stat-label">日程</span>
         </div>
         <span class="module-arrow" aria-hidden="true">→</span>
@@ -38,7 +38,7 @@
           <p>回顾低分题目，重点突破薄弱题型</p>
         </div>
         <div class="module-stat">
-          <span class="stat-num num-display">{{ loading ? '—' : wrongCount }}</span>
+          <span class="stat-num num-display">{{ loading || loadFailed ? '—' : wrongCount }}</span>
           <span class="stat-label">错题</span>
         </div>
         <span class="module-arrow" aria-hidden="true">→</span>
@@ -57,7 +57,7 @@
           <p>集中回看重点题目与高频考点</p>
         </div>
         <div class="module-stat">
-          <span class="stat-num num-display">{{ loading ? '—' : favCount }}</span>
+          <span class="stat-num num-display">{{ loading || loadFailed ? '—' : favCount }}</span>
           <span class="stat-label">收藏</span>
         </div>
         <span class="module-arrow" aria-hidden="true">→</span>
@@ -75,7 +75,7 @@
           <p>用数据看见每一次进步的轨迹</p>
         </div>
         <div class="module-stat">
-          <span class="stat-num num-display">{{ loading ? '—' : trendCount }}</span>
+          <span class="stat-num num-display">{{ loading || loadFailed ? '—' : trendCount }}</span>
           <span class="stat-label">场次</span>
         </div>
         <span class="module-arrow" aria-hidden="true">→</span>
@@ -109,6 +109,8 @@ const favCount = ref(0)
 const trendCount = ref(0)
 /** 计数未就绪时显示 —，避免把「加载中」读成「你没有数据」 */
 const loading = ref(true)
+/** R10-F11：四个统计请求**全部失败**时也显示 —（0 是有效值，不能拿它冒充「加载失败」） */
+const loadFailed = ref(false)
 
 function safeLen(arr: unknown): number {
   return Array.isArray(arr) ? arr.length : 0
@@ -128,6 +130,11 @@ onMounted(async () => {
     const favData = fav as unknown as { total?: number } | null
     favCount.value = favData?.total ?? safeLen(fav) ?? 0
     trendCount.value = safeLen(trend)
+    // R10-F11：四个请求都被 .catch(()=>null) 兜住，故「全为 null」即「全部失败」。
+    // 此时显示 —（判空不判 0）：把「加载失败」显示成 0 会让用户以为「我没有错题/收藏」。
+    if (cal === null && wrong === null && fav === null && trend === null) {
+      loadFailed.value = true
+    }
   } catch {
     // 静默降级，统计失败不影响页面可用性
   } finally {
