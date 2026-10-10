@@ -270,10 +270,35 @@
         <h2 class="detail-title">{{ detail.title }}</h2>
         <div class="detail-sub">{{ detail.companyName }} · {{ detail.salary || '面议' }}</div>
         <div class="detail-meta">
-          <span v-if="detail.location">📍 {{ detail.location }}</span>
-          <span v-if="detail.degree">🎓 {{ detail.degree }}</span>
-          <span v-if="detail.experience">💼 {{ detail.experience }}</span>
-          <span v-if="detail.industry">🏢 {{ detail.industry }}</span>
+          <!-- 元信息图标统一内联 SVG（DESIGN.md §5.5）：emoji 配色不随主题，暗色下突兀 -->
+          <span v-if="detail.location">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ detail.location }}
+          </span>
+          <span v-if="detail.degree">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M22 9L12 4 2 9l10 5 10-5z M6 11.6V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.4"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ detail.degree }}
+          </span>
+          <span v-if="detail.experience">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2 M4 7h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z M3 13h18"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ detail.experience }}
+          </span>
+          <span v-if="detail.industry">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16 M16 9h2a2 2 0 0 1 2 2v10 M3 21h18 M8 7h4 M8 11h4 M8 15h4"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ detail.industry }}
+          </span>
           <!-- 截止日期统一由下方「数据来源说明」的有效期一行呈现，此处不再重复 -->
         </div>
         <div v-if="detail.description" class="detail-block">
@@ -1336,6 +1361,13 @@ onMounted(() => {
   flex-wrap: wrap;
   font-size: 13px;
   color: var(--c-text-tertiary);
+}
+
+/* 图标与文字垂直居中、留 4px 间距（与 ResumeHistoryView 的 .meta-time 同一形态） */
+.detail-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .detail-block {
