@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.2'
+export const CURRENT_VERSION = '1.66.3'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.3',
+    date: '2026-10-10',
+    title: '版本 1.66.3 · 管理后台的标题与数字样式和全站统一，筛选按钮与键盘操作更一致',
+    items: [
+      { text: '管理后台的页面标题字号与其它页面统一了（此前偏小），统计数字也改用与全站一致的等宽字体，数字对齐更整齐', level: 'user' },
+      { text: '错题本的「低于 50 / 60 / 70 分」筛选按钮，样式与招聘广场的筛选按钮统一 —— 此前是另一套偏小的写法，看起来像两个不同的控件', level: 'user' },
+      { text: '收藏列表的卡片现在按空格键也能展开 / 收起（此前只有回车键有效），键盘操作更顺手', level: 'user' },
+      { text: '新增两条设计守卫：页面级标题字号统一为 28px；可点击的非按钮元素必须同时支持回车与空格键', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.2',
     date: '2026-10-10',
