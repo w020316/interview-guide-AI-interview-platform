@@ -193,4 +193,16 @@ function handleClick(ev: MouseEvent) {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── 触控目标 ≥44px（R10-D11 切片）──
+ * DESIGN.md:74 规定触控目标 ≥44px。375px 真机走查实测 md 只有 41px
+ * （font-size 14 × line-height 1.5 = 21，+ padding 9×2 = 18，+ border 2 = 41）。
+ * 移动端把 md / lg 抬到 44。**刻意不动 sm**：sm 多用于密集行内（标签行、列表操作），
+ * 强行 44px 会撑坏版式，需单独评估 —— 已列入 backlog，不要顺手改。 */
+@media (max-width: 768px) {
+  .base-btn--md,
+  .base-btn--lg {
+    min-height: 44px;
+  }
+}
 </style>

@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.14'
+export const CURRENT_VERSION = '1.66.15'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.15',
+    date: '2026-10-10',
+    title: '版本 1.66.15 · 手机上的主按钮更好按了（高度补到 44 像素）',
+    items: [
+      { text: '窄屏下的主按钮此前高度只有 41 像素，略低于触控友好标准（44 像素），拇指容易点偏；现补足到 44 像素。**小号按钮保持原样**——它用在密集列表行里，强行加高会把列表撑散', level: 'user' },
+      { text: '实现：`BaseButton` 的 md / lg 两个尺寸在 ≤768px 补 `min-height:44px`（md 原为 41 = 字号14×行高1.5 + 内边距9×2 + 描边2）。共用组件级改动：全站 19 文件 85 处按钮中约 41 处（md/lg）受影响，sm 的 44 处不受影响', level: 'tech' },
+      { text: '按 QA 独立验证结论：`min-height` 只改高度不改宽度，因此不会引发按钮行横向换行，最坏是整行纵向 +3px', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.14',
     date: '2026-10-10',
