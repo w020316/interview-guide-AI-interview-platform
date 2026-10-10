@@ -231,4 +231,15 @@ function onBlur(e: FocusEvent) {
   line-height: 1.4;
   color: var(--c-danger);
 }
+
+/* ── 触控目标 ≥44px（R10-D11 切片）──
+ * DESIGN.md:74 规定触控目标 ≥44px。375px 真机实测 md 的 <input> 高 42px
+ * （字体 14 + padding 11/14 + 1px 描边，行高取 UA 默认）。移动端把 md / lg 抬到 44；
+ * **刻意不动 sm**：与 BaseButton 同一裁决 —— sm 多用于密集行内，硬抬会撑坏版式。 */
+@media (max-width: 768px) {
+  .base-input--md .base-input__inner,
+  .base-input--lg .base-input__inner {
+    min-height: 44px;
+  }
+}
 </style>

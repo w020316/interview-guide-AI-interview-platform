@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.16'
+export const CURRENT_VERSION = '1.66.17'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.17',
+    date: '2026-10-11',
+    title: '版本 1.66.17 · 手机上的输入框也补到 44 像素（与按钮一致）',
+    items: [
+      { text: '手机上的输入框（AI 设置、岗位导入、知识问答、简历导入等所有表单）此前高度只有 42 像素，略低于触控友好标准（44 像素）；现与按钮一起补足到 44 像素。小号输入框保持不变（用在密集行内，硬加高会把版式撑散）', level: 'user' },
+      { text: '实现：`BaseInput` 的 md / lg 两个尺寸在 ≤768px 补 `min-height:44px`（真机实测 md 原为 42px）。与上一版 `BaseButton`（41→44）同一裁决，共用组件级改动：全站 10 处消费全部是默认 md，均受影响', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.16',
     date: '2026-10-10',
