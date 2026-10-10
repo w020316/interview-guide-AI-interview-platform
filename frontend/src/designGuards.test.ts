@@ -743,3 +743,61 @@ describe('不得保留死兜底 var(--已定义令牌, 兜底值)（v1.66.5）',
     ).toEqual([])
   })
 })
+
+describe('容器宽度只有两档 + 外壳（v1.66.8 · R10-D01）', () => {
+  it('页面容器与宽布局的 max-width 只能取 900 / 1080（外壳 1280）', () => {
+    // 背景：DESIGN.md §5.5 定死「两档容器宽度，不要各页随手取值」——
+    // 1080（列表/看板/日历/对话等「宽」页）与 900（阅读/编辑列），外壳固定 1280。
+    // v1.63.2 曾手工收敛过一次（当时 900/980/1080/1180 并存），**但没有门禁** ——
+    // 于是又漂成 860 / 900 / 960 / 980 / 1080 / 1100 / 1180 / 1200 八种。
+    // 这是「没有门禁的规范必然重新漂移」的第二次实证，故按两道判据锁住：
+    //   判据一：页面容器（`.<name>-page` / `.home`）只能 900 / 1080 —— 抓「窄了」的漂移；
+    //   判据二：任何 ≥900px 的宽布局只能 900 / 1080 / 1280 —— 抓「宽了」的漂移
+    //           （弹窗 / 卡片 / 文本块都 < 900，不受影响）。
+    const PAGE_ALLOWED = new Set(['900px', '1080px'])
+    const WIDE_ALLOWED = new Set(['900px', '1080px', '1280px'])
+    const PAGE_SELECTOR = /^\.[a-z][a-z0-9-]*-page$/
+    const bad: string[] = []
+    let scanned = 0
+
+    for (const file of walkExt(SRC, new Set(['.vue']))) {
+      const r = rel(file)
+      for (const sm of fs.readFileSync(file, 'utf8').matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)) {
+        const css = sm[1].replace(/\/\*[\s\S]*?\*\//g, '')
+        let i = 0
+        while (i < css.length) {
+          const b = css.indexOf('{', i)
+          if (b === -1) break
+          const sel = css.slice(i, b).trim()
+          let j = b + 1
+          let depth = 1
+          while (j < css.length && depth > 0) {
+            if (css[j] === '{') depth++
+            else if (css[j] === '}') depth--
+            j++
+          }
+          const body = css.slice(b + 1, j - 1)
+          if (!/^@(media|supports|layer)/.test(sel)) {
+            const m = body.match(/\bmax-width:\s*([0-9.]+px)/)
+            if (m) {
+              scanned++
+              const v = m[1]
+              const isPageContainer = PAGE_SELECTOR.test(sel) || sel === '.home'
+              const ok = isPageContainer ? PAGE_ALLOWED.has(v) : !(parseFloat(v) >= 900) || WIDE_ALLOWED.has(v)
+              if (!ok) bad.push(`${r}  ${sel} -> max-width: ${v}`)
+            }
+          }
+          i = j
+        }
+      }
+    }
+
+    expect(scanned, '扫描范围异常：max-width 规则过少，守卫可能已静默失效').toBeGreaterThan(20)
+    expect(
+      bad,
+      '容器宽度只能取 900（阅读/编辑列）/ 1080（列表、看板、日历、对话等宽页面）；' +
+        '外壳 1280 定义在 App.vue。详见 DESIGN.md §5.5：\n' +
+        bad.join('\n'),
+    ).toEqual([])
+  })
+})
