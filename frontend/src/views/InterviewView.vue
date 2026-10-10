@@ -492,9 +492,16 @@ onMounted(() => {
  * <p>为什么需要它：此前只能从「面试历史」回看题目与复盘报告，**没有回到答题现场的入口**，
  * 用户会以为未完成的面试只能作废。
  *
- * <p>失败静默 —— 这只是附加信息，不该因为一个列表接口失败就打扰用户或阻塞开始面试。
+ * <p>⚠️ **只按 status 判是不够的** —— 真实站点实测发现存在 **ONGOING 但题目数为 0** 的会话
+ * （会话已创建、题目没落库，例如生成中断）。点「继续作答」只会得到「该会话暂无题目」
+ * 并弹回本页，而本页又会再次提示 → **死循环**。所以必须顺带确认它真的有题目。
+ * 只探前 {@link MAX_PROBE} 个候选（会话多时不打一串请求）；任何异常都按「不可用」处理。
+ *
+ * <p>失败静默 —— 这只是附加信息，不该因为接口失败就打扰用户或阻塞开始面试。
  */
 const ongoingSession = ref<{ sessionId: string; jobDescription: string } | null>(null)
+
+const MAX_PROBE = 3
 
 async function loadOngoingSession() {
   try {
@@ -503,10 +510,17 @@ async function loadOngoingSession() {
       jobDescription?: string
       status?: string
     }>
-    const found = (Array.isArray(list) ? list : []).find((s) => isResumableSession(s.status))
-    ongoingSession.value = found
-      ? { sessionId: found.sessionId, jobDescription: found.jobDescription || '' }
-      : null
+    const candidates = (Array.isArray(list) ? list : [])
+      .filter((s) => isResumableSession(s.status))
+      .slice(0, MAX_PROBE)
+    for (const s of candidates) {
+      const qs = (await api.get(`/api/session/${s.sessionId}/questions`)) as unknown as unknown[]
+      if (Array.isArray(qs) && qs.length > 0) {
+        ongoingSession.value = { sessionId: s.sessionId, jobDescription: s.jobDescription || '' }
+        return
+      }
+    }
+    ongoingSession.value = null
   } catch {
     ongoingSession.value = null
   }
@@ -537,6 +551,8 @@ async function resumeSession(targetId: string) {
     ])
     if (!Array.isArray(qs) || qs.length === 0) {
       ElMessage.warning('该会话暂无题目')
+      // N1：同时清掉设置页的提示，避免「提示 → 点击 → 弹回 → 又提示」的死循环
+      ongoingSession.value = null
       router.replace('/interview')
       return
     }
