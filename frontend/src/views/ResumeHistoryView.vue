@@ -109,7 +109,13 @@
           <template v-else-if="detail">
             <!-- 失败态：AI 未能解析出结果时给出明确反馈，而不是渲染近乎空白的详情 -->
             <div v-if="detailFailed" class="analysis-failed">
-              <div class="failed-icon" aria-hidden="true">⚠</div>
+              <div class="failed-icon" aria-hidden="true">
+                <!-- R10-D03b：字符图标 ⚠ 换内联 SVG（与各页错误态同一路径） -->
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 9v4 M12 17h.01 M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
               <div class="failed-title">本次分析未能生成有效结果</div>
               <div class="failed-desc">
                 {{ parseError || 'AI 未能解析出有效的分析结果，请重新分析这份简历。' }}
@@ -965,7 +971,8 @@ const summaryText = computed(() => {
 }
 
 .failed-icon {
-  font-size: 32px;
+  display: flex;
+  justify-content: center;
   line-height: 1;
 }
 

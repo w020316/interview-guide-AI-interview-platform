@@ -13,7 +13,7 @@
           <!-- 岗位名取不到时不渲染（报告是转发产物，不印占位行） -->
           <p v-if="jobTitle" class="report-job">{{ jobTitle }}</p>
           <p class="report-sub">
-            <span class="report-star" aria-hidden="true">★</span> {{ scopeText }} · 灵感参考 AI 面试工具
+            <span class="report-star" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.45 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z"/></svg></span> {{ scopeText }} · 灵感参考 AI 面试工具
           </p>
         </div>
         <button class="report-close" aria-label="关闭" @click="emit('close')">
@@ -216,6 +216,8 @@ function clampPct(v: number) {
   margin: 0;
 }
 .report-star {
+  display: inline-flex;
+  vertical-align: -2px;
   color: var(--c-accent);
   margin-right: 3px;
 }

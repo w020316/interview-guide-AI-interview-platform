@@ -76,7 +76,11 @@
           <p>基于所有已完成面试题目的 AI 评分</p>
         </div>
         <div class="banner-score">
-          <span class="banner-star">★</span>
+          <span class="banner-star" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.45 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z"/>
+            </svg>
+          </span>
           <span class="banner-score-num num-display">{{ formatScore(stats?.avgInterviewScore) }}</span>
           <span class="banner-score-unit">分</span>
         </div>
@@ -667,8 +671,8 @@ function fmtRelative(iso: string): string {
 }
 
 .banner-star {
+  display: inline-flex;
   color: var(--c-accent);
-  font-size: 22px;
   line-height: 1;
 }
 

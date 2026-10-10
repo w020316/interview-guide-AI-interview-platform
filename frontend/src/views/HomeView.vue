@@ -110,7 +110,12 @@
                 </div>
               </div>
               <div class="visual-cta">
-                <span class="visual-star">★</span>
+                <span class="visual-star">
+                  <!-- R10-D03b：字符图标 ★ 换内联 SVG（保持实心 + currentColor 继承点缀色） -->
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.45 6.2 20.5l1.1-6.45-4.7-4.6 6.5-.95z"/>
+                  </svg>
+                </span>
                 <span>{{ ctaText }}</span>
               </div>
             </div>
@@ -737,8 +742,8 @@ const steps = [
 }
 
 .visual-star {
+  display: inline-flex;
   color: var(--c-accent);
-  font-size: 14px;
 }
 
 .visual-cta span:last-child {

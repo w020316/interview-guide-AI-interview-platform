@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.13'
+export const CURRENT_VERSION = '1.66.14'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.14',
+    date: '2026-10-10',
+    title: '版本 1.66.14 · 最后几个「字符当图标」换成了矢量图标',
+    items: [
+      { text: '报告面板、首页演示区、个人中心的星标，以及简历历史里的警示图标，此前用的是 ★ / ⚠ 这类字符（不同设备字体不同、粗细不一），现统一换成与全站一致的矢量（SVG）图标——缩放与换色都跟随主题', level: 'user' },
+      { text: '保留项（已说明）：列表项的项目符号（`li::before` 的 `content`）属 CSS 装饰符，改成 SVG 需要给每个列表项插入元素，收益不抵改动面，按设计审计的「人工清单」档保留', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.13',
     date: '2026-10-10',
