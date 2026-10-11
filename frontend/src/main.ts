@@ -8,6 +8,7 @@ import './styles/variables.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { initTheme } from './theme'
 import { prewarmBackend, installWakeRecovery } from './utils/backendWake'
+import { installSessionGuard } from './utils/sessionGuard'
 import { setupPwa } from './utils/pwa'
 
 // 在任何渲染前应用主题，避免首屏闪烁
@@ -25,6 +26,13 @@ prewarmBackend()
 // 页面重新可见 / 网络恢复时自动补探测：移动端切走再切回会冻结定时器，
 // 没有这个钩子会一直停在「正在冷启动」的假象上。
 installWakeRecovery()
+
+// 会话失效恢复：页面重新可见 / 窗口重新聚焦时立即重校验 token。
+// 修复「页面长时间开着，回来时所有功能都用不了」：启动清理只在应用启动执行、
+// 请求拦截器要有请求才触发、路由守卫要有跳转才触发，「回到页面」本身不触发任何一条
+// → 这里补上主动校验，失效则清会话并带说明跳登录（见 utils/sessionGuard.ts 的归因说明：
+// 线上 JWT 为 24h，同日几小时不会过期，真正兜的是「会话在页面之外失效」那一类）。
+installSessionGuard()
 
 const app = createApp(App)
 

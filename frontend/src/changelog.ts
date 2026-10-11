@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.17'
+export const CURRENT_VERSION = '1.66.18'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.18',
+    date: '2026-10-11',
+    title: '版本 1.66.18 · 修复「页面长时间开着，回来时什么都用不了」',
+    items: [
+      { text: '修复：登录后一直不关页面，隔一段时间再回到这个页面时，会出现「看着还是登录状态，但每个操作都没反应或报错」的情况；而且被送回登录页时没有任何说明，让人分不清是自己被登出还是系统坏了。现在只要回到页面，系统会立刻重新确认登录状态：已失效就明确提示「登录已过期，请重新登录」，重新登录后还能回到你原来待的那个页面；任何操作遇到登录失效，也都会给出同样的明确说明，不再无声地跳走', level: 'user' },
+      { text: '实现：新增 `utils/sessionGuard.ts`，监听 `visibilitychange`（可见）与 `window.focus`，调用纯函数 `evaluateSessionRecovery()` 判定后清会话并带 `redirect` 跳登录；在 `main.ts` 与既有 `installWakeRecovery` 并列安装。补齐此前三条兜底路径（`auth.ts` 仅启动时清理、请求拦截器需有请求、路由守卫需有跳转）都依赖「动作」才触发的结构性缺口', level: 'tech' },
+      { text: '实现：新增无依赖模块 `utils/sessionExpiry.ts`，统一「会话失效 → 跳登录」约定（`LOGIN_PATH` / `SESSION_EXPIRED_FLAG` / `buildSessionExpiredLoginUrl`）；`api/index.ts` 的请求拦截器（本地 token 失效）与响应拦截器（401）两条跳转路径改为复用同一构造函数 —— 此前这两处跳转**都不带 `expired=1`**，正是「回到登录页却毫无说明」的来源。刻意独立成模块而非并入 `sessionGuard.ts`，避免 `api` 间接 import element-plus 而把依赖拽进主包', level: 'tech' },
+      { text: '⚠️ 归因更正：本次**不是**「24h 凭证在几小时内过期」。线上 `app.jwt.expiration-ms` 实测 86400000（已用线上签发的真实 token 解码复核 `exp - iat = 86400s`，`render.yaml` 与 `application.yml` 默认值一致），同日「中午登录 → 下午回来」不可能过期。真正兜住的是「页面长期开着、会话在页面之外失效」：离开超 24h、在别处登出（`jti` 进黑名单）、`JWT_SECRET` 轮换、账号被禁用、localStorage 被清 —— 后几种本地 token 看着完全合法，只有服务端会拒绝。旧注释与本条初稿的错误结论已一并改正', level: 'tech' },
+      { text: '测试：新增 `utils/sessionGuard.test.ts` 21 条 + `utils/sessionExpiry.test.ts` 8 条；`api/index.test.ts` 两处跳转断言由 `/login?redirect=` 收紧为 `/login?expired=1&redirect=`（锁住「必须带说明标记」）。另：登录页提示条的样式被 v1.66.5 设计门禁拦下 —— 初版写成 `var(--c-warning-text, #b45309)` 这类「**未定义令牌 + 写死兜底**」，兜底会静默生效、暗色下直接破版；已改用明暗双主题均有定义的 `--c-warning` / `--c-warning-light` / `--c-warning-border`，并去掉圆角的死兜底', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.17',
     date: '2026-10-11',

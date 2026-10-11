@@ -75,6 +75,19 @@
           <button :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">注册</button>
         </div>
 
+        <!-- 会话过期提示（v1.66.18）：
+             由 utils/sessionGuard 在「页面从后台恢复且 token 已过期」时带 ?expired=1 跳转过来。
+             跳转前用 ElMessage 提示不可靠（消息组件随旧页面卸载而销毁），故改为在登录页
+             自身渲染一条持久提示——「为什么回到登录页」永远有解释，且不会一闪而过。 -->
+        <div v-if="sessionExpired" class="session-expired-tip" role="status">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 7.5v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="16.5" r="1.1" fill="currentColor"/>
+          </svg>
+          <span>登录已过期，请重新登录</span>
+        </div>
+
         <form v-if="activeTab === 'login'" @submit.prevent="handleLogin" class="auth-form">
           <div class="field">
             <label>用户名</label>
@@ -219,6 +232,7 @@ import { ElMessage } from 'element-plus'
 import api, { getErrMessage, isColdStartError } from '../api'
 import { setAuth } from '../auth'
 import { ensureAwake, isBackendKnownReady, prewarmBackend, wakeState } from '../utils/backendWake'
+import { SESSION_EXPIRED_FLAG } from '../utils/sessionGuard'
 
 const router = useRouter()
 const route = useRoute()
@@ -226,6 +240,15 @@ const activeTab = ref('login')
 const loading = ref(false)
 const loginForm = ref({ username: '', password: '' })
 const regForm = ref({ username: '', password: '', email: '' })
+
+/**
+ * 会话过期提示（v1.66.18）：由 utils/sessionGuard 跳转时带 `?expired=1`。
+ * 用 route.query 派生而非快照，保证直接访问 /login（无该参数）时不误显示。
+ */
+const sessionExpired = computed(() => {
+  const q = route.query[SESSION_EXPIRED_FLAG]
+  return (Array.isArray(q) ? q[0] : q) === '1'
+})
 
 // 新增交互状态
 const showLoginPwd = ref(false)
@@ -646,6 +669,27 @@ async function handleRegister() {
   bottom: 0;
   height: 2px;
   background: var(--brand-primary);
+}
+
+/* 会话过期提示（v1.66.18）：与 tab-switch 之间的过渡留白由 tab-switch 的 margin-bottom 提供。
+   颜色一律走既有告警令牌（--c-warning / --c-warning-light / --c-warning-border 在明暗两套主题下均有定义）。
+   ⚠️ 切勿写成 `var(--令牌, 写死颜色)`：令牌若未定义，兜底会**静默生效**，暗色下直接破版
+   （v1.66.5 的设计门禁 designGuards.test.ts 会拦下这种写法）。 */
+.session-expired-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--c-warning);
+  background: var(--c-warning-light);
+  border: 1px solid var(--c-warning-border);
+  border-radius: var(--radius-md);
+}
+.session-expired-tip svg {
+  flex: 0 0 auto;
 }
 
 .auth-form {

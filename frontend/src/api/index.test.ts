@@ -78,7 +78,9 @@ describe('api/index 请求拦截器（fulfilled）', () => {
     const cfg: any = { headers: {}, url: '/api/c' }
     const out = await reqFulfilled(cfg)
     expect(localStorage.getItem('token')).toBeNull()
-    expect((window.location as any).href).toContain('/login?redirect=')
+    // v1.66.18：跳转必须带 expired=1，否则登录页无从说明「为什么回到这里」
+    expect((window.location as any).href).toContain('/login?expired=1&redirect=')
+    expect((window.location as any).href).toContain(encodeURIComponent('/resume'))
   })
 
   it('登录页遇到过期 token 不跳转（避免循环）', async () => {
@@ -148,7 +150,11 @@ describe('api/index 响应拦截器（rejected）', () => {
     const err: any = { config: { url: '/api/h' }, response: { status: 401, data: {} } }
     await expect(resRejected(err)).rejects.toBe(err)
     expect(localStorage.getItem('token')).toBeNull()
-    expect((window.location as any).href).toContain('/login?redirect=')
+    // v1.66.18：401 兜底同样必须带 expired=1。
+    // 这条覆盖「本地 token 看着合法、服务端已拒绝」（异地登出 / 密钥轮换 / 账号禁用）——
+    // 正是「回到页面后所有功能都用不了、却被无声弹走」的最后一道网。
+    expect((window.location as any).href).toContain('/login?expired=1&redirect=')
+    expect((window.location as any).href).toContain(encodeURIComponent('/history'))
   })
 
   it('403 不再清 token（P2-05：授权失败 ≠ 认证失效，保留当前会话上下文）', async () => {

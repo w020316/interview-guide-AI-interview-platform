@@ -3,6 +3,7 @@ import { clearAuth, isTokenValid } from '../auth'
 import { apiBaseUrl } from './baseUrl'
 import { ensureAwake } from '../utils/backendWake'
 import { finishAiTask, startAiTask } from '../utils/aiTasks'
+import { buildSessionExpiredLoginUrl } from '../utils/sessionExpiry'
 
 /**
  * 后端 API 统一封装
@@ -194,10 +195,12 @@ api.interceptors.request.use((config) => {
   if (token && isTokenValid(token)) {
     config.headers.Authorization = `Bearer ${token}`
   } else if (token && !isTokenValid(token)) {
-    // token 非法或已过期，清除并跳登录
+    // token 非法或已过期，清除并跳登录。
+    // v1.66.18：跳转地址带 `expired=1`，由登录页展示持久提示 —— 否则用户只看到
+    // 「莫名其妙回到登录页」，无从判断是自己被登出还是系统故障。
     clearAuth()
     if (window.location.pathname !== '/login') {
-      window.location.href = '/login?redirect=' + encodeURIComponent(currentRelativeUrl())
+      window.location.href = buildSessionExpiredLoginUrl(currentRelativeUrl())
     }
   }
   // FormData 时让浏览器自动设置 Content-Type（multipart/form-data + boundary）
@@ -265,9 +268,12 @@ api.interceptors.response.use(
     //   或后端权限 403 直连同源路径），用户会被静默登出并丢失当前操作上下文。
     if (error.response?.status === 401) {
       // 登录页不跳转（避免循环），其他页面清除 auth 并跳登录
+      // v1.66.18：同样带 `expired=1`，让「为什么回到登录页」永远有解释（见 sessionExpiry.ts）。
+      // 这条兜底覆盖「本地 token 看着合法、服务端已拒绝」的情形（异地登出 / 密钥轮换 / 账号禁用），
+      // 也是本版本修复「回到页面后所有功能都用不了」的最后一道网。
       if (window.location.pathname !== '/login') {
         clearAuth()
-        window.location.href = '/login?redirect=' + encodeURIComponent(currentRelativeUrl())
+        window.location.href = buildSessionExpiredLoginUrl(currentRelativeUrl())
       }
       finishAiTask(aiTaskId, false, '登录已过期')
       return Promise.reject(error)
