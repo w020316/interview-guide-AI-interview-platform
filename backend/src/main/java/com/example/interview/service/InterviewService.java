@@ -166,6 +166,7 @@ public class InterviewService {
                     .append("1. 直接输出 JSON 数组，不要 Markdown 代码块、不要 ```json 标记\n")
                     .append("2. 字符串必须用 ASCII 双引号 \"，禁止单引号或中文引号\n")
                     .append("3. 字符串值内禁止裸换行符、回车符、制表符\n")
+                    .append("3.1 referenceAnswer 与 keyPoints 在前端是按纯文本原样展示的，必须保持纯文本：不要出现任何 Markdown 语法（星号加粗、井号标题、短横线列表、反引号代码、竖线表格等）；需要分点时用分号或「1）2）」这类纯文本写法\n")
                     .append("4. 不要输出注释、解释、前后缀文字\n")
                     .append("5. 输出格式：\n")
                     .append("[{\"question\":\"请介绍你的项目架构\",\"category\":\"项目深挖\",\"difficulty\":\"MEDIUM\",\"keyPoints\":[\"考察点1\"],\"referenceAnswer\":\"参考答案要点\"}]")

@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.19'
+export const CURRENT_VERSION = '1.66.20'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.20',
+    date: '2026-10-12',
+    title: '版本 1.66.20 · AI 求职信与优化简历的预览也统一了排版',
+    items: [
+      { text: '「岗位分析」生成的求职信预览、「简历优化」生成的优化后简历预览，此前是另一套排版：标题大小不一致，求职信的一级标题还会变成宋体大字，而且段落之间会莫名多出空行。现在这两处与智能体回答、知识问答使用同一套排版标准，标题层级、段落间距、列表样式都一致，超长链接也不会撑破卡片', level: 'user' },
+      { text: '顺带修掉两个观感问题：优化简历预览里的小标题原本比大标题更抢眼（暗色主题下尤其明显），现在层级恢复正常；文档里的加粗也不再整段染成绿色', level: 'user' },
+      { text: '实现：新增 `.md-body.is-document` 文档修饰类（定义在 `styles/markdown.css`），承载「成品文档」版式 —— 行高 1.8、h1 品牌色下划线、h2 品牌色左竖条、h3 收敛为正文级。`JobAnalysisView` 与 `ResumeView` 的本地 `:deep` 全部移入该修饰类；门禁里的 `MD_ALLOWED_VIEWS` 白名单随之**撤销**，「views 里不得自写 markdown 元素样式」现在是零例外', level: 'tech' },
+      { text: '修复：`JobAnalysisView` 的求职信预览容器上有 `white-space: pre-wrap`，而 markdown-it 输出的 HTML 在块级元素之间本来就有换行符 → 每个块边界（`</p>\\n<p>`、`</h1>\\n<p>`、`</li>\\n<li>`）都多渲染出一个**额外空行**，段落与标题间距被翻倍且不可控。已删除该属性（段内硬换行若确实需要，那是 `utils/markdown.ts` 的 breaks 选项职责，不该由容器承担）', level: 'tech' },
+      { text: '测试：新增 1 条守卫（两个修饰类 `is-compact` / `is-document` 必须在唯一来源里定义），并把「views 不得自写 markdown 元素样式」改为零例外。至此前端全部 5 个 `v-html="renderMarkdown(...)"` 落点都收敛到单一来源', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.19',
     date: '2026-10-12',

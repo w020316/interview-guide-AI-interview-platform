@@ -339,7 +339,7 @@
               </button>
             </div>
           </div>
-          <div v-if="optimizeView === 'preview'" class="optimize-preview" v-html="optimizedHtml"></div>
+          <div v-if="optimizeView === 'preview'" class="optimize-preview md-body is-document" v-html="optimizedHtml"></div>
           <pre v-else class="optimize-source">{{ optimizedMarkdown }}</pre>
         </div>
       </div>
@@ -1975,56 +1975,15 @@ function formatDate() {
   background: var(--brand-primary-50);
 }
 
+/* 容器只管「盒子」；markdown 元素排版统一由 styles/markdown.css 的
+ * .md-body.is-document 提供（AI 优化简历是「成品文档」，理由见该文件注释）。
+ * 原来自写的 h1/h2/h3/ul/li/strong/p 已全部移入该修饰类 —— 其中 h2 原本用
+ * --brand-primary-hover，暗色下比 h1 的 --brand-primary 更亮，层级倒挂；
+ * strong 原本染品牌绿，文档里会变成「荧光笔」。两处均已按规范统一。 */
 .optimize-preview {
   padding: 32px 40px;
-  font-family: var(--font-sans);
-  color: var(--c-text);
-  line-height: 1.8;
   max-height: 800px;
   overflow-y: auto;
-}
-
-.optimize-preview :deep(h1) {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--brand-primary);
-  border-bottom: 2px solid var(--brand-primary-100);
-  padding-bottom: 8px;
-  margin: 0 0 20px;
-}
-
-.optimize-preview :deep(h2) {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--brand-primary-hover);
-  margin: 24px 0 12px;
-  border-left: 4px solid var(--brand-primary);
-  padding-left: 12px;
-}
-
-.optimize-preview :deep(h3) {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--c-text);
-  margin: 16px 0 8px;
-}
-
-.optimize-preview :deep(ul) {
-  padding-left: 24px;
-  margin: 8px 0;
-}
-
-.optimize-preview :deep(li) {
-  margin: 4px 0;
-}
-
-.optimize-preview :deep(strong) {
-  color: var(--brand-primary);
-  font-weight: 600;
-}
-
-.optimize-preview :deep(p) {
-  margin: 8px 0;
 }
 
 .optimize-source {

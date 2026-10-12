@@ -258,6 +258,50 @@
   }
 }
 
+/* ── 文档变体：成品文档预览（AI 求职信 / AI 优化简历）─────────────────
+ * 与 is-compact 同构的修饰类，**定义在这里而不是视图里** —— 视图自写
+ * markdown 元素样式正是 v1.66.19 那次「五套实现漂移、全站表格零样式」的
+ * 成因，已加门禁（含本条：白名单已撤，零例外）。
+ *
+ * 为什么这两个场景算「文档」而非「应用内正文」：用户是自上而下通读，并会
+ * 复制 / 下载导出（JobAnalysisView 与 ResumeView 都有导出入口），层级也是
+ * 文档式的（h1 = 文档标题、h2 = 章节）。所以行高更疏、h1/h2 带品牌色与
+ * 编辑式标记。
+ *
+ * 统一取向：以「简历预览」那套为准（h1 下划线 + h2 左竖条 + h3 收敛）。
+ * 求职信此前只给 h1/h2 换了颜色、未设字号与字族 → h1 命中 variables.css
+ * 全局 `h1{font-family:var(--font-display)}`，落成**衬线 + UA 默认约 30px**，
+ * 同一类内容两处差一档多，违反 DESIGN.md §2。
+ *
+ * 刻意**不覆盖** strong / p / ul / li / code：沿用基础档即可（两份预览原本
+ * 的段距与列表缩进就与基础档一致）。特别是简历预览原来把 strong 染成品牌绿
+ * —— 文档里每个粗体都染绿会变成「荧光笔」，且 600 字重会触发 CJK 伪粗体。 */
+.md-body.is-document {
+  line-height: 1.8;
+}
+
+.md-body.is-document h1 {
+  font-size: var(--font-size-2xl);
+  color: var(--brand-primary);
+  border-bottom: 2px solid var(--brand-primary-100);
+  padding-bottom: var(--space-sm);
+  margin: 0 0 var(--space-lg);
+}
+
+.md-body.is-document h2 {
+  font-size: var(--font-size-lg);
+  color: var(--brand-primary);
+  border-left: 4px solid var(--brand-primary);
+  padding-left: var(--space-md);
+  margin: var(--space-lg) 0 var(--space-md);
+}
+
+.md-body.is-document h3 {
+  font-size: var(--font-size-base);
+  color: var(--c-text);
+  margin: var(--space-md) 0 var(--space-sm);
+}
+
 /* ── 紧凑变体：窄容器 / 逐字输出流 ────────────────────────────────────
  * 用于面试页 240px 高的「AI 实时提示」滚动区：那里纵向空间紧张，
  * 标题用完整档位会把可见内容挤掉。字号仍在 DESIGN 阶梯上，只是整体降一档。

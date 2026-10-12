@@ -258,7 +258,7 @@
             <BaseButton variant="ghost" size="sm" @click="downloadLetter">下载 .md</BaseButton>
           </div>
         </div>
-        <div class="letter-preview" v-html="letterHtml"></div>
+        <div class="letter-preview md-body is-document" v-html="letterHtml"></div>
       </div>
     </div>
   </div>
@@ -1152,25 +1152,19 @@ function gapStatusClass(status: string): string {
   gap: 8px;
 }
 
+/* 容器只管「盒子」；markdown 元素排版统一由 styles/markdown.css 的
+ * .md-body.is-document 提供（AI 求职信是「成品文档」，理由见该文件注释）。
+ * ⚠️ 去掉 white-space: pre-wrap —— markdown-it 在块级元素之间会输出 \n，
+ * pre-wrap 把这些段间换行保留成**强制换行**，于是每个块边界
+ * （</p>\n<p>、</h1>\n<p>、</li>\n<li>）都多渲染出一个空行，
+ * 段落与标题的间距被翻倍且不可控。段内硬换行若确实需要，
+ * 那是 utils/markdown.ts 的 breaks 选项职责，不该由容器承担。 */
 .letter-preview {
   padding: 28px 32px;
   background: var(--c-surface);
   border: 1px solid var(--c-border-light);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  font-family: var(--font-sans);
-  color: var(--c-text);
-  line-height: 1.8;
-  white-space: pre-wrap;
-}
-
-.letter-preview :deep(h1),
-.letter-preview :deep(h2) {
-  color: var(--brand-primary);
-}
-
-.letter-preview :deep(p) {
-  margin: 8px 0;
 }
 
 /* ── 响应式 ── */

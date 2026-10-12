@@ -163,22 +163,33 @@ Windows 回退宋体、Android 回退默认衬线 —— 小字号下笔画发�
   `role="button"` + `tabindex="0"` + `@keydown.enter` + `@keydown.space.prevent` + `:focus-visible` 焦点环。
 - **这是可访问性要求，不是可选。**
 
-**AI 生成的正文（markdown）排版（v1.66.19 定死）**
+**AI 生成的正文（markdown）排版（v1.66.19 定死，v1.66.20 补文档档）**
 - `renderMarkdown()`（`utils/markdown.ts`）的输出**只有一个排版来源**：
-  `frontend/src/styles/markdown.css` 的 `.md-body`。容器加 `class="md-body"` 即可；
-  纵向空间紧张的场景（面试页 240px 的「AI 实时提示」流）再叠 `is-compact`。
-- ❌ **禁止在视图里再写 `:deep(h1|h2|table|code|pre|hr|blockquote|…)`**。
+  `frontend/src/styles/markdown.css` 的 `.md-body`。前端全部 5 个
+  `v-html="renderMarkdown(...)"` 落点都已挂上它。
+- ❌ **禁止在视图里再写 `:deep(h1|h2|table|code|pre|hr|blockquote|…)`** —— **零例外**。
   v1.66.19 实测：同一份 markdown 曾被 5 个视图各写一套，覆盖范围 24 / 6 / 5 条不等，
   结果是**全站表格零样式**、行内代码写死 `rgba(0,0,0,0.06)`（暗色下不可见）。
-  已加门禁（`designGuards.test.ts` 的「markdown 正文排版契约」，5 条）。
-- **例外**：求职信预览（`JobAnalysisView` 的 `.letter-preview`）与简历预览
-  （`ResumeView` 的 `.optimize-preview`）是**文档**排版而非对话正文，刻意不走 `.md-body`，
-  已在门禁白名单内并注明理由。
+  已加门禁（`designGuards.test.ts` 的「markdown 正文排版契约」一组，勿删）。
+  ⚠️ 曾有过的 `MD_ALLOWED_VIEWS` 白名单已在 v1.66.20 **撤销**，不要再加回来。
+- **场景差异用修饰类表达，不要在视图里另写一套**：
+  - `.md-body.is-compact` —— 纵向空间紧张的流（面试页 240px 的「AI 实时提示」）
+  - `.md-body.is-document` —— **成品文档预览**（AI 求职信 `.letter-preview` /
+    AI 优化简历 `.optimize-preview`）。判据：用户自上而下通读、并会复制/导出，
+    层级是文档式的（h1 = 文档标题、h2 = 章节）。版式：行高 1.8、h1 品牌色下划线、
+    h2 品牌色左竖条、h3 收敛为正文级；`strong`/`p`/`ul`/`li`/`code` 沿用基础档。
+- ⚠️ markdown 容器**不要写 `white-space: pre-wrap`**：markdown-it 输出的 HTML 在块级
+  元素之间本来就有换行符，`pre-wrap` 会把它们保留成**强制换行**，每个块边界多出一个
+  空行、段距被翻倍且不可控（v1.66.20 修掉求职信预览的这一处）。段内硬换行若确实需要，
+  那是 `utils/markdown.ts` 的 `breaks` 选项职责。
 - 标题一律 `--font-title`：注意 `variables.css` 有全局 `h1 { font-family: var(--font-display) }`，
   气泡/卡片里的小标题若不显式覆盖会渲染成**衬线**，违反 §2。
 - 表格：`table-layout: fixed` + `width/max-width: 100%` 保证窄屏不横向溢出
   （`v-html` 注入**套不了滚动容器**，只能纯 CSS 解决）；≤640px 降到 12px 字 + 4px 内边距。
 - 正文里的 emoji 是**模型输出的内容**，不是我们的功能图标，不单独设样式。
+- **纯文本 AI 字段不要硬套 markdown 渲染**：如错题的「参考答案」（`referenceAnswer`）在
+  3 个视图里都是纯文本展示，正确做法是**在后端提示词里声明它是纯文本字段、禁用 markdown 语法**，
+  而不是前端 `renderMarkdown`（会与卡片的 13px 字号冲突，且 markdown 会把单个换行折叠成空格）。
 
 ## 6. 文案
 

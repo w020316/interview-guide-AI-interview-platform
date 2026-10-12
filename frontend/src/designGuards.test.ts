@@ -956,12 +956,6 @@ describe('空态图标类名必须统一为 .empty-icon-wrap（v1.66.13 · R10-D
 
 const MD_SOURCE = path.join(SRC, 'styles', 'markdown.css')
 
-/** 文档预览：求职信 / 简历导出预览，刻意按「文档」排版而非「对话正文」。 */
-const MD_ALLOWED_VIEWS = new Set([
-  'views/JobAnalysisView.vue', // 求职信预览（.letter-preview）
-  'views/ResumeView.vue', // 简历优化预览（.optimize-preview）
-])
-
 /** 遮罩层必须半透明黑 —— 它是「压在内容之上」的物理隐喻，与主题无关。 */
 const SCRIM_SELECTOR = /(?:^|[,\s.#])(?:modal-mask|backdrop|overlay|scrim)\b/
 
@@ -982,7 +976,7 @@ describe('markdown 正文排版契约（v1.66.19 · R10-D12）', () => {
     expect(main, 'main.ts 未引入 styles/markdown.css，.md-body 不会生效').toContain('styles/markdown.css')
   })
 
-  it('views/** 不得再自写 markdown 元素样式（只允许 .md-body 一个来源）', () => {
+  it('views/** 不得再自写 markdown 元素样式（只允许 .md-body 一个来源，零例外）', () => {
     const bad: string[] = []
     let scanned = 0
     const DEEP_MD =
@@ -992,7 +986,6 @@ describe('markdown 正文排版契约（v1.66.19 · R10-D12）', () => {
       const r = rel(file)
       if (!r.startsWith('views/')) continue
       scanned++
-      if (MD_ALLOWED_VIEWS.has(r)) continue
       const css = stripCssComments(styleBlocks(fs.readFileSync(file, 'utf8')))
       for (const [i, line] of css.split('\n').entries()) {
         if (DEEP_MD.test(line)) bad.push(`${r}:${i + 1}  ${line.trim()}`)
@@ -1004,9 +997,46 @@ describe('markdown 正文排版契约（v1.66.19 · R10-D12）', () => {
       bad,
       'markdown 元素样式只允许写在 styles/markdown.css 的 .md-body 里。在视图里自写会重新造成' +
         '「同一份 markdown 多处观感不同」——全站表格样式就是这么丢的。' +
-        '给容器加 class="md-body" 即可，紧凑场景再叠 is-compact：\n' +
+        '给容器加 class="md-body" 即可；紧凑场景（240px 提示流）叠 is-compact，' +
+        '成品文档（求职信 / 简历预览）叠 is-document：\n' +
         bad.join('\n'),
     ).toEqual([])
+  })
+
+  it('markdown 标题必须显式声明 --font-title（否则会被全局衬线规则吃掉）', () => {
+    // variables.css 有一条全局 `h1 { font-family: var(--font-display) }`（衬线）。
+    // `.md-body` 若不显式声明 --font-title，气泡/卡片/文档里的 h1 就会落成衬线
+    // （Windows 回退宋体）—— v1.66.20 实测求职信预览正是这样，且**现有「小号衬线」
+    // 守卫拦不住**：它只对 font-size < 24px 判违规，而文档 h1 恰好是 24px，在豁免线上。
+    // 因此在这里单独锁住「h1 的规则块里必须有 font-family: var(--font-title)」。
+    const css = stripCssComments(fs.readFileSync(MD_SOURCE, 'utf8'))
+    const rule = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find((m) => /\.md-body h1\b/.test(m[1]))
+    expect(rule, 'styles/markdown.css 里找不到以 .md-body h1 为选择器之一的规则块').toBeTruthy()
+    expect(
+      rule![2],
+      '该规则块没有声明 font-family: var(--font-title) —— h1 会回落到 variables.css 的全局衬线规则（Windows=宋体）',
+    ).toContain('font-family: var(--font-title)')
+  })
+
+  it('两个修饰类必须在唯一来源里定义且真的带字号覆盖（is-compact / is-document）', () => {
+    // 场景差异（紧凑提示流 / 成品文档）**必须**用 markdown.css 里的修饰类表达，
+    // 而不是在视图里另写一套 :deep —— 否则「单一来源」又只剩口号。
+    //
+    // ⚠️ 断言必须落到**具体规则块里的具体声明**，不能只查类名/选择器子串：
+    // v1.66.20 QA 变异测试实测暴露过两次静默失效 ——
+    //   ① 只查 `.md-body.is-compact`（纯类名子串）→ 删掉 h1 规则照样匹配（h2/h3/p 里还有）；
+    //   ② 改成查 `.md-body.is-compact h1`（带选择器）→ 仍被多选择器块
+    //      `.md-body.is-compact h1, h2, … { margin: … }` 满足，删掉字号规则依旧绿。
+    // 故这里解析出单选择器规则块，断言块内确实有 font-size。
+    const css = stripCssComments(fs.readFileSync(MD_SOURCE, 'utf8'))
+    for (const modifier of ['is-compact', 'is-document']) {
+      const block = css.match(new RegExp(`\\.md-body\\.${modifier} h1\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+      expect(block, `styles/markdown.css 里找不到 .md-body.${modifier} h1 { … } 这条单选择器规则`).not.toBe('')
+      expect(
+        block,
+        `.md-body.${modifier} h1 规则里没有 font-size —— 该修饰类的字号覆盖已被删除或改坏`,
+      ).toContain('font-size')
+    }
   })
 
   it('覆盖必须完整（缺任一 markdown 元素即视为契约破损）', () => {
