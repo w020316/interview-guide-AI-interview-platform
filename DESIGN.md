@@ -211,6 +211,11 @@ Windows 回退宋体、Android 回退默认衬线 —— 小字号下笔画发�
 
 ## 8. 改完必须做的验证
 
+> 前三项 + 线上部署验证可**一条命令**跑完：`node scripts/verify-release.mjs [--live]`
+> （详见 `docs/发布清单.md`。沙箱内会自动识别 `safe-delete` 环境守卫并改用仓库外临时目录重试。）
+> 为什么固化：`vite build` 一旦漏跑，而它又是 Cloudflare Pages 部署的前提 ——
+> 构建失败与「平台没触发构建」的线上表现完全一样，排查成本翻倍（v1.66.20 实测踩过）。
+
 1. `npx vue-tsc --noEmit` → 0 error
 2. `npx vitest run` → 全绿（含 `designGuards.test.ts` 与 `changelog.test.ts` 两个门禁）
 3. `npx vite build` → 成功
