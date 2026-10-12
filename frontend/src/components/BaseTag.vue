@@ -123,7 +123,9 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 }
 .base-tag__close:hover {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.08);
+  /* 此前写死 rgba(0,0,0,0.08)：暗色主题下标签底本就是深色，叠 8% 黑等于没有
+   * hover 反馈。改用 currentColor 混色 —— 对任意标签色都成立，且随主题翻转。 */
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 .base-tag__close:focus-visible {
   outline: 2px solid currentColor;

@@ -125,7 +125,7 @@
             <span class="hint-arrow" :class="{ open: hintOpen }">▾</span>
           </button>
           <div v-if="hintOpen" id="hint-body" class="hint-body">
-            <div class="stream-box" v-html="streamHtml"></div>
+            <div class="stream-box md-body is-compact" v-html="streamHtml"></div>
             <div class="hint-actions">
               <BaseButton variant="ghost" size="sm" :loading="streaming" :disabled="streaming" @click="startHint">
                 {{ streaming ? '获取中…' : (streamContent ? '重新获取' : '获取 AI 提示') }}
@@ -1884,9 +1884,12 @@ onUnmounted(() => {
   padding: 0 16px 16px;
 }
 
+/* 容器只管「盒子」；markdown 元素排版统一由 styles/markdown.css 的 .md-body 提供。
+ * 这里叠 is-compact：提示流只有 240px 高，标题用完整档位会把可见内容挤掉。
+ * 此前这里自写了 24 条 :deep 规则（全仓最完整的一套），但只有它有、其余三处没有，
+ * 且它自己也漏了 table（模型输出的表格全站零样式）。字号 / 行高 / 文字色已交给
+ * .md-body —— 同元素两套规则靠样式加载顺序决胜是隐患，不再保留重复声明。 */
 .stream-box {
-  font-size: 14px;
-  line-height: 1.7;
   max-height: 240px;
   overflow-y: auto;
   background: var(--c-surface);
@@ -1894,92 +1897,6 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   border: 1px solid var(--c-border-light);
   margin-bottom: 10px;
-  color: var(--c-text);
-}
-
-.stream-box :deep(p) {
-  margin: 0 0 8px;
-}
-
-.stream-box :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-.stream-box :deep(h1),
-.stream-box :deep(h2),
-.stream-box :deep(h3),
-.stream-box :deep(h4) {
-  font-family: var(--font-sans);
-  line-height: 1.4;
-  font-weight: 700;
-  color: var(--c-text);
-  margin: 12px 0 6px;
-}
-
-.stream-box :deep(h1) { font-size: 17px; }
-.stream-box :deep(h2) { font-size: 16px; padding-bottom: 4px; border-bottom: 1px solid var(--c-border-light); }
-.stream-box :deep(h3) { font-size: 15px; }
-.stream-box :deep(h4) { font-size: 14px; }
-
-.stream-box :deep(> h1:first-child),
-.stream-box :deep(> h2:first-child),
-.stream-box :deep(> h3:first-child) {
-  margin-top: 0;
-}
-
-.stream-box :deep(strong) {
-  font-weight: 650;
-  color: var(--c-text);
-}
-
-.stream-box :deep(ul),
-.stream-box :deep(ol) {
-  margin: 4px 0 8px;
-  padding-left: 20px;
-}
-
-.stream-box :deep(li) {
-  margin: 2px 0;
-}
-
-.stream-box :deep(li) > ul,
-.stream-box :deep(li) > ol {
-  margin: 2px 0;
-}
-
-.stream-box :deep(blockquote) {
-  margin: 6px 0 10px;
-  padding: 2px 12px;
-  border-left: 3px solid var(--brand-primary-200);
-  color: var(--c-text-secondary);
-}
-
-.stream-box :deep(code) {
-  background: var(--c-bg-alt);
-  padding: 2px 6px;
-  border-radius: var(--radius-xs);
-  font-family: var(--font-mono);
-  font-size: 13px;
-}
-
-.stream-box :deep(pre) {
-  background: var(--c-bg-alt);
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  overflow-x: auto;
-  margin: 6px 0 10px;
-}
-
-.stream-box :deep(pre code) {
-  background: transparent;
-  padding: 0;
-  font-size: 13px;
-}
-
-.stream-box :deep(hr) {
-  border: none;
-  border-top: 1px solid var(--c-border-light);
-  margin: 10px 0;
 }
 
 .hint-actions {

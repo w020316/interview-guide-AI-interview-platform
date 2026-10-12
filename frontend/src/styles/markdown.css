@@ -1,0 +1,298 @@
+/* ══════════════════════════════════════════════════════════════════════
+   markdown.css —— AI 生成正文（markdown）排版的**唯一来源**
+   ══════════════════════════════════════════════════════════════════════
+
+   为什么需要这个文件
+   ────────────────────────────────────────────────────────────────────
+   `utils/markdown.ts` 的 `renderMarkdown()` 被 5 个视图调用，而每个视图
+   各写一套 `:deep(...)` 样式，且**覆盖范围差别巨大**：
+
+     InterviewView .stream-box  24 条（h1-h4 / strong / li / 引用 / pre / hr）
+     KnowledgeView .answer-body  6 条
+     AgentView     .md-content   5 条（只有 p / ul / ol / a / code）
+     JobAnalysisView .letter-preview / ResumeView .optimize-preview（文档预览）
+
+   后果（v1.66.19 实测）：模型输出的 **GFM 表格全站零样式**，被塞进 76% 宽的
+   气泡里挤成一团；行内代码写死 `rgba(0,0,0,0.06)`，暗色下与气泡同色等于不可见；
+   `#` 标题命中 variables.css 的全局 `h1 { font-family: var(--font-display) }`，
+   在气泡里渲染成**衬线大字**，违反 DESIGN.md §2（衬线只给 ≥24px 页面级标题）。
+
+   这正是项目最贵的教训：「**没有门禁的约定必然漂移**」。因此本文件是
+   markdown 元素样式的**唯一允许出现的地方**，并由 `designGuards.test.ts` 的
+   三条守卫锁住（颜色不得写死 / 覆盖完整性 / 单一来源）。
+
+   用法：任何 `v-html="renderMarkdown(...)"` 的容器加 `class="md-body"`。
+   紧凑场景（如面试页 240px 高的提示流）再叠 `is-compact`。
+
+   约束（与 DESIGN.md 一致，改动前先读契约）
+   ────────────────────────────────────────────────────────────────────
+   · 颜色 / 圆角 / 间距 / 字号**一律走令牌**，本文件不得出现 hex / rgb / rgba
+     （半透明黑会被现有亮度门禁放行，所以另有一条守卫专治它）
+   · 标题一律 `--font-title`（无衬线）。**不要**用 `--font-display`：
+     衬线只给 ≥24px 的页面级标题，气泡/卡片里的小标题在 Windows 会退化成宋体
+   · 圆角只能取 0 / 50% / --radius-* 令牌（唯一来源是 variables.css）
+   · 正文里的 emoji 属于**模型输出的内容**（不是我们的功能图标），
+     不单独设样式，只保证 `line-height >= 1.4` 不被裁切
+   ══════════════════════════════════════════════════════════════════════ */
+
+.md-body {
+  font-size: var(--font-size-base);
+  line-height: 1.65;
+  color: var(--c-text);
+  /* 长 URL / 长 token 必须能断行：`break-word` 不改变 min-content，
+   * 拦不住 flex 子项被撑破，必须用 `anywhere`。 */
+  overflow-wrap: anywhere;
+}
+
+/* 首尾元素不吃掉容器的内边距，否则气泡顶部空隙 = padding + margin，视觉不均 */
+.md-body > :first-child {
+  margin-top: 0;
+}
+
+.md-body > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── 标题 ──────────────────────────────────────────────────────────────
+ * 统一 --font-title + 字号阶梯（20/18/16/15/13）。层级由「字重 + 负字距 +
+ * 颜色」建立，而不是靠字体族切换（DESIGN.md §2）。 */
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+  font-family: var(--font-title);
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.012em;
+  color: var(--c-text);
+  margin: var(--space-md) 0 var(--space-sm);
+  text-wrap: balance;
+}
+
+.md-body h1 {
+  font-size: var(--font-size-xl);
+}
+
+.md-body h2 {
+  font-size: var(--font-size-lg);
+}
+
+.md-body h3 {
+  font-size: var(--font-size-md);
+}
+
+.md-body h4 {
+  font-size: var(--font-size-base);
+}
+
+.md-body h5,
+.md-body h6 {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--c-text-secondary);
+}
+
+/* ── 段落与强调 ──────────────────────────────────────────────────────── */
+.md-body p {
+  margin: var(--space-sm) 0;
+  text-wrap: pretty;
+}
+
+/* CJK 只有 400 / 700 两档真实字重，写 600 会触发浏览器伪粗体（笔画糊） */
+.md-body strong {
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+.md-body em {
+  font-style: italic;
+}
+
+/* 全局 `a` 去掉了下划线，正文里的链接会和 strong 混在一起，这里补回来 */
+.md-body a {
+  color: var(--brand-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.md-body a:hover {
+  color: var(--brand-primary-hover);
+}
+
+/* ── 列表 ────────────────────────────────────────────────────────────── */
+.md-body ul,
+.md-body ol {
+  margin: var(--space-sm) 0;
+  padding-left: var(--space-lg);
+}
+
+.md-body li {
+  margin: var(--space-xs) 0;
+}
+
+.md-body li::marker {
+  color: var(--c-text-tertiary);
+}
+
+.md-body li > ul,
+.md-body li > ol {
+  margin: var(--space-xs) 0;
+}
+
+.md-body li > p {
+  margin: var(--space-xs) 0;
+}
+
+/* ── 表格 ──────────────────────────────────────────────────────────────
+ * 全站此前**没有任何** markdown 表格样式，模型输出的表格落浏览器默认
+ * （无边框、无内边距、border-collapse: separate 还有缝）。
+ *
+ * 窄屏不溢出：内容是 v-html 注入的，**不能套一层滚动 div**，只能纯 CSS 解决。
+ * `table-layout: fixed` + `width/max-width: 100%` 让列宽 = 容器宽等分，
+ * 内容只能在单元格内换行 → 表格宽度恒 <= 100%，`scrollWidth` 不可能被撑宽。
+ * 代价是列等宽、长内容多换行（390px 下 3 列各约 89px），可读但偏挤；
+ * 若将来真机上挤得难读，再换成 `display: block; overflow-x: auto`（会引入
+ * 气泡内嵌套横向滚动条，移动端体感更差，故不作为默认）。
+ *
+ * 不做斑马纹：可用中性色只有 --c-bg-alt 一档，与表头底色撞车，反而更乱。 */
+.md-body table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: var(--space-sm) 0 var(--space-md);
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+}
+
+.md-body th,
+.md-body td {
+  padding: var(--space-sm);
+  border: 1px solid var(--c-border);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.md-body thead th {
+  background: var(--c-bg-alt);
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+/* ── 引用 ────────────────────────────────────────────────────────────── */
+.md-body blockquote {
+  margin: var(--space-sm) 0;
+  padding: var(--space-xs) var(--space-md);
+  border-left: 3px solid var(--brand-primary-200);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--brand-primary-50);
+  color: var(--c-text-secondary);
+}
+
+.md-body blockquote > :first-child {
+  margin-top: 0;
+}
+
+.md-body blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── 代码 ────────────────────────────────────────────────────────────── */
+.md-body code {
+  background: var(--c-bg-alt);
+  color: var(--brand-primary);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.md-body pre {
+  margin: var(--space-sm) 0;
+  padding: var(--space-md);
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+.md-body pre code {
+  background: transparent;
+  color: var(--c-text);
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* ── 其他 ────────────────────────────────────────────────────────────── */
+.md-body hr {
+  border: none;
+  border-top: 1px solid var(--c-border);
+  margin: var(--space-md) 0;
+}
+
+.md-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+/* ── 窄屏收敛（≤640px，DESIGN.md §3 已登记档位）─────────────────────────
+ * 3 列表格在 390px 视口下每列只有约 89px。按完整档（13px 字 + 8px 内边距）
+ * 每行只放得下约 5 个汉字，截图实测明显偏挤；降到 12px 字 + 4px 内边距后
+ * 约 6.7 个，换行数近乎减半。字号仍在 DESIGN 阶梯上（--font-size-xs = 12）。 */
+@media (max-width: 640px) {
+  .md-body table {
+    font-size: var(--font-size-xs);
+  }
+
+  .md-body th,
+  .md-body td {
+    padding: var(--space-xs);
+  }
+}
+
+/* ── 紧凑变体：窄容器 / 逐字输出流 ────────────────────────────────────
+ * 用于面试页 240px 高的「AI 实时提示」滚动区：那里纵向空间紧张，
+ * 标题用完整档位会把可见内容挤掉。字号仍在 DESIGN 阶梯上，只是整体降一档。
+ * ⚠️ 这是**刻意的例外**，不是漂移；新场景请优先用完整档 `.md-body`。 */
+.md-body.is-compact h1 {
+  font-size: var(--font-size-lg);
+}
+
+.md-body.is-compact h2 {
+  font-size: var(--font-size-md);
+}
+
+.md-body.is-compact h3,
+.md-body.is-compact h4 {
+  font-size: var(--font-size-base);
+}
+
+.md-body.is-compact h1,
+.md-body.is-compact h2,
+.md-body.is-compact h3,
+.md-body.is-compact h4,
+.md-body.is-compact h5,
+.md-body.is-compact h6 {
+  margin: var(--space-sm) 0 var(--space-xs);
+}
+
+.md-body.is-compact p,
+.md-body.is-compact ul,
+.md-body.is-compact ol {
+  margin: var(--space-xs) 0 var(--space-sm);
+}
+
+/* 紧凑场景的 h2 保留一条发丝下划线：那是提示流里「分段」的编辑式线索
+ * （沿用 InterviewView 原有做法，避免收敛后丢失）。 */
+.md-body.is-compact h2 {
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--c-border-light);
+}

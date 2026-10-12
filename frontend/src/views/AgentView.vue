@@ -52,7 +52,7 @@
             <div class="msg-avatar">{{ msg.role === 'user' ? '我' : 'AI' }}</div>
             <div class="msg-bubble" :class="{ streaming: msg.role === 'assistant' && streaming && i === messages.length - 1 }">
               <template v-if="msg.role === 'user'">{{ msg.content }}</template>
-              <div v-else class="md-content" v-html="renderedContent(msg.content, msg.role === 'assistant' && streaming && i === messages.length - 1)"></div>
+              <div v-else class="md-body" v-html="renderedContent(msg.content, msg.role === 'assistant' && streaming && i === messages.length - 1)"></div>
             </div>
           </div>
 
@@ -483,7 +483,9 @@ onMounted(() => {
   flex-direction: column;
   border: 1px solid var(--c-border);
   border-radius: var(--radius-lg);
-  background: var(--c-surface);
+  /* 容器用 --c-bg、气泡用 --c-surface-elevated：暗色下 --c-surface 与
+   * --c-bg-alt 同值（#211d1a），旧写法会让气泡与容器零对比、边界不可辨 */
+  background: var(--c-bg);
   overflow: hidden;
 }
 
@@ -582,19 +584,28 @@ onMounted(() => {
   color: var(--c-on-primary);
 }
 
+/* 助手回答常常是「长结构化正文 + 表格」，需要横向空间（DESIGN.md §5.5 的
+ * 65~75 字符阅读带）。`.msg-bubble` 是 flex 子项且没有 flex-grow，基尺寸 =
+ * max-content，所以 100% 只是**上限**，一句寒暄仍会收缩到内容宽，不会松散。
+ * 用户消息保持 76%：都是短句，右对齐更好读。 */
 .msg-bubble {
-  max-width: 76%;
+  max-width: 100%;
+  /* flex 子项默认 min-width:auto，长 token / 长 URL 会撑破容器 */
+  min-width: 0;
   padding: 10px 14px;
   border-radius: var(--radius-lg);
-  font-size: 14px;
-  line-height: 1.7;
-  background: var(--c-bg-alt);
+  font-size: var(--font-size-base);
+  line-height: 1.65;
+  background: var(--c-surface-elevated);
+  border: 1px solid var(--c-border);
   color: var(--c-text);
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .msg-row.user .msg-bubble {
+  max-width: 76%;
   background: var(--brand-primary);
+  border-color: var(--brand-primary);
   color: var(--c-on-primary);
 }
 
@@ -610,26 +621,9 @@ onMounted(() => {
   }
 }
 
-.md-content :deep(p) {
-  margin: 4px 0;
-}
-
-.md-content :deep(ul),
-.md-content :deep(ol) {
-  margin: 6px 0;
-  padding-left: 20px;
-}
-
-.md-content :deep(a) {
-  color: var(--brand-primary);
-}
-
-.md-content :deep(code) {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 1px 5px;
-  border-radius: var(--radius-xs);
-  font-size: 13px;
-}
+/* markdown 正文排版统一由 styles/markdown.css 的 .md-body 提供
+ * （唯一来源，由 designGuards.test.ts 锁住）。此处不再重复定义
+ * p / ul / ol / a / code 等元素样式 —— 那正是此前「五套实现漂移」的成因。 */
 
 .thinking-dots span {
   animation: dot 1.4s infinite;
@@ -706,8 +700,8 @@ onMounted(() => {
     min-width: 140px;
   }
 
-  .msg-bubble {
-    max-width: 86%;
+  .msg-row.user .msg-bubble {
+    max-width: 88%;
   }
 }
 </style>

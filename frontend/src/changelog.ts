@@ -85,9 +85,22 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.18'
+export const CURRENT_VERSION = '1.66.19'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.66.19',
+    date: '2026-10-12',
+    title: '版本 1.66.19 · 智能体回答里的表格不再挤成一团',
+    items: [
+      { text: '求职智能体给出的长回答里，如果包含表格（比如「淘汰策略 / 行为 / 适用场景」这类对比），此前完全没有排版：没有表头底色、没有单元格边距、也没有边框，几列内容挤在一起，手机上尤其难受。现在表格有了清晰的表头、发丝分隔线和合适的内边距，并且任何宽度下都不会把页面撑出横向滚动条', level: 'user' },
+      { text: '回答里的各级小标题此前是浏览器默认样式（字号大小不一、上下间距随意），以「#」开头的一级标题还会被渲染成宋体大字，与全站风格割裂。现在标题统一为无衬线、按 20 / 18 / 16 / 15 的阶梯排布，层级一眼可辨；同时补齐了引用块、代码块、分隔线、加粗与列表的样式', level: 'user' },
+      { text: '智能体的回答气泡此前只占 76% 宽度，长回答被压成窄条；现在助手的回答可以用满宽度（一句话寒暄仍会自然收缩到内容宽，不会显得空荡），你自己发的话保持 76% 以便与回答区分', level: 'user' },
+      { text: '修复：暗色主题下回答气泡与聊天区的底色是同一个颜色，气泡边界完全看不出来；行内代码的底色此前是写死的半透明黑，暗色下与气泡同色、等于没有底色。现在气泡改用更亮的表面色并带描边，行内代码用品牌色，两种主题下都清晰可辨', level: 'user' },
+      { text: '实现：新增 `styles/markdown.css` 作为 AI 正文排版的**唯一来源**（`.md-body`）。此前 `renderMarkdown()` 被 5 个视图调用，markdown 元素样式却各写一套 —— InterviewView 24 条、KnowledgeView 6 条、AgentView 仅 5 条，且**全站都没有表格样式**。现收敛为单一来源 + `is-compact` 紧凑变体（面试页 240px 的 AI 提示流沿用紧凑档，避免字号变大后可见内容被挤掉）', level: 'tech' },
+      { text: '测试：`designGuards.test.ts` 新增 5 条守卫 —— 唯一来源存在且已被引入 / 视图不得再自写 markdown 元素样式（白名单仅求职信与简历两个**文档预览**）/ 元素覆盖完整性 / 表格必须自带不溢出契约 / 渲染区不得写死颜色（专治 `rgba(0,0,0,α)` 这个「亮度门禁放行纯黑」的盲区）。顺带修掉 `BaseTag` 关闭按钮 hover 的写死半透明黑（暗色下没有 hover 反馈），改用 `color-mix(in srgb, currentColor …)`', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.18',
     date: '2026-10-11',

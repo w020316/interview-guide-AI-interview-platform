@@ -932,3 +932,151 @@ describe('空态图标类名必须统一为 .empty-icon-wrap（v1.66.13 · R10-D
     ).toEqual([])
   })
 })
+
+/* ══════════════════════════════════════════════════════════════════
+   markdown 正文排版契约（v1.66.19 · R10-D12）
+   ══════════════════════════════════════════════════════════════════ */
+
+/**
+ * ── 为什么需要它 ────────────────────────────────────────────────────
+ * `utils/markdown.ts` 的 `renderMarkdown()` 被 5 个视图调用，而 markdown 元素
+ * 样式一度是**每个视图各写一套**，覆盖范围差别巨大：
+ *
+ *   InterviewView  .stream-box   24 条（h1-h4 / strong / li / 引用 / pre / hr）
+ *   KnowledgeView  .answer-body   6 条
+ *   AgentView      .md-content    5 条（只有 p / ul / ol / a / code）
+ *
+ * 后果（实测）：模型输出的 **GFM 表格全站零样式**，被塞进 76% 宽的气泡里挤成
+ * 一团；行内代码写死 `rgba(0,0,0,0.06)`，暗色下与气泡同色等于不可见 —— 而现有的
+ * 「不允许写死浅色背景」守卫**拦不住它**：`LIGHT_BG` 命中后还要过 `isLightHex()`
+ * 判亮度，纯黑的 alpha 无论多少均值都是 0，会被判成「不是浅色」而放行。
+ *
+ * 这是「没有门禁的约定必然漂移」的又一次实证，故按五条判据锁住。
+ */
+
+const MD_SOURCE = path.join(SRC, 'styles', 'markdown.css')
+
+/** 文档预览：求职信 / 简历导出预览，刻意按「文档」排版而非「对话正文」。 */
+const MD_ALLOWED_VIEWS = new Set([
+  'views/JobAnalysisView.vue', // 求职信预览（.letter-preview）
+  'views/ResumeView.vue', // 简历优化预览（.optimize-preview）
+])
+
+/** 遮罩层必须半透明黑 —— 它是「压在内容之上」的物理隐喻，与主题无关。 */
+const SCRIM_SELECTOR = /(?:^|[,\s.#])(?:modal-mask|backdrop|overlay|scrim)\b/
+
+function stripCssComments(css: string): string {
+  return css.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+}
+
+/** 取 .vue 的 <style> 段（模板里的 :style="{...}" 会干扰选择器回溯） */
+function styleBlocks(text: string): string {
+  const blocks = [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1])
+  return blocks.length ? blocks.join('\n') : text
+}
+
+describe('markdown 正文排版契约（v1.66.19 · R10-D12）', () => {
+  it('唯一来源 styles/markdown.css 存在且已被 main.ts 引入', () => {
+    expect(fs.existsSync(MD_SOURCE), 'styles/markdown.css 不存在').toBe(true)
+    const main = fs.readFileSync(path.join(SRC, 'main.ts'), 'utf8')
+    expect(main, 'main.ts 未引入 styles/markdown.css，.md-body 不会生效').toContain('styles/markdown.css')
+  })
+
+  it('views/** 不得再自写 markdown 元素样式（只允许 .md-body 一个来源）', () => {
+    const bad: string[] = []
+    let scanned = 0
+    const DEEP_MD =
+      /:deep\(\s*(?:>\s*)?(h[1-6]|p|ul|ol|li|table|thead|tbody|tr|th|td|blockquote|pre|code|hr|strong|em|img|a)\b/
+
+    for (const file of walkExt(SRC, new Set(['.vue']))) {
+      const r = rel(file)
+      if (!r.startsWith('views/')) continue
+      scanned++
+      if (MD_ALLOWED_VIEWS.has(r)) continue
+      const css = stripCssComments(styleBlocks(fs.readFileSync(file, 'utf8')))
+      for (const [i, line] of css.split('\n').entries()) {
+        if (DEEP_MD.test(line)) bad.push(`${r}:${i + 1}  ${line.trim()}`)
+      }
+    }
+
+    expect(scanned, '扫描范围异常：文件数过少，守卫可能已静默失效').toBeGreaterThan(15)
+    expect(
+      bad,
+      'markdown 元素样式只允许写在 styles/markdown.css 的 .md-body 里。在视图里自写会重新造成' +
+        '「同一份 markdown 多处观感不同」——全站表格样式就是这么丢的。' +
+        '给容器加 class="md-body" 即可，紧凑场景再叠 is-compact：\n' +
+        bad.join('\n'),
+    ).toEqual([])
+  })
+
+  it('覆盖必须完整（缺任一 markdown 元素即视为契约破损）', () => {
+    const css = stripCssComments(fs.readFileSync(MD_SOURCE, 'utf8'))
+    const REQUIRED = [
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li',
+      'table', 'thead', 'th', 'td', 'blockquote', 'pre', 'code', 'hr',
+      'strong', 'em', 'a', 'img',
+    ]
+    const missing = REQUIRED.filter((tag) => !css.includes(`.md-body ${tag}`))
+    expect(
+      missing,
+      `styles/markdown.css 缺少这些元素的规则（模型会输出它们，缺了就落浏览器默认样式）：${missing.join(', ')}`,
+    ).toEqual([])
+  })
+
+  it('表格必须自带「不横向溢出」契约（v-html 注入，套不了滚动容器）', () => {
+    const css = stripCssComments(fs.readFileSync(MD_SOURCE, 'utf8'))
+    const block = css.match(/\.md-body table\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(block, 'styles/markdown.css 里找不到 .md-body table 规则').not.toBe('')
+    expect(block, '表格必须 max-width: 100%，否则长内容会撑破气泡').toContain('max-width: 100%')
+    const contained = /table-layout:\s*fixed/.test(block) || /overflow-x:\s*auto/.test(block)
+    expect(contained, '表格必须用 table-layout: fixed（或 overflow-x: auto）保证不撑破容器').toBe(true)
+  })
+
+  it('markdown 渲染区不得写死颜色（含「半透明黑」这个亮度门禁盲区）', () => {
+    const bad: string[] = []
+    const HARD_COLOR = /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/
+
+    // ① 唯一来源自身：所有颜色类声明必须走 var()
+    const COLOR_DECL =
+      /(?:^|[;\s{])(background|background-color|color|border|border-[a-z]+|border-color|border-[a-z]+-color)\s*:\s*([^;{}]+)/g
+    const mdCss = stripCssComments(fs.readFileSync(MD_SOURCE, 'utf8'))
+    for (const [i, line] of mdCss.split('\n').entries()) {
+      for (const m of line.matchAll(COLOR_DECL)) {
+        const value = m[2].trim()
+        if (!HARD_COLOR.test(value) || value.includes('var(')) continue
+        bad.push(`styles/markdown.css:${i + 1}  ${line.trim()}`)
+      }
+    }
+
+    // ② 全站：不得把「半透明黑 / 纯黑」当背景。遮罩层例外（与主题无关的物理隐喻）；
+    //    其余场景在暗色下叠在深色容器上等于不可见。
+    //    为什么不用「只看亮度」的老办法：现有 LIGHT_BG 命中后要过 isLightHex()，
+    //    纯黑的 alpha 无论多少均值都是 0 → 被判「不是浅色」而放行。
+    //    这里覆盖三种写法：rgba()/rgb() 逗号式、rgb() 空格斜杠式（现代语法）、hex 式。
+    //    hex 式与既有的「不得写死颜色 hex」守卫重叠，属刻意的双保险（QA 复核后补）。
+    const BLACKISH_BG =
+      /background(?:-color)?\s*:\s*(?:rgba?\(\s*0\s*[,\s]\s*0\s*[,\s]\s*0\s*[,/]|hsla?\(\s*0\s*[,\s]\s*0%\s*[,\s]\s*0%\s*[,/]|#000(?:000)?[0-9a-fA-F]{0,2}(?![\w-]))/
+    for (const file of walkExt(SRC, SCAN_EXT)) {
+      const r = rel(file)
+      if (r.endsWith('styles/variables.css')) continue
+      const raw = fs.readFileSync(file, 'utf8')
+      const css = stripCssComments(r.endsWith('.vue') ? styleBlocks(raw) : raw)
+      const lines = css.split('\n')
+      for (const [i, line] of lines.entries()) {
+        if (!BLACKISH_BG.test(line)) continue
+        // 选择器可能在前几行（多行选择器列表），故回看 5 行做上下文判断
+        const ctx = lines.slice(Math.max(0, i - 5), i + 1).join('\n')
+        if (SCRIM_SELECTOR.test(ctx)) continue
+        bad.push(`${r}:${i + 1}  ${line.trim()}`)
+      }
+    }
+
+    expect(
+      bad,
+      '这些颜色是写死的。半透明黑背景在暗色主题下等于不可见（现有亮度门禁因纯黑均值为 0 而放行，' +
+        '是本次实测的盲区）—— 请改用语义令牌：背景 --c-bg-alt / --c-surface-elevated，' +
+        '前景 --c-text / --brand-primary；需要「叠加一层」用 color-mix(in srgb, currentColor N%, transparent)：\n' +
+        bad.join('\n'),
+    ).toEqual([])
+  })
+})

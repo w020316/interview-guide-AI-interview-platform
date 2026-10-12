@@ -69,7 +69,7 @@
           </svg>
           <h4>AI 回答</h4>
         </div>
-        <div class="answer-body" v-html="renderedAnswer"></div>
+        <div class="md-body" v-html="renderedAnswer"></div>
       </div>
     </div>
 
@@ -710,41 +710,10 @@ function formatTime(t?: string) {
   font-family: var(--font-title);
 }
 
-.answer-body {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--c-text);
-  word-break: break-word;
-}
-
-.answer-body :deep(h1),
-.answer-body :deep(h2),
-.answer-body :deep(h3) {
-  font-size: 16px;
-  margin: 16px 0 8px;
-  color: var(--c-text);
-}
-
-.answer-body :deep(code) {
-  background: var(--c-bg-alt);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--brand-primary);
-}
-
-.answer-body :deep(pre) {
-  background: var(--c-bg-alt);
-  padding: 12px;
-  border-radius: var(--radius-md);
-  overflow-x: auto;
-  margin: 8px 0;
-}
-
-.answer-body :deep(p) {
-  margin: 8px 0;
-}
+/* AI 回答正文的排版统一由 styles/markdown.css 的 .md-body 提供（唯一来源）。
+ * 此处此前自写了一套（h1-h3 / code / pre / p），与 AgentView、InterviewView
+ * 各写一套 —— 三套覆盖范围差别巨大，同一份 markdown 在三处观感不同，
+ * 且全站都没有表格样式。已收敛，并由 designGuards.test.ts 锁住。 */
 
 /* ── 结果卡片 ── */
 .result-card {

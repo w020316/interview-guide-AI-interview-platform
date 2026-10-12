@@ -163,6 +163,23 @@ Windows 回退宋体、Android 回退默认衬线 —— 小字号下笔画发�
   `role="button"` + `tabindex="0"` + `@keydown.enter` + `@keydown.space.prevent` + `:focus-visible` 焦点环。
 - **这是可访问性要求，不是可选。**
 
+**AI 生成的正文（markdown）排版（v1.66.19 定死）**
+- `renderMarkdown()`（`utils/markdown.ts`）的输出**只有一个排版来源**：
+  `frontend/src/styles/markdown.css` 的 `.md-body`。容器加 `class="md-body"` 即可；
+  纵向空间紧张的场景（面试页 240px 的「AI 实时提示」流）再叠 `is-compact`。
+- ❌ **禁止在视图里再写 `:deep(h1|h2|table|code|pre|hr|blockquote|…)`**。
+  v1.66.19 实测：同一份 markdown 曾被 5 个视图各写一套，覆盖范围 24 / 6 / 5 条不等，
+  结果是**全站表格零样式**、行内代码写死 `rgba(0,0,0,0.06)`（暗色下不可见）。
+  已加门禁（`designGuards.test.ts` 的「markdown 正文排版契约」，5 条）。
+- **例外**：求职信预览（`JobAnalysisView` 的 `.letter-preview`）与简历预览
+  （`ResumeView` 的 `.optimize-preview`）是**文档**排版而非对话正文，刻意不走 `.md-body`，
+  已在门禁白名单内并注明理由。
+- 标题一律 `--font-title`：注意 `variables.css` 有全局 `h1 { font-family: var(--font-display) }`，
+  气泡/卡片里的小标题若不显式覆盖会渲染成**衬线**，违反 §2。
+- 表格：`table-layout: fixed` + `width/max-width: 100%` 保证窄屏不横向溢出
+  （`v-html` 注入**套不了滚动容器**，只能纯 CSS 解决）；≤640px 降到 12px 字 + 4px 内边距。
+- 正文里的 emoji 是**模型输出的内容**，不是我们的功能图标，不单独设样式。
+
 ## 6. 文案
 
 - ❌ 假精确数字（`100%`、`99.99%`）；❌ AI 套话（「赋能」「一站式解决方案」「开启新篇章」…）
