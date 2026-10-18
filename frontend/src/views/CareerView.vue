@@ -226,7 +226,46 @@
           <div class="story-title">{{ s.title }}</div>
           <div class="story-actions">
             <button class="link-btn" @click="togglePractice(s.id)">{{ practicingId === s.id ? '收起练习' : '练习 / 质检' }}</button>
+            <button class="link-btn" @click="startEdit(s)">{{ editingId === s.id ? '收起编辑' : '编辑' }}</button>
             <button class="link-btn danger" @click="removeStory(s.id)">删除</button>
+          </div>
+        </div>
+
+        <!-- G4：行内编辑。此前 StoryBankService.update() 已实现但无任何调用方（死代码），
+             用户改一句措辞只能删掉重建，连带丢掉已有的六项质检结果 -->
+        <div v-if="editingId === s.id" class="practice">
+          <div class="edit-grid">
+            <label class="edit-field"><span>标题</span>
+              <input v-model="editForm.title" class="input" maxlength="200" placeholder="例如：重构订单模块" />
+            </label>
+            <label class="edit-field"><span>情境（Situation）</span>
+              <textarea v-model="editForm.situation" class="input ta" rows="2"></textarea>
+            </label>
+            <label class="edit-field"><span>任务（Task）</span>
+              <textarea v-model="editForm.task" class="input ta" rows="2"></textarea>
+            </label>
+            <label class="edit-field"><span>行动（Action）</span>
+              <textarea v-model="editForm.action" class="input ta" rows="3"></textarea>
+            </label>
+            <label class="edit-field"><span>结果（Result）</span>
+              <textarea v-model="editForm.result" class="input ta" rows="2"></textarea>
+            </label>
+            <label class="edit-field"><span>证据（可核实的数字/产出）</span>
+              <textarea v-model="editForm.evidence" class="input ta" rows="2"></textarea>
+            </label>
+            <label class="edit-field"><span>能力标签（逗号分隔）</span>
+              <input v-model="editForm.capabilityTags" class="input" maxlength="500" />
+            </label>
+            <label class="edit-field"><span>目标赛道</span>
+              <input v-model="editForm.targetTrack" class="input" maxlength="200" />
+            </label>
+          </div>
+          <div class="edit-actions">
+            <BaseButton size="sm" variant="gradient" :disabled="editSaving || !editForm.title.trim()" @click="saveEdit(s.id)">
+              {{ editSaving ? '保存中…' : '保存修改' }}
+            </BaseButton>
+            <BaseButton size="sm" variant="ghost" @click="editingId = null">取消</BaseButton>
+            <span class="edit-hint">已有质检结果会保留；改完想重新判定，点「练习 / 质检」再测一次。</span>
           </div>
         </div>
         <div class="story-grid">
@@ -273,7 +312,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton, BaseTag } from '../components'
@@ -432,9 +471,58 @@ function adviceClass(a: ApplyAdvice) {
   return 'low'
 }
 
-/** 加载我的故事库 */
-async function loadStories() {
+// ── G4（2026-10-18）：故事行内编辑 ──
+const editingId = ref<number | null>(null)
+const editSaving = ref(false)
+const editForm = reactive({
+  title: '', situation: '', task: '', action: '',
+  result: '', evidence: '', capabilityTags: '', targetTrack: '',
+})
+
+/** 进入编辑：把当前故事整份拷进表单（不直接绑 s，避免取消后界面已被改动） */
+function startEdit(s: StoryItem) {
+  if (editingId.value === s.id) {
+    editingId.value = null
+    return
+  }
+  editingId.value = s.id
+  editForm.title = s.title || ''
+  editForm.situation = s.situation || ''
+  editForm.task = s.task || ''
+  editForm.action = s.action || ''
+  editForm.result = s.result || ''
+  editForm.evidence = s.evidence || ''
+  editForm.capabilityTags = s.capabilityTags || ''
+  editForm.targetTrack = s.targetTrack || ''
+  // 编辑与练习面板互斥，否则同屏两个输入区会让人分不清在改什么
+  practicingId.value = null
+}
+
+/**
+ * 保存修改。后端是**部分更新语义**（只覆盖非 null 字段），
+ * 这里整份提交，语义等价且在「清空某个字段」时行为可预期。
+ * 注意：`checkResult` 不在提交范围内——它是针对内容的质检快照，不该被前端覆盖。
+ */
+async function saveEdit(id: number) {
+  if (!editForm.title.trim()) {
+    ElMessage.warning('标题不能为空')
+    return
+  }
+  editSaving.value = true
   try {
+    await api.put(`/api/story-bank/${id}`, { ...editForm })
+    ElMessage.success('已保存')
+    editingId.value = null
+    await loadStories()
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '保存失败，请稍后再试'))
+  } finally {
+    editSaving.value = false
+  }
+}
+
+/** 加载我的故事库 */
+async function loadStories() {  try {
     stories.value = (await api.get('/api/story-bank')) as unknown as StoryItem[]
   } catch {
     // 静默：故事库加载失败不打断页面
@@ -654,4 +742,34 @@ async function doFollowUp(s: StoryItem) {
 .check-name { font-weight: 600; color: var(--c-text); flex: none; }
 .check-comment { color: var(--c-text-tertiary); }
 .check-suggestion { font-size: 13px; line-height: 1.7; color: var(--c-text-secondary); background: var(--brand-primary-light); border-radius: var(--radius-sm); padding: 8px 10px; margin-top: 8px; }
+
+/* ── G4：故事行内编辑 ──
+   刻意不用 @media：项目门禁只允许已登记的断点，而 auto-fit + minmax 本身就能自适应列数，
+   既不新增断点，也不用为「桌面两列 / 移动一列」各写一套。 */
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0 14px;
+}
+.edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.edit-field > span {
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+.edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.edit-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-text-tertiary);
+}
 </style>

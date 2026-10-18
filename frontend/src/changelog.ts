@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.69.0'
+export const CURRENT_VERSION = '1.70.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.70.0',
+    date: '2026-10-18',
+    title: '版本 1.70.0 · 故事库里的故事能改了',
+    items: [
+      { text: '故事库每张卡片多了「编辑」：标题、情境、任务、行动、结果、证据、能力标签、目标赛道都能直接改，改完点保存即可。此前想调一句措辞只能先删掉再重新提炼——连带把已经做过的六项质检结果一起丢掉', level: 'user' },
+      { text: '已有的质检结果会保留（换个说法不等于结论失效）；改完内容如果想重新判定，点「练习 / 质检」再测一次就行', level: 'user' },
+      { text: '实现：接上 `StoryBankService.update()` —— 这个方法**早就写好了却没有任何调用方**，是标准的死代码；新增 `PUT /api/story-bank/{id}`。采用部分更新语义（只覆盖 body 里非 null 的字段），否则前端只传一个字段就会把 STAR 其余层清空', level: 'tech' },
+      { text: '顺带修掉它的错误语义：此前故事不存在抛 `BusinessException`，全局映射成 **503「服务不可用」**，把「故事没了/不是你的」误报成「服务挂了」。改为 `ResourceNotFoundException` → 404 —— 与 v1.48.0 修 delete 的 P1-05 同一原因，当时只修了 delete、漏了 update', level: 'tech' },
+      { text: '测试：`StoryUpdateServiceTest` 4 条（只传 action 其余不变 / 空白标题不覆盖 / 标题 trim / 不存在 404 且不落库）+ `StoryUpdateControllerTest` 2 条（路径与 404 映射）。重点在「部分更新」——这是死代码首次被验证的语义', level: 'tech' },
+    ],
+  },
   {
     version: '1.69.0',
     date: '2026-10-18',

@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -144,6 +145,23 @@ public class StoryBankController {
 
         String json = storyBankService.followUp(story, answer);
         return Result.success(parseToMap(json, "followup"));
+    }
+
+    /**
+     * 更新故事内容（仅允许本人，G4，2026-10-18）
+     * PUT /api/story-bank/{id}
+     *
+     * <p>此前 {@code StoryBankService.update()} 早已写好却**没有任何调用方**（死代码）——
+     * 用户想改一句措辞只能删掉重建，连带丢掉已有的六项质检结果。
+     *
+     * <p>部分更新语义：只覆盖 body 里非 null 的字段，避免前端只传一部分时把
+     * STAR 其余层误清空。`check_result` 保持不变（它是针对该故事内容的快照，
+     * 换个标题不代表质检结论失效）。
+     */
+    @Operation(summary = "更新故事内容（部分更新）")
+    @PutMapping("/{id}")
+    public Result<StoryBankEntity> update(@PathVariable Long id, @RequestBody StoryBankEntity patch) {
+        return Result.success(storyBankService.update(currentUserId(), id, patch));
     }
 
     /** 删除故事 */

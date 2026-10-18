@@ -106,7 +106,12 @@ public class StoryBankService {
     public StoryBankEntity update(String userId, Long id, StoryBankEntity patch) {
         StoryBankEntity existing = findOwned(userId, id);
         if (existing == null) {
-            throw new BusinessException("故事不存在或无权操作");
+            // G4（2026-10-18）：与 delete 的 P1-05 同因 —— 此前抛 BusinessException，
+            // 全局映射成 **503「服务不可用」**。503 表示服务侧故障，而这里只是资源不存在，
+            // 会让前端把「故事被删了/不是你的」误报成「服务挂了」。统一为 404。
+            // 注：findByIdAndUserId 不区分「不存在」与「非本人」，故两者都回 404，
+            // 避免通过状态码探测他人故事是否存在。
+            throw new ResourceNotFoundException("故事不存在或无权操作");
         }
         if (patch.getTitle() != null && !patch.getTitle().isBlank()) {
             existing.setTitle(patch.getTitle().trim());
