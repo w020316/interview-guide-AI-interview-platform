@@ -3,7 +3,7 @@
     <header class="page-header page-head-row">
       <div>
         <h1>简历历史</h1>
-        <p>查看历次简历分析的结果与评分变化</p>
+        <p>查看历次简历分析的结果与各维度问题清单，改完重新分析，对比清单少了哪些</p>
       </div>
       <button v-if="resumes.length >= 2 && !compareMode" class="compare-toggle" @click="toggleCompareMode">
         多版本对比
@@ -163,6 +163,15 @@
                   <div class="dim-bar">
                     <div class="dim-bar-fill" :style="{ width: (d.score || 0) + '%', background: scoreGradient(d.score) }"></div>
                   </div>
+                  <!-- 规则化清单条目：与 ResumeView 同源（utils/resumeChecklist），
+                       从落库的简历正文确定性计算，注入「含金量」维度；
+                       正文缺失 / 非含金量维度时为空数组，不渲染。 -->
+                  <ul v-if="dimChecklist(d.name).length" class="dim-issues">
+                    <li v-for="(c, ci) in dimChecklist(d.name)" :key="ci" class="dim-issue">
+                      <span class="issue-problem">{{ c.problem }}</span>
+                      <span class="issue-advice">{{ c.advice }}</span>
+                    </li>
+                  </ul>
                   <p class="dim-suggestion">{{ d.suggestion }}</p>
                 </div>
               </div>
@@ -253,6 +262,7 @@ import { isConflictError } from '../utils/httpError'
 import { repairAndCheck } from '../utils/jsonRepair'
 import { compareResume, type ResumeVersion, type DimDiff } from '../utils/resumeCompare'
 import { isParseFailed } from '../utils/resumeAnalysis'
+import { checklistForDimension, type ResumeChecklistItem } from '../utils/resumeChecklist'
 import { EMPTY } from '../utils/format'
 import { getScoreColor, getScoreGradient } from '../utils/score'
 import { BaseButton } from '../components'
@@ -419,6 +429,18 @@ const failedIds = computed(() => {
 
 /** 当前详情是否为解析失败 */
 const detailFailed = computed(() => isParseFailed(detail.value))
+
+/* ── 规则化清单条目（vNext 叙事转向）──
+ * 与 ResumeView 同源：从落库的简历正文（content）确定性计算，
+ * 注入「含金量」维度。正文以「[上传文件] 」前缀标记来源，先剥掉再统计。 */
+
+/** 详情对应的简历原文；缺失 / 空时为 ''，checklistForDimension 会安全返回空数组 */
+const detailResumeText = computed(() => (detail.value?.content ?? '').replace(/^\[上传文件\]\s*/, ''))
+
+/** 某维度应注入的规则化清单条目（仅含金量维度） */
+function dimChecklist(name: string): ResumeChecklistItem[] {
+  return checklistForDimension(name, detailResumeText.value)
+}
 
 function getPreview(r: Resume): string {
   if (!r.content) return '简历记录'
@@ -1207,6 +1229,39 @@ const summaryText = computed(() => {
   height: 100%;
   border-radius: var(--radius-full);
   transition: width 0.6s ease;
+}
+
+/* ── 规则化清单条目（与 ResumeView 同源：utils/resumeChecklist）── */
+.dim-issues {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dim-issue {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+}
+
+.issue-problem {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--c-text);
+}
+
+.issue-advice {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
 }
 
 .dim-suggestion {

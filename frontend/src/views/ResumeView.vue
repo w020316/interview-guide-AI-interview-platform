@@ -168,20 +168,21 @@
       </div>
     </div>
 
-    <!-- 加载状态：骨架屏（v1.23.2 优化②，按结果布局占位，降低等待焦虑） -->
+    <!-- 加载状态：骨架屏（v1.23.2 优化②，按结果布局占位，降低等待焦虑）。
+         顺序与结果区一致：维度卡在前、参考总分为小徽标在后。 -->
     <div v-if="loading" class="loading-state" role="status" aria-live="polite">
-      <div class="skeleton-hero">
-        <div class="skeleton skeleton-circle"></div>
-        <div class="skeleton-hero-lines">
-          <div class="skeleton skeleton-line" style="width: 30%"></div>
-          <div class="skeleton skeleton-line" style="width: 52%"></div>
-        </div>
-      </div>
       <div class="skeleton-grid">
         <div v-for="i in 4" :key="i" class="skeleton-card">
           <div class="skeleton skeleton-line" style="width: 42%"></div>
           <div class="skeleton skeleton-bar"></div>
           <div class="skeleton skeleton-line" style="width: 88%"></div>
+        </div>
+      </div>
+      <div class="skeleton-hero">
+        <div class="skeleton skeleton-circle"></div>
+        <div class="skeleton-hero-lines">
+          <div class="skeleton skeleton-line" style="width: 30%"></div>
+          <div class="skeleton skeleton-line" style="width: 52%"></div>
         </div>
       </div>
       <div class="skeleton-hint">AI 正在分析你的简历 · 首次调用需冷启动，最长约 1-2 分钟</div>
@@ -199,10 +200,46 @@
         <span>{{ parseError }}</span>
       </div>
 
-      <!-- 综合评分 -->
-      <div class="score-hero">
-        <div class="score-circle" :style="{ '--score-color': scoreColor }">
-          <svg viewBox="0 0 120 120" class="score-svg">
+      <!-- 各维度问题与建议（主视觉）。
+           vNext 叙事转向：实测模型打分对同档内容改进不敏感、跨轮噪声 ≈ 信号，
+           「改完看分数变化」的承诺不可靠 → 主推四个维度各自的问题清单。
+           「含金量」维度的清单最前面注入 utils/resumeChecklist 的规则化条目
+           （从简历原文确定性计算；原文不可用时自动退化为仅 AI 建议，
+           无条目时用 EMPTY 口径，绝不显示「0 条问题」）。 -->
+      <div v-if="parsed.dimensions?.length" class="dimensions">
+        <h4 class="block-title">各维度问题与建议</h4>
+        <div class="dim-grid">
+          <div v-for="(d, idx) in parsed.dimensions" :key="idx" class="dim-card">
+            <div class="dim-head">
+              <span class="dim-name">{{ d.name }}</span>
+              <!-- v1.65.1：判空 —— 原来 `{{ d.score }}分` 在 score 缺失时会渲染出一个孤零零的「分」 -->
+              <span class="dim-score" :style="{ color: getScoreColor(d.score) }">{{ d.score != null ? `${d.score}分` : EMPTY }}</span>
+            </div>
+            <div class="dim-bar">
+              <div class="dim-bar-fill" :style="{ width: (d.score || 0) + '%', background: getScoreGradient(d.score) }"></div>
+            </div>
+            <ul v-if="dimHasContent(d.name, d.suggestion)" class="dim-issues">
+              <li v-for="(c, ci) in dimChecklist(d.name)" :key="'rule-' + ci" class="dim-issue">
+                <span class="issue-problem">{{ c.problem }}</span>
+                <span class="issue-advice">{{ c.advice }}</span>
+              </li>
+              <li v-if="d.suggestion.trim()" class="dim-issue is-ai">
+                <span class="issue-problem">AI 建议</span>
+                <span class="issue-advice">{{ d.suggestion }}</span>
+              </li>
+            </ul>
+            <!-- 无清单条目 ≠ 0 条问题：空态走全站 EMPTY 口径 -->
+            <p v-else class="dim-empty">{{ EMPTY }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 参考总分（辅助信息，降级展示）。
+           总分保留但缩小、后置：它是四维加权的结果，单独盯涨跌不可靠；
+           改进以各维度问题清单为准。导出 PDF / 分享链路里的总分不在本页，不受影响。 -->
+      <div class="score-summary">
+        <div class="score-chip" :style="{ '--score-color': scoreColor }">
+          <svg viewBox="0 0 120 120" class="score-svg" aria-hidden="true">
             <circle cx="60" cy="60" r="52" class="score-track" />
             <circle cx="60" cy="60" r="52" class="score-fill"
               :style="{ strokeDasharray: 327, strokeDashoffset: 327 - (327 * (parsed.overallScore || 0)) / 100 }" />
@@ -213,9 +250,9 @@
             <span v-if="parsed.overallScore != null" class="score-unit">分</span>
           </div>
         </div>
-        <div class="score-meta">
-          <h3>综合评分</h3>
-          <p>{{ scoreLevel }}</p>
+        <div class="score-note">
+          <span class="score-label">参考总分 · {{ scoreLevel }}</span>
+          <p>总分仅供参考。按上面的维度问题清单逐条修改，改完重新分析，对比问题清单少了哪些。</p>
         </div>
       </div>
 
@@ -228,24 +265,6 @@
           带着这份简历去模拟面试
         </button>
         <p class="next-hint">自动携带简历摘要{{ targetJob ? `与目标岗位「${targetJob}」` : '' }}，AI 将据此定制面试题</p>
-      </div>
-
-      <!-- 维度评分 -->
-      <div v-if="parsed.dimensions?.length" class="dimensions">
-        <h4 class="block-title">维度评分</h4>
-        <div class="dim-grid">
-          <div v-for="(d, idx) in parsed.dimensions" :key="idx" class="dim-card">
-            <div class="dim-head">
-              <span class="dim-name">{{ d.name }}</span>
-              <!-- v1.65.1：判空 —— 原来 `{{ d.score }}分` 在 score 缺失时会渲染出一个孤零零的「分」 -->
-              <span class="dim-score" :style="{ color: getScoreColor(d.score) }">{{ d.score != null ? `${d.score}分` : EMPTY }}</span>
-            </div>
-            <div class="dim-bar">
-              <div class="dim-bar-fill" :style="{ width: (d.score || 0) + '%', background: getScoreGradient(d.score) }"></div>
-            </div>
-            <p class="dim-suggestion">{{ d.suggestion }}</p>
-          </div>
-        </div>
       </div>
 
       <!-- 优势 & 建议 -->
@@ -353,6 +372,7 @@ import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { repairAndCheck } from '../utils/jsonRepair'
 import { getScoreColor, getScoreGradient } from '../utils/score'
+import { checklistForDimension, type ResumeChecklistItem } from '../utils/resumeChecklist'
 import { EMPTY } from '../utils/format'
 import { JOB_SUGGESTIONS } from '../utils/jobOptions'
 import {
@@ -640,6 +660,21 @@ async function pasteFromClipboard() {
 
 /** 综合评分主色 */
 const scoreColor = computed(() => getScoreColor(parsed.value.overallScore || 0))
+
+/* ── 规则化清单条目（vNext 叙事转向）──
+ * 从简历原文确定性计算，注入「含金量」维度清单最前面。
+ * resumeText 在上传 / URL 导入时由后端回传、粘贴文本时就是输入本身；
+ * 不可用（空串）时 checklistForDimension 返回空数组，视图自动退化为仅 AI 建议。 */
+
+/** 某维度应展示的清单条目（规则化条目 + 仅含金量维度注入） */
+function dimChecklist(name: string): ResumeChecklistItem[] {
+  return checklistForDimension(name, resumeText.value)
+}
+
+/** 该维度是否有可展示的清单内容（条目或 AI 建议）；判定收敛在此，模板不写复合条件 */
+function dimHasContent(name: string, suggestion: string): boolean {
+  return dimChecklist(name).length > 0 || suggestion.trim() !== ''
+}
 
 /** 综合评分等级文案 */
 const scoreLevel = computed(() => {
@@ -1401,15 +1436,16 @@ function formatDate() {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 24px;
+  padding: 20px 24px;
   background: var(--c-surface);
   border: 1px solid var(--c-border-light);
   border-radius: var(--radius-lg);
   margin-bottom: 16px;
 }
+/* 参考总分降级后是小徽标（与结果区 .score-chip 同为 72px） */
 .skeleton-circle {
-  width: 96px;
-  height: 96px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -1450,10 +1486,6 @@ function formatDate() {
   .skeleton-grid {
     grid-template-columns: 1fr;
   }
-  .skeleton-circle {
-    width: 72px;
-    height: 72px;
-  }
 }
 
 /* ── 结果区 ── */
@@ -1478,23 +1510,22 @@ function formatDate() {
   font-size: 16px;
 }
 
-/* ── 综合评分 ── */
-.score-hero {
+/* ── 参考总分（辅助信息，vNext 叙事转向后降级：缩小 + 后置，不再当首屏主视觉）── */
+.score-summary {
   display: flex;
   align-items: center;
-  gap: 32px;
-  padding: 32px;
+  gap: 18px;
+  padding: 16px 20px;
   background: var(--c-surface);
-  border-radius: var(--radius-lg);
   border: 1px solid var(--c-border-light);
-  box-shadow: var(--shadow-sm);
-  margin-bottom: 32px;
+  border-radius: var(--radius-md);
+  margin-bottom: 28px;
 }
 
-.score-circle {
+.score-chip {
   position: relative;
-  width: 120px;
-  height: 120px;
+  width: 72px;
+  height: 72px;
   flex-shrink: 0;
 }
 
@@ -1527,7 +1558,7 @@ function formatDate() {
 }
 
 .score-num {
-  font-size: 32px;
+  font-size: 20px;
   font-weight: 800;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -1538,20 +1569,26 @@ function formatDate() {
 }
 
 .score-unit {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--c-text-tertiary);
 }
 
-.score-meta h3 {
-  font-size: 18px;
+.score-note {
+  min-width: 0;
+}
+
+.score-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
   font-weight: 600;
   font-family: var(--font-title);
   color: var(--c-text);
-  margin: 0 0 4px;
 }
 
-.score-meta p {
-  font-size: 14px;
+.score-note p {
+  font-size: 12.5px;
+  line-height: 1.6;
   color: var(--c-text-secondary);
   margin: 0;
 }
@@ -1657,11 +1694,51 @@ function formatDate() {
   transition: width 0.6s ease;
 }
 
-.dim-suggestion {
+/* ── 各维度问题与建议（主视觉）──
+ * 每张维度卡：维度名 + 小分数条 + 问题清单。
+ * 条目两行式：problem（缺什么，加粗）+ advice（怎么补，可照抄的示例）。 */
+.dim-issues {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dim-issue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--c-bg-alt);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+}
+
+/* AI 建议条目：虚线框 + 透明底，与规则化条目区分层级 */
+.dim-issue.is-ai {
+  background: transparent;
+  border-style: dashed;
+}
+
+.issue-problem {
   font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--c-text);
+}
+
+.issue-advice {
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--c-text-secondary);
-  margin: 0;
+}
+
+.dim-empty {
+  font-size: 13px;
+  color: var(--c-text-tertiary);
+  margin: 8px 0 0;
 }
 
 /* ── 优势 & 建议 ── */
@@ -1797,11 +1874,9 @@ function formatDate() {
 
 /* ── 响应式 ── */
 @media (max-width: 768px) {
-  .score-hero {
+  .score-summary {
     flex-direction: column;
-    text-align: center;
-    gap: 16px;
-    padding: 24px 20px;
+    align-items: flex-start;
   }
   .dim-grid {
     grid-template-columns: 1fr;
