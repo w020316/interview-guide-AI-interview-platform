@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.68.0'
+export const CURRENT_VERSION = '1.69.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.69.0',
+    date: '2026-10-18',
+    title: '版本 1.69.0 · 面试记录也能删了',
+    items: [
+      { text: '面试历史里每一场现在都能删除：卡片右侧有个垃圾桶图标，点一下确认即可。删除会连带清掉那场的题目、你的回答与评分。此前练了几十场之后历史列表只能一直往前堆', level: 'user' },
+      { text: '收藏夹里已经收藏的题目**不受影响**。这一点是刻意的：收藏是题目的快照，不是面试的一部分，删练习不该动你的收藏', level: 'user' },
+      { text: '实现：新增 `DELETE /api/session/{sessionId}`。关键点 —— `interview_question.session_id` 是**没有外键的 VARCHAR**，删会话不会自动级联，必须显式删题目；否则会留下永远读不到、却仍进入统计口径的孤儿数据（错题本、平均分、题目汇总都按 session_id 关联）', level: 'tech' },
+      { text: '刻意不删 `favorite_question`：该表整条保存题目、参考答案与我的回答，语义是「收藏夹」而不是会话子表。连带清空属于破坏用户资产，所以只让 `session_id` 悬空（该列本就可空）', level: 'tech' },
+      { text: '测试：`SessionDeleteServiceTest` 4 条（本人删 / 无题目也能删 / 删他人 403 且不动数据 / 不存在 404）+ `SessionDeleteControllerTest` 3 条。越权那条断言的是「HTTP 200 + 业务码 403」这一本项目既有形态 —— 若按真 403 断言，正确实现反而会被判成 bug', level: 'tech' },
+    ],
+  },
   {
     version: '1.68.0',
     date: '2026-10-18',

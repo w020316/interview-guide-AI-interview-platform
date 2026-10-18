@@ -143,6 +143,29 @@ public class InterviewSessionController {
     }
 
     /**
+     * 删除面试会话（仅限本人会话，G2-b，2026-10-18）
+     * DELETE /api/session/{sessionId}
+     *
+     * <p>此前会话只增不删，练几十场之后 History 列表无法收拾。
+     * 连带删除该会话下的题目（`interview_question.session_id` 无外键，不会自动级联），
+     * **不动收藏夹**（收藏是题目快照，语义上不属于会话）。
+     *
+     * <p>返回 {@code deletedQuestions} 供前端如实提示"连同 N 道题一起删除"。
+     */
+    @DeleteMapping("/{sessionId}")
+    public Result<Map<String, Object>> deleteSession(@PathVariable String sessionId) {
+        // 与 finish / listQuestions 同一范式：controller 层给友好 403，service 层再校验一次（纵深防御）
+        InterviewSessionEntity session = sessionService.getBySessionId(sessionId);
+        if (!currentUserId().equals(session.getUserId())) {
+            return Result.error(403, "无权删除该会话");
+        }
+        long deletedQuestions = sessionService.deleteSession(sessionId, currentUserId());
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("deletedQuestions", deletedQuestions);
+        return Result.success(data);
+    }
+
+    /**
      * 查询会话下的所有题目（仅限本人会话）
      * GET /api/session/{sessionId}/questions
      */

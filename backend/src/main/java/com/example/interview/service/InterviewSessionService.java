@@ -108,8 +108,34 @@ public class InterviewSessionService {
         return sessionRepository.save(session);
     }
 
-    // ─────────────────────────────── 题目管理 ───────────────────────────────
+    /**
+     * 删除一场面试会话（G2-b，2026-10-18）。
+     *
+     * <p>此前会话只增不删，练了几十场之后 History 列表无法清理。
+     *
+     * <p><b>为什么必须显式删题目</b>：`interview_question.session_id` 是**没有外键的 VARCHAR**，
+     * 删会话不会自动级联。不处理会留下永远不会被读到、却仍进入统计口径的孤儿数据
+     * （错题本、平均分、题目汇总都按 session_id 关联）。
+     *
+     * <p><b>为什么刻意不删 favorite_question</b>：那张表是题目的**快照**
+     * （question / 参考答案 / 我的回答 整条存下来），语义是「收藏夹」而不是会话的子表。
+     * 删一场练习就清空用户收藏，属于破坏用户资产。残留的 session_id 会悬空，但该列本就可空。
+     *
+     * @return 连带删除的题目数量
+     */
+    @Transactional
+    public long deleteSession(String sessionId, String currentUserId) {
+        InterviewSessionEntity session = getBySessionId(sessionId);
+        if (!currentUserId.equals(session.getUserId())) {
+            throw new org.springframework.security.access.AccessDeniedException("无权删除他人会话");
+        }
+        long questionCount = questionRepository.countBySessionId(sessionId);
+        questionRepository.deleteBySessionId(sessionId);
+        sessionRepository.delete(session);
+        return questionCount;
+    }
 
+    // ─────────────────────────────── 题目管理 ───────────────────────────────
     /**
      * 批量保存 AI 生成的面试题目
      *

@@ -74,6 +74,14 @@
             </BaseButton>
             <!-- 第三批 A：历史回看复用 ReportPanel（旧会话 eval_detail 为 null 时自动降级） -->
             <BaseButton variant="ghost" size="sm" @click.stop="openReport(s)">复盘报告</BaseButton>
+            <!-- G2-b：删除这场面试（连带题目；收藏夹不受影响） -->
+            <button class="session-del" type="button" title="删除这场面试记录"
+                    aria-label="删除这场面试记录" @click.stop="askDelete(s)">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -121,7 +129,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton } from '../components'
 import ReportPanel from '../components/ReportPanel.vue'
@@ -201,6 +209,33 @@ async function openReport(s: Session) {
 }
 
 onMounted(() => loadHistory())
+
+/**
+ * 删除一场面试记录（G2-b）。
+ *
+ * <p>文案里明写「收藏夹里的题目不受影响」：后端刻意不删 `favorite_question`
+ * （那是题目快照，语义上不属于会话），但用户不一定知道，所以要在确认框里说清楚——
+ * **不解释的"安全"会被当成"删漏了"**。
+ */
+async function askDelete(s: Session) {
+  try {
+    await ElMessageBox.confirm(
+      '删除后不可恢复：这场面试的题目、你的回答与评分都会移除。收藏夹里已收藏的题目不受影响。',
+      '删除这场面试记录？',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消
+  }
+  try {
+    const res = (await api.delete(`/api/session/${s.sessionId}`)) as unknown as { deletedQuestions?: number }
+    const n = res?.deletedQuestions ?? 0
+    ElMessage.success(n > 0 ? `已删除，同时移除 ${n} 道题` : '已删除')
+    await loadHistory()
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '删除失败，请稍后再试'))
+  }
+}
 
 async function loadHistory() {
   loading.value = true
@@ -407,6 +442,33 @@ function statusText(status: string) {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* G2-b：删除按钮。图标按钮与「查看题目/复盘报告」这些文字按钮并排，
+   用 30×30 的方形点击区保证触控目标，hover 才显红，避免常态抢眼。 */
+.session-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-text-tertiary);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.session-del:hover {
+  color: var(--c-danger);
+  background: var(--c-danger-light);
+}
+
+.session-del:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
 }
 
 .session-title {
