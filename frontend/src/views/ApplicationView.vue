@@ -256,6 +256,10 @@
         </template>
 
         <template v-else>
+          <!-- v1.74.2：全被拦下时不覆盖旧结果，必须说清「这次没存」，否则用户以为历史结果被清了 -->
+          <div v-if="tailorPersisted === false" class="modal-sub">
+            这次生成没有可用的条目，已保留你上一次的定制简历。
+          </div>
           <div v-if="tailorResult.matchedKeywords?.length" class="mini-block">
             <div class="label">已命中关键词</div>
             <div class="tags"><BaseTag v-for="k in tailorResult.matchedKeywords" :key="k" variant="success" size="sm">{{ k }}</BaseTag></div>
@@ -273,11 +277,12 @@
             </div>
           </div>
           <!-- v1.74.0：事实溯源闸门拦下的条目。必须显式告知，否则用户只会看到「AI 少写了一条」 -->
+          <!-- v1.74.2：只说明事实，不回显被剔除的改写原文——那句话是模型编的，渲染出来等于递给用户直接粘贴 -->
           <div v-if="tailorResult.findings?.length" class="mini-block">
             <div class="label">已剔除 {{ tailorResult.findings.length }} 条含原文未出现数字的改写</div>
             <ul class="plain-list">
               <li v-for="(f, i) in tailorResult.findings" :key="i">
-                原文中没有「{{ (f.tokens || []).join('、') }}」，已从这条改写中移除：{{ f.rewritten }}
+                原文中没有「{{ (f.tokens || []).join('、') }}」，该条改写已整条移除
               </li>
             </ul>
           </div>
@@ -499,7 +504,7 @@ interface TailoredResult {
   suggestions?: string[]
   raw?: string
   /** v1.74.0：被事实溯源闸门剔除的条目（改写里出现原文没有的数字） */
-  findings?: { type: string; tokens?: string[]; rewritten?: string }[]
+  findings?: { type: string; tokens?: string[] }[]
 }
 
 const statusOrder = [
@@ -528,6 +533,8 @@ const tailorResume = ref('')
 const tailorDetail = ref('')
 const tailoring = ref(false)
 const tailorResult = ref<TailoredResult | null>(null)
+/** v1.74.2：本次生成是否已落库。false = 全部条目被拦下，上一次的定制简历仍然保留 */
+const tailorPersisted = ref<boolean | null>(null)
 
 const total = computed(() => items.value.length)
 
@@ -656,12 +663,14 @@ async function remove(a: Application) {
 function openTailor(a: Application) {
   tailorTarget.value = a
   tailorResult.value = null
+  tailorPersisted.value = null
   tailorResume.value = ''
   tailorDetail.value = ''
 }
 
 function showTailored(a: Application) {
   tailorTarget.value = a
+  tailorPersisted.value = null
   tailorResume.value = ''
   tailorDetail.value = ''
   try {
@@ -681,9 +690,10 @@ async function doTailor() {
     const res = (await api.post(`/api/application/${target.id}/tailor`, {
       resumeText: r,
       jobDetail: tailorDetail.value.trim(),
-    })) as unknown as { tailoredResume?: TailoredResult }
+    })) as unknown as { tailoredResume?: TailoredResult; persisted?: boolean }
     tailorResult.value = res?.tailoredResume || null
-    ElMessage.success('定制简历已生成')
+    tailorPersisted.value = res?.persisted ?? null
+    ElMessage.success(res?.persisted === false ? '本次没有可用条目，已保留上次结果' : '定制简历已生成')
     await load()
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '生成失败，请稍后重试'))

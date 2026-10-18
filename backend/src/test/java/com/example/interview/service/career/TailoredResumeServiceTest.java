@@ -162,6 +162,70 @@ class TailoredResumeServiceTest {
     }
 
     @Test
+    @DisplayName("数字溯源 · 年份不能给个位数背书：原文「2023 年毕业」不得放行改写里的「3」")
+    void tailor_yearCannotVouchForSingleDigit() throws Exception {
+        // v1.74.2 线上问题：子串匹配下「2023」包含「3」，于是「管理 3 个团队」被判为有来源。
+        // 几乎每份简历都有年份，等于 0/1/2/3/19/20/21/22/23/24/25/26 这批数字的闸门形同虚设。
+        stubChatClient("{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"rewrittenBullets\":[{\"original\":\"参与课程设计\","
+                + "\"rewritten\":\"管理 3 个团队完成课程设计\",\"reason\":\"突出规模\"}],"
+                + "\"summary\":\"\",\"suggestions\":[]}");
+
+        String result = service.tailor("2023 年毕业，参与课程设计", "Java 后端", "");
+
+        JsonNode node = parse(result);
+        assertThat(node.get("rewrittenBullets").size()).isZero();
+        assertThat(node.get("findings").size()).isEqualTo(1);
+        assertThat(node.get("findings").get(0).get("tokens").toString()).contains("3");
+    }
+
+    @Test
+    @DisplayName("数字溯源 · 大数不能给小数字背书：原文「QPS 3000」不得放行「30%」")
+    void tailor_bigNumberCannotVouchForSmallOne() throws Exception {
+        stubChatClient("{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"rewrittenBullets\":[{\"original\":\"负责性能优化\","
+                + "\"rewritten\":\"负责性能优化，提升 30%\",\"reason\":\"量化结果\"}],"
+                + "\"summary\":\"\",\"suggestions\":[]}");
+
+        String result = service.tailor("QPS 峰值 3000", "Java 后端", "");
+
+        JsonNode node = parse(result);
+        assertThat(node.get("rewrittenBullets").size()).isZero();
+        assertThat(node.get("findings").get(0).get("tokens").toString()).contains("30%");
+    }
+
+    @Test
+    @DisplayName("数字溯源 · 小数尾零不误杀：原文 40% / 改写 40.0% 应保留")
+    void tailor_decimalTrailingZeros_notFalsePositive() throws Exception {
+        // 归一化前「40.0」在原文里找不到字面「40.0」，会被当成编造而整条误杀
+        stubChatClient("{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"rewrittenBullets\":[{\"original\":\"响应时间下降 40%\","
+                + "\"rewritten\":\"响应时间下降 40.0%，覆盖核心链路\",\"reason\":\"突出结果\"}],"
+                + "\"summary\":\"\",\"suggestions\":[]}");
+
+        String result = service.tailor("响应时间下降 40%", "Java 后端", "");
+
+        JsonNode node = parse(result);
+        assertThat(node.get("rewrittenBullets").size()).isEqualTo(1);
+        assertThat(node.get("findings").size()).isZero();
+    }
+
+    @Test
+    @DisplayName("数字溯源 · 边界内正常命中：原文「负责 3 个模块」放行「负责 3 个核心模块」")
+    void tailor_numberWithinBoundary_keepsBullet() throws Exception {
+        stubChatClient("{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"rewrittenBullets\":[{\"original\":\"负责 3 个模块\","
+                + "\"rewritten\":\"负责 3 个核心模块的设计\",\"reason\":\"关键词前置\"}],"
+                + "\"summary\":\"\",\"suggestions\":[]}");
+
+        String result = service.tailor("负责 3 个模块", "Java 后端", "");
+
+        JsonNode node = parse(result);
+        assertThat(node.get("rewrittenBullets").size()).isEqualTo(1);
+        assertThat(node.get("findings").size()).isZero();
+    }
+
+    @Test
     @DisplayName("结构非法：第一次缺 rewrittenBullets，重试一次拿到合法结果")
     void tailor_invalidStructure_retriesOnce() throws Exception {
         String missingBullets = "{\"matchedKeywords\":[],\"missingKeywords\":[],"

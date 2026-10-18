@@ -59,6 +59,11 @@ import java.util.regex.Pattern;
  *   <li>单条 bullet 缺 {@code original}/{@code rewritten} → 只丢这一条，其余保留。</li>
  * </ul>
  * 前端拿到的字段类型永远正确（不下发脏数据），但可用结果不会被判死。
+ *
+ * <p><b>v1.74.2 收紧数字溯源的匹配口径</b>：v1.74.0 用子串包含判断来源，
+ * 「2023 年毕业」会给改写里的 {@code 3} 背书、「QPS 3000」会给 {@code 30} 背书——
+ * 几乎每份简历都有年份，等于这批数字的闸门形同虚设。现改为数字边界匹配，
+ * 并把小数尾零归一化（{@code 40.0} → {@code 40}）以免误杀等价写法。
  */
 @Service
 public class TailoredResumeService {
@@ -70,16 +75,6 @@ public class TailoredResumeService {
 
     /** 岗位描述最大长度 */
     private static final int MAX_JOB_LEN = 1500;
-
-    /**
-     * 兜底 JSON（结构等价，保证前端字段可读）。
-     *
-     * <p>v1.74.0 起它**不再**被 {@link #tailor} 当作「成功结果」返回——空响应或结构非法
-     * 一律走 {@link #validateOrRetryTailor} 的重试/抛错。保留该常量是为了给前端与测试
-     * 提供一份「空结果长什么样」的结构参照，字段必须与正常输出同构（含 v1.74.0 新增的 findings）。
-     */
-    static final String TAILOR_FALLBACK_JSON = "{\"matchedKeywords\":[],\"missingKeywords\":[],"
-            + "\"rewrittenBullets\":[],\"summary\":\"\",\"suggestions\":[],\"findings\":[]}";
 
     /** 定制简历 JSON 校验/改写用（结构固定，独立实例足够，避免与全局 ObjectMapper 配置耦合） */
     private static final ObjectMapper TAILOR_MAPPER = new ObjectMapper();
@@ -449,17 +444,25 @@ public class TailoredResumeService {
     /**
      * 单个数字 token 是否能在基准文本里找到来源。
      *
-     * <p>判定刻意宽松（子串包含，而非词边界匹配）：这里的代价是不对称的——误杀会删掉用户
-     * 本来正确的条目，漏放只是让一个可能编造的数字过关。产品上宁可漏放也要避免误杀，
-     * 因为用户看到「我的真实数据被删了」会直接失去对功能的信任。
+     * <p><b>v1.74.2 改为数字边界匹配（此前是子串包含）</b>：子串匹配让大数给小数字背书——
+     * 原文「2023 年毕业」会让改写里的 {@code 3} / {@code 20} / {@code 23} 全部被判为有来源，
+     * 原文「QPS 3000」会让 {@code 30} 过关。而几乎每份简历都有年份，等于这批数字的闸门形同虚设，
+     * 产品对用户「原文没有的数字会被剔除」的承诺随之落空。
+     *
+     * <p>边界只判「紧邻字符不是数字」，不把小数点算进去：这样「原文 40.0 / 改写 40」仍能命中，
+     * 而「原文 3000 / 改写 30」会被正确判为无来源。判定前先归一化小数尾零
+     * （{@code 40.0} → {@code 40}、{@code 3.50} → {@code 3.5}），避免「原文 40% / 改写 40.0%」被误杀。
+     *
+     * <p>百分号仍然剥掉只比数值：这是有意的宽松，避免「原文 40% / 改写 40 个」这类误杀。
      *
      * @param token    已去除空白的数字 token（如 {@code 40%} / {@code 3} / {@code 3.5}）
      * @param baseline 用户真实材料（原始简历全文），**不含**模型自写的 original
      */
     private static boolean isNumberSourced(String token, String baseline) {
         boolean percent = token.endsWith("%");
-        String numeric = percent ? token.substring(0, token.length() - 1) : token;
-        if (baseline.contains(numeric)) {
+        String raw = percent ? token.substring(0, token.length() - 1) : token;
+        String numeric = trimDecimalZeros(raw);
+        if (containsNumberWithBoundary(baseline, numeric)) {
             return true;
         }
         // 小数 / 百分比不做中文数字比对：中文里没有「三点五%」这种简历写法
@@ -482,6 +485,41 @@ public class TailoredResumeService {
         }
         // 「两」是「二」的口语形式：「负责两个模块」→「负责 2 个模块」
         return value == 2 && baseline.contains("两");
+    }
+
+    /**
+     * 数字 token 是否以「数字边界」形式出现在基准文本中。
+     *
+     * <p>即 token 前后紧邻的字符都不是阿拉伯数字。小数点本身不算数字，
+     * 所以「原文 40.0 / 改写 40」这类等价写法仍能命中。
+     *
+     * <p>token 数量极少（一份结果通常个位数），每次编译正则的代价可以忽略；
+     * 不建缓存是为了避免用一个无上限的 Map 记住模型输出过的所有 token。
+     */
+    private static boolean containsNumberWithBoundary(String text, String numeric) {
+        return Pattern.compile("(?<!\\d)" + Pattern.quote(numeric) + "(?!\\d)")
+                .matcher(text).find();
+    }
+
+    /**
+     * 归一化小数尾零：{@code 40.0} → {@code 40}、{@code 3.50} → {@code 3.5}、{@code 40.000} → {@code 40}。
+     *
+     * <p>不做归一化时，「原文 40% / 改写 40.0%」会因字面不同被判为无来源而整条误杀——
+     * 这不是编造，只是同一个数的另一种写法。
+     *
+     * @param numeric 不含百分号的数字文本
+     */
+    private static String trimDecimalZeros(String numeric) {
+        int dot = numeric.indexOf('.');
+        if (dot < 0) {
+            return numeric;
+        }
+        int end = numeric.length();
+        while (end > dot + 1 && numeric.charAt(end - 1) == '0') {
+            end--;
+        }
+        // 小数部分全是零（40.000）→ 只留整数部分
+        return (end == dot + 1) ? numeric.substring(0, dot) : numeric.substring(0, end);
     }
 
     /**

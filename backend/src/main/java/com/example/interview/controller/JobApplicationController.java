@@ -198,7 +198,13 @@ public class JobApplicationController {
      * POST /api/application/{id}/tailor
      * Body: {"resumeText":"我的简历要点","jobDetail":"可选，补充 JD"}
      *
-     * 生成结果持久化到台账记录，便于投递时直接取用。
+     * <p>生成结果持久化到台账记录，便于投递时直接取用。
+     *
+     * <p><b>v1.74.2：全部条目被溯源闸门拦下时不落库</b>。此前无条件覆盖，
+     * 一次「模型全在编数字」的生成会把用户上一次可用的定制简历覆盖成空且不可恢复。
+     * 现在只在拿到至少一条可用改写时才写库；全被拦下时仍返回 200 + 完整 JSON（含 findings），
+     * 并用 {@code persisted=false} 让前端区分「这次没存」——用户需要看到原因，
+     * 所以这里**不能**改成错误码。
      */
     @Operation(summary = "生成定制简历要点")
     @PostMapping("/{id}/tailor")
@@ -216,11 +222,22 @@ public class JobApplicationController {
         String jobDetail = req.get("jobDetail") == null ? "" : req.get("jobDetail").toString();
 
         String json = tailoredResumeService.tailor(resumeText, app.getTitle(), jobDetail);
-        applicationService.saveTailoredResume(userId, id, json);
+        Map<String, Object> tailored = parseToMap(json);
+
+        // 有可用条目才覆盖历史结果：空数组 / 字段缺失 / JSON 无法解析都视为「本次没有可用结果」
+        Object bullets = tailored.get("rewrittenBullets");
+        boolean persisted = bullets instanceof List<?> list && !list.isEmpty();
+        if (persisted) {
+            applicationService.saveTailoredResume(userId, id, json);
+        } else {
+            log.info("定制简历本次没有可用条目（{}），不覆盖历史结果，applicationId={}",
+                    bullets == null ? "rewrittenBullets 缺失" : "rewrittenBullets 为空", id);
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("applicationId", id);
-        result.put("tailoredResume", parseToMap(json));
+        result.put("tailoredResume", tailored);
+        result.put("persisted", persisted);
         return Result.success(result);
     }
 

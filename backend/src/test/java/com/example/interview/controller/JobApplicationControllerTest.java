@@ -213,7 +213,8 @@ class JobApplicationControllerTest {
         when(applicationService.findOwned("user-1", 1L))
                 .thenReturn(app(1L, JobApplicationEntity.STATUS_APPLIED));
         when(tailoredResumeService.tailor(anyString(), anyString(), anyString()))
-                .thenReturn("{\"summary\":\"懂业务的 Java 后端\",\"rewrittenBullets\":[]}");
+                .thenReturn("{\"summary\":\"懂业务的 Java 后端\",\"rewrittenBullets\":"
+                        + "[{\"original\":\"负责订单系统\",\"rewritten\":\"负责订单系统架构\"}]}");
         when(applicationService.saveTailoredResume(eq("user-1"), eq(1L), anyString()))
                 .thenReturn(app(1L, JobApplicationEntity.STATUS_APPLIED));
 
@@ -222,7 +223,35 @@ class JobApplicationControllerTest {
                         .content("{\"resumeText\":\"熟悉 Java\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.applicationId").value(1))
-                .andExpect(jsonPath("$.data.tailoredResume.summary").value("懂业务的 Java 后端"));
+                .andExpect(jsonPath("$.data.tailoredResume.summary").value("懂业务的 Java 后端"))
+                .andExpect(jsonPath("$.data.persisted").value(true));
+
+        verify(applicationService).saveTailoredResume(eq("user-1"), eq(1L), anyString());
+    }
+
+    @Test
+    @DisplayName("POST /api/application/{id}/tailor：全部条目被剔除时不覆盖旧结果，但仍返回 200 + findings")
+    void tailor_allBulletsRemoved_doesNotPersist() throws Exception {
+        // v1.74.2：溯源闸门把本次所有条目都拦下时，若不判断就落库，
+        // 用户上一次可用的定制简历会被覆盖成空且不可恢复。
+        loginAs("user-1");
+        when(applicationService.findOwned("user-1", 1L))
+                .thenReturn(app(1L, JobApplicationEntity.STATUS_APPLIED));
+        when(tailoredResumeService.tailor(anyString(), anyString(), anyString()))
+                .thenReturn("{\"summary\":\"\",\"rewrittenBullets\":[],\"findings\":"
+                        + "[{\"type\":\"unsourced_number\",\"tokens\":[\"40%\"],"
+                        + "\"rewritten\":\"响应时间下降 40%\"}]}");
+
+        mockMvc.perform(post("/api/application/1/tailor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"resumeText\":\"负责订单系统性能优化\"}"))
+                // 不能改成错误码：用户需要看到 findings 才知道为什么这次没结果
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.persisted").value(false))
+                .andExpect(jsonPath("$.data.tailoredResume.findings[0].tokens[0]").value("40%"));
+
+        verify(applicationService, never()).saveTailoredResume(anyString(), any(Long.class), anyString());
     }
 
     @Test

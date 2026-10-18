@@ -85,9 +85,17 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.74.1'
+export const CURRENT_VERSION = '1.74.2'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.74.2',
+    date: '2026-10-18',
+    title: '版本 1.74.2 · 数字核对更准了，也不会覆盖你上次的结果',
+    items: [
+      { text: '简历里的年份不会再让随便一个数字蒙混过关；如果这次生成全被拦下，你上次的定制简历不会被覆盖', level: 'user' },
+    ],
+  },
   {
     version: '1.74.1',
     date: '2026-10-18',
