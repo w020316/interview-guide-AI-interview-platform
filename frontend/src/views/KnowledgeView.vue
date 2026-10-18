@@ -25,6 +25,13 @@
         </svg>
         RAG 问答
       </button>
+      <button :class="{ active: tab === 'search' }" @click="tab = 'search'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        快速检索
+      </button>
       <button :class="{ active: tab === 'import' }" @click="tab = 'import'">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -44,6 +51,38 @@
         </svg>
         题目汇总
       </button>
+    </div>
+
+    <!-- 快速检索（G7）：此前 /api/knowledge/search 有实现、无界面。
+         它只做向量检索、不调大模型 —— 给用户一条零 AI 成本的查库路径 -->
+    <div v-if="tab === 'search'" class="ask-section fade-in">
+      <div class="field-row">
+        <label>检索关键词</label>
+        <BaseInput v-model="searchQuery" block placeholder="例如：HashMap 扩容、线程池拒绝策略" />
+      </div>
+      <div class="search-actions">
+        <BaseButton variant="gradient" :loading="searchLoading"
+          :disabled="searchLoading || !searchQuery.trim()" @click="searchKnowledge">
+          {{ searchLoading ? '检索中…' : '检索' }}
+        </BaseButton>
+        <span class="search-hint">只在知识库里找相似片段，不生成回答 —— 不消耗 AI 额度。</span>
+      </div>
+
+      <div v-if="searchError" class="search-error" role="alert">{{ searchError }}</div>
+
+      <div v-if="searched && !searchLoading && !searchError && !searchHits.length" class="search-empty">
+        知识库里没有匹配的内容。换个说法试试，或到「导入知识」补一条。
+      </div>
+
+      <div v-if="searchHits.length" class="search-list">
+        <div v-for="(h, i) in searchHits" :key="h.id || i" class="search-item">
+          <div class="search-item-head">
+            <span class="search-rank">#{{ i + 1 }}</span>
+            <span class="search-sim">相似度 {{ formatSimilarity(h.similarity) }}</span>
+          </div>
+          <div class="search-content">{{ h.content }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- RAG 问答 -->
@@ -262,9 +301,39 @@ import {
   type ScoreSample,
 } from '../utils/scoreDisplay'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
+import { parseSearchHits, formatSimilarity, type SearchHit } from '../utils/knowledgeSearch'
 
-type Tab = 'ask' | 'import' | 'wrong' | 'summary'
+type Tab = 'ask' | 'search' | 'import' | 'wrong' | 'summary'
 const tab = ref<Tab>('ask')
+
+// ── 快速检索（G7）──
+const searchQuery = ref('')
+const searchLoading = ref(false)
+const searchHits = ref<SearchHit[]>([])
+const searchError = ref('')
+/** 区分「还没搜过」与「搜过但没结果」——后者才显示空态文案 */
+const searched = ref(false)
+
+async function searchKnowledge() {
+  const q = searchQuery.value.trim()
+  if (!q) {
+    ElMessage.warning('请输入要检索的内容')
+    return
+  }
+  searchLoading.value = true
+  searchError.value = ''
+  try {
+    // 后端 data 是一段 JSON 字符串（不是数组），交给 parseSearchHits 归一
+    const raw = await api.get('/api/knowledge/search', { params: { query: q, topK: 5 } })
+    searchHits.value = parseSearchHits(raw)
+    searched.value = true
+  } catch (e: unknown) {
+    searchError.value = getErrMessage(e, '检索失败，请稍后再试')
+    searchHits.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
 
 // ── RAG 问答 ──
 const question = ref('')
@@ -1081,5 +1150,79 @@ function formatTime(t?: string) {
   .rate-bar-wrap {
     padding: 14px;
   }
+}
+
+/* ── G7 快速检索 ── */
+.search-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.search-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-text-tertiary);
+}
+
+/* 错误态用常驻行内提示，不用 toast 一闪而过（DESIGN.md §5） */
+.search-error {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-danger);
+  background: var(--c-danger-light);
+  border: 1px solid var(--c-danger-border);
+  border-radius: var(--radius-sm);
+}
+
+.search-empty {
+  padding: 16px 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--c-text-tertiary);
+}
+
+.search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.search-item {
+  padding: 12px 14px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+}
+
+.search-item-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.search-rank {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-text-tertiary);
+}
+
+.search-sim {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-primary);
+}
+
+.search-content {
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--c-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>

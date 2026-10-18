@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.70.0'
+export const CURRENT_VERSION = '1.71.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.71.0',
+    date: '2026-10-18',
+    title: '版本 1.71.0 · 知识库能「只查不答」了',
+    items: [
+      { text: '知识库新增「快速检索」：输入关键词，直接列出库里最相似的几段原文，并标出相似度。它**不生成回答**，所以既快、也不消耗 AI 额度', level: 'user' },
+      { text: '两个模式怎么选：想确认「知识库里到底有没有这个知识点」，用检索看原文；想要一段组织好的解释，用「RAG 问答」', level: 'user' },
+      { text: '实现：接上 `GET /api/knowledge/search` —— 也是「有实现、没界面」的既有接口。注意它的 `data` 是一段 **JSON 字符串**而非数组，直接 `length` 会拿到字符数、直接遍历会按字符遍历，都是静默错；新增 `utils/knowledgeSearch.ts` 做归一', level: 'tech' },
+      { text: '相似度只认 `similarity`（= 1 - distance）。后端的历史字段 `score` 取值其实是 **distance**（越小越相似），语义相反 —— 这是 v1.34.1 的 P2-10 踩过的坑，前端不该再各处理一遍；两个字段都没有时显示「—」而不是 0', level: 'tech' },
+      { text: '测试：`knowledgeSearch.test.ts` 13 条 —— 字符串/已解析数组/非法 JSON/null 四种入参、只有 distance 时的 1-d 兜底、负 distance 钳到 0、优先 similarity 不被 score 误导、空内容条目过滤、以及 `formatSimilarity` 的 null→「—」与越界钳制', level: 'tech' },
+    ],
+  },
   {
     version: '1.70.0',
     date: '2026-10-18',
