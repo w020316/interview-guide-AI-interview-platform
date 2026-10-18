@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.71.1'
+export const CURRENT_VERSION = '1.71.2'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.71.2',
+    date: '2026-10-18',
+    title: '版本 1.71.2 · 简历分析少了两类惹人烦的判断',
+    items: [
+      { text: '修掉一类**误报**：以前如果简历开头写「3 年经验」、而工作经历分段加起来其实是 3 年多，AI 可能判成「时间线矛盾」让你去核实——你很可能信了它、把对的改成错的。现在它会**先把各段起止时间加起来再判断**，相差不到 1 年就视为一致', level: 'user' },
+      { text: 'AI 不再评价你的学历。之前会出现「专科背景可考虑专升本」这类话——事实没错，但作为产品主动给的建议并不合适，而且不是你现在就能改到简历上的东西。现在只提**能立刻动手改**的建议', level: 'user' },
+      { text: '实现：`ResumeAnalysisService` 的 prompt 增加三条「判断约束」，置于评分要求之前——① 判定经验年限一致性前必须先累加各段起止时间，相差 ≤1 年视为一致；② 无法确定当前年月或缺起止时间时，不得输出「需核实」类怀疑判断、也不得据此扣分；③ 不评价学历/学校层次', level: 'tech' },
+      { text: '复验（3 份差异化简历，9 次真实模型调用）：改前 83/65/52 → 改后 **88/74/58**；「时间线矛盾」「专升本」两类表述均消失；**排序与差距未被破坏**（14 与 16，仍 ≥10）。分数整体上移是修掉了原本压在「表述清晰度」上的系统性低估，不是分数通胀', level: 'tech' },
+    ],
+  },
   {
     version: '1.71.1',
     date: '2026-10-18',
