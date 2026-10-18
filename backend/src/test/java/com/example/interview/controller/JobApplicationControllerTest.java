@@ -26,6 +26,8 @@ import java.util.Map;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -235,6 +237,26 @@ class JobApplicationControllerTest {
                         .content("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    @DisplayName("POST /api/application/{id}/tailor：模型结果格式异常时不落库（避免脏数据覆盖历史定制简历）")
+    void tailor_serviceThrows_doesNotPersist() throws Exception {
+        loginAs("user-1");
+        when(applicationService.findOwned("user-1", 1L))
+                .thenReturn(app(1L, JobApplicationEntity.STATUS_APPLIED));
+        // v1.74.0：结构校验失败 + 重试仍失败时 service 抛 BusinessException，
+        // 控制器不得继续调用 saveTailoredResume——否则会把上一次的定制结果覆盖成空
+        when(tailoredResumeService.tailor(anyString(), anyString(), anyString()))
+                .thenThrow(new com.example.interview.common.BusinessException("定制简历结果格式异常，请稍后重试"));
+
+        mockMvc.perform(post("/api/application/1/tailor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"resumeText\":\"熟悉 Java\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value(503));
+
+        verify(applicationService, never()).saveTailoredResume(anyString(), any(Long.class), anyString());
     }
 
     @Test

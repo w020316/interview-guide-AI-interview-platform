@@ -272,6 +272,15 @@
               <div v-if="b.reason" class="bullet-reason">{{ b.reason }}</div>
             </div>
           </div>
+          <!-- v1.74.0：事实溯源闸门拦下的条目。必须显式告知，否则用户只会看到「AI 少写了一条」 -->
+          <div v-if="tailorResult.findings?.length" class="mini-block">
+            <div class="label">已剔除 {{ tailorResult.findings.length }} 条含原文未出现数字的改写</div>
+            <ul class="plain-list">
+              <li v-for="(f, i) in tailorResult.findings" :key="i">
+                原文中没有「{{ (f.tokens || []).join('、') }}」，已从这条改写中移除：{{ f.rewritten }}
+              </li>
+            </ul>
+          </div>
           <div v-if="tailorResult.summary" class="mini-block">
             <div class="label">定位陈述（可放简历开头）</div>
             <div class="summary-box">{{ tailorResult.summary }}</div>
@@ -489,6 +498,8 @@ interface TailoredResult {
   summary?: string
   suggestions?: string[]
   raw?: string
+  /** v1.74.0：被事实溯源闸门剔除的条目（改写里出现原文没有的数字） */
+  findings?: { type: string; tokens?: string[]; rewritten?: string }[]
 }
 
 const statusOrder = [

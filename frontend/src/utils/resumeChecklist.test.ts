@@ -34,9 +34,30 @@ describe('countQuantifiedStats 量化数字计数', () => {
     expect(countQuantifiedStats('2023年毕业，2024 年带队')).toBe(0)
   })
 
-  it('正例：「N 年经验 / 开发 / 工作」等资历背景不计入（目标用户简历恰是这类）', () => {
+  it('正例：「N 年经验 / 经历 / 从业」等资历背景不计入（目标用户简历恰是这类）', () => {
     const text = '3 年后端开发经验，5 年 Java 经验，2 年工作经历，3年以上从业时间'
     expect(countQuantifiedStats(text)).toBe(0)
+  })
+
+  // v1.74.0：「N 年工作无故障」是**成果语境**（稳定性成果），此前被「工作」锚点误判成
+  // 资历背景而排除，全文只有这一处量化时会误报「0 处量化数据」。锚点表去掉「开发 / 工作」后应计入。
+  it('正例：「稳定运行 3 年工作无故障」计入量化（成果语境，不是资历背景）', () => {
+    expect(countQuantifiedStats('稳定运行 3 年工作无故障')).toBe(1)
+  })
+
+  it('正例：「近 3 年工作无重大事故」计入量化', () => {
+    expect(countQuantifiedStats('近 3 年工作无重大事故')).toBe(1)
+  })
+
+  it('正例：「系统连续 3 年工作无故障」计入量化', () => {
+    expect(countQuantifiedStats('系统连续 3 年工作无故障')).toBe(1)
+  })
+
+  it('回归：去掉「开发 / 工作」锚点后，「N 年经验 / 经历 / 从业」仍按资历背景排除', () => {
+    // 「5 年 Java 开发」不带「经验」会重新计入——这是有意的取舍：宁可多计，不可误报「0 处量化」
+    expect(countQuantifiedStats('3 年后端开发经验')).toBe(0)
+    expect(countQuantifiedStats('2 年工作经历')).toBe(0)
+    expect(countQuantifiedStats('3 年以上从业时间')).toBe(0)
   })
 
   it('反例：背景年限不吞掉真实量化——「响应时间 3 秒」正常计入', () => {
