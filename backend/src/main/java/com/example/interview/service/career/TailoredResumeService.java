@@ -127,10 +127,9 @@ public class TailoredResumeService {
         String raw = callModel(prompt);
         // 重试也要过并发闸门：callModel 内部已包 AiConcurrencyGuard.call()，不能因为「是重试」就绕过
         String validated = validateOrRetryTailor(raw, () -> callModel(prompt));
-        // 第二个参数必须是**原始未截断**的 resumeText。模型只看到截断后的 2500 字，正常情况下
-        // 不会写出截断尾部的内容；但一旦它写出的数字恰好是用户真实简历里存在、只是落在截断尾部，
-        // 用截断版做基准就会把这条**真实**条目判成「无来源」删掉——判据应当是「用户是否真的写过」，
-        // 而不是「模型是否看得到」。用全文只会更宽松，不会更严
+        // 第二个参数必须是**原始未截断**的 resumeText：溯源要回答的是「用户到底写没写过这个数」，
+        // 而不是「模型当时看不看得到」——所以基准用用户提供的全文，而不是喂给模型的截断版本。
+        // （模型只看到前 2500 字，本就不会写出截断点之后的内容，故此举只放宽、不漏杀。）
         return stripUnsourcedNumbers(validated, resumeText);
     }
 
