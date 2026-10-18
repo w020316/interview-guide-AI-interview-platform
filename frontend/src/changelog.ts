@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.66.20'
+export const CURRENT_VERSION = '1.67.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.67.0',
+    date: '2026-10-18',
+    title: '版本 1.67.0 · 现在可以自己改密码了',
+    items: [
+      { text: '个人中心新增「账号安全」：填上原密码与新密码就能改，改完需要用新密码重新登录一次。此前账号只有一个设定密码的时机——注册那一刻，之后既改不了、也没有找回通道；一旦忘记，简历记录、投递台账、面试复盘、故事库全都取不回来', level: 'user' },
+      { text: '三条限制是有意为之：新密码 6-64 位、不能与原密码相同、两次输入必须一致。另外连续试错会被限流——这不是为了难为你，而是防止有人拿到你的登录状态后反复猜原密码', level: 'user' },
+      { text: '实现：新增 `POST /api/auth/change-password`（凭原密码），按用户 5 次/小时限流（`app.auth.change-password-limit-per-hour`）；新密码复用注册时同一套 `PasswordPolicy`，避免「改密」成为绕过弱口令校验的后门', level: 'tech' },
+      { text: '安全：改密成功后吊销当前 token（jti 进黑名单）。把 logout 里的吊销逻辑抽成 `revokeCurrentToken()` 供两处共用，避免两份实现日后漂移。⚠️ 已知局限：**其他设备**上已签发的 token 仍存活至自然过期——全局吊销需要给 `users` 加 `tokenVersion` 字段，本轮未做', level: 'tech' },
+      { text: '测试：`AuthChangePasswordTest` 6 条 —— 成功落库的是新哈希 / 原密码错且**不落库** / 新密码过短 / 与旧密码相同 / 旧 token 被吊销 / 超限 429。「不落库」用 `verify(never())` 断言，专防「先写库再报错」这种顺序错误', level: 'tech' },
+    ],
+  },
   {
     version: '1.66.20',
     date: '2026-10-12',

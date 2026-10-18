@@ -164,6 +164,33 @@
       <div v-else class="ai-key-state">AI 设置加载中…</div>
     </section>
 
+    <!-- 账号安全（G5，2026-10-18）：此前只有注册/登录，忘记密码 = 账号连同台账永久报废 -->
+    <section class="data-section fade-in-up" data-account-security-section>
+      <div class="section-header">
+        <h2>账号安全</h2>
+        <span class="section-note">修改成功后当前登录会立即失效，需要用新密码重新登录</span>
+      </div>
+
+      <div class="data-actions ai-key-form">
+        <label class="ai-field"><span>原密码</span>
+          <BaseInput v-model="pwdForm.oldPassword" type="password" autocomplete="current-password" block />
+        </label>
+        <label class="ai-field"><span>新密码（6-64 位，不能与原密码相同）</span>
+          <BaseInput v-model="pwdForm.newPassword" type="password" autocomplete="new-password" block />
+        </label>
+        <label class="ai-field"><span>确认新密码</span>
+          <BaseInput v-model="pwdForm.confirmPassword" type="password" autocomplete="new-password" block />
+        </label>
+
+        <div class="ai-key-actions">
+          <BaseButton variant="gradient" :disabled="pwdSaving" @click="changePassword">
+            {{ pwdSaving ? '提交中…' : '修改密码' }}
+          </BaseButton>
+        </div>
+        <div v-if="pwdError" class="data-note note-error">{{ pwdError }}</div>
+      </div>
+    </section>
+
     <!-- 最近活动 -->
     <section class="recent-section">
       <div class="section-header">
@@ -215,6 +242,7 @@ import { computed, reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
+import { clearAuth } from '../auth'
 import { EMPTY } from '../utils/format'
 import {
   EXPORT_PATH,
@@ -272,6 +300,54 @@ async function loadAiKey() {
     aiKeyForm.apiKey = ''
   } catch { /* 设置加载失败不阻断页面 */ } finally {
     aiKeyLoading.value = false
+  }
+}
+
+const pwdForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const pwdSaving = ref(false)
+const pwdError = ref('')
+
+/**
+ * 修改密码（G5）。
+ *
+ * <p>本地先做四项校验（空值 / 长度 / 两次不一致 / 与原密码相同），是为了**少一次往返**；
+ * 真正的判定仍以后端为准——后端会再过一遍 PasswordPolicy 并吊销旧 token。
+ * 因此这里的错误提示不追求与后端文案逐字一致，只求不给用户「点下去没反应」的体感。
+ */
+async function changePassword() {
+  pwdError.value = ''
+  if (!pwdForm.oldPassword || !pwdForm.newPassword) {
+    pwdError.value = '请填写原密码与新密码'
+    return
+  }
+  if (pwdForm.newPassword.length < 6 || pwdForm.newPassword.length > 64) {
+    pwdError.value = '新密码长度需 6-64 字符'
+    return
+  }
+  if (pwdForm.newPassword !== pwdForm.confirmPassword) {
+    pwdError.value = '两次输入的新密码不一致'
+    return
+  }
+  if (pwdForm.newPassword === pwdForm.oldPassword) {
+    pwdError.value = '新密码不能与原密码相同'
+    return
+  }
+
+  pwdSaving.value = true
+  try {
+    await api.post('/api/auth/change-password', {
+      oldPassword: pwdForm.oldPassword,
+      newPassword: pwdForm.newPassword,
+    })
+    // 后端已吊销当前 token：这里必须清本地凭证并回登录页，
+    // 否则页面看着还「登录着」，但下一个请求必然 401。
+    ElMessage.success('密码已修改，请用新密码重新登录')
+    clearAuth()
+    router.push('/login')
+  } catch (e: unknown) {
+    pwdError.value = getErrMessage(e, '修改失败，请稍后再试')
+  } finally {
+    pwdSaving.value = false
   }
 }
 

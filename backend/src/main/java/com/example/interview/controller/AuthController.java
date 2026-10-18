@@ -73,9 +73,22 @@ public class AuthController {
 
     private com.example.interview.util.PerUserRateLimiter registerLimiter;
 
+    /**
+     * 修改密码限流（G5，2026-10-18）：按用户维度 5 次/小时。
+     *
+     * <p>为什么改密也要限流：改密接口校验的是「原密码」，等价于一次离线可猜的
+     * 密码校验点。拿到他人 token 的攻击者可以反复提交 <原密码, 新密码> 组合来爆破
+     * 原密码；而它不像 /login 那样有 IP + 账号双维度锁定保护，必须自己限。
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.auth.change-password-limit-per-hour:5}")
+    private int changePasswordLimitPerHour;
+
+    private com.example.interview.util.PerUserRateLimiter changePasswordLimiter;
+
     @jakarta.annotation.PostConstruct
     void initRegisterLimiter() {
         registerLimiter = new com.example.interview.util.PerUserRateLimiter(registerLimitPerHour, 60 * 60 * 1000L);
+        changePasswordLimiter = new com.example.interview.util.PerUserRateLimiter(changePasswordLimitPerHour, 60 * 60 * 1000L);
     }
 
     /** 最大失败次数（超过则锁定） */
@@ -292,18 +305,107 @@ public class AuthController {
     @Operation(summary = "用户登出")
     @PostMapping("/logout")
     public Result<Void> logout(jakarta.servlet.http.HttpServletRequest request) {
+        revokeCurrentToken(request, "登出");
+        return Result.success(null);
+    }
+
+    /**
+     * 把当前请求 Bearer token 的 jti 写入吊销黑名单（存活至 token 自然过期）。
+     * 无 Authorization 头 / 旧版无 jti 的 token 幂等跳过。
+     *
+     * @param reason 仅用于日志，便于区分「登出吊销」与「改密吊销」
+     */
+    private void revokeCurrentToken(jakarta.servlet.http.HttpServletRequest request, String reason) {
         String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ") && tokenBlacklist != null) {
-            String token = header.substring(7);
-            if (jwtUtil.isValid(token)) {
-                String jti = jwtUtil.extractJti(token);
-                if (jti != null) {
-                    long expiresAt = jwtUtil.extractExpirationMs(token);
-                    tokenBlacklist.revoke(jti, expiresAt);
-                    log.info("登出：token 已吊销（jti={}，存活至 token 自然过期）", jti);
-                }
-            }
+        if (header == null || !header.startsWith("Bearer ") || tokenBlacklist == null) {
+            return;
         }
+        String token = header.substring(7);
+        if (!jwtUtil.isValid(token)) {
+            return;
+        }
+        String jti = jwtUtil.extractJti(token);
+        if (jti == null) {
+            return;
+        }
+        long expiresAt = jwtUtil.extractExpirationMs(token);
+        tokenBlacklist.revoke(jti, expiresAt);
+        log.info("{}：token 已吊销（jti={}，存活至 token 自然过期）", reason, jti);
+    }
+
+    /**
+     * 修改密码（G5，2026-10-18）。
+     *
+     * <p>背景：改密前的 AuthController 只有 register / login / logout / me 四个端点，
+     * 用户一旦忘记密码，账号连同其投递台账、面试记录、故事库**永久无法取回**。
+     * 本接口先解决「记得原密码时主动改密」，找回密码依赖邮件通道、另行排期。
+     *
+     * <p>安全约束（缺一即成为攻击面）：
+     * <ol>
+     *   <li>原密码必须校验 —— 仅凭 token 不足以改密；</li>
+     *   <li>按用户 5 次/小时限流 —— 防止拿到 token 后爆破原密码；</li>
+     *   <li>新密码走与注册同一套 PasswordPolicy —— 否则可绕过弱口令校验；</li>
+     *   <li>改完**吊销当前 token** —— 改密的语义就是「让旧会话失效」，
+     *       不吊销等于 attacker 拿到 token 后改密也能继续用。</li>
+     * </ol>
+     *
+     * <p>已知局限：只吊销**当前** token。其他设备上已签发的 token 仍存活至自然过期
+     * （系统当前无 tokenVersion 字段做全局吊销）。前端在成功后必须清 token 并回登录页。
+     */
+    @Operation(summary = "修改密码（凭原密码）")
+    @PostMapping("/change-password")
+    public Result<Void> changePassword(@RequestBody Map<String, String> req,
+                                       jakarta.servlet.http.HttpServletRequest request) {
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+            throw new com.example.interview.common.BusinessException("未认证用户");
+        }
+        String userId = auth.getPrincipal().toString();
+
+        if (!changePasswordLimiter.allow(userId)) {
+            return Result.error(429, "修改密码过于频繁，请稍后再试");
+        }
+
+        String oldPassword = req.get("oldPassword");
+        String newPassword = req.get("newPassword");
+        if (oldPassword == null || oldPassword.isEmpty() || newPassword == null || newPassword.isEmpty()) {
+            return Result.error(400, "原密码与新密码不能为空");
+        }
+        // 长度上限先挡住，避免超长字符串进入 BCrypt（BCrypt 只取前 72 字节，超长会被静默截断）
+        if (oldPassword.length() > 128) {
+            return Result.error(400, "原密码长度超限");
+        }
+        if (newPassword.length() < 6 || newPassword.length() > 64) {
+            return Result.error(400, "新密码长度需 6-64 字符");
+        }
+
+        UserEntity user;
+        try {
+            user = userRepository.findById(Long.valueOf(userId)).orElse(null);
+        } catch (NumberFormatException e) {
+            user = null;   // 非数字 subject（历史 token）一律视为用户不存在
+        }
+        if (user == null) {
+            return Result.error(400, "用户不存在");
+        }
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
+            return Result.error(400, "原密码不正确");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            return Result.error(400, "新密码不能与原密码相同");
+        }
+        String weakReason = com.example.interview.util.PasswordPolicy.validate(newPassword, user.getUsername());
+        if (weakReason != null) {
+            return Result.error(400, weakReason);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.saveAndFlush(user);
+
+        revokeCurrentToken(request, "改密");
+
+        log.info("用户 {} 修改密码成功，当前 token 已吊销", user.getUsername());
         return Result.success(null);
     }
 
