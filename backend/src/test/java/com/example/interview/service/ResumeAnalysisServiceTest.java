@@ -45,8 +45,12 @@ class ResumeAnalysisServiceTest {
     private static final String USER_ID = "user-123";
     private static final String RESUME = "三年 Java 后端经验，熟悉 Spring Boot";
     private static final String JOB = "Java 后端";
+    // v1.72.0：总分改为由维度确定性聚合后，fixture 里的 overallScore 必须与维度分自洽 ——
+    // 原先写 75 却只有一个 80 分的维度，属于「模型给的总分与维度对不上」的脏输入，
+    // 聚合会把它纠正成 80，导致本类这些**管道类**断言（缓存/重试/向量化）全部误报失败。
+    // 覆盖「聚合确实生效」的断言放在 ScoreAggregatorTest 与下面的 overridesAiOverall 用例里。
     private static final String VALID_JSON =
-            "{\"overallScore\":75,\"dimensions\":[{\"name\":\"岗位匹配度\",\"score\":80,\"suggestion\":\"补充量化成果\"}],\"strengths\":[\"项目扎实\"],\"improvements\":[\"加数据\"]}";
+            "{\"overallScore\":80,\"dimensions\":[{\"name\":\"岗位匹配度\",\"score\":80,\"suggestion\":\"补充量化成果\"}],\"strengths\":[\"项目扎实\"],\"improvements\":[\"加数据\"]}";
 
     @BeforeEach
     void setUp() {
@@ -110,6 +114,20 @@ class ResumeAnalysisServiceTest {
         verify(ragSearchService, timeout(3000)).addToVectorStore(anyList());
         verify(resumeCounter).increment();
         verify(aiCallTimer).record(anyLong(), any(TimeUnit.class));
+    }
+
+    @Test
+    @DisplayName("analyze: AI 给的总分与维度不自洽时，以维度聚合值为准（v1.72.0）")
+    void analyze_overridesAiOverallWithAggregatedScore() {
+        stubCacheMiss();
+        // 模型拍了个 95，但唯一的维度只有 60 分 → 用户看到的应是 60，而不是 95
+        stubChatClient("{\"overallScore\":95,\"dimensions\":[{\"name\":\"岗位匹配度\",\"score\":60}],"
+                + "\"strengths\":[\"a\"],\"improvements\":[\"b\"]}");
+
+        String result = service.analyze(USER_ID, RESUME, JOB);
+
+        assertThat(result).contains("\"overallScore\":60");
+        assertThat(result).doesNotContain("\"overallScore\":95");
     }
 
     @Test

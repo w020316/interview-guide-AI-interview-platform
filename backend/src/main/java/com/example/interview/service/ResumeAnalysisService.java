@@ -67,17 +67,20 @@ public class ResumeAnalysisService {
     private static final String CACHE_PREFIX = "resume:analysis:";
 
     /**
-     * Prompt 版本号（v1.71.3，2026-10-18）。
+     * 分析链路版本号（v1.71.3 引入，v1.72.0 改名并递增到 v3）。
      *
      * <p><b>为什么必须进缓存键</b>：缓存键原本只有「简历文本 + 目标岗位」的哈希。
-     * 一旦改了 prompt（例如 v1.71.2 加的「时间线/学历」判断约束），老简历在 TTL 内
-     * 仍会命中**旧 prompt 产出的旧结果** —— 表现为「代码改了、线上好像没生效」，
+     * 一旦改了产出逻辑（prompt 约束、总分聚合方式等），老简历在 TTL 内仍会命中
+     * **旧逻辑产出的旧结果** —— 表现为「代码改了、线上好像没生效」，
      * 而这类静默失效正是本项目反复踩的坑。
      *
-     * <p><b>使用约定：只要 prompt 文案有实质改动，就必须递增这个常量。</b>
-     * 递增后旧键自然失效（30 分钟后过期），无需手动清 Redis。
+     * <p><b>使用约定：只要会改变分析结果的改动（prompt 文案、后处理、聚合口径），
+     * 就必须递增这个常量。</b>递增后旧键自然失效（30 分钟后过期），无需手动清 Redis。
+     *
+     * <p>v2：加入「时间线/学历」判断约束（v1.71.2）。
+     * v3：总分改为由维度确定性聚合（v1.72.0）。
      */
-    private static final String PROMPT_VERSION = "v2";
+    static final String ANALYSIS_VERSION = "v3";
 
     /**
      * 构造简历分析的缓存键（v1.71.3 抽出成方法，便于单测覆盖）。
@@ -87,7 +90,7 @@ public class ResumeAnalysisService {
      * - `PROMPT_VERSION` 保证「改了 prompt 就换一批键」，老键 30 分钟内自然过期。
      */
     String buildCacheKey(String userId, String resumeText, String targetJob) {
-        return CACHE_PREFIX + PROMPT_VERSION + ":" + userId + ":"
+        return CACHE_PREFIX + ANALYSIS_VERSION + ":" + userId + ":"
                 + HashUtil.sha256Short(resumeText + "\u0001" + targetJob);
     }
 
@@ -209,7 +212,17 @@ public class ResumeAnalysisService {
                                     .call()
                                     .content()));
 
-            // 6. 写入缓存（30 分钟，Redis 不可用时静默跳过）
+            // 6. 总分改为由维度确定性聚合（v1.72.0）
+            //
+            //    实测（07-AI评测-扩展样本.md §4）：模型单独给的 overallScore 不随内容变化 ——
+            //    同一份简历「删掉全部量化数字」「主导降级为参与」「技术栈模糊化」三个变体
+            //    总分全是 85；给弱简历补上量化数字反而从 75 掉到 70。用户的反馈回路因此失效。
+            //
+            //    必须放在**写缓存之前**：否则缓存里存的是旧口径的总分，
+            //    下一个人命中缓存又会看到它（这正是 v1.71.3 修的同一类问题）。
+            cleaned = com.example.interview.util.ScoreAggregator.applyDeterministicOverall(cleaned);
+
+            // 7. 写入缓存（30 分钟，Redis 不可用时静默跳过）
             //    校验已保证 cleaned 为可用结果，因此直接缓存；兜底脏数据不可能再进入缓存。
             try {
                 redisTemplate.opsForValue().set(cacheKey, cleaned, 30, TimeUnit.MINUTES);

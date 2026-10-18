@@ -26,10 +26,10 @@ class ResumeAnalysisCacheKeyTest {
     private static final String JOB = "Java 后端";
 
     @Test
-    @DisplayName("键里带 prompt 版本段，且以 resume:analysis:v2: 开头")
-    void key_containsPromptVersion() {
+    @DisplayName("键里带分析链路版本段（取自 ANALYSIS_VERSION，避免测试里再抄一份版本号）")
+    void key_containsAnalysisVersion() {
         String key = service.buildCacheKey(USER, TEXT, JOB);
-        assertThat(key).startsWith("resume:analysis:v2:");
+        assertThat(key).startsWith("resume:analysis:" + ResumeAnalysisService.ANALYSIS_VERSION + ":");
     }
 
     @Test
