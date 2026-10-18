@@ -13,7 +13,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>interview-guide</artifactId>
-    <version>1.71.0</version>
+    <version>1.71.1</version>
     <name>interview-guide</name>
     <description>AI 智能面试辅助平台</description>
 
@@ -23,6 +23,21 @@
         <jjwt.version>0.12.6</jjwt.version>
         <bucket4j.version>8.10.1</bucket4j.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <!-- ══ 安全补丁批次 1（2026-10-18，见 docs/quality-loop-2026-10-18/04-依赖审计.md）══
+             依据：OSV/GHSA 逐版本比对 182 个构件，28 个命中 107 条漏洞。
+             本批只做**同一大版本线内的补丁升级**，不迁移框架 —— 目的是把
+             「留在 3.3.x 上也能修掉」的那部分先消掉，与「必须升 4.1」的结构性问题分开。
+
+             为什么是覆盖属性而不是升 parent：spring-boot-starter-parent 3.3.13 已把
+             tomcat/postgresql/logback/netty 的版本写死在 spring-boot-dependencies 里，
+             在 <properties> 里声明同名属性即可覆盖，改动面最小。
+
+             ⚠️ 全部为补丁线（10.1.x / 42.7.x / 1.5.x / 4.1.x），务必保持大版本不变，
+             否则会连带改变 Jackson/编译器/API 语义。 -->
+        <tomcat.version>10.1.61</tomcat.version>
+        <postgresql.version>42.7.14</postgresql.version>
+        <logback.version>1.5.38</logback.version>
+        <netty.version>4.1.139.Final</netty.version>
         <!-- G8（2026-10-18）：实网探针默认不参与回归。
              背景：全量 1277 用例耗时 5 分 07 秒，其中 7 个 Probe 类合计 194 秒（63%），
              且全部依赖外网 —— 断网/被墙/上游改版都会让 CI 假红，与本次改动无关。

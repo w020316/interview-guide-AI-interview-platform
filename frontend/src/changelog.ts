@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.71.0'
+export const CURRENT_VERSION = '1.71.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.71.1',
+    date: '2026-10-18',
+    title: '版本 1.71.1 · 底层依赖安全补丁（无界面变化）',
+    items: [
+      { text: '这一版**没有新功能，界面和上次完全一样**——只升级了几个底层组件，用来修补已知的安全问题。如果你没感觉到任何变化，说明升级是平稳的', level: 'user' },
+      { text: '这一版只升级了 4 个底层依赖的补丁版本，**功能与界面没有任何变化**：Tomcat 10.1.42 → 10.1.61、PostgreSQL 驱动 42.7.7 → 42.7.14、Logback 1.5.18 → 1.5.38、Netty 4.1.122.Final → 4.1.139.Final。依据是 182 个依赖构件对 OSV 漏洞库的逐版本比对，本批消除 **36 条**已知漏洞（含 **7 条 critical**）', level: 'tech' },
+      { text: '为什么只做这四个：它们都能在**同一条大版本线内**修掉，属于「改版本属性 + 回归」级别，不涉及框架迁移。剩余的 Spring 家族漏洞在 3.3.x 线上没有修复版本（3.3.13 是 3.3 线最后一版，官方 EOL 已 16 个月），必须升到 4.1.x 才能解决 —— 那是独立的迁移排期，不混在补丁里做', level: 'tech' },
+      { text: '验证：1298 用例全绿、覆盖率 LINE 86.25% / BRANCH 71.40% 不变；另按 Dockerfile 真实打包，打开 jar 的 `BOOT-INF/lib` 确认四个版本确实进了产物（防「改了 pom 但产物没变」）', level: 'tech' },
+    ],
+  },
   {
     version: '1.71.0',
     date: '2026-10-18',
