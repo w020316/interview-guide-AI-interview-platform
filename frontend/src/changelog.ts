@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.67.0'
+export const CURRENT_VERSION = '1.67.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.67.1',
+    date: '2026-10-18',
+    title: '版本 1.67.1 · 修正改密接口的未登录判定',
+    items: [
+      { text: '修一处权限判定的疏漏：未登录状态下直接调用改密接口，此前会得到「新密码长度需 6-64 字符」这种莫名其妙的提示，现在会明确要求先登录。正常从界面操作不会遇到，但接口语义不该含糊', level: 'user' },
+      { text: '根因：Spring Security 的匿名令牌 `AnonymousAuthenticationToken` 的 `isAuthenticated()` **恒为 true**，principal 是字符串 `anonymousUser`。控制器只判了 `principal != null`，于是匿名请求被当成已登录用户放行到业务校验', level: 'tech' },
+      { text: '修复：`SecurityConfig` 把 `/api/auth/change-password` 声明为 `authenticated()` 且**必须放在 `/api/auth/**` 的 permitAll 之前**（与 P2-07 给 `/api/auth/me` 的处置同一范式）；控制器再加一层纵深防御——拒绝匿名令牌与非数字 principal（JWT 的 subject 恒为数字 id）', level: 'tech' },
+      { text: '为什么单测没抓到：`@WebMvcTest` 切片排除了 Security 过滤器，**不会产生匿名令牌**，所以「未认证 → 503」在切片里是绿的，线上却是 400。本次补了 2 条直接用 `AnonymousAuthenticationToken` 构造登录态的用例，并做了变异验证：把校验改回旧逻辑后，**恰好这 2 条变红**、其余 15 条不受影响', level: 'tech' },
+    ],
+  },
   {
     version: '1.67.0',
     date: '2026-10-18',

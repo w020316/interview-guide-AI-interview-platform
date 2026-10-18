@@ -358,10 +358,20 @@ public class AuthController {
                                        jakarta.servlet.http.HttpServletRequest request) {
         org.springframework.security.core.Authentication auth =
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+        // 不能只判 `auth.getPrincipal() != null`：Spring Security 的匿名令牌
+        // AnonymousAuthenticationToken 的 isAuthenticated() 恒为 true、principal 是字符串
+        // "anonymousUser"，会让匿名请求一路走到业务校验（线上实测返回
+        // 400「新密码长度需 6-64 字符」，而不是 401/503）。
+        // JWT 的 subject 恒为数据库自增 id，故「非数字 principal」可直接判定为未认证。
+        if (auth == null || !auth.isAuthenticated()
+                || auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
             throw new com.example.interview.common.BusinessException("未认证用户");
         }
-        String userId = auth.getPrincipal().toString();
+        Object principal = auth.getPrincipal();
+        String userId = principal == null ? null : principal.toString();
+        if (userId == null || !userId.matches("\\d+")) {
+            throw new com.example.interview.common.BusinessException("未认证用户");
+        }
 
         if (!changePasswordLimiter.allow(userId)) {
             return Result.error(429, "修改密码过于频繁，请稍后再试");

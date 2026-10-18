@@ -86,6 +86,12 @@ public class SecurityConfig {
                 // 此前落在 permitAll 内，匿名请求经 AnonymousAuthenticationToken 也返回 200 假身份，
                 // 被禁用用户则返回 banned:false，与该接口展示禁用状态的目的矛盾
                 .requestMatchers("/api/auth/me").authenticated()
+                // G5（2026-10-18）：/api/auth/change-password 同理必须先于 /api/auth/**。
+                // 线上指纹复验实测：未加这条时，匿名请求经 AnonymousAuthenticationToken
+                // （isAuthenticated() 恒为 true、principal 是字符串 "anonymousUser"）通过了
+                // 控制器里的认证判断，返回 400「新密码长度需 6-64 字符」—— 语义完全错误，
+                // 且会让所有匿名请求共用同一个限流桶（key=anonymousUser）。
+                .requestMatchers("/api/auth/change-password").authenticated()
                 // 认证接口公开
                 .requestMatchers("/api/auth/**").permitAll()
                 // 系统信息公开（轻量探活；深度体检在 /api/health/detail，走 anyRequest 认证）

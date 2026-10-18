@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -299,6 +300,42 @@ class AuthChangePasswordTest {
             mockMvc.perform(post("/api/auth/change-password")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body("OldPw#2026", "NewPw#2026")))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.code").value(503));
+
+            verify(userRepository, never()).saveAndFlush(any(UserEntity.class));
+        }
+
+        @Test
+        @DisplayName("匿名令牌（生产环境的真实形态）→ 503，绝不能走到业务校验")
+        void change_anonymousToken_returns503() throws Exception {
+            // 这一条是线上指纹复验倒逼出来的：匿名请求在 Spring Security 里会得到一个
+            // AnonymousAuthenticationToken —— isAuthenticated() 恒为 true、principal 是
+            // 字符串 "anonymousUser"。此前只判 principal != null，于是匿名请求一路走到
+            // 长度校验，线上返回 400「新密码长度需 6-64 字符」。
+            // 注意新密码故意设为 "x"（长度 1）：若该缺陷回归，本用例会拿到 400 而失败，
+            // 从而复现线上症状，而不是被一个「看起来也像失败」的断言蒙混过去。
+            SecurityContextHolder.getContext().setAuthentication(
+                    new AnonymousAuthenticationToken("anonymous-key", "anonymousUser",
+                            List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+
+            mockMvc.perform(post("/api/auth/change-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body("OldPw#2026", "x")))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.code").value(503));
+
+            verify(userRepository, never()).saveAndFlush(any(UserEntity.class));
+        }
+
+        @Test
+        @DisplayName("非数字 principal（历史 token）→ 503，不进入业务校验")
+        void change_nonNumericPrincipal_returns503() throws Exception {
+            loginAs("legacy-user");
+
+            mockMvc.perform(post("/api/auth/change-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body("OldPw#2026", "x")))
                     .andExpect(status().isServiceUnavailable())
                     .andExpect(jsonPath("$.code").value(503));
 
