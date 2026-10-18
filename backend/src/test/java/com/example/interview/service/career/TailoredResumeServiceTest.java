@@ -185,6 +185,23 @@ class TailoredResumeServiceTest {
     }
 
     @Test
+    @DisplayName("结构非法：rewrittenBullets 为空数组也不算成功（空面板必须走重试/报错）")
+    void tailor_emptyBullets_throws() {
+        // 变异测试（v1.74.0 验证阶段）发现：删掉 isValidTailor 里的 bullets.isEmpty()
+        // 判断后全部用例仍绿——说明「空数组」这条分支当时没有任何测试锁住。
+        // 而空数组恰恰是最隐蔽的失败形态：结构合法、HTTP 200、前端 v-if 全部落空，
+        // 用户只看到一块空面板，既不知道失败也不知道为什么。
+        String emptyBullets = "{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"rewrittenBullets\":[],\"summary\":\"\",\"suggestions\":[]}";
+        stubChatClientSequence(emptyBullets, emptyBullets);
+
+        assertThatThrownBy(() -> service.tailor("负责订单系统性能优化", "Java 后端", ""))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("定制简历结果格式异常");
+        verify(callResponseSpec, times(2)).content();
+    }
+
+    @Test
     @DisplayName("空响应：走重试，最终抛 BusinessException（不得把兜底串当成功返回）")
     void tailor_emptyResponse_throwsInsteadOfFallback() {
         stubChatClient("");
@@ -206,10 +223,12 @@ class TailoredResumeServiceTest {
     @Test
     @DisplayName("stripUnsourcedNumbers：缺 findings 字段时补空数组")
     void stripUnsourcedNumbers_addsFindingsField() throws Exception {
-        String json = "{\"rewrittenBullets\":[{\"original\":\"负责三个模块\","
-                + "\"rewritten\":\"负责 3 个模块\",\"reason\":\"\"}],\"summary\":\"\"}";
+        // 基准刻意用阿拉伯数字而非「三个」：本用例的意图是「缺 findings 字段时补空数组」，
+        // 若依赖中文数字逻辑，一旦有人动 chineseNumeral 这条会跟着红，诊断信息会误导人
+        String json = "{\"rewrittenBullets\":[{\"original\":\"负责 3 个模块\","
+                + "\"rewritten\":\"负责 3 个核心模块\",\"reason\":\"\"}],\"summary\":\"\"}";
 
-        JsonNode node = parse(TailoredResumeService.stripUnsourcedNumbers(json, "负责三个模块"));
+        JsonNode node = parse(TailoredResumeService.stripUnsourcedNumbers(json, "负责 3 个模块"));
 
         assertThat(node.get("findings").isArray()).isTrue();
         assertThat(node.get("findings").size()).isZero();
