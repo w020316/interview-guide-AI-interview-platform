@@ -85,9 +85,17 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.74.0'
+export const CURRENT_VERSION = '1.74.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.74.1',
+    date: '2026-10-18',
+    title: '版本 1.74.1 · 定制简历不再因为一个小字段缺失就报错',
+    items: [
+      { text: '定制简历偶尔会整份报错，已修复：模型漏掉次要字段时会自动补齐，只有改写条目本身不可用才提示重试', level: 'user' },
+    ],
+  },
   {
     version: '1.74.0',
     date: '2026-10-18',

@@ -19,13 +19,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * {@link TailoredResumeService} 单元测试（v1.74.0 定制简历事实溯源）
+ * {@link TailoredResumeService} 单元测试（v1.74.0 定制简历事实溯源 / v1.74.1 校验放宽）
  *
  * <p>覆盖点：
  * <ol>
  *   <li>合法 JSON 原样返回，findings 为空数组；</li>
- *   <li>结构非法（缺 rewrittenBullets / 空响应）触发重试一次，仍非法则抛 {@link BusinessException}
- *       —— 不再把兜底串当成功结果下发；</li>
+ *   <li>主叙事不可用（缺 rewrittenBullets / 空数组 / 条目全坏）触发重试一次，仍不可用则抛
+ *       {@link BusinessException}——不再把兜底串当成功结果下发；</li>
+ *   <li>v1.74.1 回归用例：次要字段（suggestions / matchedKeywords / missingKeywords / summary）
+ *       缺失或类型不对时**自动补齐并成功返回**，只有主叙事不可用才失败；单条 bullet 坏只丢那一条；</li>
+ *   <li>错误归因分叉：空响应报「AI 服务暂时不可用」，输出结构问题才报「格式异常」；</li>
  *   <li>数字溯源：编造的数字整条剔除并写 findings；原文已有的数字与中文数字（三个 ↔ 3 个）不得误杀；</li>
  *   <li>{@code stripUnsourcedNumbers} 自身异常时原样返回（安全网不能带崩主流程）；</li>
  *   <li>{@code chineseNumeral} 0-99 边界。</li>
@@ -187,7 +190,7 @@ class TailoredResumeServiceTest {
     @Test
     @DisplayName("结构非法：rewrittenBullets 为空数组也不算成功（空面板必须走重试/报错）")
     void tailor_emptyBullets_throws() {
-        // 变异测试（v1.74.0 验证阶段）发现：删掉 isValidTailor 里的 bullets.isEmpty()
+        // 变异测试（v1.74.0 验证阶段）发现：删掉结构校验里的 bullets.isEmpty()
         // 判断后全部用例仍绿——说明「空数组」这条分支当时没有任何测试锁住。
         // 而空数组恰恰是最隐蔽的失败形态：结构合法、HTTP 200、前端 v-if 全部落空，
         // 用户只看到一块空面板，既不知道失败也不知道为什么。
@@ -202,13 +205,96 @@ class TailoredResumeServiceTest {
     }
 
     @Test
-    @DisplayName("空响应：走重试，最终抛 BusinessException（不得把兜底串当成功返回）")
+    @DisplayName("空响应：走重试，最终抛「AI 服务暂时不可用」而不是「格式异常」")
     void tailor_emptyResponse_throwsInsteadOfFallback() {
+        // v1.74.1：空响应是链路故障（模型没回内容），不是「模型输出结构不对」。
+        // 两种故障的处置方式完全不同，文案必须分叉——这条用例就是错误归因的守卫。
         stubChatClient("");
 
         assertThatThrownBy(() -> service.tailor("负责订单系统性能优化", "Java 后端", ""))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("定制简历结果格式异常");
+                .hasMessageContaining("AI 服务暂时不可用")
+                .hasMessageNotContaining("格式异常");
+    }
+
+    @Test
+    @DisplayName("次要字段缺失：缺 suggestions 不判失败，补空数组且保留 bullets")
+    void tailor_missingSuggestions_stillSucceeds() throws Exception {
+        // v1.74.0 线上回归：模型偶发漏 suggestions，整份结果被判非法 → 重试 → 503（实测 40%）
+        String json = "{\"matchedKeywords\":[\"Spring Boot\"],\"missingKeywords\":[\"Kafka\"],"
+                + "\"rewrittenBullets\":[{\"original\":\"负责订单系统\",\"rewritten\":\"负责订单系统架构\","
+                + "\"reason\":\"贴合 JD\"}],\"summary\":\"懂业务的 Java 后端\"}";
+        stubChatClient(json);
+
+        String result = service.tailor("负责订单系统", "Java 后端", "");
+
+        JsonNode node = parse(result);
+        assertThat(node.get("suggestions").isArray()).isTrue();
+        assertThat(node.get("suggestions").size()).isZero();
+        assertThat(node.get("rewrittenBullets").size()).isEqualTo(1);
+        // 不重试：次要字段缺失属于「可修正」，不该多消耗一次 AI 调用
+        verify(callResponseSpec, times(1)).content();
+    }
+
+    @Test
+    @DisplayName("次要字段缺失：缺 matchedKeywords + missingKeywords 不判失败，两个都补空数组")
+    void tailor_missingKeywordArrays_stillSucceeds() throws Exception {
+        String json = "{\"rewrittenBullets\":[{\"original\":\"负责订单系统\",\"rewritten\":\"负责订单系统架构\","
+                + "\"reason\":\"贴合 JD\"}],\"summary\":\"懂业务的 Java 后端\",\"suggestions\":[]}";
+        stubChatClient(json);
+
+        JsonNode node = parse(service.tailor("负责订单系统", "Java 后端", ""));
+
+        assertThat(node.get("matchedKeywords").isArray()).isTrue();
+        assertThat(node.get("matchedKeywords").size()).isZero();
+        assertThat(node.get("missingKeywords").isArray()).isTrue();
+        assertThat(node.get("missingKeywords").size()).isZero();
+        assertThat(node.get("rewrittenBullets").size()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("summary 为 null：不判失败，补空串")
+    void tailor_nullSummary_stillSucceeds() throws Exception {
+        String json = "{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"rewrittenBullets\":[{\"original\":\"负责订单系统\",\"rewritten\":\"负责订单系统架构\","
+                + "\"reason\":\"贴合 JD\"}],\"summary\":null,\"suggestions\":[]}";
+        stubChatClient(json);
+
+        JsonNode node = parse(service.tailor("负责订单系统", "Java 后端", ""));
+
+        assertThat(node.get("summary").isTextual()).isTrue();
+        assertThat(node.get("summary").asText()).isEmpty();
+        assertThat(node.get("rewrittenBullets").size()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("单条 bullet 缺 rewritten：只丢坏的那条，好的保留")
+    void tailor_oneBadBullet_dropsOnlyThatOne() throws Exception {
+        String json = "{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"rewrittenBullets\":["
+                + "{\"original\":\"负责订单系统\",\"rewritten\":\"负责订单系统架构\",\"reason\":\"贴合 JD\"},"
+                + "{\"original\":\"负责支付模块\",\"reason\":\"缺 rewritten 字段\"}],"
+                + "\"summary\":\"\",\"suggestions\":[]}";
+        stubChatClient(json);
+
+        JsonNode node = parse(service.tailor("负责订单系统", "Java 后端", ""));
+
+        assertThat(node.get("rewrittenBullets").size()).isEqualTo(1);
+        assertThat(node.get("rewrittenBullets").get(0).get("original").asText()).isEqualTo("负责订单系统");
+    }
+
+    @Test
+    @DisplayName("bullets 全部缺 rewritten：主叙事不可用，抛格式异常")
+    void tailor_allBulletsBroken_throws() {
+        String json = "{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"rewrittenBullets\":[{\"original\":\"负责订单系统\"},{\"original\":\"负责支付模块\"}],"
+                + "\"summary\":\"\",\"suggestions\":[]}";
+        stubChatClientSequence(json, json);
+
+        assertThatThrownBy(() -> service.tailor("负责订单系统", "Java 后端", ""))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("格式异常");
+        verify(callResponseSpec, times(2)).content();
     }
 
     @Test

@@ -45,6 +45,20 @@ import java.util.regex.Pattern;
  *       故输出前逐条核对数字来源，原文没有的数字连同整条改写一起剔除，并把剔除原因
  *       回传给前端，让用户知道「AI 想编，被拦下了」而不是静默少一条。</li>
  * </ol>
+ *
+ * <p><b>v1.74.1 修正 v1.74.0 的过严校验（线上回归）</b>：v1.74.0 的校验要求四个次要字段
+ * （matchedKeywords / missingKeywords / suggestions / summary）全部存在且类型正确，
+ * 而模型偶发漏掉其中一个。线上实测 5 次请求 2 次 503——用户本可以拿到完好的改写条目，
+ * 却因为一个装饰性字段缺失被判「格式异常」并重试，重试大概率同样漏，最终整份失败。
+ *
+ * <p>现在的原则是<b>只拒绝「不可用」的，其余尽量修正</b>：
+ * <ul>
+ *   <li>主叙事 {@code rewrittenBullets}：缺失、非数组、或剔除坏条目后为空 → 判不可用（重试/抛错）；</li>
+ *   <li>三个次要字符串数组：缺失或类型不对 → 补空数组 + {@code log.warn}，不判失败；</li>
+ *   <li>{@code summary}：缺失或非字符串 → 补空串；</li>
+ *   <li>单条 bullet 缺 {@code original}/{@code rewritten} → 只丢这一条，其余保留。</li>
+ * </ul>
+ * 前端拿到的字段类型永远正确（不下发脏数据），但可用结果不会被判死。
  */
 @Service
 public class TailoredResumeService {
@@ -69,6 +83,18 @@ public class TailoredResumeService {
 
     /** 定制简历 JSON 校验/改写用（结构固定，独立实例足够，避免与全局 ObjectMapper 配置耦合） */
     private static final ObjectMapper TAILOR_MAPPER = new ObjectMapper();
+
+    /**
+     * 链路故障文案：AI 调用没拿到内容（超时、空响应、调用抛异常）。
+     *
+     * <p>与 {@link #MSG_FORMAT_INVALID} 分开是有意的：这两种故障的处置方式完全不同——
+     * 前者是「稍后再试就好」，后者要去看模型输出结构。v1.74.0 把它们合并成一句
+     * 「格式异常」，线上排查时无法区分「模型没回」和「模型回错了」。
+     */
+    static final String MSG_AI_UNAVAILABLE = "AI 服务暂时不可用，请稍后重试";
+
+    /** 输出结构故障文案：拿到了内容，但主叙事（rewrittenBullets）不可用 */
+    static final String MSG_FORMAT_INVALID = "定制简历结果格式异常，请稍后重试";
 
     /**
      * 改写文本里的数字 token：阿拉伯数字 + 可选小数 + 可选百分号。
@@ -141,47 +167,128 @@ public class TailoredResumeService {
     }
 
     /**
-     * 校验定制简历结果是否为「可用的」JSON —— 既要能解析，也要满足业务契约：
+     * 把模型输出规范化成「前端可直接渲染」的结构，不可用则返回 {@code null}。
+     *
+     * <p><b>判据只有一条：主叙事能不能用。</b>{@code rewrittenBullets} 是用户真正要拿走的东西，
+     * 它缺失 / 不是数组 / 剔除坏条目后为空，才算本次生成失败；其余字段都只是装饰，
+     * 缺失时补齐即可——v1.74.0 把它们也当成硬性契约，导致线上 40% 的请求被判 503。
+     *
+     * <p>逐项规则：
      * <ul>
-     *   <li>{@code rewrittenBullets} 为**非空数组**，每项是对象且 {@code original}/{@code rewritten}
-     *       均为非空白字符串（前端直接渲染这两个字段，缺一个就是空白面板）；</li>
-     *   <li>{@code matchedKeywords} / {@code missingKeywords} / {@code suggestions} 存在且为字符串数组；</li>
-     *   <li>{@code summary} 存在且为字符串（允许空串：模型偶尔确实无话可说，不算脏数据）。</li>
+     *   <li>{@code rewrittenBullets}：非数组 → null；单条缺 {@code original}/{@code rewritten}
+     *       （非字符串或空白）→ 丢弃该条；全部被丢弃 → null；</li>
+     *   <li>{@code matchedKeywords} / {@code missingKeywords} / {@code suggestions}：缺失或非数组
+     *       → 补空数组；数组内混入非字符串元素 → 只丢坏元素；</li>
+     *   <li>{@code summary}：缺失或非字符串 → 补空串；</li>
+     *   <li>{@code findings}：保证存在（前端按存在性判断是否渲染提示块）。</li>
      * </ul>
      *
-     * <p>为什么必须有这层校验：定制简历是**嵌套结构**，与简历分析同源（同一模型、同一类提示词），
-     * 而 {@code JsonRepairUtil} 只能修「语法坏」不能修「结构缺字段」。此前缺字段的 JSON 会被
-     * 原样落库并下发，前端 {@code v-if} 全部落空，用户看到的是空面板——既不知道失败也不知道为什么。
+     * <p>每处修正都 {@code log.warn} 并带上字段名：线上要能回答「是模型漏了什么」，
+     * 而不是只看到一句「结果非法」。这里**不做**数字溯源，那是
+     * {@link #stripUnsourcedNumbers} 的职责（两件事混在一起会让失败原因无法归因）。
+     *
+     * @param json 已过 {@code JsonRepairUtil} 的 JSON 文本
+     * @return 规范化后的 JSON；主叙事不可用或无法解析时返回 {@code null}
      */
-    static boolean isValidTailor(String json) {
-        if (!JsonRepairUtil.isValid(json)) {
-            return false;
+    static String normalizeTailor(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
         }
         try {
-            JsonNode node = TAILOR_MAPPER.readTree(json);
-            if (node == null || !node.isObject()) {
-                return false;
+            JsonNode root = TAILOR_MAPPER.readTree(json);
+            if (root == null || !root.isObject()) {
+                log.warn("定制简历结果不是 JSON 对象，判为不可用");
+                return null;
             }
-            JsonNode bullets = node.get("rewrittenBullets");
-            if (bullets == null || !bullets.isArray() || bullets.isEmpty()) {
-                return false;
+            ObjectNode obj = (ObjectNode) root;
+
+            // 主叙事：唯一的硬性契约
+            JsonNode bullets = obj.get("rewrittenBullets");
+            if (bullets == null || !bullets.isArray()) {
+                log.warn("定制简历缺少 rewrittenBullets 或类型不是数组（模型输出结构异常），判为不可用");
+                return null;
             }
-            for (JsonNode b : bullets) {
-                if (b == null || !b.isObject()) {
-                    return false;
+            ArrayNode keptBullets = TAILOR_MAPPER.createArrayNode();
+            int dropped = 0;
+            for (JsonNode bullet : bullets) {
+                if (bullet == null || !bullet.isObject()
+                        || !isNonBlankText(bullet.get("original"))
+                        || !isNonBlankText(bullet.get("rewritten"))) {
+                    dropped++;
+                    continue;
                 }
-                if (!isNonBlankText(b.get("original")) || !isNonBlankText(b.get("rewritten"))) {
-                    return false;
-                }
+                keptBullets.add(bullet);
             }
-            return isStringArray(node.get("matchedKeywords"))
-                    && isStringArray(node.get("missingKeywords"))
-                    && isStringArray(node.get("suggestions"))
-                    && node.get("summary") != null
-                    && node.get("summary").isTextual();
+            if (keptBullets.isEmpty()) {
+                log.warn("定制简历 rewrittenBullets 剔除坏条目后为空（原 {} 条，丢弃 {} 条），判为不可用",
+                        bullets.size(), dropped);
+                return null;
+            }
+            if (dropped > 0) {
+                // 只丢坏的那几条：其余改写条目对用户仍然可用，不该整份判失败
+                log.warn("定制简历 rewrittenBullets 有 {} 条缺少 original/rewritten，已丢弃，保留 {} 条",
+                        dropped, keptBullets.size());
+            }
+            obj.set("rewrittenBullets", keptBullets);
+
+            // 次要字段：缺失就补，不判失败
+            normalizeStringArray(obj, "matchedKeywords");
+            normalizeStringArray(obj, "missingKeywords");
+            normalizeStringArray(obj, "suggestions");
+
+            JsonNode summary = obj.get("summary");
+            if (summary == null || !summary.isTextual()) {
+                log.warn("定制简历缺少 summary 或类型不是字符串（模型偶发），已补空串");
+                obj.put("summary", "");
+            }
+
+            JsonNode findings = obj.get("findings");
+            if (findings == null) {
+                obj.putArray("findings");
+            } else if (!findings.isArray()) {
+                log.warn("定制简历 findings 类型不是数组（模型偶发），已补空数组");
+                obj.putArray("findings");
+            }
+
+            return TAILOR_MAPPER.writeValueAsString(obj);
         } catch (Exception e) {
-            return false;
+            log.warn("定制简历结果规范化失败（JSON 无法解析）：{}", e.getMessage());
+            return null;
         }
+    }
+
+    /**
+     * 规范化一个「字符串数组」次要字段：缺失/类型不对补空数组，混入非字符串元素则只丢坏元素。
+     *
+     * @param obj   待规范化的对象（原地修改）
+     * @param field 字段名，仅用于日志定位
+     */
+    private static void normalizeStringArray(ObjectNode obj, String field) {
+        JsonNode node = obj.get(field);
+        if (node == null) {
+            log.warn("定制简历缺少 {}（模型偶发），已补空数组", field);
+            obj.putArray(field);
+            return;
+        }
+        if (isStringArray(node)) {
+            return;
+        }
+        if (!node.isArray()) {
+            log.warn("定制简历 {} 类型不是数组（模型偶发），已补空数组", field);
+            obj.putArray(field);
+            return;
+        }
+        ArrayNode filtered = TAILOR_MAPPER.createArrayNode();
+        int dropped = 0;
+        for (JsonNode element : node) {
+            if (element != null && element.isTextual()) {
+                filtered.add(element);
+            } else {
+                dropped++;
+            }
+        }
+        log.warn("定制简历 {} 有 {} 个非字符串元素，已丢弃", field, dropped);
+        obj.set(field, filtered);
     }
 
     /** 字段是否为非空白字符串 */
@@ -203,37 +310,50 @@ public class TailoredResumeService {
     }
 
     /**
-     * 输出前校验：破损 JSON 先重试一次，仍不合格则抛出明确错误。
+     * 输出前规范化：结构不可用先重试一次，仍不可用则抛出明确错误。
      *
-     * <p>范式逐行对齐 {@code ResumeAnalysisService.validateOrRetryResume}——「要么合法，要么明确失败」，
-     * **不再把兜底串当成功结果返回**。重试会多消耗一次 AI 调用，但只在解析/契约失败时发生，
+     * <p>范式对齐 {@code ResumeAnalysisService.validateOrRetryResume}——「要么可用，要么明确失败」，
+     * **不把兜底串当成功结果返回**。重试会多消耗一次 AI 调用，但只在主叙事不可用时发生，
      * 相比「把脏数据当成功下发、前端渲染出空面板」，这个代价是值得的。
+     *
+     * <p><b>错误文案必须分叉（v1.74.1）</b>：此前两种完全不同的故障都报「结果格式异常」，
+     * 用户和运维都无法区分「AI 没返回内容」与「AI 返回了但结构不对」：
+     * <ul>
+     *   <li>调用没拿到内容（null/空白，或重试调用抛异常）→ {@value #MSG_AI_UNAVAILABLE}，属于链路问题；</li>
+     *   <li>拿到了内容但主叙事不可用 → {@value #MSG_FORMAT_INVALID}，属于模型输出结构问题。</li>
+     * </ul>
      *
      * @param retryCall 重试时重新发起 AI 调用的动作（需自行包裹并发闸门）
      */
     private String validateOrRetryTailor(String raw, java.util.function.Supplier<String> retryCall) {
-        String repaired = JsonRepairUtil.repairAndLog(raw, "career-tailor-resume");
-        if (isValidTailor(repaired)) {
-            return repaired;
+        String normalized = normalizeTailor(JsonRepairUtil.repairAndLog(raw, "career-tailor-resume"));
+        if (normalized != null) {
+            return normalized;
         }
-        log.warn("定制简历输出非法 JSON（已尝试修复），重试一次。原文前 200 字：{}", TextUtil.truncate(raw, 200));
+        if (raw == null || raw.isBlank()) {
+            log.warn("定制简历首次调用未返回内容（链路无响应），重试一次");
+        } else {
+            log.warn("定制简历输出不可用（已尝试修复），重试一次。原文前 200 字：{}", TextUtil.truncate(raw, 200));
+        }
 
         String retryRaw;
         try {
             retryRaw = retryCall.get();
         } catch (Exception e) {
-            log.warn("定制简历重试调用失败：{}", e.getMessage());
-            throw new BusinessException("定制简历结果格式异常，请稍后重试");
+            // 调用本身抛异常是链路故障，不是「模型输出格式不对」——文案不能混为一谈
+            log.warn("定制简历重试调用失败（链路异常）：{}", e.getMessage());
+            throw new BusinessException(MSG_AI_UNAVAILABLE);
         }
         if (retryRaw == null || retryRaw.isBlank()) {
-            throw new BusinessException("定制简历结果格式异常，请稍后重试");
+            log.warn("定制简历重试仍未返回内容（链路无响应），放弃本次生成");
+            throw new BusinessException(MSG_AI_UNAVAILABLE);
         }
-        String retryRepaired = JsonRepairUtil.repairAndLog(retryRaw, "career-tailor-resume-retry");
-        if (isValidTailor(retryRepaired)) {
-            return retryRepaired;
+        String retryNormalized = normalizeTailor(JsonRepairUtil.repairAndLog(retryRaw, "career-tailor-resume-retry"));
+        if (retryNormalized != null) {
+            return retryNormalized;
         }
-        log.error("定制简历重试后仍非法，放弃本次生成。原文前 200 字：{}", TextUtil.truncate(retryRaw, 200));
-        throw new BusinessException("定制简历结果格式异常，请稍后重试");
+        log.error("定制简历重试后仍不可用，放弃本次生成。原文前 200 字：{}", TextUtil.truncate(retryRaw, 200));
+        throw new BusinessException(MSG_FORMAT_INVALID);
     }
 
     /**
