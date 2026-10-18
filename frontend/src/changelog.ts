@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.71.2'
+export const CURRENT_VERSION = '1.71.3'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.71.3',
+    date: '2026-10-18',
+    title: '版本 1.71.3 · 修掉「明明改了却看不到变化」',
+    items: [
+      { text: '我们更新简历分析的判断逻辑之后，如果你在**半小时内**分析过同一份简历，再点一次拿到的仍是旧结果——看起来就像"改了没生效"。现在每次更新逻辑都会让旧缓存失效，你看到的一定是当前版本的分析', level: 'user' },
+      { text: '实现：缓存键原为 `前缀 + userId + sha256(简历文本+岗位)`，现在加入 `PROMPT_VERSION` 段。这是本项目反复出现的失效模式（改了行为但被缓存挡住），用「prompt 有实质改动必须递增版本号」的约定收口', level: 'tech' },
+      { text: '新增 `ResumeAnalysisCacheKeyTest` 4 条：键必须以 `resume:analysis:v2:` 开头、**必须不等于旧格式**（这条是关键回归）、同输入稳定、user/文本/岗位任一变化即换键。抽出 `buildCacheKey` 纯函数以便直接测，不走 Spring 上下文', level: 'tech' },
+    ],
+  },
   {
     version: '1.71.2',
     date: '2026-10-18',

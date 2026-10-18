@@ -66,6 +66,31 @@ public class ResumeAnalysisService {
 
     private static final String CACHE_PREFIX = "resume:analysis:";
 
+    /**
+     * Prompt 版本号（v1.71.3，2026-10-18）。
+     *
+     * <p><b>为什么必须进缓存键</b>：缓存键原本只有「简历文本 + 目标岗位」的哈希。
+     * 一旦改了 prompt（例如 v1.71.2 加的「时间线/学历」判断约束），老简历在 TTL 内
+     * 仍会命中**旧 prompt 产出的旧结果** —— 表现为「代码改了、线上好像没生效」，
+     * 而这类静默失效正是本项目反复踩的坑。
+     *
+     * <p><b>使用约定：只要 prompt 文案有实质改动，就必须递增这个常量。</b>
+     * 递增后旧键自然失效（30 分钟后过期），无需手动清 Redis。
+     */
+    private static final String PROMPT_VERSION = "v2";
+
+    /**
+     * 构造简历分析的缓存键（v1.71.3 抽出成方法，便于单测覆盖）。
+     *
+     * <p>三段式：`前缀 + prompt 版本 : userId : sha256(简历文本 + 目标岗位)`。
+     * - `userId` 防跨用户串扰（不同用户同一份简历应各自计费/命中）；
+     * - `PROMPT_VERSION` 保证「改了 prompt 就换一批键」，老键 30 分钟内自然过期。
+     */
+    String buildCacheKey(String userId, String resumeText, String targetJob) {
+        return CACHE_PREFIX + PROMPT_VERSION + ":" + userId + ":"
+                + HashUtil.sha256Short(resumeText + "\u0001" + targetJob);
+    }
+
     /** 简历分析缓存存活时长（毫秒）：与 Redis 侧 30 分钟保持一致（v1.34.1 P2-5） */
     private static final long CACHE_TTL_MILLIS = 30 * 60 * 1000L;
 
@@ -91,8 +116,8 @@ public class ResumeAnalysisService {
         long start = System.nanoTime();
         boolean cacheHit = false;
         try {
-            // 1. 缓存命中检查（key 包含 userId 防跨用户串扰）
-            String cacheKey = CACHE_PREFIX + userId + ":" + HashUtil.sha256Short(resumeText + "\u0001" + targetJob);
+            // 1. 缓存命中检查（key 包含 userId 防跨用户串扰；含 PROMPT_VERSION 防「改了 prompt 却命中旧结果」）
+            String cacheKey = buildCacheKey(userId, resumeText, targetJob);
             try {
                 Object cached = redisTemplate.opsForValue().get(cacheKey);
                 if (cached != null) {
