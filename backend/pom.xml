@@ -23,6 +23,11 @@
         <jjwt.version>0.12.6</jjwt.version>
         <bucket4j.version>8.10.1</bucket4j.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <!-- G8（2026-10-18）：实网探针默认不参与回归。
+             背景：全量 1277 用例耗时 5 分 07 秒，其中 7 个 Probe 类合计 194 秒（63%），
+             且全部依赖外网 —— 断网/被墙/上游改版都会让 CI 假红，与本次改动无关。
+             这些类已打 @Tag("probe")；要单独跑它们时用 -Dsurefire.excludedGroups= 清空排除。 -->
+        <surefire.excludedGroups>probe</surefire.excludedGroups>
     </properties>
 
     <!-- Spring AI BOM 统一管理版本 -->
@@ -259,6 +264,9 @@
                          故改用 SerialGC（与生产 512MB 容器同款，虚拟空间占用小）并设上限。
                          此配置只作用于测试分叉 JVM，不影响生产容器内存参数。 -->
                     <argLine>@{argLine} -Xmx1024m -XX:MaxMetaspaceSize=512m -XX:ReservedCodeCacheSize=192m -XX:+UseSerialGC</argLine>
+                    <!-- G8：默认排除 @Tag("probe") 的实网探针，见 <properties> 中的说明。
+                         值走属性而非写死，便于 -Dsurefire.excludedGroups= 临时放开。 -->
+                    <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
         </plugins>
