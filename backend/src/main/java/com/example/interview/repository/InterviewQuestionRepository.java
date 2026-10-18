@@ -43,6 +43,15 @@ public interface InterviewQuestionRepository extends JpaRepository<InterviewQues
     /** 删除指定会话的所有题目（级联删除场景） */
     void deleteBySessionId(String sessionId);
 
+    /**
+     * 批量删除多个会话的题目（G2：删除简历时级联清理其派生会话）。
+     *
+     * <p>刻意用批量而不是在循环里逐条 {@code deleteBySessionId}：后者是 N 次 DELETE，
+     * 会话多的用户会明显变慢，且中途失败会留下「会话已删、题目还在」的半截状态
+     * （整个方法在调用方的 @Transactional 内，批量语句失败即整体回滚）。
+     */
+    void deleteBySessionIdIn(Collection<String> sessionIds);
+
     /** 指定用户全部题目平均评分（子查询聚合，避免全量加载题目实体） */
     @Query("select avg(q.evaluationScore) from InterviewQuestionEntity q " +
             "where q.sessionId in (select s.sessionId from InterviewSessionEntity s where s.userId = :userId)")

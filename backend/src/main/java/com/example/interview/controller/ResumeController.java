@@ -224,6 +224,25 @@ public class ResumeController {
     }
 
     /**
+     * 删除一份简历（G2，2026-10-18）
+     * DELETE /api/resume/{id}?cascade=false
+     *
+     * <p>此前简历**只增不删**：分析了几十份之后列表无法清理，用户只能靠「最新在前」硬扛。
+     *
+     * <p>默认保守：若该简历已派生出面试会话，返回 409 并带上会话数量，
+     * 让用户明确知道「删这份简历会牵连到面试记录」；只有显式 {@code cascade=true}
+     * 才连带删除。返回值里带 {@code deletedSessions} 供前端如实提示。
+     */
+    @DeleteMapping("/{id}")
+    public Result<Map<String, Object>> delete(@PathVariable Long id,
+                                              @RequestParam(required = false, defaultValue = "false") boolean cascade) {
+        int deletedSessions = resumeService.deleteForUser(id, currentUserId(), cascade);
+        Map<String, Object> data = new HashMap<>();
+        data.put("deletedSessions", deletedSessions);
+        return Result.success(data);
+    }
+
+    /**
      * 基于分析结果生成优化版简历（Markdown 格式）
      * POST /api/resume/optimize
      * Body: {"resumeText": "...", "targetJob": "...", "analysis": "..."}

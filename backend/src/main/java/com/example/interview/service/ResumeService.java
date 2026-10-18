@@ -32,6 +32,13 @@ public class ResumeService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /** G2：删除简历前判定引用关系，并支持显式级联清理派生会话 */
+    @Autowired
+    private com.example.interview.repository.InterviewSessionRepository sessionRepository;
+
+    @Autowired
+    private com.example.interview.repository.InterviewQuestionRepository questionRepository;
+
     /**
      * 保存简历分析结果
      *
@@ -121,8 +128,49 @@ public class ResumeService {
         return resume;
     }
 
+    /**
+     * 删除一份简历（G2，2026-10-18）。
+     *
+     * <p><b>为什么不能直接 deleteById</b>：`interview_session.resume_id` 是一条
+     * **没有 ON DELETE 子句的普通外键**。直接删会触发外键约束失败，对用户表现为 500。
+     * 因此必须先判定引用，再在两种语义里选一种：
+     * <ul>
+     *   <li>{@code cascade=false}（默认）：被引用即拒绝，抛 {@link ConflictException} → HTTP 409，
+     *       文案带上「N 场面试」，让用户知道拒绝的原因而不是撞一个不明所以的 500；</li>
+     *   <li>{@code cascade=true}：用户已明确同意 —— 在同一事务内先删题目、再删会话、最后删简历。
+     *       顺序不能反：先删简历会立刻撞外键。</li>
+     * </ul>
+     *
+     * <p>归属校验复用 {@link #getByIdAndUser}：不存在 → 404，非本人 → 403。
+     * 不做「静默删除他人数据」这种便利——那是越权。
+     *
+     * @return 被级联删除的会话数量（0 表示没有派生会话）
+     */
+    @Transactional
+    public int deleteForUser(Long id, String userId, boolean cascade) {
+        ResumeEntity resume = getByIdAndUser(id, userId);
+        List<com.example.interview.entity.InterviewSessionEntity> sessions =
+                sessionRepository.findAllByResumeId(id);
+
+        if (!sessions.isEmpty() && !cascade) {
+            throw new com.example.interview.common.ConflictException(
+                    "该简历已用于 " + sessions.size() + " 场面试，需确认后一并删除");
+        }
+
+        if (!sessions.isEmpty()) {
+            List<String> sessionIds = sessions.stream()
+                    .map(com.example.interview.entity.InterviewSessionEntity::getSessionId)
+                    .toList();
+            questionRepository.deleteBySessionIdIn(sessionIds);
+            sessionRepository.deleteAll(sessions);
+        }
+
+        resumeRepository.delete(resume);
+        log.info("用户 {} 删除简历 {}，级联删除会话 {} 场", userId, id, sessions.size());
+        return sessions.size();
+    }
+
     /** 统计用户简历数量 */
-    public long countByUser(String userId) {
-        return resumeRepository.countByUserId(userId);
+    public long countByUser(String userId) {        return resumeRepository.countByUserId(userId);
     }
 }

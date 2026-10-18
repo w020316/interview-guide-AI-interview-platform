@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.67.1'
+export const CURRENT_VERSION = '1.68.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.68.0',
+    date: '2026-10-18',
+    title: '版本 1.68.0 · 简历历史里终于可以删记录了',
+    items: [
+      { text: '简历分析历史现在可以删除了：每张卡片右侧多了一个垃圾桶图标，点了会先确认一次。此前只能一直往前堆，分析了几十份之后列表没法收拾，只能靠「最新的排最前」硬扛', level: 'user' },
+      { text: '如果这份简历已经用来练过模拟面试，第一次删除会被拦下来并告诉你关联了几场。要继续删需要再确认一次——因为会同时清掉那些面试记录（含题目和评分）。多这一道不是为了烦你，是为了别让一次误点把真正的面试复盘清掉', level: 'user' },
+      { text: '实现：新增 `DELETE /api/resume/{id}?cascade=false`。关键约束 —— `interview_session.resume_id` 是一条**没有 ON DELETE 子句的普通外键**，直接删简历会撞外键约束、对用户表现为 500。所以服务层先查引用：被引用且未要求级联 → `ConflictException` → 409（文案带会话数量）；级联时在同一事务内按「题目 → 会话 → 简历」顺序删，顺序反了会立刻撞外键', level: 'tech' },
+      { text: '测试：`ResumeDeleteServiceTest` 5 条 —— 无引用直接删 / 有引用拒绝**且一份数据都不动** / 级联顺序用 `InOrder` 断言 / 不存在 404 / 删他人 403；`ResumeDeleteControllerTest` 4 条覆盖路径、`cascade` 透传与 409/404 映射。级联那条**不能只断言「删成功」**：顺序写反同样会"删成功"的假象不存在，但会抛外键异常，所以必须锁顺序', level: 'tech' },
+    ],
+  },
   {
     version: '1.67.1',
     date: '2026-10-18',

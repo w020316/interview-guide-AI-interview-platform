@@ -18,6 +18,14 @@ public interface InterviewSessionRepository extends JpaRepository<InterviewSessi
     /** 通过业务 sessionId 查找会话 */
     Optional<InterviewSessionEntity> findBySessionId(String sessionId);
 
+    /**
+     * 查找某份简历派生出的全部面试会话（G2，2026-10-18）。
+     *
+     * <p>用途：删除简历前判定引用关系。`interview_session.resume_id` 是**无 ON DELETE 的
+     * 普通外键**，直接删简历会撞外键约束（表现为 500），所以必须先查再决定拒绝还是级联。
+     */
+    List<InterviewSessionEntity> findAllByResumeId(Long resumeId);
+
     /** 查询指定用户的所有会话，按创建时间倒序 */
     List<InterviewSessionEntity> findByUserIdOrderByCreatedAtDesc(String userId);
 

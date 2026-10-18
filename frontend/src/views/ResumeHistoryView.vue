@@ -90,6 +90,14 @@
           </div>
         </div>
         <div class="card-action">
+          <button v-if="!compareMode" class="card-del" type="button"
+                  title="删除这份分析记录" aria-label="删除这份分析记录"
+                  @click.stop="askDelete(r)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
             <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
@@ -239,8 +247,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
+import { isConflictError } from '../utils/httpError'
 import { repairAndCheck } from '../utils/jsonRepair'
 import { compareResume, type ResumeVersion, type DimDiff } from '../utils/resumeCompare'
 import { isParseFailed } from '../utils/resumeAnalysis'
@@ -279,8 +288,55 @@ const parseError = ref('')
 
 onMounted(() => loadResumes())
 
-async function loadResumes() {
-  loading.value = true
+/**
+ * 删除一条简历分析记录（G2）。
+ *
+ * <p>为什么要二次确认，而且第二段确认是分开的：后端在「该简历已派生出面试会话」时
+ * 会返回 409 而不是直接删——因为 `interview_session.resume_id` 是没有 ON DELETE 的外键，
+ * 静默级联会连带清掉用户真实的面试复盘。**先拒绝、再让用户明确同意**，
+ * 比"点了删除就把面试记录一起干掉了"要安全得多。
+ */
+async function askDelete(r: Resume) {
+  try {
+    await ElMessageBox.confirm(
+      '删除后不可恢复，这份分析记录会从历史中移除。',
+      '删除这份简历记录？',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消（ElMessageBox 取消时 reject 一个 'cancel'）
+  }
+  await deleteResume(r, false)
+}
+
+async function deleteResume(r: Resume, cascade: boolean) {
+  try {
+    const res = (await api.delete(
+      `/api/resume/${r.id}`,
+      cascade ? { params: { cascade: true } } : undefined,
+    )) as unknown as { deletedSessions?: number }
+    const n = res?.deletedSessions ?? 0
+    ElMessage.success(n > 0 ? `已删除，并清理 ${n} 场关联面试` : '已删除')
+    await loadResumes()
+  } catch (e: unknown) {
+    if (!cascade && isConflictError(e)) {
+      try {
+        await ElMessageBox.confirm(
+          `${getErrMessage(e, '这份简历已被面试引用')}。继续删除会同时清除这些面试记录（含题目与评分），不可恢复。`,
+          '这份简历与面试记录关联',
+          { confirmButtonText: '一并删除', cancelButtonText: '保留', type: 'warning' },
+        )
+      } catch {
+        return
+      }
+      await deleteResume(r, true)
+      return
+    }
+    ElMessage.error(getErrMessage(e, '删除失败，请稍后再试'))
+  }
+}
+
+async function loadResumes() {  loading.value = true
   try {
     const data = await api.get('/api/resume/history') as unknown as Resume[]
     resumes.value = data || []
@@ -855,9 +911,38 @@ const summaryText = computed(() => {
 }
 
 .card-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--c-text-tertiary);
   flex-shrink: 0;
   transition: color var(--transition-fast);
+}
+
+/* 删除按钮（G2）：图标按钮，hover 才显红；保留 focus-visible 焦点环（键盘可达） */
+.card-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--c-text-tertiary);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.card-del:hover {
+  color: var(--c-danger);
+  background: var(--c-danger-light);
+}
+
+.card-del:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
 }
 
 .resume-card:hover .card-action {
