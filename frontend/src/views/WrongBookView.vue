@@ -188,7 +188,8 @@ function difficultyText(d: string) {
 .page-header h1 { font-size: 28px; font-weight: 700; color: var(--c-text); margin: 0 0 6px; letter-spacing: -0.5px; }
 .page-header p { font-size: 14px; color: var(--c-text-secondary); margin: 0; }
 
-.filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); padding: 14px 18px; margin-bottom: 18px; box-shadow: var(--shadow-sm); }
+/* margin-bottom 18 → 16：全站纵向节奏走 4/8 栅格，18 会让筛选条与列表差半格 */
+.filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); padding: 14px 18px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
 .filter-label { font-size: 13px; color: var(--c-text-secondary); }
 /* 切换控件 · 独立胶囊按钮（DESIGN.md §5「带计数的筛选」idiom）
  * v1.66.3：由 .radio-row / .radio-chip 收敛而来 —— 此前是第 4 种写法，

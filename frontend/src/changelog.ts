@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.76.2'
+export const CURRENT_VERSION = '1.76.3'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.76.3',
+    date: '2026-10-19',
+    title: '版本 1.76.3 · 剩下的页面也一起体检了',
+    items: [
+      { text: '登录、JD 拆解、智能体、历史记录、学习中心、日历、错题本、收藏夹、成长趋势、简历历史、管理后台全部做了同样的检查：手机端触控目标全部达标、没有横向溢出', level: 'user' },
+      { text: '学习中心的说明文字、管理后台的指标卡不再有偏小的字号与错位间距', level: 'user' },
+      { text: '出错提示（右上角浮条）的文字改成了正文色 —— 原来的红字压浅红底看着费劲', level: 'user' },
+    ],
+  },
   {
     version: '1.76.2',
     date: '2026-10-19',

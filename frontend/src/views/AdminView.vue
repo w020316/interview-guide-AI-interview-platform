@@ -323,7 +323,7 @@ import api, { getErrMessage } from '../api'
 import { authState } from '../auth'
 import { recruitTypeLabel, RECRUIT_TYPE_CODES, RECRUIT_TYPE_LABELS } from '../utils/recruitType'
 import { EmptyChart } from '../components'
-import { asArray } from '../utils/safeData'
+import { asArray, asObject, asFiniteNumber } from '../utils/safeData'
 
 /**
  * 管理后台（v1.37.0 视觉与信息架构重构）
@@ -453,6 +453,32 @@ const userPage = ref(0)
 const userSize = 10
 const userKeyword = ref('')
 const usersLoading = ref(false)
+
+/** 指标空态：结构必须**完整** —— 模板里直接读 metrics.cache.hits / metrics.jvm.usedMb，
+ *  任何一个嵌套对象缺失都会抛 "Cannot read properties of undefined"，整页落到错误边界。
+ *  v1.76.3：此前接口返回 {} 就会这样；因为这块只在 ≥768px 渲染，手机端一直没暴露。 */
+const EMPTY_METRICS: Metrics = {
+  aiCalls: {},
+  cache: { hits: 0, misses: 0, searchCache: { hits: 0, misses: 0 } },
+  sse: { maxConcurrent: 0, activeCount: 0 },
+  jvm: { usedMb: 0, freeMb: 0, totalMb: 0, maxMb: 0 },
+}
+
+/** 逐层归一：缺哪层补哪层；数组/字符串等错误类型一律回落到空态 */
+function normalizeMetrics(raw: unknown): Metrics {
+  const o = asObject<Partial<Metrics>>(raw, EMPTY_METRICS)
+  const cache = asObject(o.cache, EMPTY_METRICS.cache)
+  return {
+    aiCalls: asObject(o.aiCalls, {}),
+    cache: {
+      ...EMPTY_METRICS.cache,
+      ...cache,
+      searchCache: asObject(cache.searchCache, EMPTY_METRICS.cache.searchCache as { hits: number; misses: number }),
+    },
+    sse: asObject(o.sse, EMPTY_METRICS.sse),
+    jvm: asObject(o.jvm, EMPTY_METRICS.jvm),
+  }
+}
 
 const metrics = ref<Metrics | null>(null)
 
@@ -657,8 +683,8 @@ async function fetchJobs() {
     if (jobScope.value === 'domestic') params.set('overseas', 'false')
     else if (jobScope.value === 'overseas') params.set('overseas', 'true')
     const data = (await api.get(`/api/admin/jobs?${params.toString()}`)) as unknown as { total: number; items: JobRow[] }
-    jobsTotal.value = data.total
-    jobs.value = data.items
+    jobsTotal.value = asFiniteNumber(data?.total)
+    jobs.value = asArray<JobRow>(data?.items)
   } catch (e) {
     ElMessage.error(getErrMessage(e, '加载岗位失败'))
   } finally {
@@ -714,8 +740,8 @@ async function fetchUsers() {
     const params = new URLSearchParams({ page: String(userPage.value), size: String(userSize) })
     if (userKeyword.value.trim()) params.set('keyword', userKeyword.value.trim())
     const data = (await api.get(`/api/admin/users?${params.toString()}`)) as unknown as { total: number; items: UserRow[] }
-    usersTotal.value = data.total
-    users.value = data.items
+    usersTotal.value = asFiniteNumber(data?.total)
+    users.value = asArray<UserRow>(data?.items)
   } catch (e) {
     ElMessage.error(getErrMessage(e, '加载用户失败'))
   } finally {
@@ -768,7 +794,7 @@ async function toggleBan(u: UserRow) {
 
 async function fetchMetrics() {
   try {
-    metrics.value = (await api.get('/api/admin/metrics')) as unknown as Metrics
+    metrics.value = normalizeMetrics(await api.get('/api/admin/metrics'))
   } catch (e) {
     ElMessage.error(getErrMessage(e, '获取指标失败'))
   }
@@ -869,7 +895,7 @@ onMounted(() => {
 .admin-tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   padding: 4px;
   background: var(--c-bg-alt);
   border-radius: var(--radius-lg);

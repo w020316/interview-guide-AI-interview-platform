@@ -404,7 +404,7 @@ onMounted(load)
 .page-header p { font-size: 14px; color: var(--c-text-secondary); margin: 0; }
 
 /* 工具行 */
-.cal-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 18px; box-shadow: var(--shadow-sm); }
+.cal-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
 .stats-row { display: flex; gap: 28px; }
 .mini-stat { display: flex; flex-direction: column; }
 .mini-num { font-size: 24px; font-weight: 700; color: var(--c-text); line-height: 1.1; }
@@ -442,7 +442,7 @@ onMounted(load)
 .mini-more { font-size: 10px; color: var(--c-text-tertiary); padding-left: 4px; }
 
 /* 当日明细 */
-.day-detail { margin-top: 18px; background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); padding: 18px 20px; box-shadow: var(--shadow-sm); }
+.day-detail { margin-top: 16px; background: var(--c-surface); border: 1px solid var(--c-border-light); border-radius: var(--radius-lg); padding: 18px 20px; box-shadow: var(--shadow-sm); }
 .detail-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .detail-head h2 { font-size: 16px; font-weight: 600; color: var(--c-text); margin: 0; }
 .event-list { display: flex; flex-direction: column; gap: 10px; }

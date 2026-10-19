@@ -101,7 +101,7 @@ function reload() {
 }
 
 .re-desc {
-  margin: 0 0 22px;
+  margin: 0 0 24px;
   font-size: 14px;
   line-height: 1.7;
   color: var(--c-text-secondary);
@@ -156,7 +156,7 @@ function reload() {
 }
 
 .re-detail {
-  margin-top: 22px;
+  margin-top: 24px;
   text-align: left;
   font-size: 12px;
   color: var(--c-text-tertiary);
@@ -180,8 +180,8 @@ function reload() {
   border-radius: var(--radius-sm);
 }
 
-/* 移动端：按钮撑满，避免在窄屏里挤成两行小按钮 */
-@media (max-width: 480px) {
+/* 触屏断点（≤768，与全局触摸层一致）：按钮撑满且 ≥48px */
+@media (max-width: 768px) {
   .route-error {
     margin: 24px auto;
     padding: 24px 18px;

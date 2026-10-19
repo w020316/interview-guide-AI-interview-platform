@@ -170,7 +170,8 @@ onMounted(async () => {
 
 .module-stat { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
 .stat-num { font-size: 24px; font-weight: 700; color: var(--c-text); line-height: 1; }
-.stat-label { font-size: 11px; color: var(--c-text-tertiary); margin-top: 3px; }
+/* 12px 是全站最小字号下限（11px 在 Windows 的雅黑下笔画糊成一片） */
+.stat-label { font-size: 12px; color: var(--c-text-tertiary); margin-top: 2px; }
 .module-arrow { color: var(--c-text-tertiary); font-size: 18px; transition: transform var(--transition-fast), color var(--transition-fast); flex-shrink: 0; }
 .module-card:hover .module-arrow { transform: translateX(3px); color: var(--brand-primary); }
 
