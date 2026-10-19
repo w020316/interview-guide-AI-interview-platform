@@ -11,6 +11,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -385,14 +387,190 @@ class TailoredResumeServiceTest {
         assertThat(node.get("rewrittenBullets").size()).isEqualTo(1);
     }
 
+    /* ─────────────────────────────────────────────────────────────
+       v1.75.0：数值集合比对（原文与改写落到同一个 NumKey 空间）
+       ───────────────────────────────────────────────────────────── */
+
+    /**
+     * 0–9999 → 中文数字。与生产侧 {@code parseChineseNumeral} 方向相反，专供往返验证。
+     *
+     * <p>为什么值得在测试里写一个生成器：手写中文数字解析器最容易在「零的占位」上出错
+     * （{@code 一百零五} vs {@code 一百五}），30 条手写用例覆盖不到 9000 个组合的边角，
+     * 而往返断言一次就能把它们全部跑一遍。
+     */
+    private static String toChinese(int n) {
+        if (n == 0) {
+            return "零";
+        }
+        String[] d = {"零", "一", "二", "三", "四", "五", "六", "七", "八", "九"};
+        StringBuilder sb = new StringBuilder();
+        int qian = n / 1000;
+        int bai = (n / 100) % 10;
+        int shi = (n / 10) % 10;
+        int ge = n % 10;
+        if (qian > 0) {
+            sb.append(d[qian]).append('千');
+        }
+        if (bai > 0) {
+            sb.append(d[bai]).append('百');
+        }
+        if (shi > 0) {
+            // 百位缺失时要补「零」：一千零一十
+            if (bai == 0 && sb.length() > 0) {
+                sb.append('零');
+            }
+            // 「十」「十二」不写「一十」「一十二」
+            if (shi == 1 && sb.length() == 0) {
+                sb.append('十');
+            } else {
+                sb.append(d[shi]).append('十');
+            }
+        } else if (ge > 0 && sb.length() > 0) {
+            // 一百零五、一千零五
+            sb.append('零');
+        }
+        if (ge > 0) {
+            sb.append(d[ge]);
+        }
+        return sb.toString();
+    }
+
     @Test
-    @DisplayName("chineseNumeral：0-99 边界拼写")
-    void chineseNumeral_boundaries() {
-        assertThat(TailoredResumeService.chineseNumeral(3)).isEqualTo("三");
-        assertThat(TailoredResumeService.chineseNumeral(10)).isEqualTo("十");
-        assertThat(TailoredResumeService.chineseNumeral(12)).isEqualTo("十二");
-        assertThat(TailoredResumeService.chineseNumeral(20)).isEqualTo("二十");
-        assertThat(TailoredResumeService.chineseNumeral(25)).isEqualTo("二十五");
-        assertThat(TailoredResumeService.chineseNumeral(99)).isEqualTo("九十九");
+    @DisplayName("中文数字解析：0-9999 全量往返一致")
+    void parseChineseNumeral_roundTripAllValues() {
+        for (int n = 0; n <= 9999; n++) {
+            String cn = toChinese(n);
+            assertThat(TailoredResumeService.parseChineseNumeral(cn))
+                    .as("%d 的中文写法「%s」解析失败", n, cn)
+                    .isEqualTo(BigDecimal.valueOf(n));
+        }
+    }
+
+    @Test
+    @DisplayName("中文数字解析：不支持的形态返回 null（不猜）")
+    void parseChineseNumeral_rejectsAmbiguousForms() {
+        // 连写约数：三五天不是 35
+        assertThat(TailoredResumeService.parseChineseNumeral("三五")).isNull();
+        // 单个「万」不是 10000（「万一」是「如果」）
+        assertThat(TailoredResumeService.parseChineseNumeral("万")).isNull();
+        assertThat(TailoredResumeService.parseChineseNumeral("亿")).isNull();
+        // 单位乱序
+        assertThat(TailoredResumeService.parseChineseNumeral("十百")).isNull();
+    }
+
+    /** 把一句改写包成最小合法 JSON，供矩阵用例复用 */
+    private static String bulletJson(String rewritten) {
+        return "{\"rewrittenBullets\":[{\"original\":\"原条目\",\"rewritten\":\"" + rewritten
+                + "\",\"reason\":\"\"}],\"summary\":\"\"}";
+    }
+
+    /** 这条改写是否被保留（true=保留，false=被溯源闸门剔除） */
+    private boolean kept(String source, String rewritten) throws Exception {
+        JsonNode node = parse(TailoredResumeService.stripUnsourcedNumbers(bulletJson(rewritten), source));
+        return node.get("rewrittenBullets").size() == 1;
+    }
+
+    @Test
+    @DisplayName("数值集合矩阵：同值不同写法保留，编造剔除")
+    void stripUnsourcedNumbers_valueSetMatrix() throws Exception {
+        // 每行：原文 | 改写 | 期望（1=保留 / 0=剔除）| 这条在防什么
+        String[][] cases = {
+                {"2023 年毕业", "管理 3 个团队", "0", "年份不能给个位数背书"},
+                {"QPS 峰值 3000", "提升 30%", "0", "大数不能给小数背书"},
+                {"负责三个模块", "负责四十个模块", "0", "中文数字也要核对"},
+                {"性能提升", "性能提升百分之四十", "0", "百分之X 也要核对"},
+                {"带一百二十人团队", "带 120 人团队", "1", "三位数中文不能误杀"},
+                {"响应时间下降 40%", "响应时间下降 40.0%", "1", "小数尾零不能误杀"},
+                {"４０ 次压测", "40 次压测", "1", "全角数字同值必须保留"},
+                {"40 人", "40%", "0", "计数不能说成比率"},
+                {"统一管理", "1 个模块", "0", "虚词里的「一」不能背书"},
+                {"负责三个模块", "负责 3 个核心模块", "1", "中 → 阿"},
+                {"负责 3 个模块", "负责三个模块", "1", "阿 → 中"},
+                {"服务十万用户", "服务 100000 用户", "1", "十万"},
+                {"服务十万用户", "服务 10 万用户", "1", "万作量级后缀"},
+                {"两千人", "2000 人", "1", "千"},
+                {"十二个接口", "12 个接口", "1", "十位"},
+                {"十个模块", "10 个模块", "1", "十"},
+                {"两个团队", "2 个团队", "1", "两"},
+                {"一百零五个用例", "105 个用例", "1", "零占位"},
+                {"三千五", "3500", "1", "口语省略式"},
+                {"一万二", "12000", "1", "口语省略式（万）"},
+                {"服务三亿用户", "3 亿用户", "1", "亿"},
+                {"3,000 QPS", "3000 QPS", "1", "千分位（最易误杀）"},
+                {"3 万", "30000", "1", "阿拉伯 + 万"},
+                {"1.50 年", "1.5 年", "1", "尾零归一"},
+                {"40 %", "40%", "1", "数字与百分号间有空格"},
+                {"三个月", "3 个月", "1", "月作量词"},
+                {"半年", "0.5 年", "0", "不支持的「半」整段跳过"},
+                {"第一作者", "第 1 作者", "1", "序数整类跳过"},
+                {"进一步优化", "1 步优化", "0", "「步」不是量词"},
+                {"万一失败", "1 个方案", "0", "「万一」不是 10000"},
+                {"十分熟悉", "10 个模块", "0", "「分」不是量词"},
+                {"3 个模块", "30 个模块", "0", "10 倍放大"},
+        };
+        for (String[] c : cases) {
+            assertThat(kept(c[0], c[1]))
+                    .as("原文「%s」改写「%s」——%s", c[0], c[1], c[3])
+                    .isEqualTo("1".equals(c[2]));
+        }
+    }
+
+    @Test
+    @DisplayName("真实简历 + 忠实改写：一条都不许误杀")
+    void stripUnsourcedNumbers_realisticResume_noFalseKill() throws Exception {
+        // 误杀比漏放更伤信任：用户看到「我的真实数据被删了」会直接不信这个功能。
+        // 这条用一段带年份、QPS、百分比、人数、模块数的真实简历做基准，
+        // 改写只做重排与措辞调整、不新增任何数字，必须一条都不剔除。
+        String source = "2023 年毕业，负责订单系统性能优化，QPS 峰值 3000，响应时间下降 40%，"
+                + "主导 3 个模块重构，带 5 人小组";
+        String rewritten = "主导订单系统性能优化，QPS 峰值 3000，响应时间下降 40%，"
+                + "带 5 人小组完成 3 个模块重构";
+
+        JsonNode node = parse(TailoredResumeService.stripUnsourcedNumbers(bulletJson(rewritten), source));
+
+        assertThat(node.get("rewrittenBullets").size()).as("忠实改写被误杀了").isEqualTo(1);
+        assertThat(node.get("findings").size()).as("不该产生 findings").isZero();
+    }
+
+    @Test
+    @DisplayName("findings.tokens 放改写里的原样写法，用户能拿去搜")
+    void stripUnsourcedNumbers_tokensKeepSurfaceForm() throws Exception {
+        JsonNode node = parse(TailoredResumeService.stripUnsourcedNumbers(
+                bulletJson("性能提升百分之四十，覆盖核心链路"), "性能提升"));
+
+        assertThat(node.get("rewrittenBullets").size()).isZero();
+        assertThat(node.get("findings").get(0).get("tokens").get(0).asText()).isEqualTo("百分之四十");
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       v1.75.0：重试耗时预算
+       ───────────────────────────────────────────────────────────── */
+
+    @Test
+    @DisplayName("重试预算：已耗时超预算时不重试，仍报「格式异常」")
+    void tailor_budgetExhausted_skipsRetry() {
+        service.retryBudgetMs = 0;
+        String missingBullets = "{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"summary\":\"\",\"suggestions\":[]}";
+        stubChatClient(missingBullets);
+
+        assertThatThrownBy(() -> service.tailor("负责订单系统性能优化", "Java 后端", ""))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("格式异常");
+        // 预算耗尽 → 只打了 1 次模型，没有第二次
+        verify(callResponseSpec, times(1)).content();
+    }
+
+    @Test
+    @DisplayName("重试预算：超预算且无内容时报链路故障，不是格式异常")
+    void tailor_budgetExhaustedWithBlank_reportsChainFailure() {
+        service.retryBudgetMs = 0;
+        stubChatClient("");
+
+        assertThatThrownBy(() -> service.tailor("负责订单系统性能优化", "Java 后端", ""))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("AI 服务暂时不可用")
+                .hasMessageNotContaining("格式异常");
+        verify(callResponseSpec, times(1)).content();
     }
 }

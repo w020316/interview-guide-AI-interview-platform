@@ -85,9 +85,17 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.74.2'
+export const CURRENT_VERSION = '1.75.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.75.0',
+    date: '2026-10-19',
+    title: '版本 1.75.0 · 数字核对认得「三个」「百分之四十」「3,000」这些写法了',
+    items: [
+      { text: '简历里写「三个」、改写写「3 个」不会再被误判成编造；反过来，编造的中文数字和百分比也拦得住了', level: 'user' },
+    ],
+  },
   {
     version: '1.74.2',
     date: '2026-10-18',

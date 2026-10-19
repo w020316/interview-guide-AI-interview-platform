@@ -15,8 +15,14 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -64,6 +70,29 @@ import java.util.regex.Pattern;
  * 「2023 年毕业」会给改写里的 {@code 3} 背书、「QPS 3000」会给 {@code 30} 背书——
  * 几乎每份简历都有年份，等于这批数字的闸门形同虚设。现改为数字边界匹配，
  * 并把小数尾零归一化（{@code 40.0} → {@code 40}）以免误杀等价写法。
+ *
+ * <p><b>v1.75.0 把「字符串比对」换成「数值集合比对」</b>：边界匹配仍然只认得阿拉伯数字，
+ * 于是「负责三个模块 → 负责四十个模块」这种纯中文改写完全绕过闸门，
+ * 「3,000」还会被拆成 3 和 000 而误杀。现在两侧都先归一化成 {@link NumKey}
+ * （数值 + 是否百分比）再比集合：中文数字、千分位、全角数字、{@code 万/亿}、
+ * {@code 百分之X} 都落在同一套数值语义上，{@code 40} 与 {@code 40.0} 相等，
+ * 而 {@code 40} 与 {@code 40%} 不相等（把计数说成比率是另一件事）。
+ *
+ * <p><b>已知残留（有意不处理，别当成 bug 修）</b>：
+ * <ol>
+ *   <li>不比较量词：{@code 3 个模块 → 3 个团队} 会放行——量词不改变数值事实，
+ *       强行比较会把「3 个模块 → 3 项模块」这类正常润色误杀；</li>
+ *   <li>序数整类跳过：{@code 第一作者} 里的「一」不产生 1，反向也不校验
+ *       {@code 第 1 作者}（两侧都跳过，故不会误杀，但也拦不住把「第一」改写成「第 1」）；</li>
+ *   <li>{@code 一月}（月份）会被当成「1 个月」，可能给改写里的 {@code 1 个} 背书——
+ *       中文里月份与数量同形，区分需要上下文语义，代价远高于收益；</li>
+ *   <li>不支持的形态（{@code 半年}、{@code 三五天}、{@code 廿}、{@code 俩}）直接不入集合，
+ *       源侧因此拿不出数值，对应的改写会被剔除——这是「宁可少放一条，也不放过编造」的取舍。</li>
+ * </ol>
+ *
+ * <p><b>v1.75.0 同时给重试加耗时预算</b>：首次输出非法会再打一次模型，而单次链路实测可超 130s、
+ * 前端 AI 超时只有 180s。若首次已耗时 90s 以上，重试几乎必然把前端拖到超时——用户看到的是
+ * 网络错误而不是可理解的失败。故超预算直接按首次的失败类型抛错，不再打第二次。
  */
 @Service
 public class TailoredResumeService {
@@ -92,12 +121,66 @@ public class TailoredResumeService {
     static final String MSG_FORMAT_INVALID = "定制简历结果格式异常，请稍后重试";
 
     /**
-     * 改写文本里的数字 token：阿拉伯数字 + 可选小数 + 可选百分号。
+     * 重试耗时预算（毫秒）：从 {@link #tailor} 入口算起。
      *
-     * <p>不匹配中文数字（「三个模块」）：中文数字是原文本来就有的写法，
-     * 不是模型新造的事实，无需溯源。
+     * <p>为什么是 90s：前端 AI 路径超时 180s（{@code AI_TIMEOUT}），线上实测出现过单次
+     * 链路 >130s 的慢请求。首次已经花掉 90s 还再打一次，两次串起来几乎必然越过前端超时，
+     * 用户只会看到一个网络错误，连「结果格式异常」这句可理解的失败都拿不到。
      */
-    private static final Pattern NUMBER_TOKEN = Pattern.compile("\\d+(?:\\.\\d+)?\\s*%?");
+    static final long RETRY_BUDGET_MS = 90_000;
+
+    /**
+     * 实际生效的重试预算。
+     *
+     * <p>非 final 只为可测：单测把它调成 0 才能覆盖「预算耗尽 → 不重试」这条分支，
+     * 否则要么真等 90 秒，要么把常量改成可注入的 Clock——为一个内部方法引入时钟抽象过重。
+     * 生产环境没有代码写这个字段，行为等同常量。
+     */
+    long retryBudgetMs = RETRY_BUDGET_MS;
+
+    /** 带千分位的阿拉伯数字（可带 %/万/亿 后缀）。{@code 3,000} 必须先于普通数字匹配，见 {@link #scanNumbers}。 */
+    private static final Pattern THOUSANDS_NUMBER =
+            Pattern.compile("(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?)(?:\\s*(%|[万亿]))?");
+
+    /**
+     * 普通阿拉伯数字（可带 %/万/亿 后缀）。
+     *
+     * <p>空格只允许出现在数字与后缀之间：写成 {@code \s*} 再让后缀可选，会在「3 个模块」里
+     * 把空格吃进匹配、findings 里出现 {@code "3 "}，用户按提示搜不到。
+     */
+    private static final Pattern ARABIC_NUMBER =
+            Pattern.compile("(\\d+(?:\\.\\d+)?)(?:\\s*(%|[万亿]))?");
+
+    /** 「百分之四十」：必须先于中文 run 摘走，否则「四十」会被记成 (40,false) 而非 (40,true) */
+    private static final Pattern CN_PERCENT =
+            Pattern.compile("百分之\\s*([零〇一二两三四五六七八九十百千万亿]+)");
+
+    /** 「四成」= 40%：同理先于中文 run 摘走 */
+    private static final Pattern CN_CHENG =
+            Pattern.compile("([零〇一二两三四五六七八九十百千]+)成");
+
+    /** 中文数字 run（连续的中文数字字符） */
+    private static final Pattern CN_RUN =
+            Pattern.compile("[零〇一二两三四五六七八九十百千万亿]+");
+
+    /**
+     * 中文数字 run 的左邻排除字符：这些字后面的数字是构词成分（序数、虚词），不是数量断言。
+     *
+     * <p>{@code 第}：{@code 第一次}、{@code 第一作者} 是序数，给它记 1 就等于给改写里的
+     * {@code 1 个} 背书——而「第一」与「一个」根本不是同一个事实。
+     * {@code 统/唯/同/专/单/逐/另/某/每}：{@code 统一管理}、{@code 唯一}、{@code 单一} 同理。
+     */
+    private static final String CN_LEFT_EXCLUDED = "第统唯同专单逐另某每";
+
+    /**
+     * 量词表（只做「这个 run 是不是在说数量」的门禁，不参与两侧比较）。
+     *
+     * <p>刻意<b>不含</b> {@code 分}（十分熟悉）、{@code 步}（进一步）、{@code 度}（一度）、
+     * {@code 成/折}（另按比例处理）、{@code 方/起/样/直/定/般/些/致}（虚词）——
+     * 这些字前面的「一/十」几乎都是构词，放进来会制造大量假来源。
+     */
+    private static final String CN_QUANTIFIERS =
+            "个条次人家项款台页篇份种类层笔道题年月天周秒倍位名套张块段轮届只件本间场门单";
 
     @Autowired
     private ChatClient chatClient;
@@ -111,6 +194,8 @@ public class TailoredResumeService {
      * @return 结构化 JSON 字符串（已修复为合法 JSON，且已剔除含无来源数字的改写条目）
      */
     public String tailor(String resumeText, String jobTitle, String jobDetail) {
+        // 预算从入口算起：包含提示词拼装与首次调用，因为它们同样吃前端那 180s 的预算
+        long startNanos = System.nanoTime();
         String safeResume = PromptSanitizer.sanitize(TextUtil.truncate(resumeText, MAX_RESUME_LEN));
         String safeTitle = PromptSanitizer.sanitize(TextUtil.truncate(jobTitle, 200));
         String safeDetail = PromptSanitizer.sanitize(TextUtil.truncate(
@@ -147,7 +232,7 @@ public class TailoredResumeService {
 
         String raw = callModel(prompt);
         // 重试也要过并发闸门：callModel 内部已包 AiConcurrencyGuard.call()，不能因为「是重试」就绕过
-        String validated = validateOrRetryTailor(raw, () -> callModel(prompt));
+        String validated = validateOrRetryTailor(raw, () -> callModel(prompt), startNanos);
         // 第二个参数必须是**原始未截断**的 resumeText：溯源要回答的是「用户到底写没写过这个数」，
         // 而不是「模型当时看不看得到」——所以基准用用户提供的全文，而不是喂给模型的截断版本。
         // （模型只看到前 2500 字，本就不会写出截断点之后的内容，故此举只放宽、不漏杀。）
@@ -318,9 +403,11 @@ public class TailoredResumeService {
      *   <li>拿到了内容但主叙事不可用 → {@value #MSG_FORMAT_INVALID}，属于模型输出结构问题。</li>
      * </ul>
      *
-     * @param retryCall 重试时重新发起 AI 调用的动作（需自行包裹并发闸门）
+     * @param retryCall  重试时重新发起 AI 调用的动作（需自行包裹并发闸门）
+     * @param startNanos {@link #tailor} 入口的 {@link System#nanoTime()}，用于判断是否还有重试预算
      */
-    private String validateOrRetryTailor(String raw, java.util.function.Supplier<String> retryCall) {
+    private String validateOrRetryTailor(String raw, java.util.function.Supplier<String> retryCall,
+                                         long startNanos) {
         String normalized = normalizeTailor(JsonRepairUtil.repairAndLog(raw, "career-tailor-resume"));
         if (normalized != null) {
             return normalized;
@@ -329,6 +416,24 @@ public class TailoredResumeService {
             log.warn("定制简历首次调用未返回内容（链路无响应），重试一次");
         } else {
             log.warn("定制简历输出不可用（已尝试修复），重试一次。原文前 200 字：{}", TextUtil.truncate(raw, 200));
+        }
+
+        // 预算判断放在重试调用之前：重试的意义是「再给模型一次机会」，若首次已经吃掉
+        // 大半前端超时预算，第二次只会把用户拖到网络错误，不如立刻给出可理解的失败。
+        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        if (elapsedMs >= retryBudgetMs) {
+            // 单独一条日志：运维要能区分「重试后仍失败」与「预算放弃」，
+            // 两者的处置完全不同（前者查模型输出，后者查链路耗时）
+            log.warn("定制简历跳过重试：已耗时 {}ms 超出预算", elapsedMs);
+            // 错误分类不受预算影响（v1.74.1 修过的归因混淆不能倒退）：
+            // 没拿到内容仍是链路故障，拿到内容但结构不可用仍是模型输出问题。
+            if (raw == null || raw.isBlank()) {
+                log.warn("定制简历首次调用未返回内容（链路无响应），且预算已耗尽，放弃本次生成");
+                throw new BusinessException(MSG_AI_UNAVAILABLE);
+            }
+            log.error("定制简历首次输出不可用且预算已耗尽，放弃本次生成。原文前 200 字：{}",
+                    TextUtil.truncate(raw, 200));
+            throw new BusinessException(MSG_FORMAT_INVALID);
         }
 
         String retryRaw;
@@ -366,9 +471,13 @@ public class TailoredResumeService {
      * <p>sourceText 必须传**原始未截断**版本：判据是「用户是否真的写过这个数字」，而不是
      * 「模型是否看得到」——模型写出的数字若恰好落在截断尾部，用截断版做基准会把真实条目误删。
      *
-     * <p><b>中文数字兼容</b>：中文简历里「负责三个核心模块」被改写成「负责 3 个模块」是合法改写，
-     * 不能因为基准里只有「三」没有「3」就删条目。故整数 token 额外比对中文数字形式（0-99，
-     * 含「两」）；带小数或百分号的 token 只做阿拉伯数字比对（中文没有「四十点五%」这种写法）。
+     * <p><b>中文数字兼容（v1.75.0 换成数值集合）</b>：中文简历里「负责三个核心模块」被改写成
+     * 「负责 3 个模块」是合法改写，不能因为基准里只有「三」没有「3」就删条目。现在两侧都过
+     * {@link #extractNumbers}，落到同一个 {@link NumKey} 上比较；中文数字的识别门禁见
+     * {@link #isQuantityRun}，数值解析见 {@link #parseChineseNumeral}。
+     *
+     * <p><b>findings.tokens 放改写里的原样写法</b>（{@code 40%}、{@code 百分之四十}、{@code 3,000}），
+     * 不是归一化后的 {@code 40}——用户要拿这个 token 回被剔除的那句话里搜，搜得到才有意义。
      *
      * <p><b>本方法绝不抛异常</b>：溯源是安全网，安全网自己挂掉不能把整个请求带崩。
      * 解析失败时原样返回入参（此时也无法保证 findings 存在——非法 JSON 本就无法承载字段）。
@@ -398,7 +507,8 @@ public class TailoredResumeService {
                 return TAILOR_MAPPER.writeValueAsString(obj);
             }
 
-            String source = sourceText == null ? "" : sourceText;
+            // 源集合整份只算一次：解析要跑正则 + NFKC，逐条 bullet 重算纯属浪费
+            Set<NumKey> sourceNumbers = extractNumbers(sourceText == null ? "" : sourceText);
             ArrayNode kept = TAILOR_MAPPER.createArrayNode();
             for (JsonNode bullet : bullets) {
                 String rewritten = bullet.path("rewritten").asText("");
@@ -411,15 +521,7 @@ public class TailoredResumeService {
                 // 否则模型只要在 original 里复述一遍它编的数字，就能给 rewritten 背书，
                 // 闸门形同虚设（守卫被它要守的对象自己背书）。original 里的合法数字本来就出自
                 // 原文，去掉它不损失任何真实来源。
-                String baseline = source;
-                List<String> unsourced = new ArrayList<>();
-                Matcher m = NUMBER_TOKEN.matcher(rewritten);
-                while (m.find()) {
-                    String token = m.group().replaceAll("\\s+", "");
-                    if (!isNumberSourced(token, baseline) && !unsourced.contains(token)) {
-                        unsourced.add(token);
-                    }
-                }
+                List<String> unsourced = findUnsourced(rewritten, sourceNumbers);
                 if (unsourced.isEmpty()) {
                     kept.add(bullet);
                     continue;
@@ -442,106 +544,329 @@ public class TailoredResumeService {
     }
 
     /**
-     * 单个数字 token 是否能在基准文本里找到来源。
+     * 数字的归一化键：数值 + 是否百分比。同值不同单位不算同一事实。
      *
-     * <p><b>v1.74.2 改为数字边界匹配（此前是子串包含）</b>：子串匹配让大数给小数字背书——
-     * 原文「2023 年毕业」会让改写里的 {@code 3} / {@code 20} / {@code 23} 全部被判为有来源，
-     * 原文「QPS 3000」会让 {@code 30} 过关。而几乎每份简历都有年份，等于这批数字的闸门形同虚设，
-     * 产品对用户「原文没有的数字会被剔除」的承诺随之落空。
-     *
-     * <p>边界只判「紧邻字符不是数字」，不把小数点算进去：这样「原文 40.0 / 改写 40」仍能命中，
-     * 而「原文 3000 / 改写 30」会被正确判为无来源。判定前先归一化小数尾零
-     * （{@code 40.0} → {@code 40}、{@code 3.50} → {@code 3.5}），避免「原文 40% / 改写 40.0%」被误杀。
-     *
-     * <p>百分号仍然剥掉只比数值：这是有意的宽松，避免「原文 40% / 改写 40 个」这类误杀。
-     *
-     * @param token    已去除空白的数字 token（如 {@code 40%} / {@code 3} / {@code 3.5}）
-     * @param baseline 用户真实材料（原始简历全文），**不含**模型自写的 original
+     * <p>{@code 40} 与 {@code 40.0} 相等（剥尾零后 {@code BigDecimal} 的 scale 一致），
+     * 但 {@code 40} 与 {@code 40%} 不相等——原文「40 人」不能给改写「40%」背书，
+     * 那等于把计数偷换成比率。这正是本类不采用「只比数值」的原因。
      */
-    private static boolean isNumberSourced(String token, String baseline) {
-        boolean percent = token.endsWith("%");
-        String raw = percent ? token.substring(0, token.length() - 1) : token;
-        String numeric = trimDecimalZeros(raw);
-        if (containsNumberWithBoundary(baseline, numeric)) {
+    record NumKey(BigDecimal value, boolean percent) {
+        NumKey {
+            // Set 用的是 BigDecimal.equals（比 scale），不剥尾零的话 40 与 40.0
+            // 会落成两个键，等价写法反而被误判成编造
+            value = value.stripTrailingZeros();
+            if (value.signum() == 0) {
+                // 0.00 剥尾零后的 scale 在不同 JDK 上曾有差异，统一成 ZERO 消除平台噪声
+                value = BigDecimal.ZERO;
+            }
+        }
+    }
+
+    /** 一次数字匹配：改写里的原样写法 + 归一化键 + 起始下标（用于按原文顺序输出 token） */
+    private record NumberOccurrence(String raw, NumKey key, int start) {
+    }
+
+    /**
+     * 把一段文本解析成「数值集合」。
+     *
+     * <p>原文与改写走<b>同一套</b>规则，这是 v1.75.0 的核心：只有两侧落到同一个
+     * {@link NumKey} 空间里，「三个 ↔ 3」「3,000 ↔ 3000」「十万 ↔ 100000」才谈得上相等。
+     *
+     * @param text 原文或改写；null 视为空
+     * @return 数值集合（同值不同写法自动去重）
+     */
+    static Set<NumKey> extractNumbers(String text) {
+        Set<NumKey> keys = new HashSet<>();
+        for (NumberOccurrence occurrence : scanNumbers(text)) {
+            keys.add(occurrence.key());
+        }
+        return keys;
+    }
+
+    /**
+     * 找出改写里「原文没有来源」的数字，返回它们的<b>原样写法</b>。
+     *
+     * <p>返回原样写法而不是归一化后的 {@code 40}：findings 是给用户看的，用户要拿这个 token
+     * 回到被剔除的那句话里搜索，{@code 40} 搜不到 {@code 百分之四十}。
+     *
+     * <p>按数值去重、保留首次出现的写法：同一句里「40% 和 40.0%」只需要提示一次。
+     */
+    static List<String> findUnsourced(String rewritten, Set<NumKey> sourceNumbers) {
+        List<NumberOccurrence> occurrences = scanNumbers(rewritten);
+        // 各阶段的匹配顺序不等于文本顺序（先摘百分比、再摘千分位），排序后 token 列表才读得顺
+        occurrences.sort(Comparator.comparingInt(NumberOccurrence::start));
+        List<String> unsourced = new ArrayList<>();
+        Set<NumKey> reported = new HashSet<>();
+        for (NumberOccurrence occurrence : occurrences) {
+            if (sourceNumbers.contains(occurrence.key())) {
+                continue;
+            }
+            if (reported.add(occurrence.key())) {
+                unsourced.add(occurrence.raw());
+            }
+        }
+        return unsourced;
+    }
+
+    /**
+     * 扫描一段文本里的全部数字，产出「原样写法 + 归一化键」。
+     *
+     * <p>五个阶段有严格的先后：百分比形态 → 千分位 → 普通阿拉伯数字 → 中文 run。
+     * 每个阶段命中的片段都会从缓冲区里抹掉（mask），防止后面的阶段把同一段再匹配一次。
+     */
+    private static List<NumberOccurrence> scanNumbers(String text) {
+        List<NumberOccurrence> occurrences = new ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            return occurrences;
+        }
+        // NFKC：全角 ０-９ / ％ / ． / ，折成半角。不折的话「４０ 次压测」与「40 次压测」
+        // 是两个互不相识的字符串，同一个事实会被判成编造。
+        String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC);
+        char[] masked = normalized.toCharArray();
+
+        // ① 中文百分比「百分之四十」：必须最先摘走。否则后面的中文 run 会把「四十」
+        //    记成普通数量 (40,false)，改写里的 40% 就找不到来源——而这恰恰是模型
+        //    最常编的一类数字（原文「性能提升」→ 改写「性能提升百分之四十」）。
+        Matcher cnPercent = CN_PERCENT.matcher(normalized);
+        while (cnPercent.find()) {
+            BigDecimal value = parseChineseNumeral(cnPercent.group(1));
+            if (value != null) {
+                occurrences.add(new NumberOccurrence(
+                        cnPercent.group(), new NumKey(value, true), cnPercent.start()));
+            }
+            mask(masked, cnPercent.start(), cnPercent.end());
+        }
+
+        // ② 「四成」= 40%：同理先摘走，避免「四」被单独当成 4
+        Matcher cnCheng = CN_CHENG.matcher(normalized);
+        while (cnCheng.find()) {
+            BigDecimal value = parseChineseNumeral(cnCheng.group(1));
+            if (value != null) {
+                occurrences.add(new NumberOccurrence(cnCheng.group(),
+                        new NumKey(value.multiply(BigDecimal.TEN), true), cnCheng.start()));
+            }
+            mask(masked, cnCheng.start(), cnCheng.end());
+        }
+
+        // ③ 千分位必须早于普通数字：否则 3,000 会被拆成 3 和 000 两个数，
+        //    原文「3,000 QPS」就认不出改写里的「3000 QPS」——这是最容易误杀的一条。
+        Matcher thousands = THOUSANDS_NUMBER.matcher(new String(masked));
+        while (thousands.find()) {
+            BigDecimal value = new BigDecimal(thousands.group(1).replace(",", ""));
+            occurrences.add(new NumberOccurrence(thousands.group(),
+                    arabicKey(value, thousands.group(2)), thousands.start()));
+            mask(masked, thousands.start(), thousands.end());
+        }
+
+        // ④ 普通阿拉伯数字
+        Matcher arabic = ARABIC_NUMBER.matcher(new String(masked));
+        while (arabic.find()) {
+            // 序数整类跳过：`第 1 作者` 里的 1 不是数量断言，和「第一作者」一样不该被核对。
+            // 源侧的中文 run 同样因左邻「第」被跳过，两侧对称，故不会误杀。
+            if (isOrdinalPrefix(normalized, arabic.start())) {
+                mask(masked, arabic.start(), arabic.end());
+                continue;
+            }
+            BigDecimal value = new BigDecimal(arabic.group(1));
+            occurrences.add(new NumberOccurrence(arabic.group(),
+                    arabicKey(value, arabic.group(2)), arabic.start()));
+            mask(masked, arabic.start(), arabic.end());
+        }
+
+        // ⑤ 中文数字 run：先过「是不是在说数量」的门禁，再解析数值
+        Matcher cn = CN_RUN.matcher(new String(masked));
+        while (cn.find()) {
+            if (!isQuantityRun(normalized, cn.start(), cn.end())) {
+                continue;
+            }
+            BigDecimal value = parseChineseNumeral(cn.group());
+            if (value == null) {
+                continue;
+            }
+            occurrences.add(new NumberOccurrence(cn.group(), new NumKey(value, false), cn.start()));
+        }
+        return occurrences;
+    }
+
+    /** 阿拉伯数字（含千分位）的后缀语义：% 是比率，万/亿 是量级 */
+    private static NumKey arabicKey(BigDecimal value, String suffix) {
+        if ("%".equals(suffix)) {
+            return new NumKey(value, true);
+        }
+        if ("万".equals(suffix)) {
+            return new NumKey(value.multiply(BigDecimal.valueOf(10_000L)), false);
+        }
+        if ("亿".equals(suffix)) {
+            return new NumKey(value.multiply(BigDecimal.valueOf(100_000_000L)), false);
+        }
+        return new NumKey(value, false);
+    }
+
+    /** 把已匹配的片段抹成空格，避免后续阶段重复匹配（长度不变，下标仍然有效） */
+    private static void mask(char[] buf, int start, int end) {
+        Arrays.fill(buf, start, end, ' ');
+    }
+
+    /** 数字前一个非空白字符是否为「第」（序数标记） */
+    private static boolean isOrdinalPrefix(String text, int start) {
+        int i = start - 1;
+        while (i >= 0 && Character.isWhitespace(text.charAt(i))) {
+            i--;
+        }
+        return i >= 0 && text.charAt(i) == '第';
+    }
+
+    /**
+     * 中文数字 run 是否在表达「数量」。
+     *
+     * <p>这是整套解析里最容易误判的地方：中文数字与构词成分同形，必须逐条设门禁。
+     * 三条同时满足才放行：
+     * <ol>
+     *   <li>左邻不是序数/虚词标记（{@link #CN_LEFT_EXCLUDED}）——{@code 第一次} 不是「1 次」；</li>
+     *   <li>右邻能证明它是数量：量词 / 约数标记 / 已到文本末尾 / run 自身以 万/亿 收尾；</li>
+     *   <li>能解析出合法数值（见 {@link #parseChineseNumeral}）。</li>
+     * </ol>
+     *
+     * <p>量词只用于门禁，不参与两侧比较：{@code 3 个模块 → 3 个团队} 会放行，
+     * 这是有意的（见类注释「已知残留」）。
+     */
+    private static boolean isQuantityRun(String text, int start, int end) {
+        // 条件①：`第一次`、`统一管理`、`单一方案` 里的数字是构词成分，不是数量断言
+        if (start > 0 && CN_LEFT_EXCLUDED.indexOf(text.charAt(start - 1)) >= 0) {
+            return false;
+        }
+        // 条件②：到文本末尾（`三千五`、`一万二` 这类独立写法）
+        if (end >= text.length()) {
             return true;
         }
-        // 小数 / 百分比不做中文数字比对：中文里没有「三点五%」这种简历写法
-        if (percent || numeric.indexOf('.') >= 0) {
-            return false;
-        }
-        int value;
-        try {
-            value = Integer.parseInt(numeric);
-        } catch (NumberFormatException e) {
-            return false;
-        }
-        // 只覆盖 0-99：三位数以上（QPS 8000、2000 万）几乎不会以中文数字书写，
-        // 比对中文反而会引入「八百」这类噪声匹配
-        if (value < 0 || value > 99) {
-            return false;
-        }
-        if (baseline.contains(chineseNumeral(value))) {
+        char next = text.charAt(end);
+        if (CN_QUANTIFIERS.indexOf(next) >= 0) {
             return true;
         }
-        // 「两」是「二」的口语形式：「负责两个模块」→「负责 2 个模块」
-        return value == 2 && baseline.contains("两");
+        // `十余`、`二十多`、`三十左右`、`五十以上`
+        if (text.startsWith("余", end) || text.startsWith("多", end)
+                || text.startsWith("左右", end) || text.startsWith("以上", end)
+                || text.startsWith("以下", end)) {
+            return true;
+        }
+        // `十万用户`：「用户」不是量词，但「十万」自带量级，本身就是数量断言
+        char last = text.charAt(end - 1);
+        return last == '万' || last == '亿';
     }
 
     /**
-     * 数字 token 是否以「数字边界」形式出现在基准文本中。
+     * 中文数字 run → 数值；不支持的形态返回 {@code null}（调用方整段跳过，不入集合）。
      *
-     * <p>即 token 前后紧邻的字符都不是阿拉伯数字。小数点本身不算数字，
-     * 所以「原文 40.0 / 改写 40」这类等价写法仍能命中。
+     * <p>支持 0–9999 与单层 万/亿。刻意<b>不猜</b>的形态：
+     * {@code 三五天}（连写约数）、{@code 廿/卅}（不在字符集内）、{@code 半}（半年）、
+     * {@code 俩}（不在字符集内）。这些写法拿不出可信数值，硬猜会同时制造误杀
+     * （把「三五天」读成 35）与漏放（读成 5 就给改写里的 5 背书）。
      *
-     * <p>token 数量极少（一份结果通常个位数），每次编译正则的代价可以忽略；
-     * 不建缓存是为了避免用一个无上限的 Map 记住模型输出过的所有 token。
+     * <p>口语省略式靠 {@code lastUnit} 还原：{@code 三千五} 的「五」在「千」之后读作 500；
+     * {@code 一百零五} 的「五」紧邻「零」，则读作 5。
+     *
+     * @param run 只含 {@code 零〇一二两三四五六七八九十百千万亿} 的字符串
+     * @return 数值；非法形态返回 {@code null}
      */
-    private static boolean containsNumberWithBoundary(String text, String numeric) {
-        return Pattern.compile("(?<!\\d)" + Pattern.quote(numeric) + "(?!\\d)")
-                .matcher(text).find();
+    static BigDecimal parseChineseNumeral(String run) {
+        if (run == null || run.isEmpty()) {
+            return null;
+        }
+        // 单个「万/亿」不构成合法 run：`万一` 是「如果」，不是 10000；
+        // 单独的「亿」也不代表一亿。真正的「十万」「三亿」都以数字或十百千开头。
+        char first = run.charAt(0);
+        if (first == '万' || first == '亿') {
+            return null;
+        }
+
+        long total = 0;              // 已结算的「万/亿」段
+        long section = 0;            // 当前段（万以下）
+        int pending = 0;             // 待结算的个位数字
+        boolean pendingAfterZero = false; // 该数字是否紧跟在「零」后面
+        int lastUnit = 0;            // 最近一个单位（含 万/亿），用于还原口语省略
+        int lastSmallUnit = 0;       // 当前段内已用的最小单位，用于拒绝乱序
+        boolean prevWasDigit = false;
+        boolean magnitudeSeen = false;
+
+        for (int i = 0; i < run.length(); i++) {
+            char c = run.charAt(i);
+            if (isZeroChar(c)) {
+                pending = 0;
+                pendingAfterZero = true;
+                prevWasDigit = true;
+                continue;
+            }
+            int digit = digitValue(c);
+            if (digit > 0) {
+                // 连续两个数字字符（`三五天`）是约数连写，不是可解析的数值
+                if (prevWasDigit && !isZeroChar(run.charAt(i - 1))) {
+                    return null;
+                }
+                pending = digit;
+                pendingAfterZero = prevWasDigit;
+                prevWasDigit = true;
+                continue;
+            }
+            prevWasDigit = false;
+            if (c == '十' || c == '百' || c == '千') {
+                int unit = (c == '十') ? 10 : (c == '百') ? 100 : 1000;
+                // 同一段内单位必须递减：`十百`、`百百` 不是合法写法
+                if (lastSmallUnit != 0 && unit >= lastSmallUnit) {
+                    return null;
+                }
+                // 「十」单独出现读作 10（省略了「一」）；「零十」这种写法不合法，
+                // 但 pendingAfterZero 为真时按 0 计，不会凭空补 1
+                int n = (pending == 0 && !pendingAfterZero) ? 1 : pending;
+                section += (long) n * unit;
+                lastUnit = unit;
+                lastSmallUnit = unit;
+                pending = 0;
+                pendingAfterZero = false;
+                continue;
+            }
+            if (c == '万' || c == '亿') {
+                // 只支持单层 万/亿：`一亿二万` 这类嵌套不在简历常见写法里，不猜
+                if (magnitudeSeen) {
+                    return null;
+                }
+                magnitudeSeen = true;
+                section += pending;
+                if (section == 0) {
+                    section = 1;
+                }
+                long multiplier = (c == '万') ? 10_000L : 100_000_000L;
+                total = (total + section) * multiplier;
+                section = 0;
+                lastUnit = (int) multiplier;
+                lastSmallUnit = 0;
+                pending = 0;
+                pendingAfterZero = false;
+                continue;
+            }
+            // 字符集由正则保证；走到这里说明调用方传了非法字符
+            return null;
+        }
+
+        long result = total + section;
+        if (pending != 0 || pendingAfterZero) {
+            // 紧邻「零」的尾数是完整个位（一百零五 → 105）；否则按最近单位降一级
+            // 还原口语省略（三千五 → 3500、一万二 → 12000、十二 → 12）
+            long factor = (pendingAfterZero || lastUnit < 10) ? 1L : lastUnit / 10L;
+            result += (long) pending * factor;
+        }
+        return BigDecimal.valueOf(result);
     }
 
-    /**
-     * 归一化小数尾零：{@code 40.0} → {@code 40}、{@code 3.50} → {@code 3.5}、{@code 40.000} → {@code 40}。
-     *
-     * <p>不做归一化时，「原文 40% / 改写 40.0%」会因字面不同被判为无来源而整条误杀——
-     * 这不是编造，只是同一个数的另一种写法。
-     *
-     * @param numeric 不含百分号的数字文本
-     */
-    private static String trimDecimalZeros(String numeric) {
-        int dot = numeric.indexOf('.');
-        if (dot < 0) {
-            return numeric;
+    /** 中文数字字符 → 数值；非 1-9 返回 -1（零单独处理） */
+    private static int digitValue(char c) {
+        if (c == '两') {
+            return 2;
         }
-        int end = numeric.length();
-        while (end > dot + 1 && numeric.charAt(end - 1) == '0') {
-            end--;
-        }
-        // 小数部分全是零（40.000）→ 只留整数部分
-        return (end == dot + 1) ? numeric.substring(0, dot) : numeric.substring(0, end);
+        int index = "一二三四五六七八九".indexOf(c);
+        return index >= 0 ? index + 1 : -1;
     }
 
-    /**
-     * 阿拉伯整数 → 中文数字（0-99）。
-     *
-     * <p>只覆盖 0-99 是有意的：简历里需要中文数字表达的量级（三个模块、十二个接口、二十人团队）
-     * 都在这个区间；更大数值用中文写反而罕见，且「一百二十三」的拼接规则复杂、出错成本高于收益。
-     *
-     * @param n 0-99 的整数；越界返回空串（调用方 contains("") 恒为 true，故先判越界再调用）
-     */
-    static String chineseNumeral(int n) {
-        if (n < 0 || n > 99) {
-            return "";
-        }
-        String[] digits = {"零", "一", "二", "三", "四", "五", "六", "七", "八", "九"};
-        if (n < 10) {
-            return digits[n];
-        }
-        int tens = n / 10;
-        int ones = n % 10;
-        // 「十」「十二」不写「一十」「一十二」
-        String tensPart = (tens == 1) ? "十" : digits[tens] + "十";
-        return (ones == 0) ? tensPart : tensPart + digits[ones];
+    private static boolean isZeroChar(char c) {
+        return c == '零' || c == '〇';
     }
 }
