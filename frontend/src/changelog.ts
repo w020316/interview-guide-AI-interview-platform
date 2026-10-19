@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.76.3'
+export const CURRENT_VERSION = '1.76.4'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.76.4',
+    date: '2026-10-19',
+    title: '版本 1.76.4 · 导航终于真的吸顶了，还多了个阅读进度条',
+    items: [
+      { text: '修复：顶部导航此前滚下去就跟着走了（样式写了吸顶，但被外层容器吃掉）。现在会一直停在顶部，随时能切页面', level: 'user' },
+      { text: '新增：导航下沿一条细进度条，随滚动填充，长页面能看到自己读到哪了', level: 'user' },
+      { text: '招聘广场、收藏夹、错题本、历史记录的列表在筛选、删除时有了平滑过渡，不再是瞬间跳变', level: 'user' },
+    ],
+  },
   {
     version: '1.76.3',
     date: '2026-10-19',

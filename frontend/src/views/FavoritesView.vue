@@ -43,7 +43,7 @@
           </button>
         </div>
 
-        <div class="jp-list">
+        <div class="jp-list" v-auto-animate>
           <div v-for="f in filteredJobFavorites" :key="f.jobId" class="jp-card">
             <label class="jp-pick" :title="'勾选后可与其他岗位并排对比'">
               <input type="checkbox" :checked="compareIds.includes(f.jobId)" @change="toggleCompare(f.jobId)" />

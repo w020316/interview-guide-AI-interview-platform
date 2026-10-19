@@ -11,6 +11,7 @@ import { initTheme } from './theme'
 import { prewarmBackend, installWakeRecovery } from './utils/backendWake'
 import { installSessionGuard } from './utils/sessionGuard'
 import { setupPwa } from './utils/pwa'
+import { autoAnimatePlugin } from '@formkit/auto-animate/vue'
 
 // 在任何渲染前应用主题，避免首屏闪烁
 initTheme()
@@ -62,4 +63,6 @@ window.addEventListener('unhandledrejection', (event) => {
 
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
+// 列表增删/排序的自动过渡（MIT，2KB，自带 prefers-reduced-motion 判定）
+app.use(autoAnimatePlugin)
 app.mount('#app')

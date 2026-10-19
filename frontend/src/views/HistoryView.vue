@@ -42,7 +42,7 @@
     </div>
 
     <!-- 会话列表 -->
-    <div v-else class="session-list">
+    <div v-else class="session-list" v-auto-animate>
       <div v-for="s in sessions" :key="s.sessionId" class="session-card fade-in-up">
         <div class="session-head" role="button" tabindex="0"
           @click="toggleSession(s.sessionId)"

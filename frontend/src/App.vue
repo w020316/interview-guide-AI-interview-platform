@@ -251,6 +251,10 @@
 
           </div>
         </transition>
+
+        <!-- 阅读进度条（v1.76.4）：随页面滚动铺满导航底部。
+             只动 transform: scaleX（合成层，零重排），滚动关联由 VueUse useScroll 提供。 -->
+        <div class="scroll-progress" :style="{ transform: `scaleX(${readProgress})` }" aria-hidden="true" />
       </header>
 
       <!-- 主内容区
@@ -312,8 +316,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useScroll, useResizeObserver } from '@vueuse/core'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { authState, clearAuth, isAdmin } from './auth'
 import api from './api'
@@ -422,7 +427,27 @@ watch(() => route.path, () => {
   mobileOpen.value = false
 })
 
+/* ── 阅读进度（v1.76.4）──
+ * 进度 = 已滚动 / 可滚动总高。
+ * 分母用 ResizeObserver 在**内容高度变化时**重算，而不是每个滚动帧读一次
+ * scrollHeight —— 后者会强制同步布局，正好破坏「滚动 60fps」这条底线。
+ * 视觉上只动 transform: scaleX，合成层内完成，不参与重排。 */
+const { y: scrolledY } = useScroll(window)
+const scrollableH = ref(0)
+const readProgress = computed(() => {
+  if (scrollableH.value <= 0) return 0
+  return Math.min(1, Math.max(0, scrolledY.value / scrollableH.value))
+})
+
+function measureScrollable() {
+  scrollableH.value = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+}
+
+useResizeObserver(document.body, measureScrollable)
+watch(() => route.path, () => nextTick(measureScrollable))
+
 onMounted(() => {
+  measureScrollable()
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onKeydown)
   window.addEventListener('scroll', onScroll, { passive: true })
@@ -462,7 +487,15 @@ function logout() {
   flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
+  /* ⚠️ 这里决定了导航栏到底能不能吸顶（v1.76.4 实测发现的既有缺陷）：
+   * overflow-x: hidden 会让计算后的 overflow-y 变成 auto —— 本元素因此成为
+   * **滚动容器**，而 position:sticky 只在最近的滚动容器里吸顶。
+   * 结果是：内核支持 sticky、computed 也显示 sticky，但整个页面滚下去时
+   * 导航栏照样被卷走（实测滚动 833px 后 header 的 top = -763）。
+   * overflow-x: clip 不创建滚动容器，所以保留横向裁剪的同时能让 sticky 生效。
+   * 先写 hidden 再写 clip 是渐进增强：老 WebView 不认 clip 时退回原行为，不会产生横向滚动条。 */
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* ── 导航栏：实色 + 细边框，无 blur ── */
@@ -478,6 +511,21 @@ function logout() {
 /* 滚动后浮起：与页面内容分层（参考主流站点滚动抬升） */
 .navbar.scrolled {
   box-shadow: var(--shadow-sm);
+}
+
+/* 阅读进度条：贴在导航下沿，1px 边框之上。
+ * 不加 transition —— 它跟随滚动实时变化，加过渡会「追不上」手势。 */
+.scroll-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--brand-primary);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  pointer-events: none;
+  will-change: transform;
 }
 
 .nav-inner {

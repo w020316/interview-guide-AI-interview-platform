@@ -161,7 +161,7 @@
     </div>
 
     <!-- 岗位列表 -->
-    <div v-else class="job-list fade-in-up">
+    <div v-else class="job-list fade-in-up" v-auto-animate>
       <!-- 岗位卡是可点区域 → 必须键盘可达：role + tabindex + Enter/Space + 可见焦点环。
            此前只有 @click，键盘用户打不开岗位详情，也没有任何焦点反馈。 -->
       <div

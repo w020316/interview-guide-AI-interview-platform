@@ -62,7 +62,7 @@
     </div>
 
     <!-- 错题列表 -->
-    <div v-else class="list">
+    <div v-else class="list" v-auto-animate>
       <div v-for="(q, idx) in items" :key="q.id" class="book-card fade-in-up">
         <div class="book-head">
           <div class="book-index">{{ idx + 1 }}</div>
