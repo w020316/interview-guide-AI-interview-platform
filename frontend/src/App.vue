@@ -232,7 +232,7 @@
           <div v-if="mobileOpen" class="mobile-drawer">
             <template v-for="g in mobileGroups" :key="g.title">
               <p class="md-title">{{ g.title }}</p>
-              <div class="md-grid">
+              <div class="md-grid" :class="{ 'is-single': g.items.length === 1 }">
                 <router-link
                   v-for="it in g.items"
                   :key="it.to"
@@ -249,18 +249,6 @@
               </div>
             </template>
 
-            <!-- 未登录：把「免费注册 / 登录」从头部收进抽屉（v1.76.0）
-                 此前它们与主题、菜单一起挤在 56px 高的头部里：未登录态共 4 个控件，
-                 整行最小内容宽 391.7px —— 实测 375 宽时汉堡按钮右边缘 391.7，
-                 被 .app-wrapper 的 overflow-x:hidden 静默裁掉，连滚动条都没有。
-                 收进抽屉后头部只剩「主题 + 菜单」两个控件，320px 宽也不溢出。 -->
-            <template v-if="!authState.token">
-              <p class="md-title">账户</p>
-              <div class="md-auth">
-                <button class="md-auth-primary" type="button" @click="goLogin">免费注册</button>
-                <button class="md-auth-ghost" type="button" @click="goLogin">登录</button>
-              </div>
-            </template>
           </div>
         </transition>
       </header>
@@ -451,12 +439,6 @@ function openChangelog() {
 
 function toggleTheme() {
   toggle()
-}
-
-/** 抽屉内的登录入口：先收起抽屉，避免跳转后浮层残留在新页面上 */
-function goLogin() {
-  mobileOpen.value = false
-  router.push('/login')
 }
 
 function logout() {
@@ -1006,6 +988,12 @@ function logout() {
   margin-bottom: 12px;
 }
 
+/* 只有一项时占满整行：未登录的「账户」组只有「登录 / 注册」一个入口，
+   留在半个格子里像被挤掉的残项，也浪费了一半的命中宽度。 */
+.md-grid.is-single {
+  grid-template-columns: 1fr;
+}
+
 .md-item {
   display: flex;
   align-items: center;
@@ -1032,53 +1020,6 @@ function logout() {
   background: var(--brand-primary-50);
   border-color: var(--brand-primary-200);
   font-weight: 600;
-}
-
-/* 抽屉内的账户入口（未登录时） */
-.md-auth {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 4px 0 8px;
-}
-
-.md-auth-primary,
-.md-auth-ghost {
-  min-height: 48px;
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast),
-    color var(--transition-fast), transform var(--transition-fast);
-}
-
-.md-auth-primary {
-  color: var(--c-on-primary);
-  background: var(--brand-primary);
-  border: 1px solid var(--brand-primary);
-}
-
-.md-auth-primary:hover {
-  background: var(--brand-primary-hover);
-  border-color: var(--brand-primary-hover);
-}
-
-.md-auth-ghost {
-  color: var(--c-text-secondary);
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-}
-
-.md-auth-ghost:hover {
-  color: var(--brand-primary);
-  border-color: var(--brand-primary);
-}
-
-.md-auth-primary:active,
-.md-auth-ghost:active {
-  transform: scale(0.985);
 }
 
 .drawer-enter-active,
