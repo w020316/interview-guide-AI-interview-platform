@@ -85,9 +85,17 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.75.0'
+export const CURRENT_VERSION = '1.75.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.75.1',
+    date: '2026-10-19',
+    title: '版本 1.75.1 · 简历要点少的时候，定制简历更容易出结果',
+    items: [
+      { text: '只粘一两条经历时，之前偶尔会报「格式异常」；现在重试时会明确告诉 AI 上次哪里不对，这种情况明显减少', level: 'user' },
+    ],
+  },
   {
     version: '1.75.0',
     date: '2026-10-19',

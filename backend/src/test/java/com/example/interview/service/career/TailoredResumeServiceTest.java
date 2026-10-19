@@ -573,4 +573,50 @@ class TailoredResumeServiceTest {
                 .hasMessageNotContaining("格式异常");
         verify(callResponseSpec, times(1)).content();
     }
+
+    @Test
+    @DisplayName("重试换提示词：首次返回空数组时，第二次要求「至少 1 条」")
+    void tailor_retryWithHint_whenFirstHasNoBullets() throws Exception {
+        String emptyBullets = "{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"rewrittenBullets\":[],\"summary\":\"\",\"suggestions\":[]}";
+        stubChatClientSequence(emptyBullets, VALID_JSON);
+        org.mockito.ArgumentCaptor<String> prompts = org.mockito.ArgumentCaptor.forClass(String.class);
+
+        service.tailor("负责订单系统性能优化，响应时间下降 40%", "Java 后端", "");
+
+        verify(requestSpec, times(2)).user(prompts.capture());
+        assertThat(prompts.getAllValues().get(0)).doesNotContain("【上一次的问题】");
+        // 重试用同一个 prompt 只会让模型以同样方式再错一次，所以第二次必须带上次的错因
+        assertThat(prompts.getAllValues().get(1))
+                .contains("【上一次的问题】")
+                .contains("至少输出 1 条改写条目");
+    }
+
+    @Test
+    @DisplayName("重试换提示词：首次无返回时，第二次要求直接输出 JSON")
+    void tailor_retryWithHint_whenFirstIsBlank() throws Exception {
+        stubChatClientSequence("", VALID_JSON);
+        org.mockito.ArgumentCaptor<String> prompts = org.mockito.ArgumentCaptor.forClass(String.class);
+
+        service.tailor("负责订单系统性能优化，响应时间下降 40%", "Java 后端", "");
+
+        verify(requestSpec, times(2)).user(prompts.capture());
+        assertThat(prompts.getAllValues().get(1))
+                .contains("【上一次的问题】")
+                .contains("没有返回任何内容");
+    }
+
+    @Test
+    @DisplayName("重试换提示词：两次请求的 prompt 必须不同")
+    void tailor_retryPromptMustDiffer() throws Exception {
+        String missingBullets = "{\"matchedKeywords\":[],\"missingKeywords\":[],"
+                + "\"summary\":\"\",\"suggestions\":[]}";
+        stubChatClientSequence(missingBullets, VALID_JSON);
+        org.mockito.ArgumentCaptor<String> prompts = org.mockito.ArgumentCaptor.forClass(String.class);
+
+        service.tailor("负责订单系统性能优化，响应时间下降 40%", "Java 后端", "");
+
+        verify(requestSpec, times(2)).user(prompts.capture());
+        assertThat(prompts.getAllValues().get(1)).isNotEqualTo(prompts.getAllValues().get(0));
+    }
 }

@@ -121,6 +121,29 @@ public class TailoredResumeService {
     static final String MSG_FORMAT_INVALID = "定制简历结果格式异常，请稍后重试";
 
     /**
+     * 重试提示：上一次输出里没有可用的改写条目。
+     *
+     * <p><b>为什么重试必须换提示词</b>：v1.75.0 之前重试用的是**同一个 prompt**，
+     * 模型会以完全相同的方式再错一次——这不是「再给一次机会」，而是把同一个错误复述一遍。
+     * 线上实测：对只有一条经历的输入，约 1/3 的请求两次都返回不可用的 rewrittenBullets，
+     * 根因很可能是提示词要求「挑出 3-6 条」，而原文只有一条，模型干脆返回空数组。
+     * 所以重试要告诉模型「上一次错在哪、这次怎么改」。
+     */
+    static final String RETRY_HINT_NO_BULLETS =
+            "你上一次的输出里没有可用的 rewrittenBullets（为空或缺少该字段）。"
+                    + "这次请务必至少输出 1 条改写条目：即使原始简历要点只有一条，也只改写这一条，"
+                    + "绝对不要返回空数组。";
+
+    /** 重试提示：上一次没有返回任何内容 */
+    static final String RETRY_HINT_EMPTY =
+            "你上一次没有返回任何内容。这次请直接输出一个 JSON 对象，不要解释、不要 Markdown 代码块。";
+
+    /** 重试提示：上一次输出不是合法 JSON */
+    static final String RETRY_HINT_BAD_JSON =
+            "你上一次的输出不是合法 JSON。这次只输出一个 JSON 对象：不要 Markdown 代码块、"
+                    + "不要前后缀解释、字符串用 ASCII 双引号、字符串值内不要裸换行。";
+
+    /**
      * 重试耗时预算（毫秒）：从 {@link #tailor} 入口算起。
      *
      * <p>为什么是 90s：前端 AI 路径超时 180s（{@code AI_TIMEOUT}），线上实测出现过单次
@@ -231,8 +254,11 @@ public class TailoredResumeService {
                 .toString();
 
         String raw = callModel(prompt);
-        // 重试也要过并发闸门：callModel 内部已包 AiConcurrencyGuard.call()，不能因为「是重试」就绕过
-        String validated = validateOrRetryTailor(raw, () -> callModel(prompt), startNanos);
+        // 重试**换提示词**而不是原样再问一次：同一 prompt 会让模型以同样方式再错一次。
+        // 提示词由 validateOrRetryTailor 根据「上一次错在哪」给出，见 RETRY_HINT_*。
+        // 并发闸门仍由 callModel 内部保证，重试路径不绕过。
+        String validated = validateOrRetryTailor(raw,
+                hint -> callModel(prompt + "\n\n【上一次的问题】\n" + hint), startNanos);
         // 第二个参数必须是**原始未截断**的 resumeText：溯源要回答的是「用户到底写没写过这个数」，
         // 而不是「模型当时看不看得到」——所以基准用用户提供的全文，而不是喂给模型的截断版本。
         // （模型只看到前 2500 字，本就不会写出截断点之后的内容，故此举只放宽、不漏杀。）
@@ -406,9 +432,10 @@ public class TailoredResumeService {
      * @param retryCall  重试时重新发起 AI 调用的动作（需自行包裹并发闸门）
      * @param startNanos {@link #tailor} 入口的 {@link System#nanoTime()}，用于判断是否还有重试预算
      */
-    private String validateOrRetryTailor(String raw, java.util.function.Supplier<String> retryCall,
+    private String validateOrRetryTailor(String raw, java.util.function.Function<String, String> retryCall,
                                          long startNanos) {
-        String normalized = normalizeTailor(JsonRepairUtil.repairAndLog(raw, "career-tailor-resume"));
+        String repaired = JsonRepairUtil.repairAndLog(raw, "career-tailor-resume");
+        String normalized = normalizeTailor(repaired);
         if (normalized != null) {
             return normalized;
         }
@@ -438,7 +465,7 @@ public class TailoredResumeService {
 
         String retryRaw;
         try {
-            retryRaw = retryCall.get();
+            retryRaw = retryCall.apply(retryHint(raw, repaired));
         } catch (Exception e) {
             // 调用本身抛异常是链路故障，不是「模型输出格式不对」——文案不能混为一谈
             log.warn("定制简历重试调用失败（链路异常）：{}", e.getMessage());
@@ -454,6 +481,39 @@ public class TailoredResumeService {
         }
         log.error("定制简历重试后仍不可用，放弃本次生成。原文前 200 字：{}", TextUtil.truncate(retryRaw, 200));
         throw new BusinessException(MSG_FORMAT_INVALID);
+    }
+
+    /**
+     * 根据「上一次到底错在哪」挑一条重试提示，附在重试请求的 prompt 末尾。
+     *
+     * <p>分类只有三种，都对应线上真实见过的失败形态：
+     * <ul>
+     *   <li>没返回内容 → 让模型直接出 JSON；</li>
+     *   <li>返回了但 {@code rewrittenBullets} 缺失/为空 → 明确要求「至少 1 条」，
+     *       这是最关键的一条：提示词要 3-6 条，而用户只粘了一条经历时模型容易返回空数组；</li>
+     *   <li>其它（结构坏到解析不了）→ 只强调输出格式。</li>
+     * </ul>
+     *
+     * <p>解析失败一律归到「格式」提示：分类本身不值得再抛异常。
+     *
+     * @param raw      首次原始响应（判「有没有返回内容」）
+     * @param repaired 首次响应经 {@link JsonRepairUtil} 修复后的文本（判「有没有可用条目」）
+     */
+    private static String retryHint(String raw, String repaired) {
+        if (raw == null || raw.isBlank()) {
+            return RETRY_HINT_EMPTY;
+        }
+        try {
+            JsonNode node = TAILOR_MAPPER.readTree(repaired);
+            JsonNode bullets = (node == null) ? null : node.get("rewrittenBullets");
+            if (bullets == null || !bullets.isArray() || bullets.isEmpty()) {
+                return RETRY_HINT_NO_BULLETS;
+            }
+        } catch (Exception e) {
+            // 解析不了就是格式问题，落到下面那条提示
+            log.debug("定制简历重试提示分类：解析失败，按格式问题处理：{}", e.getMessage());
+        }
+        return RETRY_HINT_BAD_JSON;
     }
 
     /**
