@@ -136,6 +136,7 @@ import ReportPanel from '../components/ReportPanel.vue'
 import { EMPTY } from '../utils/format'
 import { isResumableSession } from '../utils/interviewResume'
 import type { ReportEvalInput } from '../utils/reportView'
+import { asArray } from '../utils/safeData'
 
 const router = useRouter()
 
@@ -188,7 +189,7 @@ async function openReport(s: Session) {
     loadingId.value = s.sessionId
     try {
       const data = (await api.get(`/api/session/${s.sessionId}/questions`)) as unknown as Question[]
-      qMap.value = { ...qMap.value, [s.sessionId]: data || [] }
+      qMap.value = { ...qMap.value, [s.sessionId]: asArray<Question>(data) }
     } catch (e: unknown) {
       ElMessage.error(getErrMessage(e, '加载题目失败'))
       return
@@ -242,7 +243,7 @@ async function loadHistory() {
   try {
     // userId 由后端从 token 提取，前端不传
     const data = await api.get('/api/session/list') as unknown as Session[]
-    sessions.value = data || []
+    sessions.value = asArray<Session>(data)
   } catch (e: unknown) {
     loadError.value = true
     ElMessage.error(getErrMessage(e, '加载历史失败'))
@@ -259,7 +260,7 @@ async function loadQuestions(sessionId: string) {
   loadingId.value = sessionId
   try {
     const data = await api.get(`/api/session/${sessionId}/questions`) as unknown as Question[]
-    qMap.value = { ...qMap.value, [sessionId]: data || [] }
+    qMap.value = { ...qMap.value, [sessionId]: asArray<Question>(data) }
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载题目失败'))
   } finally { loadingId.value = '' }

@@ -196,6 +196,7 @@ import {
   WEEKDAY_LABELS, fmtDateTime, isSameDate, monthMatrix,
   statusText, statusVariant, toDatetimeLocal, toDateString,
 } from '../utils/calendar'
+import { asArray } from '../utils/safeData'
 
 interface CalendarEvent {
   id: number
@@ -290,13 +291,13 @@ async function load() {
 
 async function itemsReload() {
   const data = (await api.get('/api/calendar/event/list')) as unknown as CalendarEvent[]
-  events.value = data || []
+  events.value = asArray<CalendarEvent>(data)
 }
 
 async function loadApplications() {
   try {
     const data = (await api.get('/api/application/list')) as unknown as { items?: ApplicationOption[] }
-    applications.value = data?.items || []
+    applications.value = asArray<ApplicationOption>(data?.items)
   } catch {
     applications.value = []
   }

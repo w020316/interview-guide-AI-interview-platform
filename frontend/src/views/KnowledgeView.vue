@@ -302,6 +302,7 @@ import {
 } from '../utils/scoreDisplay'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 import { parseSearchHits, formatSimilarity, type SearchHit } from '../utils/knowledgeSearch'
+import { asArray } from '../utils/safeData'
 
 type Tab = 'ask' | 'search' | 'import' | 'wrong' | 'summary'
 const tab = ref<Tab>('ask')
@@ -512,7 +513,7 @@ async function loadWrong() {
   try {
     const data = await api.get('/api/knowledge/wrong-questions',
       { params: { threshold: threshold.value } }) as unknown as { total: number; questions: WrongQuestion[] }
-    wrongList.value = data.questions || []
+    wrongList.value = asArray<WrongQuestion>(data.questions)
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载错题失败'))
     wrongList.value = []

@@ -234,6 +234,7 @@ import {
   type ReadinessManual,
   type ReadinessResult,
 } from '../utils/readiness'
+import { asArray } from '../utils/safeData'
 
 const router = useRouter()
 
@@ -357,7 +358,7 @@ async function loadTrend(dim: string) {
   rawPoints.value = []
   loading.value = true
   try {
-    rawPoints.value = await api.get(`/api/stats/trend?dimension=${encodeURIComponent(dim)}`) as unknown as TrendPoint[]
+    rawPoints.value = asArray<TrendPoint>(await api.get(`/api/stats/trend?dimension=${encodeURIComponent(dim)}`))
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载成长数据失败'))
     rawPoints.value = prev
@@ -457,8 +458,9 @@ onMounted(async () => {
       api.get('/api/stats/trend?dimension=DAY') as unknown as TrendPoint[],
       api.get('/api/knowledge/question-summary') as unknown as { byCategory?: CategoryStat[] },
     ])
-    rawPoints.value = trend || []
-    categoryStats.value = (summary?.byCategory || [])
+    // 用 asArray 而不是 `|| []`：空对象/字符串都是 truthy，`||` 拦不住
+    rawPoints.value = asArray<TrendPoint>(trend)
+    categoryStats.value = asArray<CategoryStat>(summary?.byCategory)
       .filter((c) => c.total > 0)
       .map((c) => ({
         category: c.category,

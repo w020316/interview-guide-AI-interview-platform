@@ -567,7 +567,7 @@ async function runMatch() {
   matching.value = true
   try {
     const res = (await api.post('/api/jobs/match', { resumeText: matchResume.value })) as unknown as { items?: MatchedResult[] }
-    matched.value = (res?.items || []).filter((i) => i.job && i.job.id != null)
+    matched.value = asArray<MatchedResult>(res?.items).filter((i) => i.job && i.job.id != null)
     if (matched.value.length) {
       matchActive.value = true
       ElMessage.success(`为你推荐 ${matched.value.length} 个岗位`)
@@ -627,7 +627,7 @@ const displayJobs = computed<JobPosting[]>(() => {
 async function loadFavorites() {
   try {
     const res = await api.get('/api/jobs/favorite') as unknown as { items?: JobFavorite[] }
-    favList.value = res?.items || []
+    favList.value = asArray<JobFavorite>(res?.items)
     favCount.value = favList.value.length
     favIds.value = new Set(favList.value.map((f) => f.jobId))
   } catch {
@@ -723,8 +723,8 @@ async function fetchJobs() {
     })
     // axios 拦截器已解包 Result.data，此处直接取分页结构 {total,page,size,items}
     const data = res as unknown as { total: number; items: JobPosting[] }
-    jobs.value = data?.items || []
-    total.value = data?.total || 0
+    jobs.value = asArray<JobPosting>(data?.items)
+    total.value = asFiniteNumber(data?.total)
   } catch (e) {
     loadError.value = true
     ElMessage.error(getErrMessage(e, '岗位加载失败'))

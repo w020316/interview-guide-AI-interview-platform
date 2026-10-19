@@ -478,6 +478,7 @@ import {
   type SpreadsheetKind,
 } from '../utils/tableImport'
 import { XLSX_READ_ERROR_HINT, parseXlsxRows } from '../utils/xlsxLazy'
+import { asArray } from '../utils/safeData'
 
 interface Application {
   id: number
@@ -564,7 +565,7 @@ async function load() {
   loading.value = true
   try {
     const listData = (await api.get('/api/application/list')) as unknown as { items?: Application[] }
-    items.value = listData?.items || []
+    items.value = asArray<Application>(listData?.items)
     const board = (await api.get('/api/application/board')) as unknown as {
       counts?: Record<string, number>
       funnel?: Record<string, number>
@@ -573,8 +574,8 @@ async function load() {
     }
     counts.value = board?.counts || {}
     funnel.value = board?.funnel || {}
-    channels.value = board?.byChannel || []
-    followUps.value = board?.followUps || []
+    channels.value = asArray<ChannelStat>(board?.byChannel)
+    followUps.value = asArray<Application>(board?.followUps)
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载投递台账失败'))
   } finally {

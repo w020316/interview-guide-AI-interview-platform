@@ -316,6 +316,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton, BaseTag } from '../components'
+import { asArray } from '../utils/safeData'
 
 interface Asset {
   evidence?: string
@@ -523,7 +524,7 @@ async function saveEdit(id: number) {
 
 /** 加载我的故事库 */
 async function loadStories() {  try {
-    stories.value = (await api.get('/api/story-bank')) as unknown as StoryItem[]
+    stories.value = asArray<StoryItem>(await api.get('/api/story-bank'))
   } catch {
     // 静默：故事库加载失败不打断页面
   }
@@ -539,7 +540,7 @@ async function doExtractStories() {
       narrative: n,
       targetTrack: storyTrack.value.trim() || null,
     })) as unknown as { stories?: StoryCandidate[]; raw?: string }
-    candidates.value = r.stories || []
+    candidates.value = asArray<StoryCandidate>(r.stories)
     if (!candidates.value.length) {
       ElMessage.warning(r.raw ? 'AI 返回内容未能解析，可重试一次' : '这段描述还提炼不出完整故事，试着补充具体动作和结果')
     } else {
@@ -621,7 +622,7 @@ async function doFollowUp(s: StoryItem) {
   following.value = true
   try {
     const r = (await api.post(`/api/story-bank/${s.id}/followup`, { answer: a })) as unknown as { followups?: string[] }
-    followups.value = r.followups || []
+    followups.value = asArray<string>(r.followups)
     if (!followups.value.length) ElMessage.warning('没有生成追问，可重试一次')
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '生成追问失败，请稍后重试'))

@@ -266,6 +266,7 @@ import { checklistForDimension, type ResumeChecklistItem } from '../utils/resume
 import { EMPTY } from '../utils/format'
 import { getScoreColor, getScoreGradient } from '../utils/score'
 import { BaseButton } from '../components'
+import { asArray } from '../utils/safeData'
 
 const router = useRouter()
 
@@ -349,7 +350,7 @@ async function deleteResume(r: Resume, cascade: boolean) {
 async function loadResumes() {  loading.value = true
   try {
     const data = await api.get('/api/resume/history') as unknown as Resume[]
-    resumes.value = data || []
+    resumes.value = asArray<Resume>(data)
   } catch (e: unknown) {
     loadError.value = true
     ElMessage.error(getErrMessage(e, '加载简历历史失败'))

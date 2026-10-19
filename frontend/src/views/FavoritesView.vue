@@ -250,6 +250,7 @@ import {
   type PreferenceFilter,
 } from '../utils/preference'
 import { BaseButton, BaseTag } from '../components'
+import { asArray } from '../utils/safeData'
 
 const router = useRouter()
 
@@ -323,7 +324,7 @@ async function loadJobFavorites() {
   jobLoading.value = true
   try {
     const res = (await api.get('/api/jobs/favorite')) as unknown as { items?: JobFavoriteRow[] }
-    jobFavorites.value = res?.items || []
+    jobFavorites.value = asArray<JobFavoriteRow>(res?.items)
     // 清理已不在列表中的勾选
     const ids = new Set(jobFavorites.value.map((f) => f.jobId))
     compareIds.value = compareIds.value.filter((id) => ids.has(id as number))
@@ -364,7 +365,7 @@ function toggleCompare(jobId: number) {
 async function load() {
   try {
     const data = (await api.get('/api/favorite/list')) as unknown as { items?: FavoriteItem[] }
-    items.value = data?.items || []
+    items.value = asArray<FavoriteItem>(data?.items)
   } catch (e: unknown) {
     loadError.value = true
     ElMessage.error(getErrMessage(e, '加载收藏失败'))

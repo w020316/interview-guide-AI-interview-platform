@@ -85,9 +85,17 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.76.1'
+export const CURRENT_VERSION = '1.76.2'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.76.2',
+    date: '2026-10-19',
+    title: '版本 1.76.2 · 数据出岔子时，各页面各自扛住',
+    items: [
+      { text: '把「接口返回结构不对」的防护从招聘广场推广到全部列表页：收藏、历史、日历、投递台账、成长趋势、简历历史等，遇到异常数据会显示空列表而不是出错', level: 'user' },
+    ],
+  },
   {
     version: '1.76.1',
     date: '2026-10-19',

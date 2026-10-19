@@ -323,6 +323,7 @@ import api, { getErrMessage } from '../api'
 import { authState } from '../auth'
 import { recruitTypeLabel, RECRUIT_TYPE_CODES, RECRUIT_TYPE_LABELS } from '../utils/recruitType'
 import { EmptyChart } from '../components'
+import { asArray } from '../utils/safeData'
 
 /**
  * 管理后台（v1.37.0 视觉与信息架构重构）
@@ -621,7 +622,7 @@ async function fetchSources() {
   sourcesLoading.value = true
   try {
     const res = (await api.get('/api/admin/sources')) as unknown as { items?: SourceRow[] }
-    sources.value = res?.items || []
+    sources.value = asArray<SourceRow>(res?.items)
   } catch (e) {
     ElMessage.error(getErrMessage(e, '获取数据源失败'))
   } finally {
