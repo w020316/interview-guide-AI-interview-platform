@@ -232,7 +232,8 @@ public class TailoredResumeService {
                 .append("【候选人原始简历要点】\n").append(safeResume.isBlank() ? "未提供" : safeResume).append("\n\n")
                 .append("【重写要求】\n")
                 .append("1. 严禁编造：不得新增候选人未提及的经历、技能、公司、数字或奖项\n")
-                .append("2. rewrittenBullets：挑出 3-6 条最值得改写的原始条目，保持事实不变的前提下\n")
+                .append("2. rewrittenBullets：").append(bulletCountInstruction(resumeText))
+                .append("，保持事实不变的前提下\n")
                 .append("   ① 把与 JD 相关的关键词前置 ② 用「动作 + 方法 + 结果」结构重述 ③ 让量化结果更突出；\n")
                 .append("   reason 用一句话说明「为什么这样改更贴合该岗位」\n")
                 .append("3. matchedKeywords：候选人已具备、且 JD 明确要求的关键词\n")
@@ -270,6 +271,46 @@ public class TailoredResumeService {
      */
     private String callModel(String prompt) {
         return AiConcurrencyGuard.call(() -> chatClient.prompt().user(prompt).call().content());
+    }
+
+    /**
+     * 按「原文有多少条经历」决定提示词里要求输出几条改写。
+     *
+     * <p><b>为什么必须自适应</b>：提示词此前硬编码「挑出 3-6 条」。用户只粘一条经历时，
+     * 这是个不可能完成的任务——模型有时干脆返回空数组，于是重试也救不回来，最后报
+     * 「格式异常」。线上实测：单条输入的失败率约 1/3（加针对性重试后降到 1/5），
+     * 而成功的那些**都只返回了 1 条**，正是原文条数的真实上限。
+     *
+     * <p>只做粗判（按换行与分句符切分），不求精确：它只影响「要求几条」，判错也无害。
+     *
+     * @param resumeText 用户粘贴的简历要点（原始文本）
+     */
+    static String bulletCountInstruction(String resumeText) {
+        int items = roughItemCount(resumeText);
+        if (items <= 2) {
+            return "挑出全部可改写的原始条目（原文只有 " + items + " 条左右，请按实际条数输出，"
+                    + "至少 1 条；不要因为凑不满 3 条就返回空数组）";
+        }
+        return "挑出 3-6 条最值得改写的原始条目";
+    }
+
+    /**
+     * 粗估原文有几条经历：按换行与常见分句符切分后数非空片段。
+     *
+     * <p>刻意不用更精细的 NLP 判断——这里只需要区分「只有一两条」和「有很多条」，
+     * 精确度提升换不来任何产品价值，反而多一处可能出错的逻辑。
+     */
+    private static int roughItemCount(String resumeText) {
+        if (resumeText == null || resumeText.isBlank()) {
+            return 0;
+        }
+        int count = 0;
+        for (String part : resumeText.split("[\\n；;。]+")) {
+            if (!part.isBlank()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**

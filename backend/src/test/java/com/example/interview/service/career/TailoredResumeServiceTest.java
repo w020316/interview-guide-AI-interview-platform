@@ -575,6 +575,31 @@ class TailoredResumeServiceTest {
     }
 
     @Test
+    @DisplayName("提示词自适应：原文只有一条时不再要求「凑 3-6 条」")
+    void bulletCountInstruction_adaptsToThinInput() {
+        String thin = "负责用户增长活动页开发，配合运营完成三次大促";
+        assertThat(TailoredResumeService.bulletCountInstruction(thin))
+                .contains("至少 1 条")
+                .doesNotContain("挑出 3-6 条");
+
+        String rich = "负责订单系统重构\n主导检索链路优化\n搭建监控体系\n推动团队代码评审";
+        assertThat(TailoredResumeService.bulletCountInstruction(rich)).contains("挑出 3-6 条");
+    }
+
+    @Test
+    @DisplayName("提示词自适应：单条输入的首次请求就带「至少 1 条」，不靠重试兜")
+    void tailor_thinInput_firstPromptIsAdaptive() throws Exception {
+        stubChatClient(VALID_JSON);
+        org.mockito.ArgumentCaptor<String> prompts = org.mockito.ArgumentCaptor.forClass(String.class);
+
+        service.tailor("负责订单系统性能优化，响应时间下降 40%", "Java 后端", "");
+
+        verify(requestSpec, times(1)).user(prompts.capture());
+        // 根因在第一次调用：要求「挑出 3-6 条」而原文只有一条，模型只能返回空数组
+        assertThat(prompts.getValue()).contains("原文只有 1 条左右").contains("至少 1 条");
+    }
+
+    @Test
     @DisplayName("重试换提示词：首次返回空数组时，第二次要求「至少 1 条」")
     void tailor_retryWithHint_whenFirstHasNoBullets() throws Exception {
         String emptyBullets = "{\"matchedKeywords\":[],\"missingKeywords\":[],"
