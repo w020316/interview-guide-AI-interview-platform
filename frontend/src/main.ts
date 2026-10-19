@@ -37,11 +37,13 @@ installSessionGuard()
 
 const app = createApp(App)
 
-// 全局错误处理器：生产环境不输出到 console
+// 全局错误处理器。
+// v1.76.1 起**生产环境也输出**：此前这里是 `if (!PROD) console.error`，
+// 结果线上一次「整页空白」事故完全没有留下任何线索 —— 页面炸了、控制台却是干净的，
+// 排查全靠猜。渲染/生命周期错误本就极低频，留一行日志的代价远小于再瞎一次。
+// （路由级异常已被 RouteErrorBoundary 接住并 return false，不会重复打印。）
 app.config.errorHandler = (err) => {
-  if (!import.meta.env.PROD) {
-    console.error('全局错误:', err)
-  }
+  console.error('[app-error]', err)
 }
 
 // 路由错误处理：chunk 加载失败时自动刷新（CDN 故障/缓存问题兜底）

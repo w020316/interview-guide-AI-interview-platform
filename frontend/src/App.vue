@@ -253,13 +253,17 @@
         </transition>
       </header>
 
-      <!-- 主内容区 -->
+      <!-- 主内容区
+           RouteErrorBoundary：页面级渲染异常在这里被接住并给出可操作的兜底页，
+           而不是把 <main> 留成空白（v1.76.1，起因见组件内注释） -->
       <main class="main-content">
-        <router-view v-slot="{ Component }">
-          <transition name="page" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
+        <RouteErrorBoundary>
+          <router-view v-slot="{ Component }">
+            <transition name="page" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
+        </RouteErrorBoundary>
       </main>
 
       <!-- 页脚 -->
@@ -315,6 +319,7 @@ import { authState, clearAuth, isAdmin } from './auth'
 import api from './api'
 import ChangelogDialog from './components/ChangelogDialog.vue'
 import AiTaskCenter from './components/AiTaskCenter.vue'
+import RouteErrorBoundary from './components/RouteErrorBoundary.vue'
 import { CURRENT_VERSION } from './changelog'
 import { theme, toggleTheme as toggle } from './theme'
 import { ICONS, primaryNav, toolNav, buildMobileGroups } from './navigation'

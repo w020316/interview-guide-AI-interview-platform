@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.76.0'
+export const CURRENT_VERSION = '1.76.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.76.1',
+    date: '2026-10-19',
+    title: '版本 1.76.1 · 页面出问题时会说一声，而不是白屏',
+    items: [
+      { text: '某个接口返回的格式不对时，页面不再整屏空白：能显示的部分照常显示，实在渲染失败的会给出「刷新页面 / 回首页」的兜底页', level: 'user' },
+      { text: '招聘广场在筛选项数据异常时仍能正常打开（此前会白屏，且没有任何提示）', level: 'user' },
+    ],
+  },
   {
     version: '1.76.0',
     date: '2026-10-19',

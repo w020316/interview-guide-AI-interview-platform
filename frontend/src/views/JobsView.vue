@@ -396,6 +396,7 @@ import { BaseButton } from '../components'
 import { validateJobKeyword } from '../utils/jobKeyword'
 import { toQueryRecruitType } from '../utils/recruitType'
 import { jobTrust, jobFreshness, type JobTrust, type Freshness } from '../utils/jobTrust'
+import { asArray, asObject, asFiniteNumber } from '../utils/safeData'
 
 /**
  * 招聘信息广场
@@ -499,10 +500,37 @@ const experience = ref('')
 /** N2：默认隐藏已截止（true）—— 关闭后显示已截止岗位（后端仍将其排在最后） */
 const hideExpired = ref(true)
 
-const meta = ref<JobsMeta>({
+/** meta 的空默认值：同时作为形状兜底模板，避免「默认值」与「兜底值」两处各写一份 */
+const EMPTY_META: JobsMeta = {
   industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null,
   overseasSources: [], overseasCount: 0,
-})
+}
+
+/**
+ * 把接口返回值归一成 JobsMeta（v1.76.1）。
+ *
+ * 线上事故：该接口曾经返回过数组，而赋值处写的是 `res || EMPTY_META` ——
+ * 空数组是 truthy，兜底分支根本不会执行；随后模板读 `meta.sources.length` 抛
+ * TypeError，整棵路由子树渲染失败，页面变成一整屏空白（且异常被全局处理器吞掉）。
+ * 所以这里按字段逐个校验类型：数组字段不是数组就置空，计数字段不是有限数就归零。
+ * 只要接口还能返回 HTTP 200，页面就一定能渲染出「空筛选 + 空列表」，而不是白屏。
+ */
+function normalizeMeta(raw: unknown): JobsMeta {
+  const o = asObject<Partial<JobsMeta>>(raw, EMPTY_META)
+  return {
+    industries: asArray<string>(o.industries),
+    jobTypes: asArray<string>(o.jobTypes),
+    sources: asArray<string>(o.sources),
+    degrees: asArray<string>(o.degrees),
+    experiences: asArray<string>(o.experiences),
+    recruitCounts: asObject<Record<string, number>>(o.recruitCounts, {}),
+    lastUpdatedAt: typeof o.lastUpdatedAt === 'string' ? o.lastUpdatedAt : null,
+    overseasSources: asArray<string>(o.overseasSources),
+    overseasCount: asFiniteNumber(o.overseasCount),
+  }
+}
+
+const meta = ref<JobsMeta>({ ...EMPTY_META })
 const recruitCounts = computed(() => meta.value.recruitCounts || {})
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 
@@ -713,10 +741,7 @@ async function fetchMeta() {
     const res = await api.get('/api/jobs/meta', {
       params: { overseas: recruitType.value === 'OVERSEAS' },
     })
-    meta.value = (res as unknown as JobsMeta) || {
-      industries: [], jobTypes: [], sources: [], recruitCounts: {}, lastUpdatedAt: null,
-      overseasSources: [], overseasCount: 0,
-    }
+    meta.value = normalizeMeta(res)
   } catch {
     // 元数据加载失败不阻断主列表
   }
