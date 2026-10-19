@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.75.2'
+export const CURRENT_VERSION = '1.76.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.76.0',
+    date: '2026-10-19',
+    title: '版本 1.76.0 · 手机上更好点、更好认了',
+    items: [
+      { text: '手机上右上角的菜单按钮恢复正常显示 —— 此前在部分手机上它会变成一个空白方框，导致点不开导航', level: 'user' },
+      { text: '未登录时顶部不再把菜单按钮挤出屏幕，登录/注册收进菜单里，小屏手机也能完整显示', level: 'user' },
+      { text: '按钮、输入框、筛选标签统一加大到 48px，单手操作更容易点中', level: 'user' },
+      { text: '修正了 60 处非整数字号，小字不再发虚；页脚版本号等小链接的可点范围也加大了', level: 'user' },
+      { text: '抽屉菜单改为浮层展开，展开收起更跟手；首页各区块间距统一到同一套节奏', level: 'user' },
+    ],
+  },
   {
     version: '1.75.2',
     date: '2026-10-19',

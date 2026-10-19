@@ -451,6 +451,45 @@ button:focus:not(:focus-visible) {
   outline: none;
 }
 
+/* ── 触摸目标 ≥48px（v1.76.0）──────────────────────────────
+ * 移动端可交互控件的最小命中区抬到 48px：
+ *   · WCAG 2.5.5（AAA）要求 44×44，本项目在触屏断点上再留 4px 余量；
+ *   · 只在 ≤768px 生效：桌面 64px 导航栏与密集表格里塞 48px 会把行高撑坏，
+ *     鼠标的指向精度远高于手指，44px 已满足桌面可达性。
+ * 用「宽度断点」而非 (pointer: coarse)：可折叠设备 / 触屏笔记本会在
+ * fine 与 coarse 之间来回切换，而宽度断点在无头视口仿真下可稳定复现、可回归。
+ * ⚠️ 组件内若把 height 写死，min-height 会赢过它 —— 需要固定高度的地方请改 min-height。 */
+.el-radio-button__inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+}
+
+@media (max-width: 768px) {
+  button,
+  [role='button'],
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+  select,
+  textarea {
+    min-height: 48px;
+  }
+
+  /* 图标按钮（刷新、加减号等）此前只有 26~32px 宽，高度够了宽度仍不可点 */
+  button,
+  [role='button'] {
+    min-width: 48px;
+  }
+
+  /* Element Plus 的分段控件是 <span> 而非 button，需单独抬 */
+  .el-radio-button__inner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+  }
+}
+
 /* ── 标题字体（v1.39.0 分级）──
  * h1 保留衬线：页面级展示标题，字号 ≥24px，衬线的权威/编辑气质在这一层成立。
  * h2/h3 改用无衬线标题字族：它们在卡片/面板里普遍只有 15~20px，

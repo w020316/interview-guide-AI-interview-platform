@@ -513,7 +513,7 @@ select.input { appearance: auto; background: var(--c-bg); }
 .jp-empty { font-size: 13px; color: var(--c-text-tertiary); line-height: 1.7; }
 .jp-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .jp-filters { display: flex; gap: 8px; flex-wrap: wrap; }
-.jp-chip { padding: 5px 12px; font-size: 12.5px; color: var(--c-text-secondary); background: var(--c-bg-alt); border: 1px solid transparent; border-radius: var(--radius-full); cursor: pointer; }
+.jp-chip { padding: 5px 12px; font-size: 13px; color: var(--c-text-secondary); background: var(--c-bg-alt); border: 1px solid transparent; border-radius: var(--radius-full); cursor: pointer; }
 .jp-chip:hover { color: var(--brand-primary); border-color: var(--brand-primary-200); }
 .jp-chip.active { color: var(--c-on-primary); background: var(--brand-primary); border-color: var(--brand-primary); font-weight: 600; }
 .jp-count { margin-left: 5px; opacity: 0.85; font-size: 11px; }

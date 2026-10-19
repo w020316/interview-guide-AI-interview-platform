@@ -798,7 +798,10 @@ function fmtRelative(iso: string): string {
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 0;
+  /* v1.76.0：padding:0 时命中区只有文字本身（实测 52×17），
+     抬到 24px 高（WCAG 2.5.8 AA 指针目标下限）。 */
+  padding: 4px 2px;
+  min-height: 24px;
   font-family: inherit;
   transition: color var(--transition-fast);
 }
@@ -806,6 +809,15 @@ function fmtRelative(iso: string): string {
 .btn-link:hover {
   color: var(--brand-primary-hover);
   text-decoration: underline;
+}
+
+/* 移动端：scoped 类的 min-height:24 会压过全局 button 的 48，这里显式抬档 */
+@media (max-width: 768px) {
+  .btn-link {
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+  }
 }
 
 .btn-link:focus-visible {

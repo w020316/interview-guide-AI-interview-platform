@@ -1031,7 +1031,7 @@ function actionVariant(action: string) {
 .fu-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fu-title { font-weight: 500; color: var(--c-text); }
 .fu-company { color: var(--c-text-tertiary); }
-.fu-advice { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--c-text-secondary); }
+.fu-advice { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--c-text-secondary); }
 .fu-advice.is-high { color: var(--c-warning); }
 .fu-reason { flex: none; }
 .fu-arrow { color: var(--c-text-quaternary); }
@@ -1128,14 +1128,14 @@ function actionVariant(action: string) {
 .mini-btn.danger:hover:not(:disabled) { border-color: var(--c-danger); color: var(--c-danger); }
 .mini-select { padding: 6px 8px; font-size: 13px; border: 1px solid var(--c-border-strong); border-radius: var(--radius-md); background: var(--c-surface); color: var(--c-text-secondary); cursor: pointer; }
 
-/* ── 触控目标 ≥44px（v1.63.2）──
+/* ── 触控目标 ≥48px（v1.63.2 立规 / v1.76.0 抬档）──
  * 移动端 `.mini-btn` / `.mini-select` 只有 ~29px 高，手指容易点错。
  * 与 CalendarView 同理：放大实际尺寸而非伪元素扩热区（这些控件在卡片操作行里是相邻的）。 */
 @media (max-width: 768px) {
   .mini-btn,
-  .mini-select { min-height: 44px; padding: 11px 14px; }
-  /* N4：「复制跟进消息」同为窄屏下的关键操作，一并抬到 44px */
-  .fu-copy { min-height: 44px; padding: 11px 14px; }
+  .mini-select { min-height: 48px; padding: 12px 16px; }
+  /* N4：「复制跟进消息」同为窄屏下的关键操作，一并抬到 48px */
+  .fu-copy { min-height: 48px; padding: 12px 16px; }
 }
 
 .tailored-hint { margin-top: 10px; font-size: 12px; color: var(--c-text-tertiary); }

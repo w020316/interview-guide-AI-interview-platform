@@ -603,7 +603,7 @@ function statusText(status: string) {
 
 .q-score {
   display: inline-block;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   padding: 2px 10px;
   color: var(--c-accent);

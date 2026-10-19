@@ -201,7 +201,14 @@
               <button class="btn-register" @click="router.push('/login')">免费注册</button>
             </template>
 
-            <!-- 移动端汉堡（≤960px 时替代横向滚动菜单） -->
+            <!-- 移动端菜单开关（≤960px 时替代横向滚动菜单）
+                 ⚠️ 图标必须走 SVG，不能再用三个空 <span> 画横杠：
+                 空 span 没有内容宽度，只能靠父级 flex 的 align-items:stretch
+                 隐式拉伸成 26px 长的横杠。一旦引擎/UA 把它解析成 center/start
+                 （iOS 微信 WebView 真机实测：整个按钮退化成一片空白方框），
+                 而它是移动端唯一的导航入口，用户根本不会去点。
+                 SVG 用 currentColor，与月亮/头像等图标走同一条渲染路径，
+                 不依赖任何布局特性，从根上消除这类静默失效。 -->
             <button
               class="menu-toggle"
               :class="{ open: mobileOpen }"
@@ -210,7 +217,12 @@
               :aria-expanded="mobileOpen"
               @click.stop="mobileOpen = !mobileOpen"
             >
-              <span /><span /><span />
+              <svg v-if="!mobileOpen" class="mt-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3.5 6.5h17M3.5 12h17M3.5 17.5h17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <svg v-else class="mt-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
             </button>
           </div>
         </div>
@@ -234,6 +246,19 @@
                   </svg>
                   <span>{{ it.label }}</span>
                 </router-link>
+              </div>
+            </template>
+
+            <!-- 未登录：把「免费注册 / 登录」从头部收进抽屉（v1.76.0）
+                 此前它们与主题、菜单一起挤在 56px 高的头部里：未登录态共 4 个控件，
+                 整行最小内容宽 391.7px —— 实测 375 宽时汉堡按钮右边缘 391.7，
+                 被 .app-wrapper 的 overflow-x:hidden 静默裁掉，连滚动条都没有。
+                 收进抽屉后头部只剩「主题 + 菜单」两个控件，320px 宽也不溢出。 -->
+            <template v-if="!authState.token">
+              <p class="md-title">账户</p>
+              <div class="md-auth">
+                <button class="md-auth-primary" type="button" @click="goLogin">免费注册</button>
+                <button class="md-auth-ghost" type="button" @click="goLogin">登录</button>
               </div>
             </template>
           </div>
@@ -428,6 +453,12 @@ function toggleTheme() {
   toggle()
 }
 
+/** 抽屉内的登录入口：先收起抽屉，避免跳转后浮层残留在新页面上 */
+function goLogin() {
+  mobileOpen.value = false
+  router.push('/login')
+}
+
 function logout() {
   closeMenu()
   // JWT 无状态登出：只需前端清除 token 并跳转。后端接口失败/挂起（冷启动/网络）都不应阻塞退出，
@@ -521,7 +552,9 @@ function logout() {
 
 .brand-sub {
   font-family: var(--font-sans);
-  font-size: 11px;
+  /* 12px 是本站的正文最小字号下限：11px 在 Windows 的 Microsoft YaHei 下
+     笔画糊成一团（真机审计项），且低于可读性基线。 */
+  font-size: 12px;
   color: var(--c-text-tertiary);
   margin-top: 2px;
   letter-spacing: 0.2px;
@@ -684,7 +717,7 @@ function logout() {
 }
 
 .dd-text b {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--c-text);
   line-height: 1.3;
@@ -692,7 +725,7 @@ function logout() {
 
 .dd-text em {
   font-style: normal;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--c-text-tertiary);
   line-height: 1.3;
   white-space: nowrap;
@@ -751,7 +784,7 @@ function logout() {
 }
 
 .dd-user-meta b {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--c-text);
   overflow: hidden;
@@ -761,7 +794,7 @@ function logout() {
 
 .dd-user-meta em {
   font-style: normal;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--brand-primary);
   font-weight: 600;
 }
@@ -908,49 +941,58 @@ function logout() {
 /* ── 移动端汉堡按钮（桌面隐藏） ── */
 .menu-toggle {
   display: none;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 4px;
   width: 34px;
   height: 34px;
-  padding: 0 8px;
+  padding: 0;
+  color: var(--c-text-secondary);
   background: transparent;
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.menu-toggle span {
+.menu-toggle:hover {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+  background: var(--brand-primary-50);
+}
+
+/* 图标本体：SVG + currentColor，不依赖任何布局拉伸（见模板注释） */
+.mt-icon {
   display: block;
-  height: 2px;
-  border-radius: var(--radius-xs);
-  background: var(--c-text-secondary);
-  transition: transform var(--transition-fast), opacity var(--transition-fast);
+  transition: transform var(--transition-base);
 }
 
-.menu-toggle.open span:nth-child(1) {
-  transform: translateY(6px) rotate(45deg);
-}
-.menu-toggle.open span:nth-child(2) {
-  opacity: 0;
-}
-.menu-toggle.open span:nth-child(3) {
-  transform: translateY(-6px) rotate(-45deg);
+.menu-toggle:active .mt-icon {
+  transform: scale(0.92);
 }
 
-/* ── 移动端抽屉 ── */
+/* ── 移动端抽屉 ──
+ * 采用「浮层」而非「把内容顶下去」：定位到导航栏正下方，
+ * 只动 transform / opacity（不触发布局），展开收起全程 60fps。
+ * 此前动的是 max-height —— 每帧都要重新布局，长列表展开可感知掉帧。 */
 .mobile-drawer {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: var(--z-dropdown);
   padding: 12px 16px 18px;
   border-top: 1px solid var(--c-border-light);
   background: var(--c-surface);
+  box-shadow: var(--shadow-lg);
   max-height: 70vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .md-title {
   margin: 6px 0 8px;
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.6px;
   color: var(--c-text-quaternary);
@@ -992,15 +1034,62 @@ function logout() {
   font-weight: 600;
 }
 
+/* 抽屉内的账户入口（未登录时） */
+.md-auth {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+
+.md-auth-primary,
+.md-auth-ghost {
+  min-height: 48px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast), transform var(--transition-fast);
+}
+
+.md-auth-primary {
+  color: var(--c-on-primary);
+  background: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+}
+
+.md-auth-primary:hover {
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.md-auth-ghost {
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+}
+
+.md-auth-ghost:hover {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.md-auth-primary:active,
+.md-auth-ghost:active {
+  transform: scale(0.985);
+}
+
 .drawer-enter-active,
 .drawer-leave-active {
-  transition: opacity var(--transition-base), max-height var(--transition-base);
+  transition: opacity var(--transition-base), transform var(--transition-base);
 }
+
 .drawer-enter-from,
 .drawer-leave-to {
   opacity: 0;
-  max-height: 0;
-  overflow: hidden;
+  transform: translateY(-8px);
 }
 
 /* ── 主内容 ── */
@@ -1153,7 +1242,7 @@ function logout() {
   gap: 8px;
   padding: 7px 16px;
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--c-warning);
   background: var(--c-bg-alt);
@@ -1172,7 +1261,7 @@ function logout() {
   gap: 10px;
   padding: 7px 16px;
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--c-on-primary);
   background: var(--brand-primary);
@@ -1181,7 +1270,7 @@ function logout() {
 .update-banner-action {
   padding: 3px 12px;
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--brand-primary);
   background: var(--c-on-primary);
@@ -1267,6 +1356,12 @@ function logout() {
   .menu-toggle {
     display: flex;
   }
+  /* 未登录：登录/注册收进抽屉（见抽屉里的「账户」组）。
+     留在头部会把整行撑到 391.7px —— 375/414 宽的机器上菜单按钮直接被裁。 */
+  .btn-login,
+  .btn-register {
+    display: none;
+  }
   .user-chip .chev {
     display: none;
   }
@@ -1315,7 +1410,26 @@ function logout() {
  * 只写 (pointer: coarse) 时 headless / 鼠标主指针环境测不到，等于没验证。 */
 @media (pointer: coarse), (max-width: 1023px) {
   .version-link {
-    min-height: 44px;
+    min-height: 48px;
+  }
+}
+
+/* ── 移动/平板：头部控件统一 48px（v1.76.0）──
+ * 放在文件末尾，故意压过上面的 44px 基础档（同优先级、后写者胜）。
+ * 桌面保留 44px：64px 高的导航栏里塞 48px 图标按钮会挤压品牌区，
+ * 而鼠标的指向精度远高于手指，44px 已满足桌面可达性。 */
+@media (max-width: 960px) {
+  .theme-toggle,
+  .menu-toggle,
+  .user-chip {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    justify-content: center;
+  }
+
+  .md-item {
+    min-height: 48px;
   }
 }
 </style>

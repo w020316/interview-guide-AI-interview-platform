@@ -142,6 +142,8 @@ function onBlur(e: FocusEvent) {
 
 .base-input__inner {
   width: 100%;
+  /* 桌面端下限 44px（WCAG 2.5.5 AAA）：md 档此前实测 43px，只差 1px 却不达标。 */
+  min-height: 44px;
   font-family: var(--font-sans);
   color: var(--c-text);
   background: var(--c-surface);
@@ -232,14 +234,14 @@ function onBlur(e: FocusEvent) {
   color: var(--c-danger);
 }
 
-/* ── 触控目标 ≥44px（R10-D11 切片）──
- * DESIGN.md:74 规定触控目标 ≥44px。375px 真机实测 md 的 <input> 高 42px
- * （字体 14 + padding 11/14 + 1px 描边，行高取 UA 默认）。移动端把 md / lg 抬到 44；
- * **刻意不动 sm**：与 BaseButton 同一裁决 —— sm 多用于密集行内，硬抬会撑坏版式。 */
+/* ── 触控目标 ≥48px（R10-D11 切片 / v1.76.0 抬档）──
+ * DESIGN.md:74 原定 44px；v1.76.0 统一抬到 48（WCAG 2.5.5 AAA 44×44 之上留手指容错，
+ * 与 iOS HIG / Material 一致）。输入框是移动端最高频的控件，高度不足会直接导致误触。 */
 @media (max-width: 768px) {
+  .base-input--sm .base-input__inner,
   .base-input--md .base-input__inner,
   .base-input--lg .base-input__inner {
-    min-height: 44px;
+    min-height: 48px;
   }
 }
 </style>

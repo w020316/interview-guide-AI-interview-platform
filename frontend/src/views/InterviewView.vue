@@ -1741,7 +1741,7 @@ onUnmounted(() => {
 
 .session-job-name {
   font-family: var(--font-title);
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--c-text);

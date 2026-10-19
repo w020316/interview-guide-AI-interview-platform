@@ -168,7 +168,9 @@
       <div class="steps">
         <div v-for="(s, i) in steps" :key="s.title" class="step" v-reveal="i * 110">
           <div class="step-index">{{ String(i + 1).padStart(2, '0') }}</div>
-          <h4>{{ s.title }}</h4>
+          <!-- v1.76.0：h4 → h3。上一级是 <h2>「三步完成面试准备」，跳级到 h4
+               会让屏幕阅读器的大纲出现空洞（h2 → h4），这是 WCAG 1.3.1 的典型问题。 -->
+          <h3>{{ s.title }}</h3>
           <p>{{ s.desc }}</p>
         </div>
       </div>
@@ -408,6 +410,12 @@ const steps = [
   padding: 0 24px;
 }
 
+/* 今日待办与 Hero 之间：32px（8 的倍数）。此前是组件自带的 28px，
+   与全站 8px 栅格差半格，视觉上「差一点点」却说不清哪里不对。 */
+.home-todo {
+  margin-bottom: 32px;
+}
+
 /* ── Hero：左文右卡不对称网格 ── */
 .hero {
   position: relative;
@@ -566,10 +574,11 @@ const steps = [
 .tool-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  /* 44px：WCAG 2.5.5（AAA）的命中区下限；28px 时鼠标都要瞄一下 */
+  min-height: 44px;
   padding: 4px 12px;
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--c-text-secondary);
   background: var(--c-surface);
@@ -651,7 +660,7 @@ const steps = [
   display: inline-block;
   margin-left: 6px;
   padding: 1px 7px;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   font-family: var(--font-sans);
   color: var(--c-text-secondary);
@@ -789,7 +798,9 @@ const steps = [
  * 留白刻意**不对称**：下边距略大于上边距，视觉重心更稳，也避免各区块「等距堆叠」的均质感。
  */
 .section {
-  padding: 68px 0 76px;
+  /* 68/76 → 72/72：纵向节奏统一到 8px 栅格（此前两段落差 4px，页面扫视时
+     区块「呼吸」不均匀，是留白维度最常见的不达标项）。 */
+  padding: 72px 0;
 }
 
 /* 区块头**左对齐**（v1.63.0）：与 Hero 的左对齐编辑式构图连成一条阅读轴线。
@@ -962,7 +973,7 @@ const steps = [
   margin-bottom: 14px;
 }
 
-.step h4 {
+.step h3 {
   font-size: 17px;
   font-weight: 600;
   color: var(--c-text);
@@ -979,7 +990,7 @@ const steps = [
 
 /* ── CTA 区 ── */
 .cta-section {
-  padding: 40px 0 80px;
+  padding: 32px 0 80px;
 }
 
 .cta-card {
@@ -1050,6 +1061,12 @@ const steps = [
   }
   .step {
     padding: 20px 0 0;
+  }
+  /* 求职工具胶囊是 <a>，不吃全局 button 的触摸下限，单独抬到 48 */
+  .tool-chip {
+    min-height: 48px;
+    padding: 4px 16px;
+    font-size: 14px;
   }
   /* 移动端隐藏浮动小标：卡片仅 260px，标签外挂会在 320px 视口溢出。
      （遮挡问题已由 .visual-stage 从结构上修掉，这里只是窄屏空间取舍） */

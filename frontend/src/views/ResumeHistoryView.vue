@@ -721,7 +721,7 @@ const summaryText = computed(() => {
   white-space: nowrap;
 }
 .cmp-date {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--c-text-tertiary);
   margin-bottom: 8px;
 }
@@ -1252,7 +1252,7 @@ const summaryText = computed(() => {
 }
 
 .issue-problem {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
   color: var(--c-text);

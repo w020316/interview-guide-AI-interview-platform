@@ -70,6 +70,8 @@ function handleClick(ev: MouseEvent) {
   white-space: nowrap;
   user-select: none;
   line-height: 1.5;
+  /* 桌面端下限：WCAG 2.5.5 AAA 44×44。md 档此前实测 41px，差 3px 但不达标。 */
+  min-height: 44px;
 }
 .base-btn:focus-visible {
   outline: 2px solid var(--brand-primary);
@@ -197,12 +199,16 @@ function handleClick(ev: MouseEvent) {
 /* ── 触控目标 ≥44px（R10-D11 切片）──
  * DESIGN.md:74 规定触控目标 ≥44px。375px 真机走查实测 md 只有 41px
  * （font-size 14 × line-height 1.5 = 21，+ padding 9×2 = 18，+ border 2 = 41）。
- * 移动端把 md / lg 抬到 44。**刻意不动 sm**：sm 多用于密集行内（标签行、列表操作），
- * 强行 44px 会撑坏版式，需单独评估 —— 已列入 backlog，不要顺手改。 */
+ * v1.76.0：移动端下限从 44 抬到 48 —— WCAG 2.5.5（AAA）是 44×44，
+ * 48 是 iOS HIG / Material 的通行值，留 4px 手指容错。
+ * 这一版把 sm 也一并纳入：此前"密集行内不动 sm"的裁决在 375 宽实测中
+ * 反而出现了 31~35px 的标签按钮（首页求职工具条、知识库 tab），
+ * 手指点不中比"版式略松"代价更高。 */
 @media (max-width: 768px) {
+  .base-btn--sm,
   .base-btn--md,
   .base-btn--lg {
-    min-height: 44px;
+    min-height: 48px;
   }
 }
 </style>

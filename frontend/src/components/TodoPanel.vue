@@ -2,7 +2,11 @@
   <section class="todo-panel" data-todo-panel aria-label="今日待办">
     <header class="todo-head">
       <div class="todo-title-wrap">
-        <h2 class="todo-title">今日待办</h2>
+        <!-- v1.76.0：由 <h2> 改 <p>。
+             它在首页 DOM 里排在 Hero 的 <h1> 之前，登录用户的大纲会从 h2 起头、
+             h1 被挤到第二层；而「今日待办」是页面内的一个功能面板，不是文档章节，
+             用 <section aria-label> + 非标题文本更准确，屏幕阅读器仍能按区域跳转。 -->
+        <p class="todo-title">今日待办</p>
         <!-- 计数只在确实有待办时出现；绝不渲染「0 条」 -->
         <span v-if="view.hasAny" class="todo-total">{{ view.total }} 项待处理</span>
       </div>
@@ -139,7 +143,7 @@ function go(path: string) {
   border-radius: var(--radius-lg);
   padding: 20px 22px;
   box-shadow: var(--shadow-sm);
-  margin-bottom: 28px;
+  /* 页面级外边距交给使用方（.home-todo）：组件不该决定页面节奏 */
 }
 
 .todo-head {
@@ -166,7 +170,7 @@ function go(path: string) {
 }
 
 .todo-total {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-accent);
   background: var(--c-accent-soft);
   border-radius: var(--radius-full);
@@ -179,7 +183,7 @@ function go(path: string) {
   background: var(--c-surface);
   color: var(--c-text-secondary);
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   padding: 5px 14px;
   border-radius: var(--radius-full);
   cursor: pointer;
@@ -274,7 +278,7 @@ function go(path: string) {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-text-secondary);
   background: var(--c-warning-light);
   border: 1px solid var(--c-warning-border);
@@ -303,7 +307,7 @@ function go(path: string) {
   background: transparent;
   color: var(--brand-primary);
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   padding: 0 2px;
@@ -325,7 +329,7 @@ function go(path: string) {
 
 .todo-group-label {
   font-family: var(--font-title);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--c-text);
 }
@@ -372,7 +376,7 @@ function go(path: string) {
 }
 
 .todo-item-title {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--c-text);
   overflow: hidden;

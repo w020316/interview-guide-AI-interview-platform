@@ -981,7 +981,7 @@ onMounted(() => {
 
 .stat-label {
   margin-top: 6px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-text-tertiary);
 }
 
@@ -1036,7 +1036,7 @@ onMounted(() => {
 .alert-body b {
   display: block;
   margin-bottom: 8px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--c-danger);
 }
 
@@ -1054,7 +1054,7 @@ onMounted(() => {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.6;
 }
 
@@ -1069,7 +1069,7 @@ onMounted(() => {
 }
 
 .alert-times {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--c-text-tertiary);
 }
 
@@ -1083,7 +1083,7 @@ onMounted(() => {
 .alert-hint code {
   padding: 1px 5px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--c-text-secondary);
   background: var(--c-surface);
   border-radius: var(--radius-xs);
@@ -1143,7 +1143,7 @@ onMounted(() => {
 }
 
 .chart-hint {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--c-text-quaternary);
 }
@@ -1171,7 +1171,7 @@ onMounted(() => {
 }
 
 .bar-name {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1199,7 +1199,7 @@ onMounted(() => {
 }
 
 .bar-value {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--c-text);
   text-align: right;
@@ -1210,7 +1210,7 @@ onMounted(() => {
   font-style: normal;
   font-weight: 400;
   color: var(--c-text-quaternary);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 /* 环形图 */
@@ -1248,7 +1248,7 @@ onMounted(() => {
 }
 
 .donut-hole span {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--c-text-tertiary);
 }
 
@@ -1267,7 +1267,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-text-secondary);
 }
 
@@ -1369,7 +1369,7 @@ onMounted(() => {
 .select-input {
   padding: 9px 12px;
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--c-text);
   background: var(--c-bg-alt);
   border: 1px solid var(--c-border);
@@ -1393,7 +1393,7 @@ onMounted(() => {
 .ghost-btn {
   padding: 9px 16px;
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--c-text);
   background: var(--c-surface);
   border: 1px solid var(--c-border);
@@ -1414,7 +1414,7 @@ onMounted(() => {
 }
 
 .tip {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-text-tertiary);
   line-height: 1.6;
 }
@@ -1443,7 +1443,7 @@ onMounted(() => {
 
 .data-table th {
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-text-tertiary);
   background: var(--c-bg-alt);
   position: sticky;
@@ -1486,7 +1486,7 @@ onMounted(() => {
   display: inline-block;
   margin-left: 6px;
   padding: 1px 7px;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   border-radius: var(--radius-full);
   vertical-align: middle;
@@ -1565,7 +1565,7 @@ onMounted(() => {
 .metric-block h3 {
   margin: 0 0 12px;
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--c-text);
 }
@@ -1583,7 +1583,7 @@ onMounted(() => {
 .metric-row.metric-sub {
   padding-left: 12px;
   color: var(--c-text-tertiary);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .metric-row b {

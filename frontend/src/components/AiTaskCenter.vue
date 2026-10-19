@@ -139,7 +139,7 @@ function open(route?: string): void {
 }
 
 .ai-task-hint {
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .ai-task-err {

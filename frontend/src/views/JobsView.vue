@@ -1078,7 +1078,7 @@ onMounted(() => {
 }
 
 .source-label {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--c-text-tertiary);
   white-space: nowrap;
@@ -1087,7 +1087,7 @@ onMounted(() => {
 .source-chip {
   padding: 5px 12px;
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--c-text-secondary);
   background: var(--c-bg-alt);
@@ -1480,7 +1480,7 @@ onMounted(() => {
   border-radius: var(--radius-md);
   background: var(--c-warning-light);
   color: var(--c-text-secondary);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.7;
 }
 </style>

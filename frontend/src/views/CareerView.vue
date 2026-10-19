@@ -665,8 +665,14 @@ async function doFollowUp(s: StoryItem) {
 .hint { font-size: 12px; color: var(--c-text-quaternary); margin-top: 10px; }
 
 .result-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.link-btn { background: transparent; border: none; color: var(--brand-primary); font-size: 13px; font-weight: 500; cursor: pointer; padding: 0; }
+/* v1.76.0：原先 padding:0 → 命中区只有 13px 文字高（实测 26×17），
+   鼠标都要瞄；补纵向内边距到 24px（WCAG 2.5.8 AA 指针目标下限）。 */
+.link-btn { background: transparent; border: none; color: var(--brand-primary); font-size: 13px; font-weight: 500; cursor: pointer; padding: 4px 2px; min-height: 24px; }
 .link-btn:hover { text-decoration: underline; }
+/* 移动端：scoped 类的 min-height:24 会压过全局 button 的 48，这里显式抬档 */
+@media (max-width: 768px) {
+  .link-btn { min-height: 48px; }
+}
 
 .label { font-size: 12px; font-weight: 600; color: var(--c-text-tertiary); margin-bottom: 8px; letter-spacing: 0.3px; }
 .positioning { background: var(--brand-primary-light); border-left: 3px solid var(--brand-primary); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 18px; }

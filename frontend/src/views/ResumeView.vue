@@ -1033,7 +1033,7 @@ function formatDate() {
 }
 
 .ex-body b {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
   color: var(--c-text);
@@ -1048,7 +1048,7 @@ function formatDate() {
 .ex-flag {
   flex-shrink: 0;
   padding: 1px 5px;
-  font-size: 10.5px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 600;
   line-height: 1.5;
@@ -1060,7 +1060,7 @@ function formatDate() {
 
 .ex-body em {
   font-style: normal;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.3;
   color: var(--c-text-tertiary);
   white-space: nowrap;
@@ -1088,7 +1088,7 @@ function formatDate() {
   display: block;
   margin: 0 12px 8px;
   padding: 8px 0 2px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   /* v1.44.1：原来用 --c-text-tertiary（#78716c）压在 --c-bg-alt 上只有 4.40:1，
      低于 WCAG AA 的 4.5:1。改用 secondary 令牌，对比度约 9:1，且随主题切换。 */
@@ -1145,7 +1145,7 @@ function formatDate() {
   margin: 0 12px 8px;
   padding: 6px 8px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--c-text-secondary);
   background: var(--c-bg-alt);
@@ -1170,7 +1170,7 @@ function formatDate() {
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
   background: var(--c-bg-alt);
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .extract-guide summary {
@@ -1218,7 +1218,7 @@ function formatDate() {
   min-height: 36px;
   padding: 6px 0;
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
   color: var(--brand-primary);
@@ -1237,7 +1237,7 @@ function formatDate() {
   margin: 6px 0 0;
   padding: 6px 8px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--c-text-secondary);
   background: var(--c-surface);
@@ -1259,7 +1259,7 @@ function formatDate() {
 
 .extract-note {
   margin: 14px 0 0;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.7;
   color: var(--c-text-tertiary);
 }
@@ -1587,7 +1587,7 @@ function formatDate() {
 }
 
 .score-note p {
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--c-text-secondary);
   margin: 0;
@@ -1631,7 +1631,7 @@ function formatDate() {
 }
 .next-hint {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-text-secondary);
   line-height: 1.5;
 }
@@ -1730,7 +1730,7 @@ function formatDate() {
 }
 
 .issue-advice {
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--c-text-secondary);
 }

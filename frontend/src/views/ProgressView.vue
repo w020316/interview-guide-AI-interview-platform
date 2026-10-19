@@ -601,7 +601,7 @@ onMounted(async () => {
   letter-spacing: -0.3px;
 }
 .readiness-grade {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   padding: 3px 12px;
   border-radius: var(--radius-full);
@@ -641,7 +641,7 @@ onMounted(async () => {
 .ri-check { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--c-text-quaternary); }
 .ri-dim {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--brand-primary);
   background: var(--brand-primary-50);
   border-radius: var(--radius-sm);

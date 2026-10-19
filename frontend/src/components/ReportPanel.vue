@@ -211,7 +211,7 @@ function clampPct(v: number) {
   word-break: break-word;
 }
 .report-sub {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-text-tertiary);
   margin: 0;
 }
@@ -264,7 +264,7 @@ function clampPct(v: number) {
   margin-left: 2px;
 }
 .overall-summary {
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--c-text-secondary);
 }
@@ -310,7 +310,7 @@ function clampPct(v: number) {
   align-items: baseline;
 }
 .dim-name {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--c-text-secondary);
   font-weight: 500;
 }

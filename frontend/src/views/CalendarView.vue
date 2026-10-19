@@ -498,7 +498,7 @@ onMounted(load)
  * 放大实际尺寸会让布局自然重排，不会重叠。桌面端保持紧凑。 */
 @media (max-width: 768px) {
   .icon-btn,
-  .cal-nav { width: 44px; height: 44px; }
-  .cal-today { min-height: 44px; padding: 10px 18px; }
+  .cal-nav { width: 48px; height: 48px; }
+  .cal-today { min-height: 48px; padding: 12px 18px; }
 }
 </style>
