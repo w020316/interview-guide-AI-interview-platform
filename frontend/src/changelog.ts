@@ -85,9 +85,17 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.79.0'
+export const CURRENT_VERSION = '1.79.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.79.1',
+    date: '2026-10-20',
+    title: '版本 1.79.1 · 模板库不会再出现「只显示一部分」的情况',
+    items: [
+      { text: '修复：刚更新完的那段时间里，模板库可能只显示一部分模板。现在会完整显示', level: 'user' },
+    ],
+  },
   {
     version: '1.79.0',
     date: '2026-10-20',

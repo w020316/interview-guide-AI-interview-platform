@@ -304,18 +304,36 @@ async function loadDocuments() {
   }
 }
 
+/**
+ * 拉取模板元数据。
+ *
+ * ⚠️ **以本地常量为骨架、用服务端数据覆盖文案**，而不是直接替换成服务端列表。
+ *
+ * 原因：前端与后端部署有 1~20 分钟时间差（CF Pages 约 1 分钟、Render 约 20 分钟）。
+ * 若直接用服务端列表，**前端先上线的那段时间里用户会看到「模板少了几套」**——
+ * 版式实现本来就在前端（`cssClass` / `locale` / `sections` 全取自本地），
+ * 服务端只提供 name / scene / description 这些文案，它落后不该导致功能退化。
+ *
+ * 反过来，若后端新增了前端没有的模板，这里不会显示——这是对的：
+ * 前端没有对应的版式实现，显示了也渲染不出来。
+ */
 async function loadTemplates() {
   try {
     const list = (await api.get('/api/resume/templates')) as unknown as ResumeTemplateMeta[]
-    // 服务端是模板元数据的权威来源；接口异常时保留本地常量，页面不至于空掉
-    if (Array.isArray(list) && list.length) {
-      templates.value = list.map((t) => ({
-        ...t,
-        cssClass: findTemplate(t.id).cssClass,
-        locale: findTemplate(t.id).locale,
-        sections: findTemplate(t.id).sections,
-      }))
-    }
+    if (!Array.isArray(list) || !list.length) return
+
+    const remoteById = new Map(list.map((t) => [t.id, t]))
+    templates.value = RESUME_TEMPLATES.map((local) => {
+      const remote = remoteById.get(local.id)
+      if (!remote) return local
+      // 只取文案字段；版式字段一律以本地为准
+      return {
+        ...local,
+        name: remote.name || local.name,
+        scene: remote.scene || local.scene,
+        description: remote.description || local.description,
+      }
+    })
   } catch {
     // 静默回落本地常量：模板列表不是关键路径，不该因此打断用户
   }
