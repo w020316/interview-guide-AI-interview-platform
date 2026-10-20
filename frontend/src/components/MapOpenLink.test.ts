@@ -61,4 +61,37 @@ describe('MapOpenLink', () => {
     expect(label).toContain('腾讯地图')
     expect(label).toContain('北京')
   })
+
+  /* ── 紧凑态（v1.77.1）：岗位卡片 / 收藏夹这类元信息密集处 ── */
+
+  it('紧凑态只渲染一个默认底图，文案为「地图」', () => {
+    const wrapper = mount(MapOpenLink, { props: { keyword: '深圳', compact: true } })
+    const links = wrapper.findAll('a')
+    expect(links).toHaveLength(1)
+    expect(links[0].text()).toBe('地图')
+    // 仍是白名单首位（腾讯）——顺序由 MAP_PROVIDERS 决定，不在这里另立规则
+    expect(new URL(links[0].attributes('href')!).host).toBe('apis.map.qq.com')
+  })
+
+  it('紧凑态不再显示「在地图中搜索」前缀（卡片里空间不够）', () => {
+    const wrapper = mount(MapOpenLink, { props: { keyword: '深圳', compact: true } })
+    expect(wrapper.find('.map-open-hint').exists()).toBe(false)
+  })
+
+  it('紧凑态文案虽只剩「地图」，读屏仍能听到在哪个地图搜什么', () => {
+    const wrapper = mount(MapOpenLink, { props: { keyword: '深圳', compact: true } })
+    const a = wrapper.findAll('a')[0]
+    expect(a.attributes('target')).toBe('_blank')
+    expect(a.attributes('rel')).toContain('noopener')
+    expect(a.attributes('rel')).toContain('noreferrer')
+    expect(a.attributes('aria-label')).toContain('腾讯地图')
+    expect(a.attributes('aria-label')).toContain('深圳')
+  })
+
+  it('紧凑态下不可映射地点依然整块不渲染（守卫不因形态而放宽）', () => {
+    for (const kw of ['视频面试', '杭州/北京/深圳', '']) {
+      const wrapper = mount(MapOpenLink, { props: { keyword: kw, compact: true } })
+      expect(wrapper.find('.map-open').exists(), `${kw} 不应渲染`).toBe(false)
+    }
+  })
 })

@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.77.0'
+export const CURRENT_VERSION = '1.77.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.77.1',
+    date: '2026-10-20',
+    title: '版本 1.77.1 · 招聘广场和收藏夹也能直接查地点了',
+    items: [
+      { text: '招聘广场的岗位卡片、岗位详情，以及收藏夹里的岗位，都能直接点「地图」查地点了', level: 'user' },
+      { text: '岗位详情里可以在腾讯、高德、百度三家地图之间选；列表和收藏夹为了不挤占版面，只给一个入口', level: 'user' },
+      { text: '线上远程、多城市这类没有单一地点的岗位，仍然不显示地图入口——不给点了没结果的链接', level: 'user' },
+    ],
+  },
   {
     version: '1.77.0',
     date: '2026-10-20',

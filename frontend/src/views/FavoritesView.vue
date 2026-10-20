@@ -52,7 +52,11 @@
               <div class="jp-title">{{ f.title }}</div>
               <div class="jp-meta">
                 <span>{{ f.companyName }}</span>
-                <span v-if="f.location">{{ f.location }}</span>
+                <span v-if="f.location">
+                  {{ f.location }}
+                  <!-- v1.77.1：收藏夹同属「快速浏览」场景，用紧凑地图入口 -->
+                  <MapOpenLink :keyword="f.location" compact />
+                </span>
                 <span v-if="f.salary">{{ f.salary }}</span>
                 <span v-if="f.deadline">截止 {{ f.deadline }}</span>
               </div>
@@ -249,7 +253,7 @@ import {
   toggleSelection,
   type PreferenceFilter,
 } from '../utils/preference'
-import { BaseButton, BaseTag } from '../components'
+import { BaseButton, BaseTag, MapOpenLink } from '../components'
 import { asArray } from '../utils/safeData'
 
 const router = useRouter()

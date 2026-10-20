@@ -189,6 +189,9 @@
                 <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2"/>
               </svg>
               {{ job.location }}
+              <!-- v1.77.1：列表阶段给一个紧凑地图入口。只出一家底图，
+                   避免三个链接把 job-meta 撑成两行；要挑底图进详情面板 -->
+              <MapOpenLink :keyword="job.location" compact />
             </span>
             <span v-if="job.degree" class="meta-item">
               <svg class="meta-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -305,6 +308,8 @@
           </span>
           <!-- 截止日期统一由下方「数据来源说明」的有效期一行呈现，此处不再重复 -->
         </div>
+        <!-- v1.77.1：详情面板空间宽松，给完整三家底图供选择 -->
+        <MapOpenLink v-if="detail.location" :keyword="detail.location" class="detail-map" />
         <div v-if="detail.description" class="detail-block">
           <h4>岗位描述</h4>
           <p class="pre-wrap">{{ detail.description }}</p>
@@ -392,7 +397,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
-import { BaseButton } from '../components'
+import { BaseButton, MapOpenLink } from '../components'
 import { validateJobKeyword } from '../utils/jobKeyword'
 import { toQueryRecruitType } from '../utils/recruitType'
 import { jobTrust, jobFreshness, type JobTrust, type Freshness } from '../utils/jobTrust'
@@ -1425,6 +1430,13 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+/* v1.77.1：详情面板的地图入口单独占一行 —— 它带「在地图中搜索」前缀与三个底图链接，
+   塞进 .detail-meta 会被 14px gap 的 flex 行挤成两行 */
+.detail-map {
+  display: flex;
+  margin-top: 8px;
 }
 
 .detail-block {
