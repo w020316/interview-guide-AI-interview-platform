@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.80.0'
+export const CURRENT_VERSION = '1.81.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.81.0',
+    date: '2026-10-20',
+    title: '版本 1.81.0 · 又多了两百多个在华外企的岗位',
+    items: [
+      { text: '新增亚马逊中国数据源：直接读取官方在招岗位，都是上海、北京这些国内城市的真实职位', level: 'user' },
+      { text: '这类在华外企的岗位和国内岗位放在一起，不用再去「海外远程」分栏里翻', level: 'user' },
+      { text: '微软、苹果、特斯拉、SAP、英特尔这几家的招聘页没有对外开放，暂时收录不了', level: 'user' },
+    ],
+  },
   {
     version: '1.80.0',
     date: '2026-10-20',
