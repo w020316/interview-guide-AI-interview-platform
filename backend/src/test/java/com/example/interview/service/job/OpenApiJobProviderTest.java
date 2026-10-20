@@ -351,10 +351,10 @@ class OpenApiJobProviderTest {
         }
         var kept = AbstractOpenApiJobProvider.applyQuota(many);
 
-        assertThat(kept).hasSize(25);
-        // 顺序即上游顺序：第 0 条仍是第 0 条，最后一条是第 24 条
+        assertThat(kept).hasSize(15);
+        // 顺序即上游顺序：第 0 条仍是第 0 条，最后一条是第 14 条
         assertThat(kept.get(0).externalId()).isEqualTo("upstream-0");
-        assertThat(kept.get(24).externalId()).isEqualTo("upstream-24");
+        assertThat(kept.get(14).externalId()).isEqualTo("upstream-14");
         // 截断不能改动上游列表本身（applyQuota 是纯函数）
         assertThat(many).hasSize(120);
     }
@@ -372,7 +372,7 @@ class OpenApiJobProviderTest {
     @DisplayName("配额必须显著小于上游单次返回量，否则「以国内为主」无法成立")
     void quota_mustBeMeaningfullySmall() {
         // 五个海外源 × 配额 必须小于国内种子基数（约 298 条），否则默认视图仍会被海外淹没
-        int overseasCeiling = 5 * 25;
+        int overseasCeiling = 5 * 15;
         assertThat(overseasCeiling).isLessThan(298);
     }
 

@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.79.1'
+export const CURRENT_VERSION = '1.80.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.80.0',
+    date: '2026-10-20',
+    title: '版本 1.80.0 · 国内岗位有了真水源，加载时也不再干等',
+    items: [
+      { text: '新增腾讯招聘数据源：直接读取官方在招岗位（两千多个），国内岗位不再只是固定快照', level: 'user' },
+      { text: '海外岗位每轮收录数量收紧，默认视图里国内岗位会明显占多数', level: 'user' },
+      { text: '招聘广场加载时改为骨架屏：先显示内容轮廓再填充，不再是只有一个转圈', level: 'user' },
+    ],
+  },
   {
     version: '1.79.1',
     date: '2026-10-20',

@@ -130,10 +130,18 @@
       </div>
     </div>
 
-    <!-- 加载态 -->
-    <div v-if="loading" class="loading-state">
-      <div class="loading-spinner"></div>
-      <div class="loading-text">正在加载岗位信息...</div>
+    <!-- 加载态：骨架屏（DESIGN.md §5 要求骨架而非转圈）——
+         形状与真实岗位卡片同构，加载完成时不发生位置跳动 -->
+    <div v-if="loading" class="jobs-skeleton" aria-busy="true" aria-label="正在加载岗位信息">
+      <div v-for="i in 6" :key="`sk-${i}`" class="sk-card">
+        <SkeletonBlock width="46%" height="17px" rounded="sm" />
+        <SkeletonBlock width="26%" height="13px" rounded="sm" />
+        <div class="sk-meta">
+          <SkeletonBlock width="72px" height="12px" rounded="xs" />
+          <SkeletonBlock width="52px" height="12px" rounded="xs" />
+          <SkeletonBlock width="64px" height="12px" rounded="xs" />
+        </div>
+      </div>
     </div>
 
     <!-- 错误态（与空态区分：加载失败可重试） -->
@@ -397,7 +405,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
-import { BaseButton, MapOpenLink } from '../components'
+import { BaseButton, MapOpenLink, SkeletonBlock } from '../components'
 import { validateJobKeyword } from '../utils/jobKeyword'
 import { toQueryRecruitType } from '../utils/recruitType'
 import { jobTrust, jobFreshness, type JobTrust, type Freshness } from '../utils/jobTrust'
@@ -1312,20 +1320,30 @@ onMounted(() => {
   color: var(--c-text-secondary);
 }
 
-.loading-state {
-  text-align: center;
-  padding: 60px 0;
-  color: var(--c-text-secondary);
+/* ── 加载骨架（v1.80.0）──
+   形状与岗位卡片同构：标题行 / 公司行 / 元信息行，
+   加载完成时内容落位不跳动（比转圈更快的主观感知）。 */
+.jobs-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
 }
 
-.loading-spinner {
-  width: 36px;
-  height: 36px;
-  margin: 0 auto 12px;
-  border: 3px solid var(--c-border);
-  border-top-color: var(--brand-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.sk-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+}
+
+.sk-meta {
+  display: flex;
+  gap: 14px;
+  margin-top: 2px;
 }
 
 @keyframes spin {
