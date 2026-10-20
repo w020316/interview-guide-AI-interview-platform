@@ -140,6 +140,9 @@
           <select v-model="templateId" class="tpl-select" aria-label="切换模板">
             <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
           </select>
+          <BaseButton variant="ghost" size="sm" :disabled="autofilling" @click="onAutofill">
+            {{ autofilling ? '正在读取…' : '从已有简历填充' }}
+          </BaseButton>
           <BaseButton variant="ghost" size="sm" :disabled="saving" @click="save">保存</BaseButton>
           <BaseButton variant="primary" size="sm" @click="onExportPdf">导出 PDF</BaseButton>
         </div>
@@ -222,6 +225,7 @@ import api, { getErrMessage } from '../api'
 import {
   emptyResumeDoc,
   findTemplate,
+  isDocEmpty,
   normalizeResumeDoc,
   RESUME_TEMPLATES,
   toMarkdown,
@@ -257,6 +261,8 @@ const doc = ref<ResumeDoc>(emptyResumeDoc())
 
 const dirty = ref(false)
 const saving = ref(false)
+/** AI 自动填充进行中：这是耗时操作（接近一次对话），必须有明确加载态 */
+const autofilling = ref(false)
 const mobilePane = ref<'edit' | 'preview'>('edit')
 const viewportRef = ref<HTMLElement | null>(null)
 const viewportWidth = ref(A4_WIDTH)
@@ -382,6 +388,47 @@ async function save() {
     ElMessage.error(getErrMessage(e, '保存失败'))
   } finally {
     saving.value = false
+  }
+}
+
+/* ─────────────────── 从已有简历填充 ─────────────────── */
+
+/**
+ * 从已上传的简历自动填充。
+ *
+ * 只调接口取抽取结果、**不自动保存**：填进来的内容用户多半还要改，
+ * 保存动作始终由用户显式点击。AI 只负责「少打字」，不替用户决定内容。
+ *
+ * 当前已填有内容时先确认——自动填充是整体替换，静默覆盖掉用户刚敲的东西
+ * 是不可接受的（与「保存必须手动」是同一条原则）。
+ */
+async function onAutofill() {
+  if (docId.value == null) return
+  if (!isDocEmpty(doc.value)) {
+    try {
+      await ElMessageBox.confirm(
+        '自动填充会用你上传的简历内容覆盖当前已填写的部分，确定继续吗？',
+        '从已有简历填充',
+        { confirmButtonText: '覆盖并填充', cancelButtonText: '取消', type: 'warning' }
+      )
+    } catch {
+      return
+    }
+  }
+  autofilling.value = true
+  try {
+    const res = (await api.post(`/api/resume/documents/${docId.value}/autofill`, {})) as unknown as {
+      docData?: string
+      sourceResumeId?: number | null
+    }
+    doc.value = normalizeResumeDoc(parseDocData(res.docData))
+    // deep watch 也会捕获到这次替换，这里显式置一次作为双保险
+    dirty.value = true
+    ElMessage.success('已填充，请检查内容后点「保存」')
+  } catch (e) {
+    ElMessage.error(getErrMessage(e, '自动填充失败，可以先手动填写'))
+  } finally {
+    autofilling.value = false
   }
 }
 

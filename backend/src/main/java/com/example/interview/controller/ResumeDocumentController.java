@@ -1,7 +1,11 @@
 package com.example.interview.controller;
 
+import com.example.interview.common.ResourceNotFoundException;
 import com.example.interview.common.Result;
 import com.example.interview.entity.ResumeDocumentEntity;
+import com.example.interview.entity.ResumeEntity;
+import com.example.interview.repository.ResumeRepository;
+import com.example.interview.service.resume.ResumeAutofillService;
 import com.example.interview.service.resume.ResumeDocumentService;
 import com.example.interview.service.resume.ResumeTemplateCatalog;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,9 +40,15 @@ import java.util.Map;
 public class ResumeDocumentController {
 
     private final ResumeDocumentService documentService;
+    private final ResumeAutofillService autofillService;
+    private final ResumeRepository resumeRepository;
 
-    public ResumeDocumentController(ResumeDocumentService documentService) {
+    public ResumeDocumentController(ResumeDocumentService documentService,
+                                    ResumeAutofillService autofillService,
+                                    ResumeRepository resumeRepository) {
         this.documentService = documentService;
+        this.autofillService = autofillService;
+        this.resumeRepository = resumeRepository;
     }
 
     private String currentUserId() {
@@ -135,6 +145,64 @@ public class ResumeDocumentController {
         data.put("id", id);
         data.put("deleted", true);
         return Result.success(data);
+    }
+
+    /**
+     * 从已有简历自动填充结构化内容
+     * POST /api/resume/documents/{id}/autofill
+     *
+     * <p>请求体（都可选）：{@code { resumeText?, sourceResumeId? }}
+     * <ul>
+     *   <li>传 {@code resumeText}：直接用这段文本；</li>
+     *   <li>传 {@code sourceResumeId}：读该份简历的解析文本（<b>做归属校验</b>）；</li>
+     *   <li>都不传：取该用户<b>最新</b>的一份简历。</li>
+     * </ul>
+     *
+     * <p>⚠️ 只返回抽取结果，<b>不直接写库</b>：用户要先看一眼抽得对不对，
+     * 确认后再由前端调保存接口。自动填充是「帮用户少打字」，不是「替用户决定内容」。
+     */
+    @Operation(summary = "从已有简历自动填充")
+    @PostMapping("/documents/{id}/autofill")
+    public Result<Map<String, Object>> autofill(@PathVariable Long id,
+                                                @RequestBody(required = false) Map<String, Object> req) {
+        String userId = currentUserId();
+        // 归属校验：只能给自己的文档做填充
+        documentService.getOwned(userId, id);
+
+        Map<String, Object> body = req == null ? Map.of() : req;
+        String resumeText = asString(body.get("resumeText"));
+        Long sourceResumeId = asLong(body.get("sourceResumeId"));
+
+        String content = resumeText;
+        Long usedSourceId = null;
+
+        if (content == null || content.isBlank()) {
+            ResumeEntity source = null;
+            if (sourceResumeId != null) {
+                source = resumeRepository.findById(sourceResumeId).orElse(null);
+                // 防 IDOR：指定了别人的简历 id 时按「不存在」处理，不暴露其存在性
+                if (source != null && !userId.equals(source.getUserId())) {
+                    throw new ResourceNotFoundException("未找到该简历");
+                }
+            } else {
+                List<ResumeEntity> mine = resumeRepository.findByUserIdOrderByCreatedAtDesc(userId);
+                if (!mine.isEmpty()) {
+                    source = mine.get(0);
+                }
+            }
+            if (source == null || source.getContent() == null || source.getContent().isBlank()) {
+                return Result.error(400, "还没有可用的简历文本，请先到「简历分析」上传一份简历");
+            }
+            content = source.getContent();
+            usedSourceId = source.getId();
+        }
+
+        String docData = autofillService.autofill(content);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("docData", docData);
+        result.put("sourceResumeId", usedSourceId);
+        return Result.success(result);
     }
 
     private static String asString(Object v) {

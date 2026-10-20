@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.77.1'
+export const CURRENT_VERSION = '1.78.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.78.0',
+    date: '2026-10-20',
+    title: '版本 1.78.0 · 简历不用重打一遍，能直接从你上传的那份里读出来',
+    items: [
+      { text: '简历编辑器新增「从已有简历填充」：把你之前上传的简历自动拆成姓名、教育、工作、项目、技能各栏，不用手工重打一遍', level: 'user' },
+      { text: '只读取你上传的原文，不会替你编造没写过的内容——原文没填的栏位就留空', level: 'user' },
+      { text: '填充结果会先放进表单让你逐项检查，确认无误再点保存；已保存的版本不会在你没确认时被覆盖', level: 'user' },
+    ],
+  },
   {
     version: '1.77.1',
     date: '2026-10-20',

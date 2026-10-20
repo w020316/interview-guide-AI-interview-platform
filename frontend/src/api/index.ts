@@ -50,6 +50,10 @@ const AI_PATH_FRAGMENTS: readonly string[] = [
   '/api/resume/upload',
   '/api/resume/optimize',
   '/api/resume/import-url',
+  // v1.78.0：从已有简历自动填充（AI 结构化抽取，耗时接近一次对话）。
+  // 只匹配 '/autofill' 而不是整个 '/api/resume/documents/'，
+  // 否则列表/保存这些普通 CRUD 也会被抬到 180s 超时。
+  '/autofill',
   '/api/interview/questions',
   '/api/interview/evaluate',
   '/api/interview/followup',

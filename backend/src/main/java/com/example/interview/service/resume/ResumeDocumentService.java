@@ -143,9 +143,13 @@ public class ResumeDocumentService {
      * <p>做三件事：① 校验是合法 JSON 对象（不是对象就报错，不静默吞掉）；
      * ② 补齐 6 个顶层键（缺失补空对象 / 空数组）；③ 保证 basics 内的 links 是数组。
      *
+     * <p>v1.78.0：改为 {@code static} —— 它不依赖任何实例状态，而
+     * {@link ResumeAutofillService} 需要在校验阶段复用它。原先只能
+     * {@code new ResumeDocumentService(null)} 才能调用，属于为了复用而造对象。
+     *
      * @param blankAsSkeleton 空输入时是否返回空骨架（新建允许空，更新不允许传空串）
      */
-    String normalizeDocData(String docData, boolean blankAsSkeleton) {
+    static String normalizeDocData(String docData, boolean blankAsSkeleton) {
         if (docData == null || docData.isBlank()) {
             if (blankAsSkeleton) {
                 return emptySkeleton().toString();
