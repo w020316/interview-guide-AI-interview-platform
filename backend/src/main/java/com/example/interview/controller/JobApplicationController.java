@@ -9,6 +9,7 @@ import com.example.interview.service.JobFavoriteService;
 import com.example.interview.service.career.TailoredResumeService;
 import com.example.interview.service.job.ApplicationImportService;
 import com.example.interview.service.job.ApplicationTimelineService;
+import com.example.interview.service.job.ApplyKitService;
 import com.example.interview.service.job.JobAgentService;
 import com.example.interview.service.job.JobApplicationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,6 +62,9 @@ public class JobApplicationController {
 
     @Autowired
     private ApplicationTimelineService applicationTimelineService;
+
+    @Autowired
+    private ApplyKitService applyKitService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -239,6 +243,27 @@ public class JobApplicationController {
         result.put("tailoredResume", tailored);
         result.put("persisted", persisted);
         return Result.success(result);
+    }
+
+    /**
+     * 一键投递助手：把「投这一份」需要的东西一次给全
+     * GET /api/application/{id}/apply-kit
+     *
+     * <p>返回岗位信息、定制简历要点、打招呼话术、投递前检查清单与合规提示。
+     * <b>纯本地组装，零网络零模型调用</b>（理由见 {@link ApplyKitService} 类注释）。
+     *
+     * <p>⚠️ 合规：本接口<b>不</b>代理任何招聘平台请求。返回的 {@code applyUrl}
+     * 只供前端在新标签页打开，实际投递必须由用户本人完成。
+     */
+    @Operation(summary = "一键投递助手")
+    @GetMapping("/{id}/apply-kit")
+    public Result<Map<String, Object>> applyKit(@PathVariable Long id) {
+        String userId = currentUserId();
+        JobApplicationEntity app = applicationService.findOwned(userId, id);
+        if (app == null) {
+            return Result.error(404, "未找到该投递记录");
+        }
+        return Result.success(applyKitService.build(app));
     }
 
     /**

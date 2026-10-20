@@ -7,6 +7,8 @@ const routes = [
   { path: '/login',     component: () => import('../views/LoginView.vue'),     meta: { requiresAuth: false } },
   { path: '/resume',    component: () => import('../views/ResumeView.vue'),    meta: { requiresAuth: true  } },
   { path: '/resume/history', component: () => import('../views/ResumeHistoryView.vue'), meta: { requiresAuth: true } },
+  // v1.67.0：简历工作台（模板库 + 结构化编辑器 + 打印导出）
+  { path: '/resume/studio', component: () => import('../views/ResumeStudioView.vue'), meta: { requiresAuth: true } },
   { path: '/job',       component: () => import('../views/JobAnalysisView.vue'), meta: { requiresAuth: true  } },
   { path: '/jobs',      component: () => import('../views/JobsView.vue'),        meta: { requiresAuth: true  } },
   { path: '/agent',     component: () => import('../views/AgentView.vue'),       meta: { requiresAuth: true  } },

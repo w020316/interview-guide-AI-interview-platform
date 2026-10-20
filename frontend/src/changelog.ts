@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.76.4'
+export const CURRENT_VERSION = '1.77.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.77.0',
+    date: '2026-10-20',
+    title: '版本 1.77.0 · 简历有了模板库，投递前能一键备齐材料',
+    items: [
+      { text: '新增：简历模板库，5 套版式可选——通用、应届、技术双栏、海外英文、紧凑一页。随时换模板，已填的内容不会丢', level: 'user' },
+      { text: '新增：简历编辑器，左边填内容、右边实时看到成品，导出成 PDF 后文字可以选中和搜索，招聘网站能正常识别', level: 'user' },
+      { text: '新增：投递看板的「一键投递」，一次给全定制要点、打招呼话术和投递前检查清单，照着做就行', level: 'user' },
+      { text: '说明：平台依然不会替你登录招聘网站、也不会自动提交简历，最后一步始终由你本人完成', level: 'user' },
+    ],
+  },
   {
     version: '1.76.4',
     date: '2026-10-19',

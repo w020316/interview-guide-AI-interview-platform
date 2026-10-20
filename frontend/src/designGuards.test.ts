@@ -37,6 +37,7 @@ const HEX_ALLOWED_FILES = new Set([
   'styles/variables.css', // 令牌定义文件本身
   'utils/reportPdf.ts', // 导出 PDF 的独立 HTML 模板，脱离应用主题
   'utils/reportShare.ts', // Canvas 分享图绘制，无法使用 CSS 变量
+  'utils/resumeExport.ts', // 简历导出用的独立 HTML 文档：脱离应用后取不到 CSS 变量，必须内联色值（v1.67.0）
   'changelog.ts', // 版本发布说明文本
   'designGuards.test.ts', // 守卫自身的白名单/断言定义
 ])
@@ -265,6 +266,30 @@ const RUNTIME_INJECTED_VARS: Array<{ name: string; reason: string }> = [
   { name: '--score-color', reason: '评分色：JobAnalysisView 用 :style 按分数档位注入' },
 ]
 
+/**
+ * 组件作用域内的**局部版式变量**（v1.67.0）。
+ *
+ * 为什么单独登记而不是塞进 variables.css：这些变量是「简历纸面」这一个组件族的
+ * 版式参数（字号/行高/间距），由 `.resume-doc` 定义、由子组件 `ResumeSectionBlock`
+ * 通过 CSS 变量继承消费。它们**不跨组件复用**，放进全局令牌表只会让
+ * 「全局令牌」这个概念失去边界（谁都可以往里面塞局部变量）。
+ *
+ * 登记在这里的作用与 `RUNTIME_INJECTED_VARS` 相同：告诉守卫
+ * 「这些名字确实不在 variables.css，但这是**刻意的**，且有明确的定义位置」。
+ */
+const COMPONENT_LOCAL_VARS: Array<{ name: string; reason: string }> = [
+  { name: '--doc-fs-name', reason: '简历纸面：姓名字号，定义在 ResumeDocPreview.vue 的 .resume-doc，按模板类覆盖' },
+  { name: '--doc-fs-sec', reason: '简历纸面：区块标题字号' },
+  { name: '--doc-fs-body', reason: '简历纸面：正文字号' },
+  { name: '--doc-fs-date', reason: '简历纸面：日期/次要信息字号' },
+  { name: '--doc-lh', reason: '简历纸面：正文行高' },
+  { name: '--doc-gap-sec', reason: '简历纸面：区块间距' },
+  { name: '--doc-gap-title', reason: '简历纸面：区块标题与内容的间距' },
+  { name: '--doc-gap-entry', reason: '简历纸面：条目之间的间距' },
+  { name: '--doc-gap-list', reason: '简历纸面：列表与上级的间距' },
+  { name: '--doc-gap-li', reason: '简历纸面：列表项之间的间距' },
+]
+
 describe('CSS 变量定义完整性（v1.63.1）', () => {
   it('所有被引用的 CSS 变量都必须在 styles/variables.css 中定义', () => {
     const defined = new Set<string>()
@@ -272,7 +297,10 @@ describe('CSS 变量定义完整性（v1.63.1）', () => {
       for (const m of line.matchAll(/(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1])
     }
 
-    const exempt = new Set(RUNTIME_INJECTED_VARS.map((v) => v.name))
+    const exempt = new Set([
+      ...RUNTIME_INJECTED_VARS.map((v) => v.name),
+      ...COMPONENT_LOCAL_VARS.map((v) => v.name),
+    ])
     const missing: string[] = []
     let scanned = 0
 

@@ -31,6 +31,17 @@
    * （如白底反色 CTA 按钮）。暗色下品牌色会提亮，若用 --brand-primary
    * 就会在固定白底上退化成 2.49:1，故此处刻意不翻转。 */
   --c-brand-ink: #0f766e;
+  /* ── 纸面（v1.67.0 · 简历模板预览与导出）────────────────────────────
+   * 简历预览是「一张纸」：纸面恒为亮底，正文恒为深墨。
+   * 若复用 --c-surface / --c-text，暗色主题下纸面会翻成深色、正文翻成近白，
+   * 打印出来却是白纸深字 —— 预览与成品对不上，且暗色下纸面正文直接不可见
+   * （与 v1.63.1 的 --input-bg 事故同型）。故这组令牌**刻意不随主题翻转**，
+   * 只把暗色环境下的纸面从纯白降到 #f7f6f4 以减少眩光。
+   * 强调色不新增：纸面用已定义的 --c-brand-ink（同为不翻转的墨绿）。 */
+  --c-paper: #ffffff;
+  --c-paper-ink: #1c1917;
+  --c-paper-ink-soft: #57534e;
+  --c-paper-rule: #e0ddd9;
   --brand-accent: #c2410c;            /* 赭石橙，用于强调点缀 */
   --brand-accent-hover: #9a3412;
   --brand-accent-light: #fff7ed;
@@ -548,6 +559,10 @@ p {
   --brand-gradient-soft: linear-gradient(135deg, #12322e 0%, #211d1a 100%);
   --brand-glow: 0 4px 14px rgba(20, 184, 166, 0.18);
   --brand-glow-strong: 0 8px 24px rgba(20, 184, 166, 0.28);
+  /* 纸面：暗色环境下把纯白降到暖灰白，减少大面积白纸的眩光。
+   * 注意只降纸面底，--c-paper-ink / -ink-soft / -rule 刻意**不覆盖** ——
+   * 纸面正文必须恒为深墨，否则暗色下就变成「深底深字」。 */
+  --c-paper: #f7f6f4;
 
   /* 语义色：提亮 */
   --c-success: #34d399;

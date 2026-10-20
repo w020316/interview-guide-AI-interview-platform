@@ -191,7 +191,19 @@ public class SchemaInitializer implements CommandLineRunner {
                     + "api_key_cipher TEXT NOT NULL, "
                     + "base_url VARCHAR(200) NOT NULL, "
                     + "model VARCHAR(100) NOT NULL, "
-                    + "updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+                    + "updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)",
+            // ── 第五批（v1.67.0）：结构化简历文档（模板库 + 编辑器） ──
+            // doc_data 刻意不叫 data（SQL 保留字风险）；与 resume 表分工见 ResumeDocumentEntity 注释
+            "CREATE TABLE IF NOT EXISTS resume_document ("
+                    + "id BIGSERIAL PRIMARY KEY, "
+                    + "user_id VARCHAR(64) NOT NULL, "
+                    + "template_id VARCHAR(40) NOT NULL, "
+                    + "title VARCHAR(200) NOT NULL, "
+                    + "doc_data JSONB, "
+                    + "source_resume_id BIGINT, "
+                    + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+            "CREATE INDEX IF NOT EXISTS idx_resume_document_user ON resume_document(user_id)"
     };
 
     /**
@@ -211,7 +223,10 @@ public class SchemaInitializer implements CommandLineRunner {
 
     /** 必须存在的新表 */
     private static final String[] REQUIRED_TABLES = {
-            "data_import_log"
+            "data_import_log",
+            // v1.67.0：简历工作台依赖此表；缺表时模板编辑器的保存会 500，
+            // 加进自检让「表没建成」在启动日志里直接暴露
+            "resume_document"
     };
 
     @Override

@@ -226,6 +226,7 @@
           </select>
 
           <button class="mini-btn" :disabled="busyId === a.id" @click="openTailor(a)">定制简历</button>
+          <button class="mini-btn primary" :disabled="busyId === a.id" @click="openApplyKit(a)">一键投递</button>
           <button class="mini-btn danger" :disabled="busyId === a.id" @click="remove(a)">移除</button>
         </div>
 
@@ -296,6 +297,70 @@
           </div>
           <div class="modal-actions">
             <BaseButton variant="ghost" @click="tailorResult = null">重新生成</BaseButton>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- 一键投递助手弹窗（v1.67.0）：
+         把「投这一份」需要的东西一次给全，用户自己点提交。
+         合规：本弹窗不代理任何平台请求，只在新标签页打开 applyUrl。 -->
+    <div v-if="kitTarget" class="modal-mask" @click.self="closeApplyKit">
+      <div class="modal">
+        <div class="modal-head">
+          <div class="modal-title">一键投递 · {{ kitTarget.title }}</div>
+          <button class="modal-close" @click="closeApplyKit" aria-label="关闭"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6L6 18 M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+
+        <div v-if="kitLoading" class="modal-sub">正在整理投递材料…</div>
+        <div v-else-if="kitError" class="modal-sub is-error">{{ kitError }}</div>
+
+        <template v-else-if="kit">
+          <div class="compliance-box">{{ kit.compliance }}</div>
+
+          <div class="mini-block">
+            <div class="label">岗位</div>
+            <div class="kit-job">
+              <div class="kit-job-title">{{ kit.job.title }}</div>
+              <div class="kit-job-meta">
+                {{ [kit.job.companyName, kit.job.location, kit.job.salary].filter(Boolean).join(' · ') }}
+              </div>
+            </div>
+          </div>
+
+          <div class="mini-block">
+            <div class="label">投递前检查</div>
+            <ul class="checklist">
+              <li v-for="c in kit.checklist" :key="c.key" :class="{ 'is-warn': !c.done }">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path v-if="c.done" d="M20 6L9 17l-5-5" />
+                  <path v-else d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />
+                </svg>
+                <span class="check-label">{{ c.label }}</span>
+                <span v-if="c.hint" class="check-hint">{{ c.hint }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="mini-block">
+            <div class="label">打招呼话术</div>
+            <div class="greeting-box">{{ kit.greeting }}</div>
+            <button class="mini-btn" @click="copyGreeting">复制话术</button>
+          </div>
+
+          <div v-if="kit.missingKeywords?.length" class="mini-block">
+            <div class="label">待补关键词（只作提示，不要写进简历）</div>
+            <div class="tags">
+              <BaseTag v-for="k in kit.missingKeywords" :key="k" variant="danger" size="sm">{{ k }}</BaseTag>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <BaseButton variant="ghost" @click="closeApplyKit">关闭</BaseButton>
+            <BaseButton v-if="kit.job.applyUrl" variant="primary" @click="openApplyUrl">
+              打开投递页
+            </BaseButton>
+            <span v-else class="no-url-hint">该岗位没有投递链接，请到原平台搜索岗位名</span>
           </div>
         </template>
       </div>
@@ -659,6 +724,79 @@ async function remove(a: Application) {
   } finally {
     busyId.value = null
   }
+}
+
+/* ── 一键投递助手（v1.67.0）──────────────────────────────────────────
+ * 纯展示层：数据由后端 ApplyKitService 组装（零 AI、零网络、毫秒级）。
+ * 合规：本功能不代理任何招聘平台请求，只在新标签页打开 applyUrl，
+ * 实际投递动作必须由用户本人完成。 */
+interface ApplyKitChecklistItem {
+  key: string
+  label: string
+  done: boolean
+  hint?: string | null
+}
+
+interface ApplyKit {
+  applicationId: number
+  job: {
+    title: string
+    companyName: string
+    platform?: string | null
+    location?: string | null
+    salary?: string | null
+    applyUrl?: string | null
+    deadline?: string | null
+    status: string
+  }
+  hasTailored: boolean
+  matchedKeywords: string[]
+  missingKeywords: string[]
+  greeting: string
+  checklist: ApplyKitChecklistItem[]
+  compliance: string
+}
+
+const kitTarget = ref<Application | null>(null)
+const kit = ref<ApplyKit | null>(null)
+const kitLoading = ref(false)
+const kitError = ref('')
+
+async function openApplyKit(a: Application) {
+  kitTarget.value = a
+  kit.value = null
+  kitError.value = ''
+  kitLoading.value = true
+  try {
+    kit.value = (await api.get(`/api/application/${a.id}/apply-kit`)) as unknown as ApplyKit
+  } catch (e) {
+    kitError.value = getErrMessage(e, '整理投递材料失败，请重试')
+  } finally {
+    kitLoading.value = false
+  }
+}
+
+function closeApplyKit() {
+  kitTarget.value = null
+  kit.value = null
+  kitError.value = ''
+}
+
+async function copyGreeting() {
+  if (!kit.value) return
+  try {
+    await navigator.clipboard.writeText(kit.value.greeting)
+    ElMessage.success('话术已复制')
+  } catch {
+    ElMessage.warning('复制失败：浏览器未授予剪贴板权限，请手动选中复制')
+  }
+}
+
+function openApplyUrl() {
+  const url = kit.value?.job.applyUrl
+  if (!url) return
+  // noopener/noreferrer：不给目标页任何反向控制本页的能力
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function openTailor(a: Application) {
@@ -1174,6 +1312,53 @@ function actionVariant(action: string) {
 .bullet-new { color: var(--c-text); font-weight: 500; }
 .bullet-reason { color: var(--c-accent); font-size: 12px; margin-top: 4px; }
 .summary-box { background: var(--brand-primary-light); border-radius: var(--radius-md); padding: 12px 14px; font-size: 13px; line-height: 1.8; color: var(--c-text-secondary); }
+
+/* ── 一键投递助手（v1.67.0） ── */
+/* 合规提示常驻在弹窗顶部，不提供关闭：这句话必须被看到 */
+.compliance-box {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-info-border);
+  border-radius: var(--radius-md);
+  background: var(--c-info-light);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--c-text-secondary);
+}
+
+.kit-job { display: flex; flex-direction: column; gap: 4px; }
+.kit-job-title { font-size: 15px; font-weight: 700; color: var(--c-text); }
+.kit-job-meta { font-size: 12px; color: var(--c-text-tertiary); }
+
+.checklist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.checklist li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
+}
+.checklist li svg { flex-shrink: 0; margin-top: 3px; color: var(--c-success); }
+.checklist li.is-warn svg { color: var(--c-warning); }
+.check-label { flex-shrink: 0; }
+.check-hint { flex-basis: 100%; padding-left: 22px; font-size: 12px; color: var(--c-text-tertiary); }
+
+.greeting-box {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-bg-alt);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--c-text);
+  white-space: pre-wrap;
+}
+
+.no-url-hint { font-size: 12px; color: var(--c-text-tertiary); }
+.modal-sub.is-error { color: var(--c-danger); }
 
 /* ── 页面操作区（E/F 入口） ── */
 .page-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }

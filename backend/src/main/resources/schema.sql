@@ -24,6 +24,21 @@ CREATE TABLE IF NOT EXISTS resume (
 );
 CREATE INDEX IF NOT EXISTS idx_resume_user_id ON resume(user_id);
 
+-- 结构化简历文档表（v1.67.0：模板库 + 结构化编辑器）
+-- 与 resume 的分工：resume 存用户上传/粘贴的原始文本快照；resume_document 存可反复编辑的结构化简历。
+-- doc_data 刻意不叫 data（SQL 保留字风险）；JSON 映射走 Hibernate 跨方言，PG 生成 jsonb、H2 生成 json。
+CREATE TABLE IF NOT EXISTS resume_document (
+    id               BIGSERIAL    PRIMARY KEY,
+    user_id          VARCHAR(64)  NOT NULL,
+    template_id      VARCHAR(40)  NOT NULL,
+    title            VARCHAR(200) NOT NULL,
+    doc_data         JSONB,
+    source_resume_id BIGINT,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_resume_document_user ON resume_document(user_id);
+
 -- 面试会话表
 CREATE TABLE IF NOT EXISTS interview_session (
     id              BIGSERIAL PRIMARY KEY,

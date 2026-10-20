@@ -46,7 +46,7 @@ export const ICONS: Record<string, string> = {
  */
 export const primaryNav: NavItem[] = [
   { to: '/', label: '首页', icon: 'home', exact: true },
-  { to: '/resume', label: '简历分析', icon: 'resume' },
+  { to: '/resume', label: '简历分析', icon: 'resume', match: ['/resume', '/resume/studio'] },
   { to: '/jobs', label: '招聘广场', icon: 'users' },
   { to: '/applications', label: '投递看板', icon: 'send' },
   { to: '/job', label: 'JD 拆解', icon: 'briefcase' },
@@ -56,6 +56,8 @@ export const primaryNav: NavItem[] = [
 /** 求职工具下拉：求职过程中的其余工具页，需登录 */
 export const toolNav: NavItem[] = [
   { to: '/agent', label: '智能体', icon: 'bot', desc: '对话式求职助手' },
+  // v1.67.0：简历模板库与结构化编辑器
+  { to: '/resume/studio', label: '简历模板', icon: 'resume', desc: '选模板 · 填内容 · 导出 PDF' },
   { to: '/career', label: '求职诊断', icon: 'compass', desc: '四层能力挖掘 + 30 天计划' },
   {
     to: '/learning',

@@ -61,6 +61,11 @@ class JobApplicationControllerTest {
     /** v1.61.0：时序视图服务（新端点 /timeline 的依赖，@WebMvcTest 下必须补 @MockBean） */
     @MockBean
     private com.example.interview.service.job.ApplicationTimelineService applicationTimelineService;
+
+    /** v1.67.0：一键投递助手（新端点 /apply-kit 的依赖，@WebMvcTest 下必须补 @MockBean） */
+    @MockBean
+    private com.example.interview.service.job.ApplyKitService applyKitService;
+
     @MockBean
     private JwtUtil jwtUtil;
     @MockBean
