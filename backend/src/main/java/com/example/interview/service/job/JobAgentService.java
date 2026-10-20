@@ -41,6 +41,24 @@ public class JobAgentService {
     private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     /** 刷新互斥锁：手动刷新与定时任务并发时后到者跳过（单实例部署，实例内互斥已足够） */
+    /**
+     * meta 结果缓存（v1.82.0）。
+     *
+     * <p><b>为什么需要</b>：{@code meta()} 要跑 5 个全表 DISTINCT + 2 个 GROUP BY COUNT，
+     * 在 18000+ 行上线上实测约 <b>1.6s</b>；而首屏会同时请求列表与 meta，
+     * 这是「加载慢」的主要来源之一（实测 {@code size=1} 与 {@code size=20} 耗时接近，
+     * 说明瓶颈不在数据传输，而在这些聚合查询）。
+     *
+     * <p><b>为什么可以缓存</b>：这些数据只在 {@code refresh()} 之后才可能变化，
+     * 5 分钟 TTL 内返回旧值不会误导用户（页面上有「最后更新」时间）。
+     *
+     * <p>key 按 overseas 口径区分（null / false / true 各自独立）；
+     * {@code doRefresh()} 结束时整体清空，保证刷新后立刻可见。
+     */
+    private final Map<String, CachedMeta> metaCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final long META_CACHE_TTL_MS = 5 * 60 * 1000L;
+
     private final java.util.concurrent.atomic.AtomicBoolean refreshRunning =
             new java.util.concurrent.atomic.AtomicBoolean(false);
 
@@ -195,6 +213,8 @@ public class JobAgentService {
                 repository.deleteStaleThirdParty("内置精选", LocalDateTime.now().minusDays(60)));
 
         log.info("招聘信息刷新完成：新增 {} / 更新 {} / 下架 {} / 清理 {}", inserted, updated, expired, removed);
+        // 数据已变，meta 缓存必须立刻失效（否则最多 5 分钟内筛选面板显示旧计数）
+        metaCache.clear();
         return new RefreshResult(upserted, inserted, updated,
                 expired == null ? 0 : expired, removed == null ? 0 : removed);
     }
@@ -423,6 +443,27 @@ public class JobAgentService {
      *                 而该分栏实际只有 71 条——用户点进去会怀疑数据丢了或分页失效。
      */
     public Map<String, Object> meta(Boolean overseas) {
+        String cacheKey = overseas == null ? "all" : overseas.toString();
+        long now = System.currentTimeMillis();
+        CachedMeta cached = metaCache.get(cacheKey);
+        if (cached != null && cached.expiresAt() > now) {
+            return cached.data();
+        }
+        Map<String, Object> fresh = computeMeta(overseas);
+        metaCache.put(cacheKey, new CachedMeta(fresh, now + META_CACHE_TTL_MS));
+        return fresh;
+    }
+
+    /** 缓存条目：结果 + 过期时间戳（毫秒） */
+    private record CachedMeta(Map<String, Object> data, long expiresAt) {
+    }
+
+    /**
+     * 实际计算 meta（缓存未命中时调用）。
+     *
+     * <p>注意：返回的 Map 会被缓存并多次下发，调用方**不得修改**其中的集合。
+     */
+    private Map<String, Object> computeMeta(Boolean overseas) {
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("industries", repository.findDistinctIndustries());
         meta.put("jobTypes", repository.findDistinctJobTypes());

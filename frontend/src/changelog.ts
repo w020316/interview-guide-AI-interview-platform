@@ -85,9 +85,18 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.81.0'
+export const CURRENT_VERSION = '1.82.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.82.0',
+    date: '2026-10-20',
+    title: '版本 1.82.0 · 招聘广场的筛选面板不用每次重新算了',
+    items: [
+      { text: '招聘广场顶部的筛选面板（行业、岗位类型、来源等）改为缓存 5 分钟，再次打开页面会明显更快', level: 'user' },
+      { text: '刷新岗位数据后缓存会自动失效，不会出现「刚刷完但数字没变」的情况', level: 'user' },
+    ],
+  },
   {
     version: '1.81.0',
     date: '2026-10-20',
