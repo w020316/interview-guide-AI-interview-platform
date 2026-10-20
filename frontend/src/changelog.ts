@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.78.0'
+export const CURRENT_VERSION = '1.79.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.79.0',
+    date: '2026-10-20',
+    title: '版本 1.79.0 · 简历模板从 5 套加到 10 套，按你投什么岗来挑',
+    items: [
+      { text: '简历模板新增 5 套：左栏侧边栏、时间线经历、学术科研、产品运营、顶部色带，现在一共 10 套可选', level: 'user' },
+      { text: '每套都标了适用场景，以及「招聘系统能不能正常读出来」，拿不准就选「单栏·通用」', level: 'user' },
+      { text: '换模板不会丢内容，同一份简历可以随时在多套版式之间来回切着看', level: 'user' },
+    ],
+  },
   {
     version: '1.78.0',
     date: '2026-10-20',

@@ -222,6 +222,43 @@ body {
   --gap-list: 4px; --gap-li: 2px; padding: 12mm 14mm;
 }
 
+/* ── v1.79.0 扩充的五套 ── */
+
+/* T6 左栏·侧边栏：侧栏在左（DOM 顺序仍是主栏在前，用 order 调换） */
+.tpl-sidebar-left { --fs-name: 25px; --gap-sec: 22px; }
+.tpl-sidebar-left .doc-body {
+  display: grid; grid-template-columns: 216px 1fr; gap: 32px; align-items: start;
+}
+.tpl-sidebar-left .doc-main { min-width: 0; }
+.tpl-sidebar-left .doc-side {
+  order: -1; min-width: 0; padding: 16px 14px; border: none; border-radius: 4px;
+  background: #f1f7f6;
+}
+
+/* T7 时间线·经历：主栏左侧竖轴 + 圆点（纯装饰） */
+.tpl-timeline { --gap-entry: 18px; }
+.tpl-timeline .doc-main { padding-left: 20px; border-left: 1px solid #e0ddd9; }
+.tpl-timeline .entry { position: relative; }
+.tpl-timeline .entry::before {
+  content: ""; position: absolute; top: 5px; left: -24px;
+  width: 7px; height: 7px; border-radius: 50%; background: #0f766e;
+}
+
+/* T8 学术·科研：教育前置，行距更松 */
+.tpl-academic { --fs-body: 13px; --lh: 1.65; --gap-sec: 26px; }
+
+/* T9 产品·运营：行距松、要点标记醒目 */
+.tpl-product { --lh: 1.7; --gap-li: 6px; --gap-entry: 18px; }
+.tpl-product .bullets { padding-left: 14px; }
+.tpl-product .bullets li::marker { color: #0f766e; font-weight: 700; }
+
+/* T10 顶部色带：页眉做成浅色色块 */
+.tpl-band { --gap-sec: 22px; }
+.tpl-band .doc-head {
+  margin-bottom: 22px; padding: 16px 18px;
+  border-left: 3px solid #0f766e; border-radius: 4px; background: #eff6f5;
+}
+
 @media print {
   .resume-doc { width: auto; min-height: auto; }
 }
@@ -256,7 +293,8 @@ export function buildResumeHtml(doc: ResumeDoc, templateId: string): string {
 </header>`
 
   const SIDE: ResumeSectionKey[] = ['skills', 'extras']
-  const isTwoCol = tpl.layout === 'two-column'
+  /** 双栏（含反向）：只要不是单栏就要分出侧栏 */
+  const isTwoCol = tpl.layout !== 'one-column'
   const mainKeys = isTwoCol ? sections.filter((k) => !SIDE.includes(k)) : sections
   const sideKeys = isTwoCol ? sections.filter((k) => SIDE.includes(k)) : []
 

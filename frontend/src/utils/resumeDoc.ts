@@ -113,7 +113,16 @@ export interface ResumeTemplateMeta {
   id: string
   name: string
   scene: string
-  layout: 'one-column' | 'two-column'
+  /**
+   * 版式骨架。三种：
+   * - `one-column`：单栏（ATS 最友好）
+   * - `two-column`：双栏，主栏在左、侧栏在右
+   * - `two-column-reverse`：双栏，侧栏在左、主栏在右（v1.79.0）
+   *
+   * ⚠️ 无论哪种，**DOM 顺序永远是「页眉 → 主栏 → 侧栏」**，
+   * 视觉左右由 CSS 的 `order` 调换。这样 ATS 逐段读取时不会把两栏文字交错串行。
+   */
+  layout: 'one-column' | 'two-column' | 'two-column-reverse'
   atsLevel: 'HIGH' | 'MEDIUM'
   recommended: boolean
   description: string
@@ -197,6 +206,76 @@ export const RESUME_TEMPLATES: ResumeTemplateMeta[] = [
       '缩小字号与间距，把内容压进一页。正文字号低于常规阶梯，阅读舒适度换版面紧凑，正式投递前建议先看预览确认。',
     sections: ['summary', 'experience', 'projects', 'education', 'skills', 'extras'],
     cssClass: 'tpl-compact',
+    locale: 'zh',
+  },
+  /* ── v1.79.0 扩充：覆盖更多真实求职场景 ─────────────────────────────
+   * 选型依据（参考 GitHub 主流简历库的模板分类，实现全部自研）：
+   * Reactive Resume 把模板按 one-column / two-column / ATS-safe 三轴划分；
+   * best-resume-ever 按「目标岗位」分模板族。这里取「岗位场景」这一轴，
+   * 因为用户选模板时想的正是「我投什么岗」，而不是「我要几栏」。 */
+  {
+    id: 'sidebar-left',
+    name: '左栏·侧边栏',
+    scene: '技术 / 设计岗，技能与链接较多',
+    layout: 'two-column-reverse',
+    atsLevel: 'MEDIUM',
+    recommended: false,
+    description:
+      '左侧栏集中放联系方式、技能与证书，右侧主栏留给经历与项目。辨识度高；投严格 ATS 的系统建议改用「单栏·通用」。',
+    sections: ['summary', 'experience', 'projects', 'education', 'skills', 'extras'],
+    cssClass: 'tpl-sidebar-left',
+    locale: 'zh',
+  },
+  {
+    id: 'timeline',
+    name: '时间线·经历',
+    scene: '职场人，经历时间连贯',
+    layout: 'one-column',
+    atsLevel: 'HIGH',
+    recommended: false,
+    description:
+      '每条经历左侧带一条时间轴，按时间顺序读起来更连贯。时间轴只是装饰线，正文仍是纯文本，机器解析不受影响。',
+    sections: ['summary', 'experience', 'projects', 'education', 'skills', 'extras'],
+    cssClass: 'tpl-timeline',
+    locale: 'zh',
+  },
+  {
+    id: 'academic-cv',
+    name: '学术·科研',
+    scene: '读研 / 科研 / 高校岗位',
+    layout: 'one-column',
+    atsLevel: 'HIGH',
+    recommended: false,
+    description:
+      '教育背景前置，突出学校、专业、GPA、主修课程与科研项目，适合继续深造或投科研、高校岗位。',
+    sections: ['education', 'summary', 'projects', 'experience', 'skills', 'extras'],
+    cssClass: 'tpl-academic',
+    locale: 'zh',
+  },
+  {
+    id: 'product-ops',
+    name: '产品·运营',
+    scene: '产品 / 运营 / 市场岗',
+    layout: 'one-column',
+    atsLevel: 'HIGH',
+    recommended: false,
+    description:
+      '条目行距更松、要点前的标记更醒目，让量化结果一眼可见。适合强调增长、转化、效率的岗位。',
+    sections: ['summary', 'experience', 'projects', 'education', 'skills', 'extras'],
+    cssClass: 'tpl-product',
+    locale: 'zh',
+  },
+  {
+    id: 'header-band',
+    name: '顶部色带',
+    scene: '设计 / 市场岗，想要一点辨识度',
+    layout: 'one-column',
+    atsLevel: 'MEDIUM',
+    recommended: false,
+    description:
+      '姓名与联系方式放在顶部色带里，整页观感更完整。色带只是背景，文字仍是纯文本；但个别老旧解析系统会丢弃带背景的区域，投严格 ATS 建议改用「单栏·通用」。',
+    sections: ['summary', 'experience', 'projects', 'education', 'skills', 'extras'],
+    cssClass: 'tpl-band',
     locale: 'zh',
   },
 ]

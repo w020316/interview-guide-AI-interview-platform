@@ -116,11 +116,21 @@ class ResumeDocumentServiceTest {
     }
 
     @Test
-    @DisplayName("模板目录五套齐备，且只有一套被推荐")
-    void catalogHasFiveTemplatesWithSingleRecommendation() {
-        assertEquals(5, ResumeTemplateCatalog.all().size());
+    @DisplayName("模板目录十套齐备，且只有一套被推荐")
+    void catalogHasTenTemplatesWithSingleRecommendation() {
+        assertEquals(10, ResumeTemplateCatalog.all().size());
         long recommended = ResumeTemplateCatalog.all().stream().filter(t -> t.recommended()).count();
         assertEquals(1, recommended, "推荐标记全站只允许一套");
+    }
+
+    @Test
+    @DisplayName("模板 ID 全局唯一（重复 ID 会让前端渲染落到错误模板）")
+    void templateIdsAreUnique() {
+        long distinct = ResumeTemplateCatalog.all().stream()
+                .map(ResumeTemplateCatalog.Template::id)
+                .distinct()
+                .count();
+        assertEquals(ResumeTemplateCatalog.all().size(), distinct);
     }
 
     @Test

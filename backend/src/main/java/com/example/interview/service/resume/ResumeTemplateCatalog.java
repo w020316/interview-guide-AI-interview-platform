@@ -41,7 +41,9 @@ public final class ResumeTemplateCatalog {
      * @param id          模板 ID（前后端约定的稳定标识，不可随意改名）
      * @param name        展示名
      * @param scene       适用场景（一句话，给用户做选择依据）
-     * @param layout      {@code one-column} / {@code two-column}
+     * @param layout      {@code one-column} / {@code two-column} / {@code two-column-reverse}
+     *                    （v1.79.0 增反向双栏：侧栏在左。无论哪种，前端 DOM 顺序都是
+     *                    「页眉 → 主栏 → 侧栏」，左右由 CSS order 调换，ATS 解析不受影响）
      * @param atsLevel    {@code HIGH} / {@code MEDIUM}
      * @param recommended 是否默认推荐（全站只允许一套为 true）
      * @param description 详细说明
@@ -120,6 +122,62 @@ public final class ResumeTemplateCatalog {
                     "HIGH",
                     false,
                     "缩小字号与间距，把内容压进一页。正文字号低于常规阶梯，阅读舒适度换版面紧凑，正式投递前建议先看预览确认。",
+                    List.of(SEC_SUMMARY, SEC_EXPERIENCE, SEC_PROJECTS,
+                            SEC_EDUCATION, SEC_SKILLS, SEC_EXTRAS)
+            ),
+            // ── v1.79.0 扩充五套：按「目标岗位场景」分，因为用户选模板时想的是「我投什么岗」──
+            new Template(
+                    "sidebar-left",
+                    "左栏·侧边栏",
+                    "技术 / 设计岗，技能与链接较多",
+                    "two-column-reverse",
+                    "MEDIUM",
+                    false,
+                    "左侧栏集中放联系方式、技能与证书，右侧主栏留给经历与项目。辨识度高；投严格 ATS 的系统建议改用「单栏·通用」。",
+                    List.of(SEC_SUMMARY, SEC_EXPERIENCE, SEC_PROJECTS,
+                            SEC_EDUCATION, SEC_SKILLS, SEC_EXTRAS)
+            ),
+            new Template(
+                    "timeline",
+                    "时间线·经历",
+                    "职场人，经历时间连贯",
+                    "one-column",
+                    "HIGH",
+                    false,
+                    "每条经历左侧带一条时间轴，按时间顺序读起来更连贯。时间轴只是装饰线，正文仍是纯文本，机器解析不受影响。",
+                    List.of(SEC_SUMMARY, SEC_EXPERIENCE, SEC_PROJECTS,
+                            SEC_EDUCATION, SEC_SKILLS, SEC_EXTRAS)
+            ),
+            new Template(
+                    "academic-cv",
+                    "学术·科研",
+                    "读研 / 科研 / 高校岗位",
+                    "one-column",
+                    "HIGH",
+                    false,
+                    "教育背景前置，突出学校、专业、GPA、主修课程与科研项目，适合继续深造或投科研、高校岗位。",
+                    List.of(SEC_EDUCATION, SEC_SUMMARY, SEC_PROJECTS,
+                            SEC_EXPERIENCE, SEC_SKILLS, SEC_EXTRAS)
+            ),
+            new Template(
+                    "product-ops",
+                    "产品·运营",
+                    "产品 / 运营 / 市场岗",
+                    "one-column",
+                    "HIGH",
+                    false,
+                    "条目行距更松、要点前的标记更醒目，让量化结果一眼可见。适合强调增长、转化、效率的岗位。",
+                    List.of(SEC_SUMMARY, SEC_EXPERIENCE, SEC_PROJECTS,
+                            SEC_EDUCATION, SEC_SKILLS, SEC_EXTRAS)
+            ),
+            new Template(
+                    "header-band",
+                    "顶部色带",
+                    "设计 / 市场岗，想要一点辨识度",
+                    "one-column",
+                    "MEDIUM",
+                    false,
+                    "姓名与联系方式放在顶部色带里，整页观感更完整。色带只是背景，文字仍是纯文本；但个别老旧解析系统会丢弃带背景的区域，投严格 ATS 建议改用「单栏·通用」。",
                     List.of(SEC_SUMMARY, SEC_EXPERIENCE, SEC_PROJECTS,
                             SEC_EDUCATION, SEC_SKILLS, SEC_EXTRAS)
             )

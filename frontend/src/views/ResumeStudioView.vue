@@ -86,7 +86,7 @@
                   <span class="thumb-bar is-title"></span>
                   <span class="thumb-bar is-short"></span>
                 </div>
-                <div v-if="t.layout === 'two-column'" class="thumb-side">
+                <div v-if="t.layout !== 'one-column'" class="thumb-side">
                   <span class="thumb-bar is-title"></span>
                   <span class="thumb-bar"></span>
                   <span class="thumb-bar is-short"></span>
@@ -106,7 +106,7 @@
                 <span class="chip" :class="t.atsLevel === 'HIGH' ? 'chip-ok' : 'chip-warn'">
                   ATS {{ t.atsLevel === 'HIGH' ? '友好' : '中等' }}
                 </span>
-                <span class="chip">{{ t.layout === 'two-column' ? '双栏' : '单栏' }}</span>
+                <span class="chip">{{ layoutLabel(t.layout) }}</span>
               </div>
             </div>
           </article>
@@ -276,6 +276,13 @@ const scaledHeight = computed(() => Math.round(A4_HEIGHT * scale.value))
 
 function templateName(id: string): string {
   return findTemplate(id).name
+}
+
+/** 布局标签：三态（v1.79.0 增反向双栏），避免在模板里写三元嵌套 */
+function layoutLabel(layout: string): string {
+  if (layout === 'one-column') return '单栏'
+  if (layout === 'two-column-reverse') return '双栏·侧栏在左'
+  return '双栏'
 }
 
 function formatDate(v?: string): string {
@@ -755,6 +762,18 @@ watch(mode, async () => {
   gap: 16px;
   flex: 1;
   min-height: 0;
+}
+
+/* 反向双栏（v1.79.0）：缩略图里侧栏画在左边，与真实版式一致 */
+.thumb-two-column-reverse .thumb-body {
+  flex-direction: row-reverse;
+}
+
+.thumb-two-column-reverse .thumb-side {
+  padding-left: 0;
+  padding-right: 14px;
+  border-left: none;
+  border-right: 1px solid var(--c-paper-rule);
 }
 
 .thumb-col {

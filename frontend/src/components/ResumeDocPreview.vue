@@ -1,5 +1,14 @@
 <template>
-  <article class="resume-doc" :class="[template.cssClass, { 'is-two-col': isTwoCol }]">
+  <article
+    class="resume-doc"
+    :class="[
+      template.cssClass,
+      {
+        'is-two-col': isTwoCol,
+        'is-two-col-reverse': template.layout === 'two-column-reverse',
+      },
+    ]"
+  >
     <header class="doc-head">
       <h1 class="doc-name">{{ doc.basics.name || '你的姓名' }}</h1>
       <p v-if="doc.basics.title" class="doc-title">{{ doc.basics.title }}</p>
@@ -66,7 +75,8 @@ const props = defineProps<{
 }>()
 
 const template = computed<ResumeTemplateMeta>(() => findTemplate(props.templateId))
-const isTwoCol = computed(() => template.value.layout === 'two-column')
+/** 双栏（含反向）：只要不是单栏就走两栏布局 */
+const isTwoCol = computed(() => template.value.layout !== 'one-column')
 
 /** 双栏模板的右侧栏区块：只放无序列表型内容，被解析器追加到文末也不失真 */
 const SIDE_SECTIONS: ResumeSectionKey[] = ['skills', 'extras']
@@ -171,10 +181,24 @@ const contacts = computed(() => {
 
 .is-two-col .doc-body {
   display: grid;
-  /* 左主栏 : 右侧栏 = 1fr : 216px，gap 32（与设计规格一致） */
+  /* 主栏 : 侧栏 = 1fr : 216px，gap 32（与设计规格一致） */
   grid-template-columns: 1fr 216px;
   gap: 32px;
   align-items: start;
+}
+
+/* 反向双栏（v1.79.0）：视觉上侧栏在左，但 DOM 顺序仍是「页眉 → 主栏 → 侧栏」。
+   用列宽 + order 交换实现，**不调整 DOM** —— ATS 解析顺序不受影响。 */
+.is-two-col-reverse .doc-body {
+  grid-template-columns: 216px 1fr;
+}
+
+.is-two-col-reverse .doc-side {
+  order: -1;
+  padding-left: 0;
+  padding-right: 20px;
+  border-left: none;
+  border-right: 1px solid var(--c-paper-rule);
 }
 
 .doc-main {
@@ -266,6 +290,83 @@ const contacts = computed(() => {
   --doc-gap-list: 4px;
   --doc-gap-li: 2px;
   padding: 36px 40px;
+}
+
+/* ══════════ 模板 T6 左栏·侧边栏：侧栏浅色底，主栏在右 ══════════ */
+.tpl-sidebar-left {
+  --doc-fs-name: 25px;
+  --doc-gap-sec: 22px;
+}
+
+.tpl-sidebar-left .doc-side {
+  padding: 16px 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  /* 用极浅的品牌色底而不是深色块：纸面域的文字令牌恒为深墨，
+     深底会逼出白字，而白字在打印/暗色下都不可控（DESIGN.md §1 禁写死白字） */
+  background: color-mix(in srgb, var(--c-brand-ink) 5%, var(--c-paper));
+}
+
+/* ══════════ 模板 T7 时间线·经历：主栏左侧一条竖轴 ══════════ */
+.tpl-timeline {
+  --doc-gap-entry: 18px;
+}
+
+.tpl-timeline .doc-main {
+  padding-left: 20px;
+  border-left: 1px solid var(--c-paper-rule);
+}
+
+.tpl-timeline :deep(.entry) {
+  position: relative;
+}
+
+/* 圆点是纯装饰，不承载信息；正文顺序不变，ATS 读到的仍是纯文本 */
+.tpl-timeline :deep(.entry)::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: -24px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-brand-ink);
+}
+
+/* ══════════ 模板 T8 学术·科研：教育前置，行距更松 ══════════ */
+.tpl-academic {
+  --doc-fs-body: 13px;
+  --doc-lh: 1.65;
+  --doc-gap-sec: 26px;
+}
+
+/* ══════════ 模板 T9 产品·运营：行距松、要点标记醒目 ══════════ */
+.tpl-product {
+  --doc-lh: 1.7;
+  --doc-gap-li: 6px;
+  --doc-gap-entry: 18px;
+}
+
+.tpl-product :deep(.entry-bullets) {
+  padding-left: 14px;
+}
+
+.tpl-product :deep(.entry-bullets li)::marker {
+  color: var(--c-brand-ink);
+  font-weight: 700;
+}
+
+/* ══════════ 模板 T10 顶部色带：页眉做成浅色色块 ══════════ */
+.tpl-band {
+  --doc-gap-sec: 22px;
+}
+
+.tpl-band .doc-head {
+  margin-bottom: 22px;
+  padding: 16px 18px;
+  border-left: 3px solid var(--c-brand-ink);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--c-brand-ink) 7%, var(--c-paper));
 }
 
 /* ── 移动端（≤767）：纸面不缩放字体，只由父容器整体缩放；
