@@ -104,6 +104,13 @@ management:
       enabled: false
 
 app:
+  # F-13（2026-10-21）：生产 CORS 默认白名单不再包含 localhost / 127.0.0.1。
+  # 生产环境没有任何合法来源会使用开发者本机端口；dev/local profile 仍保留以保障联调。
+  # 纵深防御：即使 CORS_ALLOWED_ORIGINS 被误填成 http://localhost:5173，
+  # SecurityConfig 在 prod profile 下也会二次剔除（见 SecurityConfig#buildCorsConfiguration，
+  # 已有单测锁死），此处默认值保证「什么都不配」时也默认安全。
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://*.pages.dev}
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: 86400000
