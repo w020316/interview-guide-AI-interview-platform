@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -76,6 +77,9 @@ class KnowledgeControllerTest {
     private RateLimitInterceptor rateLimitInterceptor;
 
     private static final String USER_ID = "1";
+
+    /** P1-5 删除用例的文档 id（UUID 形态，与生产向量库 id 一致） */
+    private static final String DOC_ID = "3f2b8c1a-9d4e-4a71-b0c5-6e8f2d1a7c93";
 
     @BeforeEach
     void setUp() throws Exception {
@@ -503,6 +507,47 @@ class KnowledgeControllerTest {
                     .andExpect(status().isServiceUnavailable())
                     .andExpect(jsonPath("$.code").value(503))
                     .andExpect(jsonPath("$.message").value("AI 服务暂时不可用，知识导入失败，请稍后重试"));
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/knowledge/{docId} 删除知识点（P1-5）")
+    class DeleteDocument {
+
+        /**
+         * P1-5：知识库自 v1.71 起只有导入没有删除，误导入的文档会永久污染 RAG 检索。
+         * 控制器层的职责只有一条：service 说「没删掉」就转成 404，不能返回 200。
+         */
+        @Test
+        @DisplayName("本人文档删除成功返回 200 + removed=1，并把当前用户传给 service")
+        void delete_ownedDocument_returns200() throws Exception {
+            when(ragSearchService.deleteOwnedDocument(DOC_ID, USER_ID)).thenReturn(true);
+
+            mockMvc.perform(delete("/api/knowledge/" + DOC_ID))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.removed").value(1));
+
+            verify(ragSearchService).deleteOwnedDocument(DOC_ID, USER_ID);
+        }
+
+        /**
+         * IDOR 防线在控制器层的落点：service 返回 false（不存在 / 非本人 / 校验失败）
+         * 时必须抛 {@link com.example.interview.common.ResourceNotFoundException} → 404。
+         *
+         * <p>⚠️ 这里断言的是**具体子类型**（404），不是 IllegalArgumentException（400）：
+         * {@code ResourceNotFoundException extends IllegalArgumentException}，
+         * 只断言父类型会让「404 退化成 400」的回归照样变绿。
+         */
+        @Test
+        @DisplayName("非本人或不存在返回 404（不泄露文档存在性），不得返回 200")
+        void delete_notOwnedOrMissing_returns404() throws Exception {
+            when(ragSearchService.deleteOwnedDocument(DOC_ID, USER_ID)).thenReturn(false);
+
+            mockMvc.perform(delete("/api/knowledge/" + DOC_ID))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value(404))
+                    .andExpect(jsonPath("$.message").value("知识点不存在或无权删除"));
         }
     }
 

@@ -485,6 +485,58 @@ public class RagSearchService {
     }
 
     /**
+     * 删除归属于指定用户的知识文档（P1-5，2026-10-21 质量循环）。
+     *
+     * <p><b>为什么必须校验归属</b>：向量库的 docId 是全局 UUID，用户 A 只要猜到/拿到
+     * B 的 docId 就能删掉别人的知识点 —— 这是典型 IDOR。所以「查不到」与「不是你的」
+     * 对外必须返回同一个结果（404），不泄露文档存在性。
+     *
+     * <p><b>两种存储介质</b>：
+     * <ul>
+     *   <li>prod（pgvector）：直接查 {@code vector_store.metadata->>'userId'} 比对。
+     *       查不到行 = 文档不存在；查询异常 = 拒绝删除（宁可删不掉，不可误删）。</li>
+     *   <li>local（文件型 SimpleVectorStore）：无 {@code vector_store} 表，也没有
+     *       「按 id 取元数据」的 API，无法校验归属。local profile 是单用户开发环境，
+     *       不存在多租户越权面，故退化为直接删除。</li>
+     * </ul>
+     *
+     * @param docId  向量文档 id（UUID 字符串）
+     * @param userId 当前登录用户 id
+     * @return true 表示确实删除了 1 条；false 表示不存在、非本人或校验失败
+     */
+    public boolean deleteOwnedDocument(String docId, String userId) {
+        if (docId == null || docId.isBlank() || userId == null || userId.isBlank()) {
+            return false;
+        }
+        java.util.UUID uuid;
+        try {
+            uuid = java.util.UUID.fromString(docId.trim());
+        } catch (IllegalArgumentException e) {
+            return false; // 非 UUID 形态，一定不存在
+        }
+        if (jdbcTemplate != null) {
+            try {
+                String owner = jdbcTemplate.queryForObject(
+                        "SELECT metadata->>'userId' FROM vector_store WHERE id = ?",
+                        String.class, uuid);
+                if (!userId.equals(owner)) {
+                    log.info("拒绝删除非本人知识文档：docId={} owner={} requester={}", docId, owner, userId);
+                    return false;
+                }
+                return removeFromVectorStore(List.of(docId)) > 0;
+            } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+                return false; // 文档不存在
+            } catch (Exception e) {
+                // 表不存在（H2 / 文件型库）或查询失败：拒绝删除，避免「校验不了就放行」
+                log.warn("知识文档归属校验失败，已拒绝删除：docId={} 原因={}", docId, e.getMessage());
+                return false;
+            }
+        }
+        // 本地文件型向量库：无多租户面，直接删
+        return removeFromVectorStore(List.of(docId)) > 0;
+    }
+
+    /**
      * 导入知识文档到向量库（绑定 userId）
      * - 空列表直接返回，避免无意义调用
      * - 去重预检：对每个文档做相似度搜索，相似度 >= {@link #DEDUP_SIMILARITY_THRESHOLD} 视为重复，跳过

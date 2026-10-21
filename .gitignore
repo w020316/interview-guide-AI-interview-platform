@@ -21,6 +21,11 @@ frontend/.env.local
 .env
 .env.local
 *.key
+# 2026-10-21 安全审计 F-02：.bai-key.tmp（真实 sk- Key）与 .e2e-token.tmp（JWT）
+# 此前只写了 *.key 与 .tmp/（仅匹配目录），两者都匹配不到，一次 `git add .` 就会入库。
+*.tmp
+.bai-key*
+.e2e-*
 
 # playwright-cli 浏览器自动化产物（快照/日志，不入库）
 .playwright-cli/

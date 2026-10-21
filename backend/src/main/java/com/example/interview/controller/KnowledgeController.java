@@ -294,4 +294,26 @@ public class KnowledgeController {
         result.put("questions", items);
         return Result.success(result);
     }
+
+    /**
+     * 删除单条知识点（P1-5，2026-10-21 质量循环）。
+     *
+     * <p><b>为什么现在才补</b>：知识库从 v1.71 起就支持导入（单条 + 批量），但一直没有删除。
+     * 误导入/测试数据一旦进库就永久污染 RAG 检索（面试出题会命中它），用户无任何自救手段。
+     * 上一轮质量循环已把这条记为 G2-c 遗留，本轮确认仍未修复。
+     *
+     * <p><b>归属校验在 service 层</b>（{@link RagSearchService#deleteOwnedDocument}）：
+     * 不存在与非本人统一返回 404，不泄露文档存在性。
+     */
+    @Operation(summary = "删除知识点（按用户隔离）")
+    @DeleteMapping("/{docId}")
+    public Result<Map<String, Object>> deleteDocument(@PathVariable String docId) {
+        String userId = currentUserId();
+        if (!ragSearchService.deleteOwnedDocument(docId, userId)) {
+            throw new com.example.interview.common.ResourceNotFoundException("知识点不存在或无权删除");
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("removed", 1);
+        return Result.success(result);
+    }
 }
