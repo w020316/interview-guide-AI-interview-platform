@@ -305,11 +305,19 @@ async function send(preset?: string) {
 
     const reader = resp.body.getReader()
     const parser = new AgentSseParser()
+    // P1-8（2026-10-21 质量循环）：decoder 必须在整个流生命周期内复用。
+    // 原写法每片 `new TextDecoder()`，而 `{stream:true}` 的语义是「把不完整的尾部
+    // 字节留在**该实例内部**等下一片」——每片新建实例等于每片都丢弃尾部残字节，
+    // 下一片开头的续字节在全新 decoder 里非法 → 输出 U+FFFD（「�」）。
+    // 中文在 UTF-8 是 3 字节，分片边界落在字符中间的概率约 2/3，而网络分片边界随机。
+    // 表现：流式回答零星出现「�」，刷新后重新加载历史会话又正常（历史走 JSON 接口），
+    // 极易被误判成「模型输出有问题」。同仓 InterviewView.vue:960 是正确的单实例写法。
+    const decoder = new TextDecoder()
     let errorMsg = ''
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      for (const evt of parser.feed(new TextDecoder().decode(value, { stream: true }))) {
+      for (const evt of parser.feed(decoder.decode(value, { stream: true }))) {
         if (evt.event === 'meta') {
           try {
             const meta = JSON.parse(evt.data)
@@ -323,6 +331,17 @@ async function send(preset?: string) {
           errorMsg = evt.data || 'AI 服务异常，请重试'
         } else if (evt.event === 'done') {
           // 结束
+        }
+      }
+    }
+    // 流结束后冲刷 decoder 的尾部字节。正常 SSE 以 `\n\n` 收尾，此处通常为空；
+    // 但连接被提前关闭时可能残留半个多字节字符，冲刷后交给 parser 统一收尾，
+    // 避免「最后半个字丢失」与「残留字节泄漏到下一次请求」两种隐患。
+    const tail = decoder.decode()
+    if (tail) {
+      for (const evt of parser.feed(tail)) {
+        if (evt.event === 'token' && bubblePushed) {
+          assistantMsg.content += evt.data
         }
       }
     }
