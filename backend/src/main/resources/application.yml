@@ -99,7 +99,8 @@ app:
     #
     # 限流键：已登录 = userId，匿名 = 客户端 IP（匿名令牌 isAuthenticated() 恒为 true，
     # 实现里已显式排除 AnonymousAuthenticationToken，否则全站匿名共用一个桶）。
-    # 超限响应遵循 docs/api-error-contract.md：HTTP 200 + body code=429。
+    # 超限响应：HTTP 429 + body {code:429, message}（与既有 IP 限流 RateLimitInterceptor 口径一致），
+    # 并带 Retry-After / X-Rate-Limit-Remaining；前端 api/index.ts 的 429 分支展示后端文案且不重试。
     user-rate-limit:
       enabled: ${AI_USER_RATE_LIMIT_ENABLED:true}
       # 普通 AI 端点路径（逗号分隔）。取值依据是「逐个控制器 → 顺着 service 找

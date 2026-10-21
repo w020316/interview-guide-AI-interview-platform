@@ -215,8 +215,8 @@ class AiRateLimitFilterTest {
     class OverLimit {
 
         @Test
-        @DisplayName("超限返回 HTTP 200 + body code=429，并带 Retry-After")
-        void overLimit_returnsContractCompliantBody() throws Exception {
+        @DisplayName("超限返回真 HTTP 429 + body code=429，并带 Retry-After")
+        void overLimit_returnsHttpAndBodyStatus() throws Exception {
             AiRateLimitFilter filter = filter(1, 5);
             loginAs("1");
             passThrough(filter, request(INTERVIEW_PATH, IP_A), new MockHttpServletResponse());
@@ -225,8 +225,9 @@ class AiRateLimitFilterTest {
             boolean passed = passThrough(filter, request(INTERVIEW_PATH, IP_A), response);
 
             assertThat(passed).as("超限请求不得进入业务链路").isFalse();
-            // 契约 §2：代码侧直接产出的业务错误 = HTTP 200 + body code≠200
-            assertThat(response.getStatus()).isEqualTo(200);
+            // 状态码必须是真的 429：HTTP 200 会让按状态码分流的网关/监控/前端 error 分支
+            // 全都看不见限流发生过（与既有 RateLimitInterceptor 口径保持一致）。
+            assertThat(response.getStatus()).isEqualTo(429);
             JsonNode body = objectMapper.readTree(response.getContentAsString());
             assertThat(body.get("code").asInt()).isEqualTo(429);
             assertThat(body.get("message").asText()).contains("过于频繁").contains("上限 1 次/1 分钟");

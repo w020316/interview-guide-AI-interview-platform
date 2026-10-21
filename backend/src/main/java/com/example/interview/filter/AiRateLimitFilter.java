@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -59,10 +60,30 @@ import java.util.List;
  * 分片推送（以及收尾的 ASYNC dispatch）都不会重复计数 —— 否则一个正常的长回答
  * 就能把用户配额吃光。
  *
- * <h2>超限响应口径</h2>
+ * <h2>超限响应口径：真 HTTP 429 + body code=429</h2>
  *
- * <p>遵循 {@code docs/api-error-contract.md} §2：本项目的业务错误由代码侧直接产出时，
- * <b>HTTP 保持 200，语义由 body 的 {@code code} 承载</b>（429 = 限流）。
+ * <p>{@code docs/api-error-contract.md} §2 允许「HTTP 200 + body code≠200」这一形态，
+ * 但那只适用于<b>控制器内校验后 return {@code Result.error(...)}</b> 的场景。
+ * 限流的语义载体必须是<b>HTTP 状态码 429</b>，理由有三：
+ *
+ * <ol>
+ *   <li><b>状态码是网关/监控/重试中间件的唯一可编程入口</b>。契约把 429 单列为
+ *       「额度/限流」语义（§4：429 = 限流/配额耗尽，客户端应「禁止自动重试」），
+ *       这正是靠 status 传递的；HTTP 200 会让任何按状态码分流的下游（CDN、限流中间件、
+ *       axios 类库、按 4xx 统计的告警）都看不见限流发生过。</li>
+ *   <li><b>与既有 IP 限流口径统一</b>：{@code RateLimitInterceptor} 一直返回真 429，
+ *       同一个项目里两种限流返回两种状态码，只会让前端和排障各自维护一套判断。</li>
+ *   <li><b>HTTP 200 会把语义丢在错误分支里</b>：前端响应拦截器在 2xx 分支读到
+ *       {@code body.code != 200} 后只 reject 一个裸 {@code Error(message)}，
+ *       {@code code} 字段被丢弃，调用方无法分辨「限流」与「普通业务失败」，
+ *       契约 §5 要求的「限流提示 + 禁止自动重试 + 倒计时」无从触发。</li>
+ * </ol>
+ *
+ * <p>因此：<b>status = 429 承载语义</b>，body 仍写 {@code Result.error(429, ...)}
+ * （结构与成功响应一致，兼容按 body code 判读的客户端），并附
+ * {@code Retry-After} 与 {@code X-Rate-Limit-Remaining} 供页面做倒计时。
+ * 前端 {@code api/index.ts} 的 error 分支据此展示后端中文文案且<b>不进入冷启动重放</b>
+ * （重放一次只会再吃一次限流、加剧配额耗尽）。
  *
  * <h2>排除范围</h2>
  *
@@ -310,13 +331,18 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
     }
 
     /**
-     * 写出超限响应。
+     * 写出超限响应：<b>HTTP 429</b> + {@code Result} 结构 body（{@code code=429}）。
      *
-     * <p>HTTP 状态保持 200：契约（{@code docs/api-error-contract.md} §2）把
-     * 「代码侧直接产出业务错误」定义为 HTTP 200 + body {@code code != 200}。
+     * <p>为什么是 429 而不是 HTTP 200：状态码才是限流的可编程语义入口（契约 §4
+     * 「429 = 限流/配额耗尽，客户端禁止自动重试」）。HTTP 200 会让按状态码分流的网关、
+     * 监控、以及前端 error 分支全部看不见限流发生。body 仍保持 {@code Result} 结构，
+     * 是为了兼容按 {@code body.code} 判读的调用方与日志分析。
+     *
+     * <p>{@code Retry-After} 供前端页面做倒计时（秒），{@code X-Rate-Limit-Remaining}
+     * 与 IP 限流拦截器保持同名同义。
      */
     private void writeRateLimited(HttpServletResponse response, int quota) throws IOException {
-        response.setStatus(HttpServletResponse.SC_OK);
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setHeader("Retry-After", String.valueOf(windowSeconds));
