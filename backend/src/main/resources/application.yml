@@ -296,6 +296,20 @@ app:
     channels: []
     # 定时刷新：每 1 小时拉取一次各平台岗位（v1.27.0 由 6h 收紧，满足“每小时实时更新”）
     refresh-fixed-delay-ms: ${JOB_REFRESH_DELAY:3600000}
+    # ── 两个数据源的翻页轮转（P1-6，2026-10-21）────────────────────────────
+    # 此前 pageIndex / offset 是写死或缺省的：腾讯永远只抓第 1 页（200/2287 ≈ 8.7%），
+    # 亚马逊永远只取前 50 条（50/236 ≈ 21%），其余岗位从上线起就没进过库。
+    # 现在按游标逐轮轮转，页数上限由响应里的 Count/hits 动态推导。
+    #
+    # pages-per-refresh：每轮拉几页，默认 1。
+    #   调大它能更快覆盖全量，代价是单轮耗时变长、上游压力变大：
+    #     腾讯 12 页 → 默认 1 页/轮 × 6h ≈ 3 天覆盖 2282 条
+    #     亚马逊 5 页 → 默认 1 页/轮 × 6h ≈ 30h 覆盖 236 条
+    #   60 天窗口非常宽裕，所以默认不激进。
+    tencent:
+      pages-per-refresh: ${JOB_TENCENT_PAGES_PER_REFRESH:1}
+    amazon:
+      pages-per-refresh: ${JOB_AMAZON_PAGES_PER_REFRESH:1}
   rag:
     # 知识库导入去重相似度阈值（0.0~1.0），相似度 >= 此值视为重复，跳过导入
     # 0.90 对应 cosine distance <= 0.10，覆盖文本微调后重复的场景

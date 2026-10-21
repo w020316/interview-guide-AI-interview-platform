@@ -2,6 +2,8 @@ package com.example.interview.service.job;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -41,13 +43,38 @@ import java.util.List;
 @Component
 public class AmazonChinaJobProvider extends AbstractOpenApiJobProvider {
 
+    private static final Logger log = LoggerFactory.getLogger(AmazonChinaJobProvider.class);
+
     private static final String PLATFORM = "亚马逊中国";
 
     /** 实测稳定上限：50 条约 346KB；100 条会被截断 */
     private static final int PAGE_SIZE = 50;
 
-    private static final String ENDPOINT =
-            "https://www.amazon.jobs/en/search.json?country=CHN&result_limit=" + PAGE_SIZE;
+    /** 取不到 {@code hits} 时的保守页数上限（10 页 × 50 = 500 条，覆盖实测 236 条） */
+    private static final int FALLBACK_MAX_PAGE = 10;
+
+    private static final String BASE_URL = "https://www.amazon.jobs/en/search.json";
+
+    /**
+     * 偏移游标（P1-6，2026-10-21）：{@code offset} 是**条目偏移**（不是页码），
+     * 每次步进 {@link #PAGE_SIZE}，到末条回绕到 0。
+     *
+     * <p>此前 URL 里没有 {@code offset}，等价于永远只取前 50 条 —— 实测 hits=236，
+     * 也就是 79% 的中国岗位从未进库。
+     */
+    private final java.util.concurrent.atomic.AtomicInteger offsetCursor =
+            new java.util.concurrent.atomic.AtomicInteger(0);
+
+    /** 页数上限：由响应里的 {@code hits} 推导（{@code ceil(hits / 50)}） */
+    private volatile int maxPage = FALLBACK_MAX_PAGE;
+
+    /**
+     * 每轮拉取几页，默认 1（5 轮 × 6h ≈ 30h 覆盖 236 条，没必要更激进）。
+     * 调大 {@code app.jobs.amazon.pages-per-refresh} 可更快覆盖，代价是单轮变慢。
+     * 字段初始化给 1：单元测试直接 new，不走 Spring 注入。
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.jobs.amazon.pages-per-refresh:1}")
+    private int pagesPerRefresh = 1;
 
     public AmazonChinaJobProvider(ObjectMapper objectMapper) {
         super(objectMapper);
@@ -71,7 +98,74 @@ public class AmazonChinaJobProvider extends AbstractOpenApiJobProvider {
 
     @Override
     protected String endpoint() {
-        return ENDPOINT;
+        return buildUrl(0);
+    }
+
+    /**
+     * 按偏移游标轮转抓取（P1-6）。
+     *
+     * <p>每轮推进 {@code pagesPerRefresh} 页、页内步长 50，到末页回绕到 0。
+     * 页数上限来自响应的 {@code hits}（{@code ceil(hits / 50)}），岗位总数变化时自适应。
+     */
+    @Override
+    public List<JobDto> fetch() {
+        int pages = Math.max(1, pagesPerRefresh);
+        List<JobDto> all = new ArrayList<>();
+        for (int i = 0; i < pages; i++) {
+            String url = buildUrl(nextOffset());
+            String body;
+            try {
+                body = fetchRaw(url);
+            } catch (IllegalStateException e) {
+                throw e;
+            } catch (Exception e) {
+                log.warn("公开数据源 {} 拉取失败：{}", platform(), e.getMessage());
+                throw new IllegalStateException("拉取失败：" + e.getMessage(), e);
+            }
+            JsonNode root;
+            try {
+                root = objectMapper.readTree(body);
+            } catch (Exception e) {
+                log.warn("公开数据源 {} 数据解析失败：{}", platform(), e.getMessage());
+                throw new IllegalStateException("数据解析失败：" + e.getMessage(), e);
+            }
+            updateMaxPage(root);
+            all.addAll(applyQuotaForSource(parse(root)));
+        }
+        return all;
+    }
+
+    /** 拼请求 URL（条目偏移是唯一变量） */
+    static String buildUrl(int offset) {
+        return BASE_URL + "?country=CHN&result_limit=" + PAGE_SIZE + "&offset=" + offset;
+    }
+
+    /** 由 hits 推导页数上限：{@code ceil(hits / 50)}；hits 非法时保持原值 */
+    static int maxPageOf(long hits) {
+        if (hits <= 0) {
+            return FALLBACK_MAX_PAGE;
+        }
+        return Math.max(1, (int) Math.ceil(hits / (double) PAGE_SIZE));
+    }
+
+    /** 当前页数上限（测试与诊断用） */
+    int maxPage() {
+        return maxPage;
+    }
+
+    /** 取下一个偏移并推进游标（末页回绕到 0） */
+    private int nextOffset() {
+        int maxOffset = (maxPage - 1) * PAGE_SIZE;
+        return offsetCursor.getAndUpdate(o -> o >= maxOffset ? 0 : o + PAGE_SIZE);
+    }
+
+    /** 从响应读 {@code hits} 并更新页数上限；缺失时保留当前值 */
+    private void updateMaxPage(JsonNode root) {
+        JsonNode hitsNode = root == null ? null : root.get("hits");
+        if (hitsNode == null || !hitsNode.isNumber()) {
+            return;
+        }
+        maxPage = maxPageOf(hitsNode.asLong());
     }
 
     @Override

@@ -115,7 +115,26 @@ public interface JobPostingRepository extends JpaRepository<JobPostingEntity, Lo
     @Query("UPDATE JobPostingEntity j SET j.active = false WHERE j.active = true AND j.deadline < :date")
     int deactivateExpired(@Param("date") LocalDate date);
 
-    /** 清理长期未刷新的非内置数据（updated_at 早于阈值，避免第三方平台脏数据长期滞留） */
+    /**
+     * 长期未刷新的第三方岗位 → <b>下架</b>（P1-6，2026-10-21）。
+     *
+     * <p><b>为什么不再直接 DELETE</b>：外部源是按页抓取的，一轮抓不到某条岗位有很多原因
+     * （翻页没轮到它、上游临时抖动、该源当天被限流）。此前 60 天一到就物理删除，
+     * 于是「抓不到」被永久固化成「岗位消失」，且没有任何恢复路径——这正是国内岗位
+     * 越刷越少的自衰减机制链。改成下架后：岗位只是从列表消失，数据仍在库里；
+     * 一旦重新抓到，{@code JobAgentService#applyJobFields} 会把 {@code active} 置回 true
+     * （upsert 复活），用户视角就是「又出现了」。
+     *
+     * <p>{@code AND j.active = true}：只统计「本次真正被下架」的行数，
+     * 否则每轮都把已下架的再算一遍，日志上的「下架 N 条」会长期虚高、失去观测价值。
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE JobPostingEntity j SET j.active = false "
+            + "WHERE j.platform <> :builtin AND j.updatedAt < :threshold AND j.active = true")
+    int deactivateStaleThirdParty(@Param("builtin") String builtin,
+                                 @Param("threshold") LocalDateTime threshold);
+
+    /** 物理清理长期未刷新的非内置数据（P1-6：阈值由 60 天放宽到 180 天，仅作最终清理） */
     @Modifying
     @Query("DELETE FROM JobPostingEntity j WHERE j.platform <> :builtin AND j.updatedAt < :date")
     int deleteStaleThirdParty(@Param("builtin") String builtin, @Param("date") LocalDateTime date);

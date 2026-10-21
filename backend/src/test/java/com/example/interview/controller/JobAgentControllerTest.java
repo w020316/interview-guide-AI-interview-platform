@@ -367,7 +367,7 @@ class JobAgentControllerTest {
     @DisplayName("POST /api/jobs/refresh: 正常刷新返回统计结果")
     void refresh_success_returnsStats() throws Exception {
         when(jobAgentService.refresh())
-                .thenReturn(new JobAgentService.RefreshResult(2, 1, 1, 3, 1));
+                .thenReturn(new JobAgentService.RefreshResult(2, 1, 1, 3, 0, 1));
 
         mockMvc.perform(post("/api/jobs/refresh"))
                 .andExpect(status().isOk())
@@ -417,7 +417,7 @@ class JobAgentControllerTest {
         limiter.allow("someone-else");
         limiter.allow(USER_ID);
         when(jobAgentService.refresh())
-                .thenReturn(new JobAgentService.RefreshResult(1, 1, 0, 0, 0));
+                .thenReturn(new JobAgentService.RefreshResult(1, 1, 0, 0, 0, 0));
 
         mockMvc.perform(post("/api/jobs/refresh"))
                 .andExpect(status().isOk())

@@ -2,6 +2,8 @@ package com.example.interview.service.job;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -36,17 +38,43 @@ import java.util.List;
 @Component
 public class TencentCareersJobProvider extends AbstractOpenApiJobProvider {
 
+    private static final Logger log = LoggerFactory.getLogger(TencentCareersJobProvider.class);
+
     private static final String PLATFORM = "腾讯招聘";
 
     /**
-     * 单页 200 条（实测生效），配合 6 小时一轮的默认刷新间隔。
-     * 全量 2287 条约需 2 天累积——幂等 upsert 保证重复拉取不会产生重复岗位。
+     * 单页 200 条（实测生效）。
+     *
+     * <p>P1-6（2026-10-21）：此前 {@code pageIndex=1} 被写死在 URL 里，于是**永远只抓第一页**
+     * ——200/2287 ≈ 8.7% 的岗位能被看见，其余 2000+ 条从上线起就没进过库。
+     * 现在按 {@link #pagesPerRefresh} 逐轮轮转页码。
      */
     private static final int PAGE_SIZE = 200;
 
-    private static final String ENDPOINT =
-            "https://careers.tencent.com/tencentcareer/api/post/Query"
-                    + "?pageIndex=1&pageSize=" + PAGE_SIZE + "&language=zh-cn";
+    /** 取不到 {@code Data.Count} 时的保守页数上限（15 页 × 200 ≈ 3000 条，覆盖实测总量） */
+    private static final int FALLBACK_MAX_PAGE = 15;
+
+    private static final String BASE_URL =
+            "https://careers.tencent.com/tencentcareer/api/post/Query";
+
+    /** 页码游标：1..maxPage 循环推进（刷新线程单线程调用，仍用 Atomic 以防调度重叠） */
+    private final java.util.concurrent.atomic.AtomicInteger pageCursor =
+            new java.util.concurrent.atomic.AtomicInteger(1);
+
+    /** 页数上限：首次响应后按 {@code Data.Count} 动态推导，岗位总数变化时自适应 */
+    private volatile int maxPage = FALLBACK_MAX_PAGE;
+
+    /**
+     * 每轮拉取几页，默认 1。
+     *
+     * <p>为什么不默认更大：拉多页会拉长单轮耗时并增加上游压力，而 60 天窗口非常宽裕
+     * ——12 轮 × 6h ≈ 3 天就能覆盖 2282 条，完全够用。
+     * 想更快覆盖就调大 {@code app.jobs.tencent.pages-per-refresh}，代价是单轮变慢。
+     *
+     * <p>字段初始化给 1 是必要的：单元测试直接 {@code new} 出来的实例不走 Spring 注入。
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.jobs.tencent.pages-per-refresh:1}")
+    private int pagesPerRefresh = 1;
 
     public TencentCareersJobProvider(ObjectMapper objectMapper) {
         super(objectMapper);
@@ -70,7 +98,75 @@ public class TencentCareersJobProvider extends AbstractOpenApiJobProvider {
 
     @Override
     protected String endpoint() {
-        return ENDPOINT;
+        return buildUrl(1);
+    }
+
+    /**
+     * 按游标轮转抓取（P1-6）。
+     *
+     * <p>每轮推进 {@code pagesPerRefresh} 页，到末页回绕到第 1 页。页数上限来自
+     * 响应里的 {@code Data.Count}（{@code ceil(Count / 200)}），所以上游岗位总数增减时
+     * 不需要改代码，也不会一直去请求不存在的页。
+     */
+    @Override
+    public List<JobDto> fetch() {
+        int pages = Math.max(1, pagesPerRefresh);
+        List<JobDto> all = new ArrayList<>();
+        for (int i = 0; i < pages; i++) {
+            String url = buildUrl(nextPage());
+            String body;
+            try {
+                body = fetchRaw(url);
+            } catch (IllegalStateException e) {
+                throw e;
+            } catch (Exception e) {
+                log.warn("公开数据源 {} 拉取失败：{}", platform(), e.getMessage());
+                throw new IllegalStateException("拉取失败：" + e.getMessage(), e);
+            }
+            JsonNode root;
+            try {
+                root = objectMapper.readTree(body);
+            } catch (Exception e) {
+                log.warn("公开数据源 {} 数据解析失败：{}", platform(), e.getMessage());
+                throw new IllegalStateException("数据解析失败：" + e.getMessage(), e);
+            }
+            updateMaxPage(root);
+            // 配额按**页**计算（200/页），翻页不放大单轮上限
+            all.addAll(applyQuotaForSource(parse(root)));
+        }
+        return all;
+    }
+
+    /** 拼请求 URL（页码是唯一变量，便于单测直接断言） */
+    static String buildUrl(int pageIndex) {
+        return BASE_URL + "?pageIndex=" + pageIndex + "&pageSize=" + PAGE_SIZE + "&language=zh-cn";
+    }
+
+    /** 由岗位总数推导页数上限：{@code ceil(count / 200)}；count 非法时保持原值 */
+    static int maxPageOf(long count) {
+        if (count <= 0) {
+            return FALLBACK_MAX_PAGE;
+        }
+        return Math.max(1, (int) Math.ceil(count / (double) PAGE_SIZE));
+    }
+
+    /** 当前页数上限（测试与诊断用） */
+    int maxPage() {
+        return maxPage;
+    }
+
+    /** 取下一页页码并推进游标（到末页回绕到 1） */
+    private int nextPage() {
+        return pageCursor.getAndUpdate(p -> p >= maxPage ? 1 : p + 1);
+    }
+
+    /** 从响应里读 {@code Data.Count} 并更新页数上限；缺失时保留当前值（不退回默认，避免抖动） */
+    private void updateMaxPage(JsonNode root) {
+        JsonNode countNode = root == null ? null : root.path("Data").path("Count");
+        if (countNode == null || !countNode.isNumber()) {
+            return;
+        }
+        maxPage = maxPageOf(countNode.asLong());
     }
 
     @Override

@@ -766,4 +766,88 @@ class JobAgentServiceTest {
                 .extracting(JobPostingEntity::getPlatform)
                 .contains("行业精选", "RemoteOK 全球远程");
     }
+
+    // ─────────── P1-6：两段式清理（60 天下架可复活 / 180 天物理删除） ───────────
+    //
+    // 背景：此前 60 天一到就 DELETE，于是「本轮没抓到」被永久固化成「岗位消失」，
+    // 且没有任何恢复路径。外部源是按页抓取的，抓不到的原因大多是良性的
+    // （没轮到该页 / 上游抖动 / 被限流），不该等同于岗位不存在。
+
+    @Autowired
+    private jakarta.persistence.EntityManager entityManager;
+
+    /**
+     * 造一条「发布在前 daysOld 天」的岗位。
+     *
+     * <p>必须用原生 SQL 回填 {@code updated_at}：`@UpdateTimestamp` 会在写入时把它覆盖成 now，
+     * 用实体赋值是无效的（这正是「过期逻辑永远测不出来」的常见原因）。
+     */
+    private Long saveStaleJob(String platform, String externalId, int daysOld) {
+        JobPostingEntity saved = jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform(platform)
+                .externalId(externalId)
+                .title("岗位-" + externalId)
+                .companyName("某公司")
+                .active(true)
+                .build());
+        entityManager.createNativeQuery("UPDATE job_posting SET updated_at = :ts WHERE id = :id")
+                .setParameter("ts", java.time.LocalDateTime.now().minusDays(daysOld))
+                .setParameter("id", saved.getId())
+                .executeUpdate();
+        entityManager.flush();
+        entityManager.clear();
+        return saved.getId();
+    }
+
+    @Test
+    @DisplayName("P1-6：61 天未更新的第三方岗位 → 只下架不删除，数据仍在库里")
+    void stale61Days_isDeactivatedNotDeleted() {
+        Long id = saveStaleJob("腾讯招聘", "tx-stale-61", 61);
+
+        JobAgentService.RefreshResult result = newH2Service(List.of()).refresh();
+
+        JobPostingEntity reloaded = jpaRepository.findById(id).orElse(null);
+        assertThat(reloaded).as("60 天不再物理删除，数据必须还在").isNotNull();
+        assertThat(reloaded.getActive()).as("应从列表下架").isFalse();
+        assertThat(result.deactivated()).as("下架数量要能被观测到").isGreaterThanOrEqualTo(1);
+        assertThat(result.removed()).as("60 天档不应删除任何行").isZero();
+    }
+
+    @Test
+    @DisplayName("P1-6：180 天未更新的第三方岗位才物理删除")
+    void stale181Days_isDeleted() {
+        Long id = saveStaleJob("腾讯招聘", "tx-stale-181", 181);
+
+        JobAgentService.RefreshResult result = newH2Service(List.of()).refresh();
+
+        assertThat(jpaRepository.findById(id)).as("超长期数据应被物理清理").isEmpty();
+        assertThat(result.removed()).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("P1-6：下架后重新抓到的岗位会被 upsert 复活（active 置回 true）")
+    void revivesWhenFetchedAgain() {
+        Long id = saveStaleJob("腾讯招聘", "tx-revive", 61);
+        newH2Service(List.of()).refresh();
+        assertThat(jpaRepository.findById(id).orElseThrow().getActive()).isFalse();
+
+        // 下一轮该源又抓到了同一条（同一 externalId）
+        newH2Service(List.of(new FakeAdapter("腾讯招聘",
+                List.of(dto("tx-revive", "后端开发", "腾讯", null, "技术"))))).refresh();
+
+        JobPostingEntity revived = jpaRepository.findById(id).orElseThrow();
+        assertThat(revived.getActive()).as("重新抓到即复活，这是「下架」而非「删除」的核心价值").isTrue();
+    }
+
+    @Test
+    @DisplayName("P1-6：内置精选永不被清理（无论多久没更新）")
+    void builtinJobsAreNeverCleaned() {
+        Long id = saveStaleJob("内置精选", "seed-ancient", 400);
+
+        newH2Service(List.of()).refresh();
+
+        JobPostingEntity kept = jpaRepository.findById(id).orElse(null);
+        assertThat(kept).as("内置数据不参与第三方清理").isNotNull();
+        assertThat(kept.getActive()).isTrue();
+    }
 }

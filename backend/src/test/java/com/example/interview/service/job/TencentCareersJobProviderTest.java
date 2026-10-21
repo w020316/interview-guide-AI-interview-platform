@@ -110,4 +110,99 @@ class TencentCareersJobProviderTest {
         // 海外单源配额是 AbstractOpenApiJobProvider.MAX_ITEMS_PER_REFRESH（15）
         assertThat(provider().maxItemsPerRefresh()).isGreaterThan(15 * 5);
     }
+
+    // ─────────────────── P1-6：分页轮转（此前 pageIndex 写死为 1） ───────────────────
+
+    /**
+     * 记录请求 URL 并返回固定响应的子类。
+     *
+     * <p>只覆写 {@code fetchRaw}（唯一触网的地方），因此轮转逻辑、URL 拼接、页数推导
+     * 全部按真实代码执行，只是不走网络——CI 不依赖上游可用性。
+     */
+    private static final class RecordingProvider extends TencentCareersJobProvider {
+        private final List<String> urls = new java.util.ArrayList<>();
+        private final String body;
+
+        RecordingProvider(String body) {
+            super(MAPPER);
+            this.body = body;
+        }
+
+        @Override
+        protected String fetchRaw(String url) {
+            urls.add(url);
+            return body;
+        }
+    }
+
+    /** 造一个「总数 count、当页 1 条岗位」的响应 */
+    private static String pageBody(long count) {
+        return "{\"Code\":200,\"Data\":{\"Count\":" + count + ",\"Posts\":["
+                + "{\"PostId\":\"p1\",\"RecruitPostName\":\"后端开发\",\"IsValid\":true}]}}";
+    }
+
+    @Test
+    @DisplayName("P1-6：页数上限由 Data.Count 动态推导（2282 → 12 页；缺省回退 15）")
+    void maxPageDerivedFromCount() {
+        assertThat(TencentCareersJobProvider.maxPageOf(2282)).isEqualTo(12);
+        assertThat(TencentCareersJobProvider.maxPageOf(2400)).isEqualTo(12);
+        assertThat(TencentCareersJobProvider.maxPageOf(2001)).isEqualTo(11);
+        assertThat(TencentCareersJobProvider.maxPageOf(1)).isEqualTo(1);
+        // count 缺失/非法：回退到保守上限，而不是停留在 1 页
+        assertThat(TencentCareersJobProvider.maxPageOf(0)).isEqualTo(15);
+        assertThat(TencentCareersJobProvider.maxPageOf(-5)).isEqualTo(15);
+    }
+
+    @Test
+    @DisplayName("P1-6：请求 URL 携带 pageIndex 与 pageSize（此前 pageIndex 永远=1）")
+    void buildUrlCarriesPageIndex() {
+        assertThat(TencentCareersJobProvider.buildUrl(3))
+                .contains("pageIndex=3")
+                .contains("pageSize=200");
+        assertThat(TencentCareersJobProvider.buildUrl(1)).contains("pageIndex=1");
+    }
+
+    @Test
+    @DisplayName("P1-6：默认每轮 1 页，页码 1→2→3 轮转并在末页回绕到 1")
+    void rotatesPageIndexAcrossRefreshes() {
+        RecordingProvider provider = new RecordingProvider(pageBody(600)); // 600/200 = 3 页
+
+        for (int round = 0; round < 4; round++) {
+            provider.fetch();
+        }
+
+        assertThat(provider.urls).hasSize(4);
+        assertThat(provider.urls.get(0)).contains("pageIndex=1");
+        assertThat(provider.urls.get(1)).contains("pageIndex=2");
+        assertThat(provider.urls.get(2)).contains("pageIndex=3");
+        assertThat(provider.urls.get(3)).as("末页之后回绕到第 1 页").contains("pageIndex=1");
+    }
+
+    @Test
+    @DisplayName("P1-6：pages-per-refresh=N 时一轮连抓 N 页，游标整体推进 N")
+    void fetchesMultiplePagesPerRefresh() {
+        RecordingProvider provider = new RecordingProvider(pageBody(1000)); // 5 页
+        org.springframework.test.util.ReflectionTestUtils.setField(provider, "pagesPerRefresh", 3);
+
+        provider.fetch(); // 1,2,3
+        provider.fetch(); // 4,5 然后回绕 1
+
+        assertThat(provider.urls).hasSize(6);
+        assertThat(provider.urls.get(0)).contains("pageIndex=1");
+        assertThat(provider.urls.get(1)).contains("pageIndex=2");
+        assertThat(provider.urls.get(2)).contains("pageIndex=3");
+        assertThat(provider.urls.get(3)).contains("pageIndex=4");
+        assertThat(provider.urls.get(4)).contains("pageIndex=5");
+        assertThat(provider.urls.get(5)).contains("pageIndex=1");
+    }
+
+    @Test
+    @DisplayName("P1-6：响应里没有 Count 时沿用保守上限，不因一次异常响应退化成只抓 1 页")
+    void missingCountKeepsFallbackCeiling() {
+        RecordingProvider provider = new RecordingProvider("{\"Data\":{\"Posts\":[]}}");
+
+        provider.fetch();
+
+        assertThat(provider.maxPage()).isEqualTo(15);
+    }
 }

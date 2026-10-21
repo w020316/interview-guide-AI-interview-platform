@@ -77,7 +77,18 @@ public class JobAgentService {
     }
 
     /** 刷新结果统计 */
-    public record RefreshResult(int upserted, int inserted, int updated, int expired, int removed) {
+    /**
+     * 刷新结果。
+     *
+     * @param upserted    本轮写入（新增+更新）的岗位数
+     * @param inserted    其中新增
+     * @param updated     其中更新
+     * @param expired     因截止日期已过而下架的数量
+     * @param deactivated 因长期（60 天）未更新而<b>下架</b>的数量（P1-6：可复活，不是删除）
+     * @param removed     因超长期（180 天）未更新而<b>物理删除</b>的数量
+     */
+    public record RefreshResult(int upserted, int inserted, int updated, int expired,
+                                int deactivated, int removed) {
     }
 
     /** 是否有刷新任务正在执行（管理后台总览展示） */
@@ -205,18 +216,28 @@ public class JobAgentService {
             }
         }
 
-        // 数据更新机制：截止日期已过 30 天的下架；非内置数据 60 天未更新则清理
+        // 数据更新机制（P1-6，2026-10-21 两段式）：
+        //   ① 截止日期已过 30 天        → 下架
+        //   ② 非内置数据 60 天未更新    → 下架（active=false，**保留数据**，重新抓到即复活）
+        //   ③ 非内置数据 180 天未更新   → 物理删除（最终清理，防止库无界增长）
+        // ②为什么不能是删除：外部源按页抓取，一轮抓不到有很多正常原因（没轮到该页/上游抖动/被限流），
+        // 删除会把「暂时没轮到」永久固化成「岗位消失」，且没有恢复路径。
         // @Modifying 查询需要事务：用 TransactionTemplate 短事务包裹，不再依赖外部长事务
         Integer expired = transactionTemplate.execute(status ->
                 repository.deactivateExpired(LocalDate.now().minusDays(30)));
+        Integer deactivated = transactionTemplate.execute(status ->
+                repository.deactivateStaleThirdParty("内置精选", LocalDateTime.now().minusDays(60)));
         Integer removed = transactionTemplate.execute(status ->
-                repository.deleteStaleThirdParty("内置精选", LocalDateTime.now().minusDays(60)));
+                repository.deleteStaleThirdParty("内置精选", LocalDateTime.now().minusDays(180)));
 
-        log.info("招聘信息刷新完成：新增 {} / 更新 {} / 下架 {} / 清理 {}", inserted, updated, expired, removed);
+        log.info("招聘信息刷新完成：新增 {} / 更新 {} / 过期下架 {} / 长期未更新下架 {} / 物理清理 {}",
+                inserted, updated, expired, deactivated, removed);
         // 数据已变，meta 缓存必须立刻失效（否则最多 5 分钟内筛选面板显示旧计数）
         metaCache.clear();
         return new RefreshResult(upserted, inserted, updated,
-                expired == null ? 0 : expired, removed == null ? 0 : removed);
+                expired == null ? 0 : expired,
+                deactivated == null ? 0 : deactivated,
+                removed == null ? 0 : removed);
     }
 
     /** 待写入岗位：dto + 其 AI/规则分类补全结果 */

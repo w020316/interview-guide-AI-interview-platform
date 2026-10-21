@@ -87,7 +87,7 @@ class AdminServiceTest {
     @DisplayName("refreshJobs: 正常返回刷新统计；刷新中抛 IllegalStateException")
     void refreshJobs_resultAndBusy() {
         when(jobAgentService.refresh())
-                .thenReturn(new JobAgentService.RefreshResult(2, 1, 1, 0, 0))
+                .thenReturn(new JobAgentService.RefreshResult(2, 1, 1, 0, 0, 0))
                 .thenReturn(null);
 
         var result = newService(new SimpleMeterRegistry()).refreshJobs();

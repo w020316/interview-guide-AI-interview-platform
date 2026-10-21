@@ -82,7 +82,7 @@ class AdminControllerTest {
     void admin_refreshJobs() throws Exception {
         loginAsAdmin();
         when(adminService.refreshJobs())
-                .thenReturn(new com.example.interview.service.job.JobAgentService.RefreshResult(2, 1, 1, 3, 1));
+                .thenReturn(new com.example.interview.service.job.JobAgentService.RefreshResult(2, 1, 1, 3, 0, 1));
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .post("/api/admin/jobs/refresh"))
