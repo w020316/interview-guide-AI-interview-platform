@@ -1,5 +1,6 @@
 package com.example.interview.controller;
 
+import com.example.interview.common.RateLimitExceededException;
 import com.example.interview.common.Result;
 import com.example.interview.entity.UserEntity;
 import com.example.interview.repository.UserRepository;
@@ -176,7 +177,7 @@ public class AuthController {
 
         // P2-04：注册按 IP 限流（默认 5 次/小时），防批量注册与枚举
         if (!registerLimiter.allow(com.example.interview.util.ClientIpUtil.resolve(request))) {
-            return Result.error(429, "注册过于频繁，请稍后再试");
+            throw new RateLimitExceededException("注册过于频繁，请稍后再试");
         }
 
         if (username == null || password == null) {
@@ -260,11 +261,11 @@ public class AuthController {
         // 账号维度是轮换 IP 无法绕过的兜底——这正是原实现的缺口。
         long ipLockedMin = lockedRemainingMinutes(loginFailMap, clientIp, MAX_FAIL_COUNT);
         if (ipLockedMin > 0) {
-            return Result.error(429, "登录失败次数过多，请 " + ipLockedMin + " 分钟后再试");
+            throw new RateLimitExceededException("登录失败次数过多，请 " + ipLockedMin + " 分钟后再试");
         }
         long accountLockedMin = lockedRemainingMinutes(accountFailMap, accountKey, MAX_FAIL_COUNT_PER_ACCOUNT);
         if (accountLockedMin > 0) {
-            return Result.error(429, "该账号登录失败次数过多，请 " + accountLockedMin + " 分钟后再试");
+            throw new RateLimitExceededException("该账号登录失败次数过多，请 " + accountLockedMin + " 分钟后再试");
         }
 
         UserEntity user = userRepository.findByUsername(username)
@@ -279,7 +280,7 @@ public class AuthController {
             if (remaining > 0) {
                 return Result.error(401, "用户名或密码错误，还可尝试 " + remaining + " 次");
             } else {
-                return Result.error(429, "登录失败次数过多，请 5 分钟后再试");
+                throw new RateLimitExceededException("登录失败次数过多，请 5 分钟后再试");
             }
         }
 
@@ -374,7 +375,7 @@ public class AuthController {
         }
 
         if (!changePasswordLimiter.allow(userId)) {
-            return Result.error(429, "修改密码过于频繁，请稍后再试");
+            throw new RateLimitExceededException("修改密码过于频繁，请稍后再试");
         }
 
         String oldPassword = req.get("oldPassword");

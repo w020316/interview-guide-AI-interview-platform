@@ -1,5 +1,6 @@
 package com.example.interview.controller;
 
+import com.example.interview.common.RateLimitExceededException;
 import com.example.interview.common.Result;
 import com.example.interview.service.InterviewService;
 import com.example.interview.util.HashUtil;
@@ -129,7 +130,7 @@ public class InterviewController {
 
         // v1.31.4（B-10）：AI 出题接口按用户限流，防自动化刷额度
         if (!aiLimiter.allow(currentUserId())) {
-            return Result.error(429, "操作过于频繁，请稍后再试");
+            throw new RateLimitExceededException("操作过于频繁，请稍后再试");
         }
 
         // 跨场自适应：难度偏置 + 弱项聚焦（可选，空则走默认）
@@ -212,7 +213,7 @@ public class InterviewController {
 
         // v1.31.4（B-10）：AI 评分接口按用户限流，防自动化刷额度
         if (!aiLimiter.allow(currentUserId())) {
-            return Result.error(429, "操作过于频繁，请稍后再试");
+            throw new RateLimitExceededException("操作过于频繁，请稍后再试");
         }
 
         // P2-06：bucket 转私有后公开 URL 将 404——服务端换签 10 分钟短时效签名 URL 供 AI 下载。
@@ -308,7 +309,7 @@ public class InterviewController {
         }
         // v1.31.4（B-10）：AI 追问接口按用户限流，防自动化刷额度
         if (!aiLimiter.allow(currentUserId())) {
-            return Result.error(429, "操作过于频繁，请稍后再试");
+            throw new RateLimitExceededException("操作过于频繁，请稍后再试");
         }
         return Result.success(interviewService.generateFollowUp(question, userAnswer, resumeText));
     }

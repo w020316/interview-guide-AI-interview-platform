@@ -404,11 +404,12 @@ class AuthControllerTest {
             }
 
             // 第 5 次：账号维度达到阈值 → 429（若只按 IP 计数，这里会是该 IP 的第 1 次失败、返回 401）
+            // 2026-10-21：限流收口到 RateLimitExceededException → GlobalExceptionHandler，状态码为真 429
             mockMvc.perform(post("/api/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .with(req -> { req.setRemoteAddr("203.0.113.5"); return req; })
                             .content(body))
-                    .andExpect(status().isOk())
+                    .andExpect(status().isTooManyRequests())
                     .andExpect(jsonPath("$.code").value(429));
 
             // 第 6 次：换一个全新 IP，此时走「预检已锁定」分支，且明确指出来自账号维度
@@ -416,7 +417,7 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .with(req -> { req.setRemoteAddr("203.0.113.200"); return req; })
                             .content(body))
-                    .andExpect(status().isOk())
+                    .andExpect(status().isTooManyRequests())
                     .andExpect(jsonPath("$.code").value(429))
                     .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("该账号")));
         }

@@ -83,10 +83,12 @@ class AuthRegisterRateLimitTest {
                 .andExpect(jsonPath("$.code").value(200));
 
         // 第 3 次：429 限流，且未触达用户仓储
+        // 2026-10-21：限流收口到 RateLimitExceededException → GlobalExceptionHandler，
+        // HTTP 状态码改为真 429（此前是 HTTP 200 + body code=429）
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("userc")))
-                .andExpect(status().isOk())
+                .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value(429))
                 .andExpect(jsonPath("$.message").value("注册过于频繁，请稍后再试"));
     }

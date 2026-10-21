@@ -360,7 +360,7 @@ class AuthChangePasswordTest {
             mockMvc.perform(post("/api/auth/change-password")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body("WrongPw#2026", "NewPw#2026")))
-                    .andExpect(status().isOk())
+                    .andExpect(status().isTooManyRequests())
                     .andExpect(jsonPath("$.code").value(429));
         }
     }

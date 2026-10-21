@@ -43,6 +43,38 @@ public class GlobalExceptionHandler {
         return Result.error(404, ex.getMessage());
     }
 
+    /**
+     * 触发限流 → <b>429</b>（2026-10-21，429 口径收口）。
+     *
+     * <h2>本处理器存在的唯一目的：让「429 只有一个出口」</h2>
+     *
+     * <p>此前限流分散在 10 处手写返回值（{@code return Result.error(429, ...)} → HTTP 200，
+     * 以及 2 处手写 {@code response.setStatus(429)}）。同一个语义两种载体，新增限流点时
+     * 必然漏改其中一处——这正是「清单跟不上演进」的典型形态。
+     *
+     * <p>现在业务代码只 {@code throw new RateLimitExceededException(msg)}，
+     * HTTP 状态码与 body 结构<b>全部由这一处决定</b>。要调整 429 的形态，
+     * 只改这个方法即可，不存在「散落各处必须同步」的问题。
+     *
+     * <p>形态说明：状态码 429 是主判据（网关/监控/客户端重试中间件据此分流，
+     * 见 {@code docs/api-error-contract.md} §4）；body 仍保持 {@link Result} 结构并带
+     * {@code code=429}，兼容按 body code 判读的调用方。二者同源，不会出现「状态码与
+     * body 不一致」的情形。
+     *
+     * <p>注：{@code Retry-After} 不在此处统一设置——窗口长度因限流器而异
+     * （注册 1/小时、登录锁定 5 分钟、AI 60/分钟、Agent 20/分钟），
+     * 写死一个值只会给出错误倒计时。带窗口语义的两处（{@code AiRateLimitFilter}、
+     * {@code JobAgentController#refresh}）各自在响应里设置该头。
+     */
+    @ExceptionHandler(RateLimitExceededException.class)
+    public org.springframework.http.ResponseEntity<Result<Void>> handleRateLimitExceeded(
+            RateLimitExceededException ex) {
+        log.warn("触发限流（429）：{}", ex.getMessage());
+        return org.springframework.http.ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(Result.error(429, ex.getMessage()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleIllegalArgument(IllegalArgumentException ex) {
