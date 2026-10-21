@@ -126,7 +126,10 @@ class AiRateLimitFilterTest {
                     "/api/knowledge/wrong-questions",
                     "/api/resume/history",              // 简历列表 CRUD
                     "/api/resume/12",                   // 简历详情
-                    "/api/jobs/refresh",                // JobAgentController 自带 1/5min 限流
+                    // 注意：/api/jobs/refresh 已纳入 AI 配额（它触发 AI 岗位分类），
+                    // 不再放在「不计数」列表里；单数 /api/job/ 与复数 /api/jobs/ 是两个控制器。
+                    "/api/jobs",                        // 岗位列表（全站最高频读接口）
+                    "/api/jobs/12",                     // 岗位详情
                     "/api/session/create",              // 只写库，AI 出题在 /api/interview/questions
                     "/api/session/answer",              // 只写库，AI 评分在 /api/interview/evaluate
                     "/api/todo/list",
@@ -158,6 +161,12 @@ class AiRateLimitFilterTest {
                     "/api/story-bank/42/check",         // StoryBankService#check → chatClient（段通配）
                     "/api/story-bank/42/followup",      // StoryBankService#followUp → chatClient（段通配）
                     "/api/application/9/tailor",        // TailoredResumeService#tailor → chatClient（段通配）
+                    // ResumeDocumentController:165 POST /api/resume/documents/{id}/autofill
+                    // → ResumeAutofillService:119 经 AiConcurrencyGuard 真调 LLM
+                    "/api/resume/documents/5/autofill",
+                    // JobAgentController:244 POST /api/jobs/refresh（复数 jobs）
+                    // → JobAgentService → JobClassifyService（AI 岗位分类）
+                    "/api/jobs/refresh",
             };
             for (String path : aiPaths) {
                 AiRateLimitFilter filter = filter(1, 5);
@@ -167,6 +176,66 @@ class AiRateLimitFilterTest {
                 assertThat(passThrough(filter, request(path, IP_A), new MockHttpServletResponse()))
                         .as("%s 第 2 次应被限流（说明该路径已纳入配额）", path).isFalse();
             }
+        }
+
+        /**
+         * 死规则回归（P1，QA 逐条复核发现）。
+         *
+         * <p>上一版把前端 {@code AI_PATH_FRAGMENTS} 里的 {@code '/autofill'}（前端用
+         * {@code url.includes()} 子串匹配）直接抄进后端配置，而后端是<b>路径段边界前缀匹配</b>
+         * —— {@code /autofill} 只能命中「以 /autofill 开头」的路径，
+         * 真实端点 {@code /api/resume/documents/{id}/autofill} 永远匹配不到。
+         * 这条用例把「死规则」钉死：单独 {@code /autofill} 必须不命中，
+         * 而真实路径必须命中。
+         */
+        @Test
+        @DisplayName("死规则回归：单独 /autofill 不命中，真实路径 /api/resume/documents/{id}/autofill 命中")
+        void autofillRuleMatchesRealPathNotFrontendFragment() throws Exception {
+            AiRateLimitFilter filter = filter(1, 5);
+            loginAs("1");
+
+            // ① 前端片段本身（后端并不存在这个端点）不得命中，也不得消耗配额
+            assertThat(passThrough(filter, request("/autofill", IP_A), new MockHttpServletResponse()))
+                    .as("单独 /autofill 不应命中任何规则").isTrue();
+            // ② 多一段也不命中（段通配恰好匹配一段）
+            assertThat(passThrough(filter, request("/api/resume/documents/5/autofill/preview", IP_A),
+                    new MockHttpServletResponse()))
+                    .as("多一段不应命中").isTrue();
+            // ③ 少一段（缺 id）不命中
+            assertThat(passThrough(filter, request("/api/resume/documents/autofill", IP_A),
+                    new MockHttpServletResponse()))
+                    .as("缺 id 段不应命中").isTrue();
+
+            // ④ 真实路径命中并消耗配额：此时配额仍是满的（前三次都没计数）
+            assertThat(passThrough(filter, request("/api/resume/documents/5/autofill", IP_A),
+                    new MockHttpServletResponse()))
+                    .as("真实路径第 1 次应放行").isTrue();
+            assertThat(passThrough(filter, request("/api/resume/documents/5/autofill", IP_A),
+                    new MockHttpServletResponse()))
+                    .as("真实路径第 2 次应被限流（证明它真的在配额内）").isFalse();
+        }
+
+        @Test
+        @DisplayName("P2 单复数错位回归：/api/jobs/refresh 命中，而 /api/jobs 列表与 /api/jobs/12 不命中")
+        void jobsRefreshIsCoveredButJobsListIsNot() throws Exception {
+            AiRateLimitFilter filter = filter(1, 5);
+            loginAs("1");
+
+            // 高频读接口绝不能被拦（写成 /api/jobs/* 就会误伤）
+            assertThat(passThrough(filter, request("/api/jobs", IP_A), new MockHttpServletResponse()))
+                    .as("岗位列表不应被限流").isTrue();
+            assertThat(passThrough(filter, request("/api/jobs/12", IP_A), new MockHttpServletResponse()))
+                    .as("岗位详情不应被限流").isTrue();
+            assertThat(passThrough(filter, request("/api/jobs/meta", IP_A), new MockHttpServletResponse()))
+                    .as("岗位筛选 meta 不应被限流").isTrue();
+            assertThat(passThrough(filter, request("/api/jobs/favorite", IP_A), new MockHttpServletResponse()))
+                    .as("岗位收藏列表不应被限流").isTrue();
+
+            // 刷新（触发 AI 分类）必须命中，且单数 /api/job/ 规则不能替它兜底
+            assertThat(passThrough(filter, request("/api/jobs/refresh", IP_A), new MockHttpServletResponse()))
+                    .isTrue();
+            assertThat(passThrough(filter, request("/api/jobs/refresh", IP_A), new MockHttpServletResponse()))
+                    .as("/api/jobs/refresh 第 2 次应被限流").isFalse();
         }
 
         @Test

@@ -116,6 +116,15 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
      * 的真实调用点</b>，只收录「一次请求会真的打 LLM/embedding」的路径。
      * AI 调用普遍在 service 层，只在控制器里 grep {@code chatModel} 会全部漏掉。
      *
+     * <p>⚠️ <b>每一条都必须对照后端 {@code @RequestMapping} 的真实 URL 核对，
+     * 不得从前端 {@code AI_PATH_FRAGMENTS} 直接搬。</b>
+     * 前端用的是 {@code url.includes(frag)}（子串匹配），本过滤器用的是
+     * <b>路径段边界前缀匹配</b>（{@code /api/resume/analyze} 不命中
+     * {@code /api/resume/analyzer-x} 就是靠这个）。同一份清单在两种匹配语义之间搬移必然出错：
+     * 上一版把前端片段 {@code /autofill} 直接抄了过来，而真实路径是
+     * {@code /api/resume/documents/{id}/autofill} —— 段边界前缀永远匹配不到它，
+     * 这条规则实际形同不存在，直到 QA 逐条复核才被发现。这是「清单跨处搬移」的典型案例。
+     *
      * <p>语法：普通项为前缀匹配；含 {@code *} 的项按<b>路径段</b>通配
      * （{@code *} 恰好匹配一个 segment），用于表达 {@code /{id}/check} 这类带路径参数的端点。
      *
@@ -128,9 +137,16 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
      *   <li>{@code /api/knowledge/ask|import|search} —— LLM 或 embedding；
      *       {@code recent-questions} / {@code wrong-questions} / {@code question-summary}
      *       是纯数据库查询，<b>刻意不收录</b></li>
-     *   <li>{@code /api/resume/analyze|upload|optimize|import-url}、{@code /autofill}
-     *       —— 简历解析/优化/自动填充为 LLM 调用；{@code /api/resume/history}、
+     *   <li>{@code /api/resume/analyze|upload|optimize|import-url}、
+     *       {@code /api/resume/documents/<id>/autofill}（配置里中段写作段通配）
+     *       —— 简历解析/优化/自动填充为 LLM 调用（{@code ResumeAutofillService} 经
+     *       {@code AiConcurrencyGuard.call(chatClient.prompt())}）；{@code /api/resume/history}、
      *       {@code /api/resume/{id}} 等 CRUD 不收录</li>
+     *   <li>{@code /api/jobs/refresh} —— {@code JobAgentController#refresh} →
+     *       {@code JobAgentService} → {@code JobClassifyService}（AI 岗位分类）。
+     *       <b>注意是复数 jobs</b>：单数 {@code /api/job/} 是 JobAnalysisController，
+     *       两者是不同的控制器，前缀不能互相覆盖。这里精确到方法，不写
+     *       {@code /api/jobs/*}——那会把全站最高频的岗位列表查询也拦了</li>
      *   <li>{@code /api/career/mine}、{@code /api/career/plan}
      *       —— {@code CareerProfileService#mine/plan} 走 {@code chatClient}（经 AiConcurrencyGuard）</li>
      *   <li>{@code /api/story-bank/extract}、{@code /api/story-bank/<id>/check}、
@@ -150,6 +166,7 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
     public static final String DEFAULT_AI_PATH_PREFIXES = "/api/agent/"
             + ",/api/interview/"
             + ",/api/job/"
+            + ",/api/jobs/refresh"
             + ",/api/knowledge/ask"
             + ",/api/knowledge/import"
             + ",/api/knowledge/search"
@@ -157,7 +174,7 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
             + ",/api/resume/upload"
             + ",/api/resume/optimize"
             + ",/api/resume/import-url"
-            + ",/autofill"
+            + ",/api/resume/documents/*/autofill"
             + ",/api/career/mine"
             + ",/api/career/plan"
             + ",/api/story-bank/extract"

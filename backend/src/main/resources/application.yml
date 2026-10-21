@@ -105,18 +105,23 @@ app:
       enabled: ${AI_USER_RATE_LIMIT_ENABLED:true}
       # 普通 AI 端点路径（逗号分隔）。取值依据是「逐个控制器 → 顺着 service 找
       # ChatClient / AiConcurrencyGuard 的真实调用点」，只列一次请求会真的打 LLM/embedding 的路径。
+      # ⚠️ 每条都必须对照后端 @RequestMapping 的真实 URL 核对，不能从前端 AI_PATH_FRAGMENTS 直接搬：
+      #    前端是 url.includes()（子串匹配），这里是路径段边界匹配，语义不同。
+      #    真实教训：曾把前端片段 /autofill 抄过来，而真实路径是
+      #    /api/resume/documents/{id}/autofill → 段边界前缀永远匹配不到，规则形同不存在。
       # 语法：普通项 = 前缀匹配（按路径段边界）；含 * 的项 = 路径段通配（* 恰好匹配一段），
-      # 用于 /{id}/check、/{id}/tailor 这类带路径参数的端点。
+      # 用于 /{id}/check、/{id}/tailor、/documents/{id}/autofill 这类带路径参数的端点。
       # 刻意不收录（都是纯 DB 操作，收录会误伤正常浏览/编辑）：
       #   /api/knowledge/recent-questions|wrong-questions|question-summary
-      #   /api/resume/history、/api/resume/{id}
+      #   /api/resume/history、/api/resume/{id}、/api/resume/documents（列表/保存）
       #   /api/story-bank 的 list/save/update/delete
       #   /api/application 的 list/board/timeline/draft/confirm/status/import/apply-kit
       #     （/import 只走 repository；/apply-kit 源码明确注释「刻意不调 AI」）
+      #   /api/jobs 的列表/详情/meta/match/favorite（最高频读接口；只拦 /api/jobs/refresh）
       #   /api/session/**：create/{id}/questions/answer 全部只读写数据库，
       #     真正的出题与评分在 /api/interview/questions、/api/interview/evaluate
       #   /api/favorite/bank/start：控制器注释明确「不重新调用 AI 生成题目」
-      paths: ${AI_USER_RATE_LIMIT_PATHS:/api/agent/,/api/interview/,/api/job/,/api/knowledge/ask,/api/knowledge/import,/api/knowledge/search,/api/resume/analyze,/api/resume/upload,/api/resume/optimize,/api/resume/import-url,/autofill,/api/career/mine,/api/career/plan,/api/story-bank/extract,/api/story-bank/*/check,/api/story-bank/*/followup,/api/application/*/tailor}
+      paths: ${AI_USER_RATE_LIMIT_PATHS:/api/agent/,/api/interview/,/api/job/,/api/jobs/refresh,/api/knowledge/ask,/api/knowledge/import,/api/knowledge/search,/api/resume/analyze,/api/resume/upload,/api/resume/optimize,/api/resume/import-url,/api/resume/documents/*/autofill,/api/career/mine,/api/career/plan,/api/story-bank/extract,/api/story-bank/*/check,/api/story-bank/*/followup,/api/application/*/tailor}
       requests: ${AI_USER_RATE_LIMIT_REQUESTS:60}
       # 高成本前缀与其配额（覆盖上面的 requests，不会双重计数）
       expensive-paths: ${AI_USER_RATE_LIMIT_EXPENSIVE_PATHS:/api/agent/}

@@ -10,7 +10,9 @@ import com.example.interview.service.job.JobMatchService;
 import com.example.interview.util.RequestFieldUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -239,17 +241,27 @@ public class JobAgentController {
      * 手动刷新（也可由定时任务自动执行）
      * POST /api/jobs/refresh
      * 已有刷新任务执行中时返回 429，避免并发刷新撞库
+     *
+     * <p><b>429 口径（2026-10-21）</b>：限流的语义载体必须是 HTTP 状态码 429，
+     * 与 {@code AiRateLimitFilter}、{@code RateLimitInterceptor} 保持一致。
+     * 此前只返回 body {@code code=429} 而 HTTP 仍是 200 —— 按状态码分流的网关/监控
+     * 都看不见限流发生，前端 error 分支也不会有 429 提示（契约 §4/§5）。
+     * body 仍保持 {@code Result} 结构，兼容按 code 判读的调用方。
      */
     @Operation(summary = "手动刷新岗位数据")
     @PostMapping("/refresh")
-    public Result<JobAgentService.RefreshResult> refresh() {
+    public Result<JobAgentService.RefreshResult> refresh(HttpServletResponse response) {
         // 按用户限流：同一用户 5 分钟内仅允许手动刷新一次，防刷第三方抓取配额（B-10）；管理员无限制（v1.31.4）
         if (!com.example.interview.security.RoleUtil.isCurrentUserAdmin()
                 && !refreshLimiter.allow(currentUserId())) {
+            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            response.setHeader("Retry-After", "300");
             return Result.error(429, "刷新过于频繁，请 5 分钟后再试");
         }
         JobAgentService.RefreshResult result = jobAgentService.refresh();
         if (result == null) {
+            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            response.setHeader("Retry-After", "30");
             return Result.error(429, "岗位数据正在刷新中，请稍后再试");
         }
         return Result.success(result);

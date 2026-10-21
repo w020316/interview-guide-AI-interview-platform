@@ -388,7 +388,7 @@ class JobAgentControllerTest {
         limiter.allow(USER_ID);
 
         mockMvc.perform(post("/api/jobs/refresh"))
-                .andExpect(status().isOk())
+                .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value(429))
                 .andExpect(jsonPath("$.message").value("刷新过于频繁，请 5 分钟后再试"));
         verify(jobAgentService, never()).refresh();
@@ -400,7 +400,7 @@ class JobAgentControllerTest {
         when(jobAgentService.refresh()).thenReturn(null);
 
         mockMvc.perform(post("/api/jobs/refresh"))
-                .andExpect(status().isOk())
+                .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value(429))
                 .andExpect(jsonPath("$.message").value("岗位数据正在刷新中，请稍后再试"));
     }
