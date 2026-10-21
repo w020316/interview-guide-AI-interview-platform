@@ -152,6 +152,53 @@ class ApplicationImportServiceTest {
     }
 
     @Test
+    @DisplayName("P1-7：字段超长在落库前被拦，给出可定位的行级原因（不是通用 500）")
+    void apply_overlongField_reportsRowLevelReason() {
+        when(repository.findByUserIdOrderByUpdatedAtDesc("u1")).thenReturn(List.of());
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        rows.add(row("字节跳动", "Java 后端"));
+        Map<String, Object> overlong = new LinkedHashMap<>();
+        overlong.put("companyName", "腾讯");
+        overlong.put("title", "x".repeat(320));      // 上限 200 —— 先命中
+        overlong.put("location", "y".repeat(150));   // 上限 100 —— 被 title 抢先
+        rows.add(overlong);
+
+        Map<String, Object> result = service.run("u1", "xlsx", rows, false);
+
+        assertThat(result.get("canApply")).isEqualTo(false);
+        assertThat(result.get("applied")).isEqualTo(false);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> fatal = (List<Map<String, Object>>) result.get("fatalErrors");
+        assertThat(fatal).hasSize(1);
+        assertThat(fatal.get(0).get("index")).isEqualTo(1);
+        assertThat(fatal.get(0).get("message").toString())
+                .contains("岗位名称超长")
+                .contains("320/200");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("P1-7：地点超长同样被拦（上限 100，不是只校验标题）")
+    void apply_overlongLocation_reported() {
+        when(repository.findByUserIdOrderByUpdatedAtDesc("u1")).thenReturn(List.of());
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        Map<String, Object> bad = row("腾讯", "后端");
+        bad.put("location", "深圳市南山区".repeat(30)); // 180 字 > 100
+        rows.add(bad);
+
+        Map<String, Object> result = service.run("u1", "xlsx", rows, false);
+
+        assertThat(result.get("canApply")).isEqualTo(false);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> fatal = (List<Map<String, Object>>) result.get("fatalErrors");
+        assertThat(fatal).hasSize(1);
+        assertThat(fatal.get(0).get("message").toString()).contains("工作地点超长");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("MERGE：仅补缺失字段，不覆盖已有值（R7）")
     void apply_mergeFillsOnlyMissingFields() {
         JobApplicationEntity existing = JobApplicationEntity.builder()

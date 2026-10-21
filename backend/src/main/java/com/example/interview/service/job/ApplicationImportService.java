@@ -166,6 +166,32 @@ public class ApplicationImportService {
                 continue;
             }
 
+            // P1-7（2026-10-21 质量循环）：字段长度必须在落库前校验。
+            // 原实现只拦「公司/岗位为空」，对长度完全不管 —— 从 Excel/WPS 粘贴时
+            // title 单元格混入整段 JD（几百字）、location 混入地址全称（>100 字）是常态，
+            // repository.save() 会触发 "Data too long for column"，异常冒到
+            // GlobalExceptionHandler 变成通用 500，且整个事务回滚 → 200 行全部作废，
+            // 用户只知道「失败」，不知道是第几行、哪个字段。
+            // 这里复用已有的 fatalErrors 机制：dryRun 预览页直接显示行级原因。
+            String overflow = firstOverflow(
+                    company, "公司名称", 200,
+                    title, "岗位名称", 200,
+                    trimToNull(str(raw.get("location"))), "工作地点", 100,
+                    trimToNull(str(raw.get("salary"))), "薪资", 100,
+                    trimToNull(str(raw.get("applyUrl"))), "投递链接", 500,
+                    trimToNull(str(raw.get("note"))), "备注", 60000);
+            if (overflow != null) {
+                plan.errors++;
+                row.put("action", "ERROR");
+                row.put("reason", overflow);
+                plan.rows.add(row);
+                Map<String, Object> fatal = new LinkedHashMap<>();
+                fatal.put("index", i);
+                fatal.put("message", overflow);
+                plan.fatalErrors.add(fatal);
+                continue;
+            }
+
             String key = dedupeKey(company, title);
             JobApplicationEntity existing = existingByKey.get(key);
             if (existing != null) {
@@ -205,6 +231,27 @@ public class ApplicationImportService {
             }
         }
         return plan;
+    }
+
+    /**
+     * 按「值、字段名、上限」三元组依次检查长度，返回第一条超限的可读原因。
+     *
+     * <p>值为 {@code null} 时跳过（空值由调用方单独拦截，语义不同）。
+     * 上限取自 {@link JobApplicationEntity} 的 {@code @Column(length=...)}，
+     * 改列宽时两处必须同步，否则校验会与数据库约束脱节。
+     *
+     * @return 形如「岗位名称超长（320/200 字），请缩短后重试」；全部合规返回 {@code null}
+     */
+    private static String firstOverflow(Object... triples) {
+        for (int i = 0; i + 2 < triples.length; i += 3) {
+            String value = (String) triples[i];
+            String label = (String) triples[i + 1];
+            int max = (Integer) triples[i + 2];
+            if (value != null && value.length() > max) {
+                return label + "超长（" + value.length() + "/" + max + " 字），请缩短后重试";
+            }
+        }
+        return null;
     }
 
     /**
