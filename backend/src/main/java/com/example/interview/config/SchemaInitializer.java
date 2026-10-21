@@ -173,6 +173,13 @@ public class SchemaInitializer implements CommandLineRunner {
             "ALTER TABLE interview_question ADD COLUMN IF NOT EXISTS eval_detail TEXT",
             // H：岗位收藏偏好四档（可空，NULL=未标记，不得默认成任何一档）
             "ALTER TABLE job_favorite ADD COLUMN IF NOT EXISTS preference VARCHAR(20)",
+            // ── P1-2（2026-10-21）：令牌版本列 ──
+            // ⚠️ 生产库**不执行** schema.sql，只执行本数组里的 DDL。
+            // 只在 schema.sql 里加 ALTER 而漏了这里 = 生产库永远没有该列：
+            // currentVersion 的查询抛异常 → 按 fail-open 跳过校验 → 登出/改密/封禁
+            // 在生产完全失效，且启动正常、日志干净、测试全绿（静默失效）。
+            // SchemaDdlConsistencyTest 会锁住「schema.sql 的每条 ALTER 必须在这里也有」。
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 1",
             // C：导入幂等日志（新表，跨进程重启持久，(user_id, import_id) 唯一）
             "CREATE TABLE IF NOT EXISTS data_import_log ("
                     + "id BIGSERIAL PRIMARY KEY, "
@@ -218,7 +225,10 @@ public class SchemaInitializer implements CommandLineRunner {
      */
     private static final String[][] REQUIRED_COLUMNS = {
             {"interview_question", "eval_detail"},
-            {"job_favorite", "preference"}
+            {"job_favorite", "preference"},
+            // P1-2：令牌版本列。缺列会让 JwtAuthFilter 的版本查询抛异常，
+            // 按 fail-open 语义跳过校验 → 吊销静默失效（最坏的一种缺陷：看起来一切正常）
+            {"users", "token_version"}
     };
 
     /** 必须存在的新表 */
