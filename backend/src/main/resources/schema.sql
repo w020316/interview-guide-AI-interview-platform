@@ -11,6 +11,14 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 
+-- P1-2（2026-10-21）：令牌版本。登出/改密/封禁时 +1，使该用户此前签发的所有 token 立即失效。
+-- 为什么不复用 jti 黑名单：黑名单在进程内 Map 里，重启即丢（被登出的 token 复活最长 24h）；
+-- 也不放 Redis——application-prod.yml 显式排除了 RedisAutoConfiguration（「登录/鉴权不依赖 Redis」），
+-- Redis 一停用就静默退化成进程内，等于没修。版本号必须跟着用户行走 PostgreSQL。
+-- 必须写 ALTER：上面的 CREATE TABLE IF NOT EXISTS 对已存在的表是空操作，加列不会生效。
+-- DEFAULT 1 让存量行获得与「无 ver claim 的旧 token」一致的基准值，升级瞬间不踢人。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 1;
+
 -- 简历表
 CREATE TABLE IF NOT EXISTS resume (
     id              BIGSERIAL PRIMARY KEY,

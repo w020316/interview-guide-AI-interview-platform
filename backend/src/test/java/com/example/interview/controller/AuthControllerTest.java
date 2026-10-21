@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -57,7 +58,7 @@ class AuthControllerTest {
     private com.example.interview.service.UserBanRegistry userBanRegistry;
 
     @MockBean
-    private com.example.interview.security.TokenBlacklistService tokenBlacklist;
+    private com.example.interview.security.TokenVersionCache tokenVersionCache;
 
     @Nested
     @DisplayName("POST /api/auth/register 注册")
@@ -73,7 +74,7 @@ class AuthControllerTest {
                 u.setId(1L);
                 return u;
             });
-            when(jwtUtil.generateToken("1", "alice")).thenReturn("mock.jwt.token");
+            when(jwtUtil.generateToken(eq("1"), eq("alice"), anyInt())).thenReturn("mock.jwt.token");
 
             String body = objectMapper.writeValueAsString(Map.of(
                     "username", "alice", "password", "StrongPw#2026", "email", "a@b.com"));
@@ -151,7 +152,7 @@ class AuthControllerTest {
                 u.setId(2L);
                 return u;
             });
-            when(jwtUtil.generateToken("2", "张三")).thenReturn("mock.jwt.token");
+            when(jwtUtil.generateToken(eq("2"), eq("张三"), anyInt())).thenReturn("mock.jwt.token");
 
             String body = objectMapper.writeValueAsString(Map.of(
                     "username", "张三", "password", "StrongPw#2026"));
@@ -301,7 +302,7 @@ class AuthControllerTest {
                     .build();
             when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
             when(passwordEncoder.matches("123456", "hashed")).thenReturn(true);
-            when(jwtUtil.generateToken("1", "alice")).thenReturn("mock.jwt.token");
+            when(jwtUtil.generateToken(eq("1"), eq("alice"), anyInt())).thenReturn("mock.jwt.token");
 
             String body = objectMapper.writeValueAsString(Map.of(
                     "username", "alice", "password", "123456"));
@@ -428,40 +429,44 @@ class AuthControllerTest {
     class Logout {
 
         @Test
-        @DisplayName("登出始终返回 200")
+        @DisplayName("登出返回 200（未认证也幂等成功）")
         void logout_returns200() throws Exception {
             mockMvc.perform(post("/api/auth/logout"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
         }
 
+        /**
+         * P1-2（2026-10-21）：登出改为「token_version+1」，使该用户此前签发的<b>所有</b> token
+         * 立即失效（原先的 jti 黑名单只吊销当前这一个，且存在进程内 Map 里，重启即丢）。
+         */
         @Test
-        @DisplayName("带 Bearer token 登出：jti 被写入黑名单（P1 登出即吊销）")
-        void logout_withBearerToken_revokes() throws Exception {
-            when(jwtUtil.isValid("tok-1")).thenReturn(true);
-            when(jwtUtil.extractJti("tok-1")).thenReturn("jti-1");
-            when(jwtUtil.extractExpirationMs("tok-1")).thenReturn(System.currentTimeMillis() + 60_000L);
+        @DisplayName("已认证登出：token_version+1 且清缓存（全设备失效）")
+        void logout_authenticated_bumpsTokenVersion() throws Exception {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                            "7", null, java.util.List.of()));
 
-            mockMvc.perform(post("/api/auth/logout")
-                            .header("Authorization", "Bearer tok-1"))
+            mockMvc.perform(post("/api/auth/logout"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
 
-            verify(tokenBlacklist).revoke(eq("jti-1"), anyLong());
+            verify(userRepository).incrementTokenVersion(7L);
+            verify(tokenVersionCache).invalidate(7L);
+            SecurityContextHolder.clearContext();
         }
 
         @Test
-        @DisplayName("旧版无 jti 的 token 登出：幂等成功且不写黑名单")
-        void logout_tokenWithoutJti_idempotent() throws Exception {
-            when(jwtUtil.isValid("tok-old")).thenReturn(true);
-            when(jwtUtil.extractJti("tok-old")).thenReturn(null);
+        @DisplayName("未认证/匿名登出：幂等成功，且不触碰 DB（避免匿名请求成为写入口）")
+        void logout_unauthenticated_doesNotTouchDb() throws Exception {
+            SecurityContextHolder.clearContext();
 
-            mockMvc.perform(post("/api/auth/logout")
-                            .header("Authorization", "Bearer tok-old"))
+            mockMvc.perform(post("/api/auth/logout"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
 
-            verify(tokenBlacklist, never()).revoke(anyString(), anyLong());
+            verify(userRepository, never()).incrementTokenVersion(anyLong());
+            verify(tokenVersionCache, never()).invalidate(anyLong());
         }
     }
 }

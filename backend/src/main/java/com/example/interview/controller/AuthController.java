@@ -40,9 +40,12 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    /** 登出吊销黑名单（P1 2026-09-20）：required=false 兼容 @WebMvcTest 切片 */
+    /**
+     * 令牌版本缓存（P1-2，2026-10-21）：登出/改密后主动失效，使旧 token 立即被拒。
+     * required=false 兼容 @WebMvcTest 切片（不加载 security 包的 @Component）。
+     */
     @Autowired(required = false)
-    private com.example.interview.security.TokenBlacklistService tokenBlacklist;
+    private com.example.interview.security.TokenVersionCache tokenVersionCache;
 
     @Autowired
     private com.example.interview.service.UserBanRegistry userBanRegistry;
@@ -228,7 +231,9 @@ public class AuthController {
         }
 
         // subject 使用数据库自增 id（唯一且不可变），避免用户名变更导致 token 失效
-        return Result.success(jwtUtil.generateToken(user.getId().toString(), user.getUsername()));
+        // P1-2：必须带上当前的 token_version，否则登出/改密/封禁的吊销对该 token 无效
+        return Result.success(jwtUtil.generateToken(
+                user.getId().toString(), user.getUsername(), currentTokenVersion(user)));
     }
 
     /**
@@ -294,44 +299,68 @@ public class AuthController {
         }
 
         // subject 使用数据库自增 id（唯一且不可变），避免用户名变更导致 token 失效
-        return Result.success(jwtUtil.generateToken(user.getId().toString(), user.getUsername()));
+        // P1-2：必须带上当前的 token_version，否则登出/改密/封禁的吊销对该 token 无效
+        return Result.success(jwtUtil.generateToken(
+                user.getId().toString(), user.getUsername(), currentTokenVersion(user)));
     }
 
     /**
-     * 登出（P1 2026-09-20：登出即吊销）
-     * 把当前 Bearer token 的 jti 加入进程内黑名单（存活至 token 自然过期），
-     * 被盗 token 在剩余有效期内也无法再使用。
-     * 无 Authorization 头 / 旧版无 jti 的 token 幂等返回成功（前端清 token 兜底）。
+     * 登出（P1-2，2026-10-21：令牌版本自增，全设备失效）
+     *
+     * <p>把当前用户的 {@code token_version} +1，使其此前签发的<b>所有</b> token 立即失效。
+     * 这替代了原来的 jti 黑名单 —— 黑名单存在进程内 Map 里，重启即丢（被登出的 token 复活
+     * 最长 24 小时），而版本号跟着用户行走数据库，重启不影响。
+     *
+     * <p>未认证 / 匿名请求幂等返回成功（前端已清 token 兜底）。
      */
     @Operation(summary = "用户登出")
     @PostMapping("/logout")
-    public Result<Void> logout(jakarta.servlet.http.HttpServletRequest request) {
-        revokeCurrentToken(request, "登出");
+    public Result<Void> logout() {
+        Long userId = currentUserIdOrNull();
+        if (userId != null) {
+            bumpTokenVersion(userId, "登出");
+        }
         return Result.success(null);
     }
 
     /**
-     * 把当前请求 Bearer token 的 jti 写入吊销黑名单（存活至 token 自然过期）。
-     * 无 Authorization 头 / 旧版无 jti 的 token 幂等跳过。
+     * 使某用户的全部已签发 token 失效（P1-2）。
      *
-     * @param reason 仅用于日志，便于区分「登出吊销」与「改密吊销」
+     * <p>两步都要做：DB 的 {@code token_version} +1 是<b>持久化的事实</b>（重启/多实例都认），
+     * 清本地缓存是为了<b>让本实例立刻生效</b>，否则用户登出后最坏还要等 60 秒
+     * （{@code TokenVersionCache.TTL_MS}）才被拒绝。
      */
-    private void revokeCurrentToken(jakarta.servlet.http.HttpServletRequest request, String reason) {
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ") || tokenBlacklist == null) {
-            return;
+    private void bumpTokenVersion(Long userId, String reason) {
+        int affected = userRepository.incrementTokenVersion(userId);
+        if (tokenVersionCache != null) {
+            tokenVersionCache.invalidate(userId);
         }
-        String token = header.substring(7);
-        if (!jwtUtil.isValid(token)) {
-            return;
+        log.info("{}：已使 userId={} 的全部 token 失效（token_version+1，影响 {} 行）", reason, userId, affected);
+    }
+
+    /**
+     * 取实体的令牌版本，null 时回退到默认值 1（与 DB 默认值一致）。
+     * 防御历史数据：理论上 `token_version` 是 NOT NULL，但 Upgrade 前的连接池缓存/手工插入
+     * 都可能给出 null，此时签出 1 总比 NPE 或签出 0（必然被拒）好。
+     */
+    private int currentTokenVersion(UserEntity user) {
+        Integer version = user.getTokenVersion();
+        return version == null ? com.example.interview.security.JwtUtil.DEFAULT_TOKEN_VERSION : version;
+    }
+
+    /** 从 SecurityContext 取当前用户 id；未认证 / 匿名 / 非数字一律返回 null */
+    private Long currentUserIdOrNull() {        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null
+                || auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
+            return null;
         }
-        String jti = jwtUtil.extractJti(token);
-        if (jti == null) {
-            return;
+        Object principal = auth.getPrincipal();
+        String raw = principal == null ? null : principal.toString();
+        if (raw == null || !raw.matches("\\d+")) {
+            return null;
         }
-        long expiresAt = jwtUtil.extractExpirationMs(token);
-        tokenBlacklist.revoke(jti, expiresAt);
-        log.info("{}：token 已吊销（jti={}，存活至 token 自然过期）", reason, jti);
+        return Long.valueOf(raw);
     }
 
     /**
@@ -346,17 +375,17 @@ public class AuthController {
      *   <li>原密码必须校验 —— 仅凭 token 不足以改密；</li>
      *   <li>按用户 5 次/小时限流 —— 防止拿到 token 后爆破原密码；</li>
      *   <li>新密码走与注册同一套 PasswordPolicy —— 否则可绕过弱口令校验；</li>
-     *   <li>改完**吊销当前 token** —— 改密的语义就是「让旧会话失效」，
-     *       不吊销等于 attacker 拿到 token 后改密也能继续用。</li>
+     *   <li>改完<b>吊销该用户的全部 token</b>（token_version+1）—— 改密的语义就是
+     *       「让旧会话失效」，不吊销等于 attacker 拿到 token 后改密也能继续用。</li>
      * </ol>
      *
-     * <p>已知局限：只吊销**当前** token。其他设备上已签发的 token 仍存活至自然过期
-     * （系统当前无 tokenVersion 字段做全局吊销）。前端在成功后必须清 token 并回登录页。
+     * <p>P1-2（2026-10-21）：吊销范围由「仅当前 token（jti 黑名单）」升级为
+     * <b>该用户全部设备</b>（token_version+1）。这是刻意取舍——改密后把所有会话踢下线
+     * 更安全；语义代价是「某台设备改密会让其它设备的会话也失效」，对单用户场景可接受。
      */
     @Operation(summary = "修改密码（凭原密码）")
     @PostMapping("/change-password")
-    public Result<Void> changePassword(@RequestBody Map<String, String> req,
-                                       jakarta.servlet.http.HttpServletRequest request) {
+    public Result<Void> changePassword(@RequestBody Map<String, String> req) {
         org.springframework.security.core.Authentication auth =
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         // 不能只判 `auth.getPrincipal() != null`：Spring Security 的匿名令牌
@@ -414,9 +443,10 @@ public class AuthController {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.saveAndFlush(user);
 
-        revokeCurrentToken(request, "改密");
+        // P1-2：改密后该用户所有设备的 token 全部失效（含当前这台）
+        bumpTokenVersion(user.getId(), "改密");
 
-        log.info("用户 {} 修改密码成功，当前 token 已吊销", user.getUsername());
+        log.info("用户 {} 修改密码成功，全部已签发 token 已失效（token_version+1）", user.getUsername());
         return Result.success(null);
     }
 

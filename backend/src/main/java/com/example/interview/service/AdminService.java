@@ -61,6 +61,13 @@ public class AdminService {
     private final UserBanRegistry userBanRegistry;
     private final MeterRegistry meterRegistry;
 
+    /**
+     * 令牌版本缓存（P1-2，2026-10-21）：封禁后清掉缓存，使该用户<b>已签发的 token 立即失效</b>。
+     * {@code required=false} 兼容 {@code @WebMvcTest} 切片与纯单测（无此 Bean 时只做 DB 侧 +1）。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.interview.security.TokenVersionCache tokenVersionCache;
+
     public AdminService(JobPostingRepository jobPostingRepository,
                         UserRepository userRepository,
                         JobAgentService jobAgentService,
@@ -397,7 +404,15 @@ public class AdminService {
         }
 
         userBanRegistry.ban(id);
-        log.info("管理员禁用用户 id={} username={}", id, target.getUsername());
+        // P1-2（2026-10-21）：封禁必须同时使该用户已签发的 token 全部失效。
+        // 只靠 UserBanRegistry 是进程内 + Redis 的名单——Redis 在 prod 被显式排除
+        // （「登录/鉴权不依赖 Redis」），重启后名单靠 Redis 恢复，若 Redis 停用则封禁态丢失。
+        // token_version 落在 users 表，是持久化事实，与名单互为冗余（双保险）。
+        userRepository.incrementTokenVersion(id);
+        if (tokenVersionCache != null) {
+            tokenVersionCache.invalidate(id);
+        }
+        log.info("管理员禁用用户 id={} username={}（已使其全部 token 失效）", id, target.getUsername());
     }
 
     /** 解禁用户 */

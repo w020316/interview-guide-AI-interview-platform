@@ -68,7 +68,8 @@ class AuthRegisterRateLimitTest {
             u.setId(1L);
             return u;
         });
-        when(jwtUtil.generateToken(any(), any())).thenReturn("mock.jwt.token");
+        when(jwtUtil.generateToken(any(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn("mock.jwt.token");
 
         // 同 IP 第 1、2 次：放行（配额 2/小时）
         mockMvc.perform(post("/api/auth/register")

@@ -4,7 +4,7 @@ import com.example.interview.entity.UserEntity;
 import com.example.interview.interceptor.RateLimitInterceptor;
 import com.example.interview.repository.UserRepository;
 import com.example.interview.security.JwtUtil;
-import com.example.interview.security.TokenBlacklistService;
+import com.example.interview.security.TokenVersionCache;
 import com.example.interview.service.UserBanRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -81,7 +81,7 @@ class AuthChangePasswordTest {
     private UserBanRegistry userBanRegistry;
 
     @MockBean
-    private TokenBlacklistService tokenBlacklist;
+    private com.example.interview.security.TokenVersionCache tokenVersionCache;
 
     /**
      * 限流拦截器必须在切片里打成桩并显式放行。
@@ -199,8 +199,8 @@ class AuthChangePasswordTest {
         }
 
         @Test
-        @DisplayName("旧 token 被吊销：改密成功后 revoke 被调用（否则改密等于没改）")
-        void change_revokesCurrentToken() throws Exception {
+        @DisplayName("旧 token 全部失效：改密成功后 token_version+1 且清缓存（否则改密等于没改）")
+        void change_bumpsTokenVersion() throws Exception {
             loginAs("5");
             UserEntity user = existingUser(5L, "erin");
             when(userRepository.findById(5L)).thenReturn(Optional.of(user));
@@ -212,8 +212,6 @@ class AuthChangePasswordTest {
             // 它在本 token 上会用 extractUserId 的结果**覆盖** SecurityContext 里的 principal；
             // 若返回 null，控制器看到的 principal 就是 null → 走「未认证」分支（503）。
             when(jwtUtil.extractUserId("old.jwt.token")).thenReturn("5");
-            when(jwtUtil.extractJti("old.jwt.token")).thenReturn("jti-abc");
-            when(jwtUtil.extractExpirationMs("old.jwt.token")).thenReturn(9_999_999L);
 
             mockMvc.perform(post("/api/auth/change-password")
                             .header("Authorization", "Bearer old.jwt.token")
@@ -222,7 +220,8 @@ class AuthChangePasswordTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
 
-            verify(tokenBlacklist).revoke(eq("jti-abc"), eq(9_999_999L));
+            verify(userRepository).incrementTokenVersion(5L);
+            verify(tokenVersionCache).invalidate(5L);
         }
 
         @Test

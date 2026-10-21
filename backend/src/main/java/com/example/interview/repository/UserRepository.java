@@ -41,4 +41,28 @@ public interface UserRepository extends JpaRepository<UserEntity, Long>,
      */
     @Query("SELECT u.createdAt FROM UserEntity u WHERE u.createdAt >= :since")
     List<LocalDateTime> findCreatedAtSince(@Param("since") LocalDateTime since);
+
+    /**
+     * 令牌版本 +1（P1-2，2026-10-21）：登出 / 改密 / 封禁时调用，使该用户此前签发的
+     * 所有 token 立即失效。
+     *
+     * <p>用 {@code UPDATE ... SET x = x + 1} 而不是「读实体 → set → save」：
+     * 后者在两个并发登出请求下会互相覆盖（都读到 1，都写 2），等于只 +1 一次；
+     * 原子自增则是 +2，语义正确。
+     *
+     * <p>{@code @Transactional} 必须加在本方法上：{@code @Modifying} 查询需要写事务，
+     * 而调用方（登出、改密、封禁）不一定处于事务中。
+     *
+     * <p>{@code clearAutomatically + flushAutomatically}：批量 UPDATE 绕过持久化上下文，
+     * 若不清理，同一事务/同一 EntityManager 里已加载的 {@code UserEntity} 仍是旧版本
+     * （读到 1 而库里已是 2）。这不是理论问题——{@code UserRepositoryTokenVersionTest}
+     * 的第一版就是靠真实执行把它照出来的。生产路径上「写后立刻读同一实体」目前不存在，
+     * 但这层保护让后续任何人加代码时不会踩到。
+     *
+     * @return 受影响行数（0 表示该用户不存在）
+     */
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE UserEntity u SET u.tokenVersion = u.tokenVersion + 1 WHERE u.id = :id")
+    int incrementTokenVersion(@Param("id") Long id);
 }

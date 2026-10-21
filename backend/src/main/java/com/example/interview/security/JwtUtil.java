@@ -50,6 +50,15 @@ public class JwtUtil {
     private static final String AUDIENCE = "interview-guide-client";
     /** 角色 claim 名 */
     private static final String CLAIM_ROLE = "role";
+    /**
+     * 令牌版本 claim 名（P1-2，2026-10-21）。
+     *
+     * <p>与 {@code users.token_version} 比对：不一致即视为已被吊销（登出/改密/封禁）。
+     * 升级前签发的旧 token 没有该 claim —— 见 {@link #extractTokenVersion} 的兼容说明。
+     */
+    private static final String CLAIM_VERSION = "ver";
+    /** 缺省版本号：与 DB 的 {@code token_version DEFAULT 1} 对齐 */
+    public static final int DEFAULT_TOKEN_VERSION = 1;
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
     private static final String ROLE_USER = "ROLE_USER";
 
@@ -108,26 +117,45 @@ public class JwtUtil {
     }
 
     /**
-     * 签发 JWT（含真实用户信息）
+     * 签发 JWT（含真实用户信息与令牌版本）。
      *
-     * @param subject  用户标识（统一的 users.id）
-     * @param username 用户名，用于对管理员名单判定角色（ROLE_ADMIN/ROLE_USER）
+     * <p>生产签发<b>必须</b>走本方法并把 {@code users.token_version} 写进 {@code ver} claim，
+     * 否则登出/改密/封禁的吊销对该 token 无效。
+     *
+     * @param subject      用户标识（统一的 users.id）
+     * @param username     用户名，用于对管理员名单判定角色（ROLE_ADMIN/ROLE_USER）
+     * @param tokenVersion 当前令牌版本（来自 {@code users.token_version}）
      * @return 签名后的 JWT 字符串
      */
-    public String generateToken(String subject, String username) {
+    public String generateToken(String subject, String username, int tokenVersion) {
         boolean admin = isAdminUsername(username);
         return Jwts.builder()
                 .subject(subject)
-                // jti：token 唯一标识（P1 2026-09-20）——登出黑名单按它精确吊销单个 token，
-                // 不影响同一用户的其他会话
+                // jti：token 唯一标识。仅用于日志/排查（吊销已改由 token_version 承担，
+                // 不再有 jti 黑名单——两套吊销机制并存正是要消灭的模式）
                 .id(UUID.randomUUID().toString())
                 .issuer(ISSUER)
                 .audience().add(AUDIENCE).and()
                 .claim(CLAIM_ROLE, admin ? ROLE_ADMIN : ROLE_USER)
+                .claim(CLAIM_VERSION, tokenVersion)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getKey())
                 .compact();
+    }
+
+    /**
+     * 签发 JWT（<b>仅供历史测试与兼容</b>，固定 {@code ver = 1}）。
+     *
+     * <p>⚠️ 生产代码不得调用本重载：它不读用户的 {@code token_version}，
+     * 签出的 token 永远声称版本 1 —— 用户一旦登出（DB 版本变 2），
+     * 用本方法签出的 token 会被立即判定为已吊销。
+     *
+     * @deprecated 请改用 {@link #generateToken(String, String, int)}
+     */
+    @Deprecated
+    public String generateToken(String subject, String username) {
+        return generateToken(subject, username, DEFAULT_TOKEN_VERSION);
     }
 
     /** 从 token 中解析 subject（用户标识） */
@@ -136,17 +164,31 @@ public class JwtUtil {
     }
 
     /**
-     * 从 token 中解析 jti（P1 2026-09-20：登出黑名单依据）。
-     * 升级前签发的旧 token 无该 claim，返回 null——调用方应视为「不可吊销」放行。
+     * 从 token 中解析令牌版本（P1-2，2026-10-21）。
+     *
+     * <p><b>无 {@code ver} claim 时返回 {@code null}，而不是 0</b>：{@code null} 是
+     * 「升级前签发的旧 token」这个有意义的信号，调用方据此走兼容分支；
+     * 返回 0 会让旧 token 与「DB 版本 0」（不存在）混淆，也会让「无 claim」退化成
+     * 一次必然失败的比对，等于升级瞬间把所有人踢下线。
+     *
+     * <p><b>兼容策略</b>：调用方比对时把 {@code null} 视为 {@link #DEFAULT_TOKEN_VERSION}（=1，
+     * 与 DB 默认值一致）。于是升级瞬间没有任何已登录用户被踢；而他们一旦触发
+     * 登出/改密/封禁（DB 版本 +1），旧 token 立即失效。
      */
-    public String extractJti(String token) {
-        String jti = parseClaims(token).getId();
-        return jti == null || jti.isBlank() ? null : jti;
-    }
-
-    /** 从 token 中解析过期时间（epoch 毫秒），供黑名单计算条目存活期 */
-    public long extractExpirationMs(String token) {
-        return parseClaims(token).getExpiration().getTime();
+    public Integer extractTokenVersion(String token) {
+        Object ver = parseClaims(token).get(CLAIM_VERSION);
+        if (ver == null) {
+            return null;
+        }
+        if (ver instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.valueOf(ver.toString().trim());
+        } catch (NumberFormatException e) {
+            // 非法 claim 按「无 claim」处理（走兼容分支），不让一个坏字段直接 500
+            return null;
+        }
     }
 
     /**

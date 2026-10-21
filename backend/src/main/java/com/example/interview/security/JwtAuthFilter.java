@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,15 +23,17 @@ import java.io.IOException;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
+
     @Autowired
     private JwtUtil jwtUtil;
 
     /**
-     * 登出吊销黑名单（P1 2026-09-20）。
-     * required=false 以兼容 @WebMvcTest 切片（不加载 security 包 bean），缺失时跳过吊销检查。
+     * 令牌版本缓存（P1-2，2026-10-21）：替代原 jti 黑名单。
+     * required=false 以兼容 @WebMvcTest 切片（不加载 security 包 bean），缺失时跳过版本校验。
      */
     @Autowired(required = false)
-    private TokenBlacklistService tokenBlacklist;
+    private TokenVersionCache tokenVersionCache;
 
     /**
      * v1.31.4 管理后台：用户禁用注册表。
@@ -47,13 +51,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = extractToken(request);
 
         if (StringUtils.hasText(token) && jwtUtil.isValid(token)) {
-            // P1 2026-09-20：已登出吊销的 token 直接不再认证（请求将以未认证身份继续，
-            // 由授权规则返回 401）。旧版无 jti 的 token extractJti 返回 null → 视为未吊销放行
-            if (tokenBlacklist != null && tokenBlacklist.isRevoked(jwtUtil.extractJti(token))) {
+            String userId = jwtUtil.extractUserId(token);
+            // P1-2（2026-10-21）：令牌版本校验。登出/改密/封禁会把 users.token_version +1，
+            // 于是「此前签发的所有 token」立即失效（JWT 本身不可撤销，只能这样比对）。
+            // token 无 ver claim（升级前签发）时按 DEFAULT_TOKEN_VERSION(=1) 处理 ——
+            // 与 DB 默认值一致，保证升级瞬间不踢掉任何人；一旦该用户触发过一次 +1，旧 token 立刻失效。
+            if (!versionMatches(token, userId)) {
                 filterChain.doFilter(request, response);
                 return;
             }
-            String userId = jwtUtil.extractUserId(token);
             // v1.31.4 管理后台：被禁用的用户即使 token 有效也拒绝访问（registry 缺失时跳过）
             if (userBanRegistry != null && userId != null && userBanRegistry.isBanned(parseId(userId))) {
                 filterChain.doFilter(request, response);
@@ -72,6 +78,40 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 令牌版本是否仍然有效（P1-2）。
+     *
+     * <p>三重兼容，缺一都会导致「升级即全员掉线」或「切片测试集体失败」：
+     * <ol>
+     *   <li>{@code tokenVersionCache == null}（{@code @WebMvcTest} 切片）→ 跳过校验；</li>
+     *   <li>token 无 {@code ver} claim（升级前签发）→ 按 {@link JwtUtil#DEFAULT_TOKEN_VERSION}
+     *       （=1）比对，与 DB 默认值一致，故升级瞬间不踢人；</li>
+     *   <li>查不到当前版本（用户不存在 / DB 抖动）→ 跳过校验，不把偶发故障放大成全站 401。</li>
+     * </ol>
+     */
+    private boolean versionMatches(String token, String userId) {
+        if (tokenVersionCache == null) {
+            return true;
+        }
+        Long id = parseId(userId);
+        if (id == null) {
+            // 非数字 subject：历史/异常 token，交给后续授权逻辑处理
+            return true;
+        }
+        Integer current = tokenVersionCache.currentVersion(id);
+        if (current == null) {
+            return true;
+        }
+        Integer claimed = jwtUtil.extractTokenVersion(token);
+        int effective = claimed == null ? JwtUtil.DEFAULT_TOKEN_VERSION : claimed;
+        if (effective != current) {
+            // 与既有 jti 分支一致：不认证，但继续走过滤链，由授权规则给出 401
+            log.debug("token 版本已失效：userId={} token.ver={} db.ver={}", id, effective, current);
+            return false;
+        }
+        return true;
     }
 
     /** 从 Authorization: Bearer <token> 中提取 token */

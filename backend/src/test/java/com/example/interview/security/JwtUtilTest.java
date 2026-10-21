@@ -7,6 +7,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,31 +45,49 @@ class JwtUtilTest {
         assertEquals("2", jwtUtil.extractUserId(token));
     }
 
+    // ─────────────────── P1-2：令牌版本 claim（ver） ───────────────────
+
     @Test
-    @DisplayName("jti：每次签发生成唯一 token 标识且可回读（登出黑名单依据）")
-    void generateToken_jti_uniqueAndExtractable() {
+    @DisplayName("P1-2：3 参签发把 ver 写进 token，可原样回读")
+    void generateToken_withVersion_roundTrips() {
         jwtUtil.validateSecret();
-        String token1 = jwtUtil.generateToken("1", "root");
-        String token2 = jwtUtil.generateToken("1", "root");
-
-        String jti1 = jwtUtil.extractJti(token1);
-        String jti2 = jwtUtil.extractJti(token2);
-
-        assertTrue(jti1 != null && !jti1.isBlank());
-        assertTrue(jti2 != null && !jti2.isBlank());
-        assertFalse(jti1.equals(jti2)); // 同一用户两次签发 jti 也不同
+        String token = jwtUtil.generateToken("1", "root", 7);
+        assertEquals(7, jwtUtil.extractTokenVersion(token));
     }
 
     @Test
-    @DisplayName("extractExpirationMs：回读过期时间，约等于配置的有效期")
-    void extractExpirationMs_roundtrip() {
+    @DisplayName("P1-2：2 参重载固定签出 ver=1（历史兼容），不再随调用方漂移")
+    void legacyTwoArgOverload_usesDefaultVersion() {
         jwtUtil.validateSecret();
-        long before = System.currentTimeMillis();
         String token = jwtUtil.generateToken("1", "root");
-        long exp = jwtUtil.extractExpirationMs(token);
-        // 有效期 600000ms，允许 1 秒时钟偏差
-        assertTrue(exp >= before + 600_000L - 1_000L);
-        assertTrue(exp <= System.currentTimeMillis() + 600_000L + 1_000L);
+        assertEquals(JwtUtil.DEFAULT_TOKEN_VERSION, jwtUtil.extractTokenVersion(token));
+    }
+
+    /**
+     * 兼容性核心：升级前签发的 token 没有 {@code ver} claim。
+     *
+     * <p>{@link JwtUtil#extractTokenVersion} 必须返回 <b>null</b>（而不是 0）——
+     * null 才能让调用方走「视为 1」的兼容分支，于是升级瞬间没有已登录用户被踢下线；
+     * 返回 0 会让所有旧 token 立刻失效。
+     */
+    @Test
+    @DisplayName("P1-2：无 ver claim 的旧 token → extractTokenVersion 返回 null（不是 0）")
+    void tokenWithoutVersionClaim_returnsNull() {
+        jwtUtil.validateSecret();
+        String legacy = io.jsonwebtoken.Jwts.builder()
+                .subject("1")
+                .issuer("interview-guide")
+                .audience().add("interview-guide-client").and()
+                .claim("role", "ROLE_USER")
+                .issuedAt(new java.util.Date())
+                .expiration(new java.util.Date(System.currentTimeMillis() + 600_000L))
+                .signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor(
+                        SECRET.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .compact();
+
+        // 签名与有效期都合法（不会被 isValid 拦），只是缺版本号
+        assertTrue(jwtUtil.isValid(legacy));
+        assertNull(jwtUtil.extractTokenVersion(legacy));
     }
 
     @Test
