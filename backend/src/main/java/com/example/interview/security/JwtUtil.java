@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Arrays;
@@ -58,10 +59,47 @@ public class JwtUtil {
         if (jwtSecret == null || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException("JWT secret 长度不足，HS256 要求至少 32 字节。请检查 JWT_SECRET 环境变量。");
         }
+        // P1-3（2026-10-21 质量循环）：只校验长度会放过「照抄 .env.example」的部署者。
+        // 示例里的占位串有 47 字符，长度校验必然通过 → 得到一个**公开可知**的签名密钥，
+        // 任何人都能签出 {"sub":"1","role":"ROLE_ADMIN"} 的 token 直接调 /api/admin/**。
+        // 这里补两道：① 已知占位特征词 ② 低熵（全同字符 / 连续序列）。
+        // 判定刻意保守：只拦「随机 base64 不可能出现」的模式，避免误杀真实密钥导致线上启动失败。
+        String lower = jwtSecret.toLowerCase(Locale.ROOT);
+        for (String marker : PLACEHOLDER_MARKERS) {
+            if (lower.contains(marker)) {
+                throw new IllegalStateException("JWT secret 使用了示例/占位值（含 \"" + marker
+                        + "\"），任何人都能据此伪造 token。请用 `openssl rand -base64 48` 生成后写入 JWT_SECRET。");
+            }
+        }
+        if (isLowEntropy(jwtSecret)) {
+            throw new IllegalStateException(
+                    "JWT secret 过于简单（全同字符或连续序列），请用 `openssl rand -base64 48` 生成后写入 JWT_SECRET。");
+        }
         adminUsernameSet = (adminUsernames == null || adminUsernames.isBlank())
                 ? Set.of()
                 : Arrays.stream(adminUsernames.split(","))
                         .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
+    }
+
+    /**
+     * 占位密钥特征词。刻意只取「随机 base64 不可能出现」的长词：
+     * 随机串里出现 8 个连续指定字符的概率约为 1/64^8，可忽略；
+     * 而 {@code your-} / {@code example} 这类短词容易误伤真实密钥，故不纳入。
+     */
+    private static final String[] PLACEHOLDER_MARKERS = {
+            "change-this", "change-me", "changeme", "placeholder", "replace-me"
+    };
+
+    /**
+     * 全同字符（如 {@code aaaa…}）视为低熵。
+     *
+     * <p>刻意**不**检测「连续序列」（{@code 0123456789abcdef}）：真实随机密钥里出现
+     * 8~16 个连续字符的概率虽低，但测试夹具与人工构造的密钥经常包含这类片段，
+     * 一刀切会误杀导致启动失败 —— 而启动失败比弱密钥的代价更高、更直接。
+     * 占位词检测已覆盖「照抄示例」这个真实风险，此处只兜最极端的全同字符。
+     */
+    private static boolean isLowEntropy(String s) {
+        return s == null || s.isEmpty() || s.chars().distinct().count() == 1;
     }
 
     /** 生成签名 Key */

@@ -7,6 +7,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -90,5 +91,69 @@ class JwtUtilTest {
         jwtUtil.validateSecret();
         assertFalse(jwtUtil.isAdminUsername("root"));
         assertFalse(jwtUtil.isAdminUsername(null));
+    }
+
+    @Test
+    @DisplayName("P1-3：照抄 .env.example 的占位密钥 → 启动失败（长度够也不能放行）")
+    void validateSecret_rejectsExamplePlaceholder() {
+        String example = "change-this-in-production-must-be-32-chars-min!!";
+        assertTrue(example.getBytes(java.nio.charset.StandardCharsets.UTF_8).length >= 32,
+                "前提：示例串本身长度达标，否则测不到占位校验");
+        ReflectionTestUtils.setField(jwtUtil, "jwtSecret", example);
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, jwtUtil::validateSecret);
+        assertTrue(e.getMessage().contains("占位值"), "报错要指出是占位值，而不是笼统的『不合法』：" + e.getMessage());
+        assertTrue(e.getMessage().contains("openssl"), "报错要给可执行的修复动作：" + e.getMessage());
+    }
+
+    @Test
+    @DisplayName("P1-3：changeme / placeholder 变体同样被拦")
+    void validateSecret_rejectsPlaceholderVariants() {
+        for (String bad : new String[]{
+                "changeme-changeme-changeme-changeme-1234",
+                "placeholder-secret-placeholder-secret-1234",
+                "please-change-me-before-deploy-0123456789ab"}) {
+            ReflectionTestUtils.setField(jwtUtil, "jwtSecret", bad);
+            assertThrows(IllegalStateException.class, jwtUtil::validateSecret, "应拦截：" + bad);
+        }
+    }
+
+    @Test
+    @DisplayName("P1-3：全同字符属低熵，启动失败")
+    void validateSecret_rejectsLowEntropy() {
+        ReflectionTestUtils.setField(jwtUtil, "jwtSecret", "a".repeat(48));
+        IllegalStateException e = assertThrows(IllegalStateException.class, jwtUtil::validateSecret);
+        assertTrue(e.getMessage().contains("过于简单"), e.getMessage());
+    }
+
+    @Test
+    @DisplayName("P1-3：含连续序列的真实密钥不被误杀（避免线上启动失败）")
+    void validateSecret_acceptsSecretWithSequences() {
+        // 含 16 位连续 16 进制片段，但整体是人工构造的强密钥 —— 必须放行。
+        // 这条用例锁住「不做连续序列检测」这个决策，防止后续有人加回来把线上搞挂。
+        ReflectionTestUtils.setField(jwtUtil, "jwtSecret",
+                "unit-test-secret-0123456789abcdef0123456789abcdef");
+        jwtUtil.validateSecret();
+    }
+
+    @Test
+    @DisplayName("P1-3：真实随机密钥不被误杀（避免线上启动失败）")
+    void validateSecret_acceptsRealisticSecret() {
+        // 本地开发默认值：不含占位特征词、非低熵 —— 必须放行，否则本地与测试环境全挂
+        ReflectionTestUtils.setField(jwtUtil, "jwtSecret", "local-dev-secret-key-must-be-32-chars-min!!");
+        jwtUtil.validateSecret();
+
+        // 随机 base64（openssl rand -base64 48 的形态）
+        ReflectionTestUtils.setField(jwtUtil, "jwtSecret",
+                "kR7vQ2mX9pLzT4wYbN6cJ1hF8sD3gA5eU0iOqRtZxCvBnM2lKjH");
+        jwtUtil.validateSecret();
+    }
+
+    @Test
+    @DisplayName("P1-3：长度不足仍先被长度校验拦下（不改变既有语义）")
+    void validateSecret_stillRejectsShortSecret() {
+        ReflectionTestUtils.setField(jwtUtil, "jwtSecret", "short");
+        IllegalStateException e = assertThrows(IllegalStateException.class, jwtUtil::validateSecret);
+        assertTrue(e.getMessage().contains("32"));
     }
 }
