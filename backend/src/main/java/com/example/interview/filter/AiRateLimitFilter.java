@@ -63,16 +63,14 @@ import java.util.List;
  *
  * <p>遵循 {@code docs/api-error-contract.md} §2：本项目的业务错误由代码侧直接产出时，
  * <b>HTTP 保持 200，语义由 body 的 {@code code} 承载</b>（429 = 限流）。
- * 前端拦截器（{@code frontend/src/api/index.ts}）只在 HTTP 2xx 分支读 {@code body.code}
- * 并展示后端文案；若这里改成真 4xx，用户看到的会是英文的
- * {@code Request failed with status code 429}，违反契约 §5「429 应展示限流提示」。
  *
  * <h2>排除范围</h2>
  *
- * <p>只拦配置里列出的 AI 前缀。健康检查（{@code /api/health}、{@code /actuator/**}）、
+ * <p>只拦配置里列出的 AI 路径。健康检查（{@code /api/health}、{@code /actuator/**}）、
  * 静态资源（{@code /assets/**}、{@code index.html}）、SSE 心跳（不产生新请求）、
- * 以及知识库/简历模块里的普通 CRUD 端点（{@code /api/knowledge/recent-questions}、
- * {@code /api/resume/history} 等）均不计数。
+ * 以及知识库/简历/故事库/投递台账模块里的普通 CRUD 端点
+ * （{@code /api/knowledge/recent-questions}、{@code /api/resume/history}、
+ * {@code /api/story-bank} 的 list/save/update/delete 等）均不计数。
  */
 public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
 
@@ -91,21 +89,38 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
     public static final int FILTER_ORDER = -90;
 
     /**
-     * 默认受限流的 AI 路径前缀（逗号分隔，可被 {@code app.ai.user-rate-limit.paths} 覆盖）。
+     * 默认受限流的 AI 路径（逗号分隔，可被 {@code app.ai.user-rate-limit.paths} 覆盖）。
      *
-     * <p>取值依据：逐个核对控制器的真实映射，只收录「一次请求会打 AI/embedding」的路径。
+     * <p>取值依据：<b>逐个控制器 → 顺着 service 找 {@code ChatClient}/{@code AiConcurrencyGuard}
+     * 的真实调用点</b>，只收录「一次请求会真的打 LLM/embedding」的路径。
+     * AI 调用普遍在 service 层，只在控制器里 grep {@code chatModel} 会全部漏掉。
+     *
+     * <p>语法：普通项为前缀匹配；含 {@code *} 的项按<b>路径段</b>通配
+     * （{@code *} 恰好匹配一个 segment），用于表达 {@code /{id}/check} 这类带路径参数的端点。
+     *
      * <ul>
      *   <li>{@code /api/agent/} —— AgentController（ReAct 循环，另见更严的 expensive 配额）</li>
      *   <li>{@code /api/interview/} —— InterviewController 全部 5 个端点均为 AI
-     *       （questions/evaluate/followup/upload-image/ask-stream），模块内无 CRUD 端点</li>
+     *       （questions/evaluate/followup/upload-image/ask-stream），模块内无 CRUD</li>
      *   <li>{@code /api/job/} —— JobAnalysisController 全部 4 个端点均为 AI
-     *       （analyze/gap/letter/import-url），模块内无 CRUD 端点</li>
-     *   <li>{@code /api/knowledge/ask|import|search} —— 走 LLM 或 embedding；
+     *       （analyze/gap/letter/import-url），模块内无 CRUD</li>
+     *   <li>{@code /api/knowledge/ask|import|search} —— LLM 或 embedding；
      *       {@code recent-questions} / {@code wrong-questions} / {@code question-summary}
-     *       是纯数据库查询，<b>刻意不收录</b>，避免正常浏览被误伤</li>
+     *       是纯数据库查询，<b>刻意不收录</b></li>
      *   <li>{@code /api/resume/analyze|upload|optimize|import-url}、{@code /autofill}
-     *       —— 简历解析/优化为 LLM 调用；{@code /api/resume/history}、{@code /api/resume/{id}}
-     *       等 CRUD 不收录</li>
+     *       —— 简历解析/优化/自动填充为 LLM 调用；{@code /api/resume/history}、
+     *       {@code /api/resume/{id}} 等 CRUD 不收录</li>
+     *   <li>{@code /api/career/mine}、{@code /api/career/plan}
+     *       —— {@code CareerProfileService#mine/plan} 走 {@code chatClient}（经 AiConcurrencyGuard）</li>
+     *   <li>{@code /api/story-bank/extract}、{@code /api/story-bank/<id>/check}、
+     *       {@code /api/story-bank/<id>/followup}（配置里中段写作段通配）——
+     *       {@code StoryBankService#extract/check/followUp} 走 {@code chatClient}；
+     *       同模块的 list/save/update/delete 是 CRUD，不收录</li>
+     *   <li>{@code /api/application/<id>/tailor}（配置里中段写作段通配）——
+     *       {@code JobApplicationController#tailor} → {@code TailoredResumeService#tailor}
+     *       走 {@code chatClient}；同模块 {@code /import}（仅 repository）、
+     *       {@code /{id}/apply-kit}（源码明确注释「刻意不调 AI」）、
+     *       {@code /draft}/{@code confirm}/{@code status} 均为 DB 操作，不收录</li>
      * </ul>
      *
      * <p>⚠️ 本常量必须保持「编译期常量」（只用字面量与 {@code +} 拼接），
@@ -121,7 +136,13 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
             + ",/api/resume/upload"
             + ",/api/resume/optimize"
             + ",/api/resume/import-url"
-            + ",/autofill";
+            + ",/autofill"
+            + ",/api/career/mine"
+            + ",/api/career/plan"
+            + ",/api/story-bank/extract"
+            + ",/api/story-bank/*/check"
+            + ",/api/story-bank/*/followup"
+            + ",/api/application/*/tailor";
 
     /** 默认「成本最高」的路径前缀（可被 {@code app.ai.user-rate-limit.expensive-paths} 覆盖） */
     public static final String DEFAULT_EXPENSIVE_PATH_PREFIXES = "/api/agent/";
@@ -143,6 +164,9 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
 
     /** 匿名令牌的 principal 常量（Spring Security 固定值） */
     private static final String ANONYMOUS_PRINCIPAL = "anonymousUser";
+
+    /** 路径规则中的段通配符（恰好匹配一个非空路径段） */
+    private static final String WILDCARD_SEGMENT = "*";
 
     private final boolean enabled;
     private final List<String> aiPathPrefixes;
@@ -289,8 +313,7 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
      * 写出超限响应。
      *
      * <p>HTTP 状态保持 200：契约（{@code docs/api-error-contract.md} §2）把
-     * 「代码侧直接产出业务错误」定义为 HTTP 200 + body {@code code != 200}，
-     * 前端只在 2xx 分支读 {@code body.code} 并展示后端文案。
+     * 「代码侧直接产出业务错误」定义为 HTTP 200 + body {@code code != 200}。
      */
     private void writeRateLimited(HttpServletResponse response, int quota) throws IOException {
         response.setStatus(HttpServletResponse.SC_OK);
@@ -330,25 +353,36 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
     }
 
     /**
-     * 前缀匹配（按路径**段**边界匹配）。
-     *
-     * <p>刻意不用裸 {@code startsWith}：{@code /api/resume/analyze} 不应匹配
-     * {@code /api/resume/analyzer-x}，否则路径语义一变就会误伤无关接口。
+     * 是否命中任意一条受限流规则。
      */
-    private static boolean matchesAny(String path, List<String> prefixes) {
-        for (String prefix : prefixes) {
-            if (matches(path, prefix)) {
+    private static boolean matchesAny(String path, List<String> patterns) {
+        for (String pattern : patterns) {
+            if (matches(path, pattern)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean matches(String path, String prefix) {
-        if (path == null || prefix == null || prefix.isEmpty()) {
+    /**
+     * 路径匹配：普通项按<b>路径段边界</b>前缀匹配，含 {@code *} 的项按路径段通配。
+     *
+     * <p>刻意不用裸 {@code startsWith}：{@code /api/resume/analyze} 不应匹配
+     * {@code /api/resume/analyzer-x}，否则路径语义一变就会误伤无关接口。
+     *
+     * <p>{@code *} 只匹配<b>恰好一个</b>路径段，用于表达带路径参数的 AI 端点
+     * （{@code /api/story-bank/{id}/check}、{@code /api/application/{id}/tailor}）。
+     * 用通配而不是「前缀 + 后缀」双条件，是为了让一条配置就能表达整条路径，
+     * 避免再出现「前缀对了但后缀忘了配」这类清单漂移。
+     */
+    private static boolean matches(String path, String pattern) {
+        if (path == null || pattern == null || pattern.isEmpty()) {
             return false;
         }
-        String base = prefix.endsWith("/") ? prefix.substring(0, prefix.length() - 1) : prefix;
+        if (pattern.indexOf(WILDCARD_SEGMENT) >= 0) {
+            return matchesWildcard(path, pattern);
+        }
+        String base = pattern.endsWith("/") ? pattern.substring(0, pattern.length() - 1) : pattern;
         if (base.isEmpty()) {
             return false;
         }
@@ -358,6 +392,40 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
         return path.length() > base.length()
                 && path.startsWith(base)
                 && path.charAt(base.length()) == '/';
+    }
+
+    /** 逐段比较；{@code *} 段匹配任意单段（非空） */
+    private static boolean matchesWildcard(String path, String pattern) {
+        String[] patternSegments = splitSegments(pattern);
+        String[] pathSegments = splitSegments(path);
+        if (patternSegments.length != pathSegments.length) {
+            return false;
+        }
+        for (int i = 0; i < patternSegments.length; i++) {
+            String expected = patternSegments[i];
+            if (WILDCARD_SEGMENT.equals(expected)) {
+                if (pathSegments[i].isEmpty()) {
+                    return false;
+                }
+                continue;
+            }
+            if (!expected.equals(pathSegments[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 按 / 切段并丢弃首尾空段（兼容前导与尾随斜杠） */
+    private static String[] splitSegments(String value) {
+        String trimmed = value;
+        while (trimmed.startsWith("/")) {
+            trimmed = trimmed.substring(1);
+        }
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed.isEmpty() ? new String[0] : trimmed.split("/");
     }
 
     private static List<String> parsePrefixes(String commaSeparated) {

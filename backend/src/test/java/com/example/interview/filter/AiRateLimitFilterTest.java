@@ -127,8 +127,16 @@ class AiRateLimitFilterTest {
                     "/api/resume/history",              // 简历列表 CRUD
                     "/api/resume/12",                   // 简历详情
                     "/api/jobs/refresh",                // JobAgentController 自带 1/5min 限流
-                    "/api/session/create",
+                    "/api/session/create",              // 只写库，AI 出题在 /api/interview/questions
+                    "/api/session/answer",              // 只写库，AI 评分在 /api/interview/evaluate
                     "/api/todo/list",
+                    "/api/story-bank",                  // 故事库列表 CRUD
+                    "/api/story-bank/7",                // 故事详情/更新/删除
+                    "/api/application/list",            // 投递台账列表
+                    "/api/application/import",          // 仅 repository + 事务，无 AI
+                    "/api/application/9/apply-kit",     // 源码明确注释「刻意不调 AI」
+                    "/api/application/draft",           // 仅写库
+                    "/api/favorite/bank/start",         // 控制器注释「不重新调用 AI 生成题目」
             };
             for (String path : notLimited) {
                 assertThat(passThrough(filter, request(path, IP_A), new MockHttpServletResponse()))
@@ -138,6 +146,48 @@ class AiRateLimitFilterTest {
             // 关键：上面那批请求没有消耗配额 —— AI 路径的第 1 次仍然放行
             assertThat(passThrough(filter, request(INTERVIEW_PATH, IP_A), new MockHttpServletResponse()))
                     .as("非 AI 路径不得消耗 AI 配额").isTrue();
+        }
+
+        @Test
+        @DisplayName("新补齐的 career/story-bank/application 精确端点被计数（AI 调用在 service 层）")
+        void newlyCoveredAiEndpoints_areCounted() throws Exception {
+            String[] aiPaths = {
+                    "/api/career/mine",                 // CareerProfileService#mine → chatClient
+                    "/api/career/plan",                 // CareerProfileService#plan → chatClient
+                    "/api/story-bank/extract",          // StoryBankService#extract → chatClient
+                    "/api/story-bank/42/check",         // StoryBankService#check → chatClient（段通配）
+                    "/api/story-bank/42/followup",      // StoryBankService#followUp → chatClient（段通配）
+                    "/api/application/9/tailor",        // TailoredResumeService#tailor → chatClient（段通配）
+            };
+            for (String path : aiPaths) {
+                AiRateLimitFilter filter = filter(1, 5);
+                loginAs("1");
+                assertThat(passThrough(filter, request(path, IP_A), new MockHttpServletResponse()))
+                        .as("%s 第 1 次应放行", path).isTrue();
+                assertThat(passThrough(filter, request(path, IP_A), new MockHttpServletResponse()))
+                        .as("%s 第 2 次应被限流（说明该路径已纳入配额）", path).isFalse();
+            }
+        }
+
+        @Test
+        @DisplayName("段通配只匹配一段：/api/story-bank/42/check/extra 与缺段形态不命中")
+        void wildcardMatchesExactlyOneSegment() throws Exception {
+            // 多一段 / 少一段都不应命中（否则通配会把整棵子树拉进配额）
+            String[] notLimited = {
+                    "/api/story-bank/42/check/extra",
+                    "/api/story-bank/check",
+                    "/api/story-bank/42/checklist",
+                    "/api/application/9/tailor/preview",
+                    "/api/application/tailor",
+            };
+            for (String path : notLimited) {
+                AiRateLimitFilter filter = filter(1, 5);
+                loginAs("1");
+                assertThat(passThrough(filter, request(path, IP_A), new MockHttpServletResponse()))
+                        .as("%s 不应命中段通配规则", path).isTrue();
+                assertThat(passThrough(filter, request(path, IP_A), new MockHttpServletResponse()))
+                        .as("%s 也不应消耗配额", path).isTrue();
+            }
         }
 
         @Test
@@ -165,7 +215,7 @@ class AiRateLimitFilterTest {
     class OverLimit {
 
         @Test
-        @DisplayName("超限返回 HTTP 200 + body code=429（不是真 4xx），并带 Retry-After")
+        @DisplayName("超限返回 HTTP 200 + body code=429，并带 Retry-After")
         void overLimit_returnsContractCompliantBody() throws Exception {
             AiRateLimitFilter filter = filter(1, 5);
             loginAs("1");
@@ -175,8 +225,7 @@ class AiRateLimitFilterTest {
             boolean passed = passThrough(filter, request(INTERVIEW_PATH, IP_A), response);
 
             assertThat(passed).as("超限请求不得进入业务链路").isFalse();
-            // 契约 §2：代码侧直接产出的业务错误 = HTTP 200 + body code≠200。
-            // 改成 429 会让前端拦截器走 error 分支，用户只看到英文 status code 文案。
+            // 契约 §2：代码侧直接产出的业务错误 = HTTP 200 + body code≠200
             assertThat(response.getStatus()).isEqualTo(200);
             JsonNode body = objectMapper.readTree(response.getContentAsString());
             assertThat(body.get("code").asInt()).isEqualTo(429);
