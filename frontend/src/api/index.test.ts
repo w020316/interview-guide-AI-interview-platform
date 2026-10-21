@@ -180,6 +180,74 @@ describe('api/index 响应拦截器（rejected）', () => {
     expect(localStorage.getItem('token')).not.toBeNull()
   })
 
+  // ─────────────────── 429 限流（契约 §4/§5：提示 + 禁止自动重试）───────────────────
+  // 背景：后端有两处返回真 429 —— 拦截器级 IP 限流（RateLimitInterceptor）与 AI 端点
+  // 按用户配额（AiRateLimitFilter）。此前响应拦截器里没有 429 分支，两者都落到通用文案，
+  // 用户只看到英文 "Request failed with status code 429"。
+
+  it('429：透传后端中文文案，并把 Retry-After 附到错误对象上供倒计时', async () => {
+    const cfg: any = { url: '/api/agent/chat/stream', method: 'post', __retried: undefined }
+    const err: any = {
+      config: cfg,
+      response: {
+        status: 429,
+        data: { code: 429, message: 'AI 调用过于频繁（上限 20 次/1 分钟），请稍后再试' },
+        headers: { 'retry-after': '60' },
+      },
+      message: 'Request failed with status code 429',
+    }
+    await expect(resRejected(err)).rejects.toMatchObject({
+      message: expect.stringContaining('AI 调用过于频繁'),
+    })
+    expect(err.retryAfter).toBe(60)
+    // 限流绝不能被当作「后端未就绪」重放：重放只会再吃一次限流、加剧配额耗尽
+    expect(cfg.__retried).toBeUndefined()
+    expect(ensureAwakeMock).not.toHaveBeenCalled()
+  })
+
+  it('429 无 body message 时用兜底中文文案（不把 axios 英文抛给用户）', async () => {
+    const err: any = {
+      config: { url: '/api/auth/register', method: 'post' },
+      response: { status: 429, data: '', headers: {} },
+      message: 'Request failed with status code 429',
+    }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: '操作过于频繁，请稍后再试' })
+    expect(err.retryAfter).toBeUndefined()
+  })
+
+  it('429 即使响应头看起来像网关错误页，也绝不进入冷启动重放（锁住分支位置）', async () => {
+    // 位置约束的回归测试：若有人把 429 分支挪到 `const coldStart = ...` 之后，
+    // text/html 会命中 isColdStartError → 该 GET 会被静默重放一次（契约明确禁止重试）。
+    ensureAwakeMock.mockResolvedValue(true)
+    const cfg: any = { url: '/api/jobs/list', method: 'get', __retried: undefined }
+    const err: any = {
+      config: cfg,
+      response: {
+        status: 429,
+        data: '<html><title>Too Many Requests</title></html>',
+        headers: { 'content-type': 'text/html', 'retry-after': '12' },
+      },
+      message: 'Request failed with status code 429',
+    }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: '操作过于频繁，请稍后再试' })
+    expect(ensureAwakeMock).not.toHaveBeenCalled()
+    expect(cfg.__retried).toBeUndefined()
+    expect(err.retryAfter).toBe(12)
+  })
+
+  it('注册限流 429 同样透传中文文案，不清 token 不跳登录', async () => {
+    localStorage.setItem('token', validToken())
+    await mockLocation('/register')
+    const err: any = {
+      config: { url: '/api/auth/register', method: 'post' },
+      response: { status: 429, data: { code: 429, message: '注册过于频繁，请稍后再试' }, headers: {} },
+      message: 'Request failed with status code 429',
+    }
+    await expect(resRejected(err)).rejects.toMatchObject({ message: '注册过于频繁，请稍后再试' })
+    expect(localStorage.getItem('token')).not.toBeNull()
+    expect((window.location as any).href).toBe('')
+  })
+
   it('登录页遇到 401 不跳转', async () => {
     await mockLocation('/login')
     const err: any = { config: { url: '/api/login' }, response: { status: 401, data: {} } }

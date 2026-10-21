@@ -298,6 +298,38 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // 429 限流（契约 docs/api-error-contract.md §4/§5：429 = 额度/配额耗尽，
+    // 「展示限流提示 + 禁止自动重试 + 倒计时」，且必须与 503「服务不可用」区分开）。
+    //
+    // 为什么必须有这个分支：后端从两处返回真 429 ——
+    //   1) 拦截器级 IP 限流（RateLimitInterceptor，60 次/分钟）
+    //   2) AI 端点按用户配额（AiRateLimitFilter：普通 60 次/分钟、/api/agent 20 次/分钟）
+    // 此前没有本分支，两者都落到最下面的通用文案，用户只看到英文
+    // "Request failed with status code 429"，既不知道是限流、也不知道等多久。
+    //
+    // ⚠️ 位置约束：本分支必须在 `const coldStart = isColdStartError(error)` **之前** 就
+    // `return Promise.reject`。若挪到冷启动重放逻辑之后，429 会先被当作「后端未就绪」重放一次
+    // —— 重放只会再吃一次限流、并把配额打得更干（契约明确要求「禁止自动重试」）。
+    if (error.response?.status === 429) {
+      const body = error.response.data as { code?: number; message?: string } | undefined
+      const isBusinessJson =
+        body != null && typeof body === 'object' && typeof body.code !== 'undefined'
+      // 优先用后端中文文案（AI 配额文案带「上限 N 次/分钟」，注册限流带「请稍后再试」），
+      // 其次兜底，最后才是 axios 的英文 message —— 永远不要把英文抛给用户。
+      error.message = (isBusinessJson && body?.message) || '操作过于频繁，请稍后再试'
+      // Retry-After（秒）供页面做倒计时；解析失败就不带该字段，页面回退到默认文案。
+      const retryAfterRaw = (error.response.headers as Record<string, string> | undefined)?.[
+        'retry-after'
+      ]
+      const retryAfter = Number(retryAfterRaw)
+      if (Number.isFinite(retryAfter) && retryAfter > 0) {
+        Object.assign(error, { retryAfter })
+      }
+      // 与 401/403 分支一致地收口 AI 任务中心，否则被限流的 AI 任务会一直显示「进行中」
+      finishAiTask(aiTaskId, false, error.message)
+      return Promise.reject(error)
+    }
+
     const coldStart = isColdStartError(error)
 
     // 冷启动自动重放：**仅对「非 AI 的幂等 GET」生效**。
