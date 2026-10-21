@@ -67,12 +67,10 @@ public class GlobalExceptionHandler {
      * {@code JobAgentController#refresh}）各自在响应里设置该头。
      */
     @ExceptionHandler(RateLimitExceededException.class)
-    public org.springframework.http.ResponseEntity<Result<Void>> handleRateLimitExceeded(
-            RateLimitExceededException ex) {
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public Result<Void> handleRateLimitExceeded(RateLimitExceededException ex) {
         log.warn("触发限流（429）：{}", ex.getMessage());
-        return org.springframework.http.ResponseEntity
-                .status(HttpStatus.TOO_MANY_REQUESTS)
-                .body(Result.error(429, ex.getMessage()));
+        return Result.error(429, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

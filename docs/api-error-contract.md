@@ -25,11 +25,19 @@
 
 | 错误来源 | HTTP 状态码 | body `code` | 典型场景 |
 |---|---|---|---|
-| **控制器内校验后直接 `return Result.error(...)`** | **200** | 4xx 语义码 | 缺参/空值/越界/业务规则不满足（如 `code=400/403/404/429`） |
+| **控制器内校验后直接 `return Result.error(...)`** | **200** | 4xx 语义码 | 缺参/空值/越界/业务规则不满足（如 `code=400/403/404`） |
 | **异常抛出后由 `GlobalExceptionHandler` 处理** | **与 `code` 相同** | 同 HTTP 码 | 见 §3 映射表 |
 
 > **唯一正确的客户端判据**：先取 body 的 `code`，`code == 200` 才是成功；
 > 出现 `HTTP 200 但 code != 200` 是**预期行为**，不是异常。
+
+> **429 是唯一「统一经由异常通道产出」的语义码** —— 控制器内不再新增手写
+> `Result.error(429)`：注册限流、登录失败锁定、改密限流、面试出题/评分限流一律
+> `throw RateLimitExceededException`，由 `GlobalExceptionHandler` 一处产出真 HTTP 429
+> （2026-10-21，此前这 8 处返回的是 `HTTP 200 + code=429`，会让按状态码分流的网关/监控/前端
+> error 分支全都看不见限流）。剩余两处直接写状态码的场合都有结构原因，不是遗漏：
+> `AiRateLimitFilter` 是 Servlet 过滤器（无法进入 `@ControllerAdvice`），
+> `JobAgentController#refresh` 需按分支给出不同的 `Retry-After`。
 
 ### 2.1 为什么不做成单一形态
 
@@ -53,6 +61,7 @@
 | `HttpRequestMethodNotSupportedException` | 405 | 不支持的请求方法 |
 | `NoHandlerFoundException` / `NoResourceFoundException` | 404 | 接口不存在 |
 | `OptimisticLockingFailureException` | 409 | 内容已被更新，请刷新后重试 |
+| `RateLimitExceededException` | 429 | 限流（注册 / 登录失败锁定 / 改密 / 面试出题·评分），由 `GlobalExceptionHandler` 统一产出 |
 | `JsonBodySizeLimitFilter` 拦截（请求体 > 1024KB） | 413 | 请求体过大，超过 1024KB 限制 |
 | `BusinessException` | 503 | 业务故障，文案原文透出（如「AI 服务暂时不可用，请稍后重试」） |
 | `AiGateTimeoutException`（v1.34.1 新增） | 503 | AI 并发闸门排队超时，请稍后重试 |
@@ -72,7 +81,7 @@
 | 405 | 方法不支持 | 前端 bug，上报 |
 | 409 | 并发冲突 | 提示刷新后重试 |
 | 413 | 请求体过大 | 前端先做体量预检 |
-| **429** | **限流/配额耗尽**（注册限流、AI 接口限流、岗位刷新限流） | **Banner 提示 + 倒计时，禁止自动重试** |
+| **429** | **限流/配额耗尽**（注册限流、登录失败锁定、改密限流、AI 接口限流、岗位刷新限流） | **Banner 提示 + 倒计时，禁止自动重试** |
 | **503** | **AI 服务暂不可用**（降级链全失败、闸门排队超时） | 提示「服务繁忙」，可延后手动重试 |
 | 504 | 上游超时 | 同 503 |
 | 500 | 未预期内部错误 | 上报，不要重试 |
