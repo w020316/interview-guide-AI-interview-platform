@@ -43,6 +43,20 @@ public class TokenVersionCache {
     static final long TTL_MS = 60_000L;
 
     /**
+     * {@link #currentVersion(Long)} 的返回值之一：<b>DB 明确回答「查无此用户」</b>。
+     *
+     * <p>与 {@code null}（无法确定）严格区分：
+     * <ul>
+     *   <li>{@code USER_ABSENT} → 认证组件 <b>fail-closed</b>（拒绝）：签名合法但账号已不存在，
+     *       没有理由让它通过；</li>
+     *   <li>{@code null} → 认证组件 <b>fail-open</b>（跳过校验）：{@code @WebMvcTest} 切片没有
+     *       repository、或 DB 抖动——这两种情况都「无法确定」，不应把故障放大成全站 401。</li>
+     * </ul>
+     * 认证系统的通行原则：不确定时 fail-open，明确否定时 fail-closed。
+     */
+    public static final int USER_ABSENT = -1;
+
+    /**
      * {@code users.token_version} 读取。
      *
      * <p>{@code required = false}：{@code @WebMvcTest} 切片不加载 repository，
@@ -61,8 +75,9 @@ public class TokenVersionCache {
     /**
      * 取用户的当前令牌版本。
      *
-     * @return 版本号；{@code null} 表示<b>无法确定</b>（切片测试无 repository / 用户不存在 /
-     *         查询异常）—— 调用方应跳过版本校验而不是拒绝请求
+     * @return 版本号；{@link #USER_ABSENT} 表示 DB <b>明确查无此用户</b>（调用方应拒绝）；
+     *         {@code null} 表示<b>无法确定</b>（切片测试无 repository / DB 异常 / 版本列为空）
+     *         —— 调用方应跳过版本校验而不是拒绝请求
      */
     public Integer currentVersion(Long userId) {
         if (userId == null) {
@@ -76,22 +91,32 @@ public class TokenVersionCache {
         if (userRepository == null) {
             return null;
         }
+        // ⚠️ 「用户不存在」与「查不了」必须分开处理，不能都当 null：
+        //   不存在 = DB 给出的**明确否定** → 认证组件应 fail-closed（拒绝）
+        //   查不了 = 无法确定（切片无 repo / DB 异常）→ fail-open（跳过校验）
+        // 早期实现把两者压成同一个 null，等于「签名合法但用户已不存在」的 token 仍能通过过滤，
+        // principal 会被设成一个不存在的 userId，后续业务代码拿到它就会踩空。
+        com.example.interview.entity.UserEntity user;
         try {
-            Integer version = userRepository.findById(userId)
-                    .map(com.example.interview.entity.UserEntity::getTokenVersion)
-                    .orElse(null);
-            if (version == null) {
-                // 用户不存在（或历史数据缺列值）：不缓存，避免把「暂时查不到」固化 60 秒
-                log.debug("无法读取用户令牌版本（用户不存在或版本为空）：userId={}", userId);
-                return null;
-            }
-            cache.put(userId, new CachedVersion(version, now + TTL_MS));
-            return version;
+            user = userRepository.findById(userId).orElse(null);
         } catch (Exception e) {
             // 数据库抖动不应把全站打成 401：跳过校验（fail-open）并留日志
             log.warn("读取令牌版本失败，本次跳过版本校验：userId={} 原因={}", userId, e.getMessage());
             return null;
         }
+        if (user == null) {
+            // 明确不存在：不缓存（避免把「暂时查不到」固化 60 秒），交给调用方 fail-closed
+            log.debug("用户不存在，令牌版本判定为 USER_ABSENT：userId={}", userId);
+            return USER_ABSENT;
+        }
+        Integer version = user.getTokenVersion();
+        if (version == null) {
+            // 行存在但版本列为空（历史脏数据）：仍属「无法确定」，不缓存、不拒绝
+            log.debug("用户令牌版本为空，本次跳过版本校验：userId={}", userId);
+            return null;
+        }
+        cache.put(userId, new CachedVersion(version, now + TTL_MS));
+        return version;
     }
 
     /**

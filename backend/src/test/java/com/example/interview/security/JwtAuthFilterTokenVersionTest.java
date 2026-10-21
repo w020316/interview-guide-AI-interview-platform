@@ -153,6 +153,37 @@ class JwtAuthFilterTokenVersionTest {
             ReflectionTestUtils.setField(filter, "tokenVersionCache", null);
             assertThat(runWithToken(tokenWithVersion(5))).isTrue();
         }
+
+        /**
+         * fail-closed on 明确否定（2026-10-21 收口）。
+         *
+         * <p>DB 明确回答「没有这个用户」与「查不了」是两件事：前者是**否定**，
+         * 后者是**不确定**。认证组件对否定要拒绝（签名合法但账号已不存在的 token
+         * 不应被授予 principal），对不确定才跳过。
+         */
+        @Test
+        @DisplayName("用户不存在（DB 明确查无此人）→ 不认证（fail-closed）")
+        void userAbsent_doesNotAuthenticate() throws Exception {
+            TokenVersionCache cache = new TokenVersionCache();
+            UserRepository repository = mock(UserRepository.class);
+            when(repository.findById(1L)).thenReturn(Optional.empty());
+            ReflectionTestUtils.setField(cache, "userRepository", repository);
+            ReflectionTestUtils.setField(filter, "tokenVersionCache", cache);
+
+            assertThat(runWithToken(tokenWithVersion(1))).isFalse();
+        }
+
+        @Test
+        @DisplayName("DB 查询抛异常 → 仍认证（fail-open 未被 fail-closed 改动误伤）")
+        void dbFailure_stillAuthenticates() throws Exception {
+            TokenVersionCache cache = new TokenVersionCache();
+            UserRepository repository = mock(UserRepository.class);
+            when(repository.findById(1L)).thenThrow(new RuntimeException("db down"));
+            ReflectionTestUtils.setField(cache, "userRepository", repository);
+            ReflectionTestUtils.setField(filter, "tokenVersionCache", cache);
+
+            assertThat(runWithToken(tokenWithVersion(1))).isTrue();
+        }
     }
 
     // ─────────────────────────── 缓存行为 ───────────────────────────
@@ -232,14 +263,15 @@ class JwtAuthFilterTokenVersionTest {
         }
 
         @Test
-        @DisplayName("用户不存在 → 返回 null，且不缓存「查不到」")
-        void userMissing_returnsNullAndDoesNotCache() {
+        @DisplayName("用户不存在 → 返回 USER_ABSENT（不是 null），且不缓存")
+        void userMissing_returnsUserAbsentAndDoesNotCache() {
             TokenVersionCache cache = new TokenVersionCache();
             UserRepository repository = mock(UserRepository.class);
             when(repository.findById(99L)).thenReturn(Optional.empty());
             ReflectionTestUtils.setField(cache, "userRepository", repository);
 
-            assertThat(cache.currentVersion(99L)).isNull();
+            assertThat(cache.currentVersion(99L))
+                    .as("明确否定必须与「无法确定(null)」区分开").isEqualTo(TokenVersionCache.USER_ABSENT);
             assertThat(cache.cachedSize()).isZero();
         }
 

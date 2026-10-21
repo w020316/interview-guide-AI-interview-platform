@@ -83,12 +83,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     /**
      * 令牌版本是否仍然有效（P1-2）。
      *
-     * <p>三重兼容，缺一都会导致「升级即全员掉线」或「切片测试集体失败」：
+     * <p>四种情况，必须分开处理（早期实现把前三种压成同一个 null，边界画粗了）：
      * <ol>
-     *   <li>{@code tokenVersionCache == null}（{@code @WebMvcTest} 切片）→ 跳过校验；</li>
+     *   <li>{@code tokenVersionCache == null}（{@code @WebMvcTest} 切片）→ <b>跳过</b>；</li>
      *   <li>token 无 {@code ver} claim（升级前签发）→ 按 {@link JwtUtil#DEFAULT_TOKEN_VERSION}
      *       （=1）比对，与 DB 默认值一致，故升级瞬间不踢人；</li>
-     *   <li>查不到当前版本（用户不存在 / DB 抖动）→ 跳过校验，不把偶发故障放大成全站 401。</li>
+     *   <li>当前版本 {@code null}（DB 抖动 / 版本列为空）→ <b>跳过</b>（fail-open：
+     *       不把一次抖动放大成全站 401）；</li>
+     *   <li>当前版本 {@link TokenVersionCache#USER_ABSENT}（DB 明确查无此用户）→ <b>拒绝</b>
+     *       （fail-closed：签名合法但账号已不存在，没有理由让它通过）。</li>
      * </ol>
      */
     private boolean versionMatches(String token, String userId) {
@@ -103,6 +106,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         Integer current = tokenVersionCache.currentVersion(id);
         if (current == null) {
             return true;
+        }
+        if (current == TokenVersionCache.USER_ABSENT) {
+            log.debug("token 对应的用户已不存在，拒绝认证：userId={}", id);
+            return false;
         }
         Integer claimed = jwtUtil.extractTokenVersion(token);
         int effective = claimed == null ? JwtUtil.DEFAULT_TOKEN_VERSION : claimed;
