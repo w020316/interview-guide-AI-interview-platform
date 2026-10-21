@@ -87,6 +87,30 @@ app:
     # 排队超过该时长即快速失败：前台返回 503「AI 并发闸门排队超时」，后台本次跳过。
     # 取值须 < 上游读超时（application.yml 的 app.ai.read-timeout-seconds=240），否则许可可能长期被占。
     guard-acquire-timeout-seconds: ${AI_GUARD_ACQUIRE_TIMEOUT_SECONDS:30}
+    # ── 按用户 AI 配额（P1-4，2026-10-21 质量循环）─────────────────────
+    # 与下面的「按厂商 RPM 令牌桶」是两回事：
+    #   · 本节管「单个用户能打多少次 AI 请求」（防单账号打满厂商许可 → 全站 503）
+    #   · 下面那节管「本实例向某个厂商节点发多少 RPM」（防打到厂商 429）
+    # 挂载方式为路径前缀（AiRateLimitFilter），不逐接口加注解 —— 逐接口加会重演
+    # 「清单跟不上演进」：老代码只挂了 4 处，AgentController 的 11 处 AI 调用一直裸奔。
+    #
+    # Agent 为什么单独更严：它是 ReAct 循环（AgentService.MAX_ROUNDS=8），
+    # 一次 HTTP 请求可能触发 8 轮 × 多次工具调用，成本高一个量级。
+    #
+    # 限流键：已登录 = userId，匿名 = 客户端 IP（匿名令牌 isAuthenticated() 恒为 true，
+    # 实现里已显式排除 AnonymousAuthenticationToken，否则全站匿名共用一个桶）。
+    # 超限响应遵循 docs/api-error-contract.md：HTTP 200 + body code=429。
+    user-rate-limit:
+      enabled: ${AI_USER_RATE_LIMIT_ENABLED:true}
+      # 普通 AI 端点前缀（逗号分隔）。刻意只列「一次请求会打 AI/embedding」的路径，
+      # 知识库 recent-questions / 简历 history 等纯 DB 查询端点不在此列，避免误伤浏览。
+      paths: ${AI_USER_RATE_LIMIT_PATHS:/api/agent/,/api/interview/,/api/job/,/api/knowledge/ask,/api/knowledge/import,/api/knowledge/search,/api/resume/analyze,/api/resume/upload,/api/resume/optimize,/api/resume/import-url,/autofill}
+      requests: ${AI_USER_RATE_LIMIT_REQUESTS:60}
+      # 高成本前缀与其配额（覆盖上面的 requests，不会双重计数）
+      expensive-paths: ${AI_USER_RATE_LIMIT_EXPENSIVE_PATHS:/api/agent/}
+      expensive-requests: ${AI_USER_RATE_LIMIT_EXPENSIVE_REQUESTS:20}
+      # 滑动窗口长度（秒）
+      window-seconds: ${AI_USER_RATE_LIMIT_WINDOW_SECONDS:60}
     # ── 按厂商 RPM 令牌桶（v1.48.0，第六轮 P1）──────────────────────────
     # 与上面的并发闸门**叠加**：并发闸门限「同时进行数」，本项限「每分钟请求数」。
     # 背景：实测 Agnes 免费档 20 RPM，5 并发 × ~2s 可冲到 ~150 RPM；30 并发突发
