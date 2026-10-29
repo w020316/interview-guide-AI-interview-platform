@@ -85,9 +85,27 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.87.0'
+export const CURRENT_VERSION = '1.88.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.88.0',
+    date: '2026-10-29',
+    title: '版本 1.88.0 · 招聘广场接入外企官网与远程社区',
+    items: [
+      { text: '招聘广场新增三个来源：电鸭社区（远程与数字游民方向的招聘社区，以国内中小团队和初创公司为主），以及英伟达、思科两家在华外企的中国区在招岗位', level: 'user' },
+      { text: '外企岗位会带上完整的英文职位描述原文，方便直接对照自己的简历看差距', level: 'user' },
+      { text: '来源徽章如实区分：英伟达、思科标为「官方接口」，电鸭社区标为「社区发帖」——后者由社区用户自行发布，建议点开原始链接核实', level: 'user' },
+      { text: '企业没有公开的薪资、学历、截止时间，数据里保持为空、不推算；页面沿用既有展示约定', level: 'user' },
+      { text: '新增岗位按页轮转、每次只更新一小批，列表不会被一次性灌满；旧岗位只要企业还在招就会持续保留', level: 'user' },
+      { text: '后端：新增 AbstractWorkdayJobProvider（Workday 站点通用基类）与 NvidiaJobProvider / CiscoJobProvider / EleduckJobProvider。China facet 由首次请求自动发现并缓存，租户改版无需改代码；找不到国家级 facet 时退回 searchText 兜底 + 地点文本过滤，宁可漏掉「多地点」岗位也不把海外岗位混进国内栏', level: 'tech' },
+      { text: '后端：修复电鸭薪资提取正则——此前要求两端各带 K（15K-25K），而社区最常见的写法「15-25K」会被整条丢弃导致薪资静默变空；同时补上 en dash（23K–32K）这种排版变体，区间右端仍强制要求 K，避免把「2027-2028 届」误判成薪资', level: 'tech' },
+      { text: '后端：电鸭的入库过滤补齐——实测第一页 25 条里混着平台自己的「用户举报，涉海外诈骗套路，公开警示」帖与「预算2000元」外包接单需求，原实现会把它们当岗位推荐给用户；现按关键词一票否决。同时实习判定改用词边界（Internal / International 不再被判成实习），职位类型识别不出时留空而不是兜底猜「技术」', level: 'tech' },
+      { text: '配置：修正 pages-per-refresh 覆盖时间的注释——此前一律按「6h 一轮」估算，但 refresh-fixed-delay-ms 自 v1.27.0 起就是 1h，所有数字偏大 6 倍（电鸭「100 天」实为 17 天）。错误估算会诱导运维无谓调大页数、加大上游压力', level: 'tech' },
+      { text: '测试：WorkdayJobProviderTest（10）/ EleduckJobProviderTest（11）覆盖 facet 发现、多地点归一、详情失败降级、页数推导与游标轮转、以及缺失字段不编造', level: 'tech' },
+      { text: '测试：JobPagesConfigTest 的 provider 清单此前靠手工维护，新增源忘了加进去时守卫对它就完全不生效。现加一条扫描源码目录的断言，凡带 pagesPerRefresh 配置字段却未进清单的类一律判红（已实测：临时移除一家后立即报红并点名）', level: 'tech' },
+    ],
+  },
   {
     version: '1.87.0',
     date: '2026-10-29',

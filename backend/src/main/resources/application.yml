@@ -268,7 +268,7 @@ app:
     #    导致「与前端同步」这个约定在公开接口上一直没生效（两个端点报两个版本号）。
     #    现已改为读本配置；改版本时除了这里与 changelog.ts，无需再动代码。
     name: ${APP_INFO_NAME:interview-guide}
-    version: ${APP_INFO_VERSION:1.87.0}
+    version: ${APP_INFO_VERSION:1.88.0}
     description: ${APP_INFO_DESCRIPTION:AI 智能面试辅助平台后端}
     # 构建日期，CI 注入；未配置时 fallback 为当天
     build-date: ${APP_INFO_BUILD_DATE:}
@@ -296,18 +296,25 @@ app:
     channels: []
     # 定时刷新：每 1 小时拉取一次各平台岗位（v1.27.0 由 6h 收紧，满足“每小时实时更新”）
     refresh-fixed-delay-ms: ${JOB_REFRESH_DELAY:3600000}
-    # ── 实时源的翻页轮转（P1-6，2026-10-21；v1.87.0 扩到四家）────────────────
+    # ── 实时源的翻页轮转（P1-6，2026-10-21；v1.88.0 扩到七家）────────────────
     # 此前 pageIndex / offset 是写死或缺省的：腾讯永远只抓第 1 页（200/2287 ≈ 8.7%），
     # 亚马逊永远只取前 50 条（50/236 ≈ 21%），其余岗位从上线起就没进过库。
     # 现在按游标逐轮轮转，页数上限由响应里的 Count/hits/pages/totalCount 动态推导。
     #
     # pages-per-refresh：每轮拉几页，默认 1。
-    #   调大它能更快覆盖全量，代价是单轮耗时变长、上游压力变大：
-    #     腾讯 12 页 → 默认 1 页/轮 × 6h ≈ 3 天覆盖 2282 条
-    #     亚马逊 5 页 → 默认 1 页/轮 × 6h ≈ 30h 覆盖 236 条
-    #     美团 66 页 → 默认 1 页/轮 × 6h ≈ 16 天覆盖 3282 条
-    #     网易 55 页 → 默认 1 页/轮 × 6h ≈ 14 天覆盖 2729 条
-    #   60 天窗口非常宽裕，所以默认不激进。
+    #   调大它能更快覆盖全量，代价是单轮耗时变长、上游压力变大。
+    #   ⚠️ 2026-10-29 修正：下面这些覆盖时间此前一律按「6h 一轮」估算，但
+    #      refresh-fixed-delay-ms 自 v1.27.0 起就是 1h，估算结果全部偏大 6 倍。
+    #      按真实 1h/轮重算（1 页/轮）：
+    #     腾讯 12 页 → 12h 覆盖 2282 条
+    #     亚马逊 5 页 → 5h 覆盖 236 条
+    #     美团 66 页 → 66h ≈ 2.8 天覆盖 3282 条
+    #     网易 55 页 → 55h ≈ 2.3 天覆盖 2729 条
+    #     英伟达 13 页（20 条/页）→ 13h 覆盖 245 条
+    #     思科 1 页 → 一轮覆盖 11 条
+    #     电鸭 410 页（25 条/页）→ 410h ≈ 17 天覆盖 10237 条
+    #   60 天陈旧窗口对以上全部源都很宽裕（最慢的电鸭 17 天 < 60 天），
+    #   所以默认 1 页/轮即可，无需调大；调大只会增加上游压力。
     # ⚠️ 2026-10-29 修正：这几个键在代码里曾被读成 app.jobs.*（不存在），
     #    导致下面的配置与同名环境变量从未生效——改键名时务必与 @Value 对齐。
     tencent:
@@ -318,6 +325,12 @@ app:
       pages-per-refresh: ${JOB_MEITUAN_PAGES_PER_REFRESH:1}
     netease:
       pages-per-refresh: ${JOB_NETEASE_PAGES_PER_REFRESH:1}
+    nvidia:
+      pages-per-refresh: ${JOB_NVIDIA_PAGES_PER_REFRESH:1}
+    cisco:
+      pages-per-refresh: ${JOB_CISCO_PAGES_PER_REFRESH:1}
+    eleduck:
+      pages-per-refresh: ${JOB_ELEDUCK_PAGES_PER_REFRESH:1}
   rag:
     # 知识库导入去重相似度阈值（0.0~1.0），相似度 >= 此值视为重复，跳过导入
     # 0.90 对应 cosine distance <= 0.10，覆盖文本微调后重复的场景

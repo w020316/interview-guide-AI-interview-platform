@@ -97,18 +97,19 @@ export const SOURCE_KIND_META: Record<JobSourceKind, SourceKindMeta> = {
  * 保留顺序只是为了让「更具体的源」优先。
  */
 const KIND_KEYWORDS: ReadonlyArray<readonly [JobSourceKind, readonly string[]]> = [
-  // 官方公开 JSON API（含大厂自建招聘官网，v1.87.0 补齐国内四家）
+  // 官方公开 JSON API（含大厂自建招聘官网，v1.88.0 补外企 Workday 站）
   [
     'official-api',
     [
       'RemoteOK', 'Remotive', 'Arbeitnow', 'Jobicy', 'Himalayas',
       '腾讯招聘', '亚马逊中国', '美团招聘', '网易招聘',
+      '英伟达招聘', '思科招聘',
     ],
   ],
   // 官方 RSS
   ['official-rss', ['WeWorkRemotely']],
   // 社区人工发帖
-  ['community', ['V2EX', 'HN Who is hiring', 'Hacker News']],
+  ['community', ['V2EX', 'HN Who is hiring', 'Hacker News', '电鸭社区']],
   // 本项目内置精选（适配器名即「XX精选」）
   ['curated', ['内置精选', '行业精选', '服务精选', '社招精选', '精选频道', '热招速递', '秋招精选', '兼职专区']],
   // 需配置数据服务的第三方平台

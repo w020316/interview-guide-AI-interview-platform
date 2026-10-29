@@ -26,7 +26,8 @@ describe('classifySource —— 来源类型归类', () => {
 
   it('大厂自建招聘官网（国内实时源）同样归为 official-api', () => {
     // v1.87.0：腾讯 / 亚马逊此前漏归类，美团 / 网易新增
-    for (const name of ['腾讯招聘', '亚马逊中国', '美团招聘', '网易招聘']) {
+    // v1.88.0：外企 Workday 站（英伟达 / 思科）同样是企业官方在招列表
+    for (const name of ['腾讯招聘', '亚马逊中国', '美团招聘', '网易招聘', '英伟达招聘', '思科招聘']) {
       expect(classifySource(name), name).toBe('official-api')
     }
   })
@@ -35,9 +36,11 @@ describe('classifySource —— 来源类型归类', () => {
     expect(classifySource('WeWorkRemotely')).toBe('official-rss')
   })
 
-  it('V2EX 与 HN 归为 community', () => {
+  it('V2EX / HN / 电鸭归为 community', () => {
     expect(classifySource('V2EX 酷工作')).toBe('community')
     expect(classifySource('HN Who is hiring')).toBe('community')
+    // v1.88.0：电鸭是社区发帖，不能因为「接口是公开 JSON」就标成官方接口
+    expect(classifySource('电鸭社区')).toBe('community')
   })
 
   it('全部内置种子的 8 个源都归为 curated', () => {

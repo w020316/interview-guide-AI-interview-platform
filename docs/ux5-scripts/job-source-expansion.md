@@ -130,3 +130,77 @@
 - 线上前端 chunk（`JobsView-*.js`）含 `official-api` 关键词
   `腾讯招聘/亚马逊中国/美团招聘/网易招聘`，徽章映射已生效；`verify-release.mjs --live` 通过。
 - CI（`d28adcb`）success。
+
+## 七、2026-10-29 复测（第二轮）：新增「电鸭社区」「英伟达招聘」「思科招聘」（v1.88.0）
+
+**背景**：v1.87.0 补齐美团/网易后，国内实时源仍以互联网大厂为主，缺两类真实数据：
+① 中小团队与初创公司的招聘；② 在华外企的中国区岗位。用户要求按「多租户 ATS / 聚合站 / 外企官网」三个方向继续挖。
+
+**方法**：仍然只探测**站点自身前端调用的公开接口**（匿名、无 Key、无 Cookie），
+不抓 HTML、不绕验证码、不碰需要登录态或签名的接口。
+
+### 7.1 本轮探测结果
+
+| 站点 / 类别 | 接口 | 实测结果 | 判定 |
+|---|---|---|---|
+| 电鸭社区 | `GET https://svc.eleduck.com/api/v1/posts?category=5&page=N` | 200，`pager.total_pages=410`，25 条/页（≈1 万帖）；详情 `/posts/{id}` 返回 HTML 正文 | ✅ 已接入 |
+| 英伟达（Workday） | `POST https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs` | 200，中国区 245 条（北京 92 / 上海 216 / 深圳 48，岗位可跨城市）；详情含完整 JD | ✅ 已接入 |
+| 思科（Workday） | `POST https://cisco.wd5.myworkdayjobs.com/wday/cxs/cisco/Cisco_Careers/jobs` | 200，中国区 11 条（北京 / 杭州 / 上海 / 深圳） | ✅ 已接入 |
+| 智联招聘 | `fe-api.zhaopin.com` 系列 | 接口存活，但参数形态需签名 / 登录态 | ❌ 放弃 |
+| Moka（多租户 ATS） | 各租户 `app.mokahr.com` 公开接口 | 需登录态 / 租户私有签名 | ❌ 放弃 |
+| 北森（多租户 ATS） | `*.zhiye.com` 公开接口 | 仅探到中建租户，同样需签名 | ❌ 放弃 |
+| 飞书招聘租户 | `jobs.feishu.cn` 系列 | 需登录态 | ❌ 放弃 |
+| 国聘 | `www.iguopin.com` | 需登录 | ❌ 放弃 |
+| 实习僧 | `www.shixiseng.com` | 只返回 SSR 页面，无结构化 JSON | ❌ 放弃 |
+| Microsoft 官方 | `gcsservices.careers.microsoft.com` | 接口不可用 | ❌ 放弃 |
+| Apple 官方 | `jobs.apple.com` | 接口不可用 | ❌ 放弃 |
+| 联想 | 自建招聘站（**不是** Workday） | 接口形态与 Workday 不同，本轮不纳入 | ⏸ 暂缓 |
+
+**为什么 Workday 值得单独抽基类**：Workday 是大量外企共用的招聘 SaaS，接口路径与响应结构完全一致，
+只有 `{host}/{tenant}/{site}` 三段不同。抽出 `AbstractWorkdayJobProvider` 后，
+**新增一家外企只需约 20 行子类**（见 `NvidiaJobProvider` / `CiscoJobProvider`）。
+
+### 7.2 Workday 的 China facet 自动发现（关键技术点）
+
+Workday 的 facet id **因租户而异**：英伟达有国家级 `locationHierarchy1=China`，
+思科没有国家级、只有城市级「Beijing, China」——所以**不能写死**。
+
+实现：首次刷新先发一个不带 facet 的请求（`limit=1`），从响应的 `facets` 里递归查找
+① descriptor 恰好为 `China` 的**国家级** facet，否则 ② descriptor 以 `, China` 结尾的**城市级** facet，
+缓存后用于后续所有请求。两者都找不到时退回 `searchText=China` + 列表地点文本必须含 `China` 的保守过滤
+——宁可漏掉「多地点」岗位，也不把海外岗位混进国内栏。
+
+### 7.3 接入约定（新增源照此办理）
+
+- `platform()`：`电鸭社区` / `英伟达招聘` / `思科招聘`；`externalId` 前缀 `ed-` / `nv-` / `cs-`。
+- `overseas() = false`（三家都是国内岗位，不进海外远程分栏）。
+- 配置：`app.job-agent.{eleduck,nvidia,cisco}.pages-per-refresh`（默认 1）。
+  覆盖速度按线上真实刷新间隔 **1h/轮** 计算（`refresh-fixed-delay-ms` 自 v1.27.0 起就是 1h，
+  此前文档与 yml 注释一律按 6h 估算，结果偏大 6 倍，本轮已一并修正）：
+  英伟达 13 页 ≈ 13h；思科 1 页一轮全覆盖；电鸭 410 页 ≈ 17 天。
+  三者都远小于 60 天陈旧窗口，**默认 1 页/轮即可，无需调大**。
+- **不编造**：Workday 不公开薪资 / 学历 / 经验 / 截止日期 → 全部留空；地点只做
+  「`China, X` → 中文城市名」的词面映射，未知城市**保留英文原名**；
+  招聘类型只按标题里明确的 Intern / New College Graduate 判定。
+  电鸭薪资只提取标题里明确写出的区间或下限，抽不到留空。
+- 前端：`jobTrust.ts` 的 `official-api` 补 英伟达招聘 / 思科招聘；
+  电鸭社区归 `community`（社区发帖）——**不能因为「接口是公开 JSON」就标成官方接口**。
+
+### 7.4 修复：电鸭薪资正则只认「双 K」
+
+`salaryOf()` 原正则要求区间两端各带 K（`15K-25K`），而社区最常见的写法是 `15-25K`（只写末尾一个 K）——
+整条被丢弃，薪资字段**静默变空**，直到测试两条断言同时失败才暴露。
+
+修正为**首个 K 可选、右端强制**：`(\d{1,3})\s*[kK]?\s*[-~至]\s*(\d{1,3})\s*[kK]`。
+右端仍强制要求 K，否则「2027-2028 届」这类数字区间会被误判成薪资。
+
+### 7.5 门禁补漏：配置键守卫的清单本身会漏
+
+`JobPagesConfigTest`（v1.87.0 引入）把每个 Provider 的 `@Value` 键与 application.yml 对撞，
+但它的 `PROVIDERS` 是**手工清单** —— 新增源忘了往里加，守卫对它就完全不生效，且**没有任何提示**。
+
+v1.88.0 加 `everyProviderWithPagesFieldMustBeGuarded()`：扫描源码目录，凡带 `@Value` 的
+`pagesPerRefresh` 字段却没进清单的类一律判红。已实测验证：临时移除一家后测试立即报红并点名该类。
+
+> 判据不能只匹配字符串 `pagesPerRefresh`：`AbstractWorkdayJobProvider` 有一个同名**方法**，
+> 它不是配置字段，不应被要求进清单。
