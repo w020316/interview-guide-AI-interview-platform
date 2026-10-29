@@ -197,6 +197,7 @@ import {
   statusText, statusVariant, toDatetimeLocal, toDateString,
 } from '../utils/calendar'
 import { asArray } from '../utils/safeData'
+import { createLatestGuard } from '../utils/latestRequest'
 
 interface CalendarEvent {
   id: number
@@ -278,28 +279,36 @@ function selectDate(date: string) {
   selectedDate.value = date
 }
 
+/** C1：保存/改状态/删除都会触发重载，先发后至的旧响应不得覆盖新日程 */
+const loadGuard = createLatestGuard()
+
 async function load() {
+  const ticket = loadGuard.begin()
   try {
-    await itemsReload() // 必须等待，否则异常逃逸为 unhandled rejection，页面静默空数据
+    await itemsReload(ticket) // 必须等待，否则异常逃逸为 unhandled rejection，页面静默空数据
   } catch (e: unknown) {
-    ElMessage.error(getErrMessage(e, '加载日程失败'))
+    if (loadGuard.isLatest(ticket)) ElMessage.error(getErrMessage(e, '加载日程失败'))
   }
+  if (!loadGuard.isLatest(ticket)) return
   // 台账选项单独加载：它是「关联」这个可选增强的输入源，
   // 取不到时退化为「只能选不关联」，不该影响日历主功能。
-  await loadApplications()
+  await loadApplications(ticket)
 }
 
-async function itemsReload() {
+/** 不传票据时自动领取新票据（写操作后的单列表刷新即应作废此前所有在途请求） */
+async function itemsReload(ticket: number = loadGuard.begin()) {
   const data = (await api.get('/api/calendar/event/list')) as unknown as CalendarEvent[]
+  if (!loadGuard.isLatest(ticket)) return
   events.value = asArray<CalendarEvent>(data)
 }
 
-async function loadApplications() {
+async function loadApplications(ticket: number = loadGuard.begin()) {
   try {
     const data = (await api.get('/api/application/list')) as unknown as { items?: ApplicationOption[] }
+    if (!loadGuard.isLatest(ticket)) return
     applications.value = asArray<ApplicationOption>(data?.items)
   } catch {
-    applications.value = []
+    if (loadGuard.isLatest(ticket)) applications.value = []
   }
 }
 

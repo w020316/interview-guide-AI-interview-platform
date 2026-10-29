@@ -110,6 +110,7 @@ import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton, BaseTag, FavoriteToggle } from '../components'
 import { extractWeakCategories, mostFrequentJob } from '../utils/weakCategories'
+import { createLatestGuard } from '../utils/latestRequest'
 
 interface WrongQuestion {
   id: number
@@ -135,18 +136,26 @@ onMounted(() => load())
 
 watch(threshold, () => load())
 
+/** C1：拖动分数阈值会连续触发 load，先发后至的旧结果不得覆盖新阈值下的错题 */
+const loadGuard = createLatestGuard()
+
 async function load() {
+  const ticket = loadGuard.begin()
   loading.value = true
   try {
     const data = (await api.get('/api/knowledge/wrong-questions', {
       params: { threshold: threshold.value },
     })) as unknown as { total?: number; questions?: WrongQuestion[] }
+    if (!loadGuard.isLatest(ticket)) return
     items.value = data?.questions || []
     total.value = data?.total || items.value.length
+    // 失败后成功重载必须能收起错误态，否则一次抖动会永久留下「加载失败」面板
+    loadError.value = false
   } catch (e: unknown) {
+    if (!loadGuard.isLatest(ticket)) return
     loadError.value = true
     ElMessage.error(getErrMessage(e, '加载错题失败'))
-  } finally { loading.value = false }
+  } finally { if (loadGuard.isLatest(ticket)) loading.value = false }
 }
 
 /**

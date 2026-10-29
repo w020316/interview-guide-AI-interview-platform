@@ -255,6 +255,7 @@ import {
 } from '../utils/preference'
 import { BaseButton, BaseTag, MapOpenLink } from '../components'
 import { asArray } from '../utils/safeData'
+import { createLatestGuard } from '../utils/latestRequest'
 
 const router = useRouter()
 
@@ -366,14 +367,22 @@ function toggleCompare(jobId: number) {
   compareIds.value = toggleSelection(compareIds.value, jobId)
 }
 
+/** C1：连续取消收藏/删除会并发触发 load，旧响应不得覆盖新列表 */
+const loadGuard = createLatestGuard()
+
 async function load() {
+  const ticket = loadGuard.begin()
   try {
     const data = (await api.get('/api/favorite/list')) as unknown as { items?: FavoriteItem[] }
+    if (!loadGuard.isLatest(ticket)) return
     items.value = asArray<FavoriteItem>(data?.items)
+    // 失败后成功重载必须能收起错误态，否则一次抖动会永久留下「加载失败」面板
+    loadError.value = false
   } catch (e: unknown) {
+    if (!loadGuard.isLatest(ticket)) return
     loadError.value = true
     ElMessage.error(getErrMessage(e, '加载收藏失败'))
-  } finally { loading.value = false }
+  } finally { if (loadGuard.isLatest(ticket)) loading.value = false }
 }
 
 /** 从全部收藏发起模拟面试：创建会话、载入题目，跳转面试页答题 */
