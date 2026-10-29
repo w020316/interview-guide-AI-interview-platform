@@ -16,7 +16,7 @@ public class NvidiaJobProvider extends AbstractWorkdayJobProvider {
 
     private static final String PLATFORM = "英伟达招聘";
 
-    /** 每轮拉几页（20 条/页），默认 1：245 条约 13 轮，按线上 1h/轮 ≈ 13 小时覆盖 */
+    /** 每轮拉几页（20 条/页），默认 1：245 条约 13 轮 × 6h/轮 ≈ 3.25 天覆盖 */
     @org.springframework.beans.factory.annotation.Value("${app.job-agent.nvidia.pages-per-refresh:1}")
     private int pagesPerRefresh = 1;
 

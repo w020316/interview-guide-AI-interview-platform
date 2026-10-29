@@ -174,11 +174,15 @@ Workday 的 facet id **因租户而异**：英伟达有国家级 `locationHierar
 
 - `platform()`：`电鸭社区` / `英伟达招聘` / `思科招聘`；`externalId` 前缀 `ed-` / `nv-` / `cs-`。
 - `overseas() = false`（三家都是国内岗位，不进海外远程分栏）。
-- 配置：`app.job-agent.{eleduck,nvidia,cisco}.pages-per-refresh`（默认 1）。
-  覆盖速度按线上真实刷新间隔 **1h/轮** 计算（`refresh-fixed-delay-ms` 自 v1.27.0 起就是 1h，
-  此前文档与 yml 注释一律按 6h 估算，结果偏大 6 倍，本轮已一并修正）：
-  英伟达 13 页 ≈ 13h；思科 1 页一轮全覆盖；电鸭 410 页 ≈ 17 天。
-  三者都远小于 60 天陈旧窗口，**默认 1 页/轮即可，无需调大**。
+- 配置：`app.job-agent.{eleduck,nvidia,cisco}.pages-per-refresh`。
+  ⚠️ 这里的「轮」指**该源自己的刷新节奏**，不是调度器的 fixedDelay：`JobAgentService`
+  会按 `adapter.minRefreshIntervalMs()` 冷却，而 `AbstractOpenApiJobProvider` 恒返回 **6h**
+  （`OPEN_API_REFRESH_INTERVAL_MS`）——所以调度器虽然 1h 跑一次，这些源实际是
+  **6h/轮 = 4 次/天**。（v1.88.0 开发中一度按 1h 重算并改了注释，是错的，已回滚。）
+  按 6h/轮、1 页/轮：英伟达 13 页 ≈ 3.25 天；思科 1 页一轮全覆盖；
+  **电鸭 410 页 ≈ 102 天，超过 60 天陈旧下架窗口** —— 会出现「入库 → 60 天下架 →
+  102 天后再抓到 → 复活」的循环，约四成时间岗位不可见。
+  因此电鸭默认给 **3 页/轮**（410÷3÷4 ≈ 34 天），其余两家保持 1 页/轮。
 - **不编造**：Workday 不公开薪资 / 学历 / 经验 / 截止日期 → 全部留空；地点只做
   「`China, X` → 中文城市名」的词面映射，未知城市**保留英文原名**；
   招聘类型只按标题里明确的 Intern / New College Graduate 判定。

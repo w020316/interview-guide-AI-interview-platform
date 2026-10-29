@@ -66,9 +66,10 @@ class WorkdayJobProviderTest {
     /** 只覆写触网方法：facet 发现 / 分页 / 详情降级全部走真实代码 */
     private static final class RecordingProvider extends AbstractWorkdayJobProvider {
         private final List<String> listBodies = new ArrayList<>();
+        private final List<String> listUrls = new ArrayList<>();
         private final List<String> detailUrls = new ArrayList<>();
         private final String facetsBody;
-        private final String listBody;
+        private String listBody;
         private final boolean failDetail;
         private boolean discovered;
 
@@ -79,8 +80,14 @@ class WorkdayJobProviderTest {
             this.failDetail = failDetail;
         }
 
+        /** 用于模拟「offset>0 时上游返回 total=0」这种响应变化 */
+        void setListBody(String body) {
+            this.listBody = body;
+        }
+
         @Override
         protected String fetchRawPost(String url, String jsonBody, String referer) {
+            listUrls.add(url);
             listBodies.add(jsonBody);
             if (!discovered) {
                 discovered = true;
@@ -229,6 +236,41 @@ class WorkdayJobProviderTest {
         assertThat(provider.listBodies.get(1)).contains("\"offset\":0");
         assertThat(provider.listBodies.get(2)).contains("\"offset\":20");
         assertThat(provider.listBodies.get(3)).contains("\"offset\":40");
+    }
+
+    @Test
+    @DisplayName("请求 URL 必须是真实的 Workday 路径 —— host/tenant/site 写错必须红")
+    void buildsRealWorkdayUrls() {
+        RecordingProvider provider = new RecordingProvider(FACETS_WITH_CHINA, LIST_TWO_CHINA_JOBS, false);
+
+        provider.fetch();
+
+        // 变异测试证明过：桩完全忽略 url 参数时，把 host 改成 WRONG-HOST.example 也 28/28 全绿。
+        // 这条断言就是补那个缺口——host / tenant / site / 路径任何一段写错，这里立刻红。
+        assertThat(provider.listUrls).isNotEmpty();
+        assertThat(provider.listUrls.get(0))
+                .isEqualTo("https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/AcmeSite/jobs");
+        assertThat(provider.detailUrls)
+                .isNotEmpty()
+                .allMatch(u -> u.startsWith("https://acme.wd5.myworkdayjobs.com/wday/cxs/acme/AcmeSite/job/"))
+                .anyMatch(u -> u.contains("JR2028299"));
+    }
+
+    @Test
+    @DisplayName("offset>0 时上游返回 total=0，不得覆盖已推导的 maxPage")
+    void totalZeroDoesNotShrinkMaxPage() {
+        RecordingProvider provider = new RecordingProvider(FACETS_WITH_CHINA, LIST_TWO_CHINA_JOBS, false);
+
+        provider.fetch();
+        assertThat(provider.maxPage()).isEqualTo(13);   // ceil(245 / 20)
+
+        // 上游真实行为：只有 offset=0 的响应带真实 total，其余返回 0
+        provider.setListBody("{\"total\":0,\"jobPostings\":[]}");
+        provider.fetch();
+
+        assertThat(provider.maxPage())
+                .as("total=0 是「非首页响应不带 total」，不是「岗位没了」；覆盖掉会让游标永远停在首页")
+                .isEqualTo(13);
     }
 
     // ─────────────────────────── 纯函数 ───────────────────────────

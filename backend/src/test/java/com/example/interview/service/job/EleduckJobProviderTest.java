@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 电鸭社区数据源解析测试（v1.88.0）
@@ -20,6 +22,21 @@ class EleduckJobProviderTest {
 
     private EleduckJobProvider provider() {
         return new EleduckJobProvider(MAPPER);
+    }
+
+    /**
+     * 默认是 3 页/轮；需要精确控制条数的用例用这个压到 1 页，
+     * 否则每页 1 条的桩会被乘成 3 条，条数断言全部失真。
+     */
+    private static <T extends EleduckJobProvider> T withPages(T provider, int pages) {
+        try {
+            java.lang.reflect.Field f = EleduckJobProvider.class.getDeclaredField("pagesPerRefresh");
+            f.setAccessible(true);
+            f.setInt(provider, pages);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("无法设置 pagesPerRefresh", e);
+        }
+        return provider;
     }
 
     /** 取自线上真实响应（字段与层级一致，正文为节选） */
@@ -143,7 +160,52 @@ class EleduckJobProviderTest {
         assertThat(EleduckJobProvider.looksLikeHiring("某某科技招聘产品经理")).isTrue();
         // 「品牌曝光」是市场岗的正常用词，不能当警示帖过滤
         assertThat(EleduckJobProvider.looksLikeHiring("品牌曝光专员（新媒体方向）")).isTrue();
+        // 「举报」是内容安全团队的真实岗位名，不能用裸词根过滤
+        assertThat(EleduckJobProvider.looksLikeHiring("举报处理专员（内容安全）")).isTrue();
+        assertThat(EleduckJobProvider.looksLikeHiring("内容安全-举报治理")).isTrue();
         assertThat(EleduckJobProvider.looksLikeHiring(null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("city 标签为「海外」的帖子不进国内分栏")
+    void dropsOverseasPosts() throws Exception {
+        assertThat(EleduckJobProvider.isOverseasPost(MAPPER.readTree(
+                "[{\"name\":\"海外\",\"tag_group\":{\"code\":\"city\"}}]"))).isTrue();
+        assertThat(EleduckJobProvider.isOverseasPost(MAPPER.readTree(
+                "[{\"name\":\"北京\",\"tag_group\":{\"code\":\"city\"}}]"))).isFalse();
+        assertThat(EleduckJobProvider.isOverseasPost(null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("陈年帖被过滤；上游没给发布时间时不武断丢弃")
+    void filtersStalePosts() throws Exception {
+        LocalDateTime now = LocalDateTime.of(2026, 10, 29, 12, 0);
+        assertThat(EleduckJobProvider.isFresh(MAPPER.readTree(
+                "{\"published_at\":\"2026-10-29T17:23:29.749+08:00\"}"), now)).isTrue();
+        // 实测 page 400 最老到 2021-02-18，这类帖 closed 仍是 false
+        assertThat(EleduckJobProvider.isFresh(MAPPER.readTree(
+                "{\"published_at\":\"2021-02-18T10:00:00.000+08:00\"}"), now)).isFalse();
+        assertThat(EleduckJobProvider.isFresh(MAPPER.readTree("{}"), now)).isTrue();
+        assertThat(EleduckJobProvider.isFresh(MAPPER.readTree(
+                "{\"published_at\":\"not-a-date\"}"), now)).isTrue();
+    }
+
+    @Test
+    @DisplayName("公司名抽取：薪资串不会被当成企业名")
+    void companyNameNeverPicksUpSalary() {
+        // 实测标题：「急~12K-15K招聘国内远程 海外社媒运营」
+        assertThat(EleduckJobProvider.companyOf("急~12K-15K招聘国内远程 海外社媒运营"))
+                .isEqualTo("见岗位详情");
+        assertThat(EleduckJobProvider.companyOf("某某科技招聘产品经理")).isEqualTo("某某科技");
+    }
+
+    @Test
+    @DisplayName("职位类型：UI/UX 用词边界，build 不会被判成设计")
+    void jobTypeUsesWordBoundary() {
+        assertThat(EleduckJobProvider.jobTypeOf("UI 设计师")).isEqualTo("设计");
+        assertThat(EleduckJobProvider.jobTypeOf("高级 UX 设计")).isEqualTo("设计");
+        // 「build」含子串 ui，裸 contains 会误判
+        assertThat(EleduckJobProvider.jobTypeOf("build engineer")).isNull();
     }
 
     @Test
@@ -212,10 +274,22 @@ class EleduckJobProviderTest {
                 + "\"pager\":{\"total_pages\":" + totalPages + "}}";
     }
 
+    /** 生成 n 条有效岗位，用于验证详情熔断的样本量门槛 */
+    private static String listBodyWithPosts(int count) {
+        StringBuilder sb = new StringBuilder("{\"posts\":[");
+        for (int i = 0; i < count; i++) {
+            if (i > 0) sb.append(',');
+            sb.append("{\"id\":\"p").append(i)
+              .append("\",\"title\":\"远程前端工程师 20-30K\",\"summary\":\"摘要")
+              .append(i).append("\",\"closed\":false,\"deleted\":false,\"hide\":false,\"tags\":[]}");
+        }
+        return sb.append("],\"pager\":{\"total_pages\":410}}").toString();
+    }
+
     @Test
     @DisplayName("fetch 用详情正文覆盖列表摘要")
     void enrichReplacesSummaryWithDetailContent() {
-        RecordingProvider provider = new RecordingProvider(listBody(410), false);
+        RecordingProvider provider = withPages(new RecordingProvider(listBody(410), false), 1);
 
         List<JobPlatformAdapter.JobDto> jobs = provider.fetch();
 
@@ -227,12 +301,30 @@ class EleduckJobProviderTest {
     @Test
     @DisplayName("单条详情失败时退回列表摘要，不丢岗位")
     void detailFailureFallsBackToSummary() {
-        RecordingProvider provider = new RecordingProvider(listBody(410), true);
+        RecordingProvider provider = withPages(new RecordingProvider(listBody(410), true), 1);
 
         List<JobPlatformAdapter.JobDto> jobs = provider.fetch();
 
         assertThat(jobs).hasSize(1);
         assertThat(jobs.get(0).description()).isEqualTo("列表摘要");
+    }
+
+    @Test
+    @DisplayName("详情全部失败（≥3 条）时抛出，不能让健康表记 success")
+    void throwsWhenAllDetailsFail() {
+        RecordingProvider provider = withPages(new RecordingProvider(listBodyWithPosts(3), true), 1);
+
+        assertThatThrownBy(provider::fetch)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("详情接口全部失败");
+    }
+
+    @Test
+    @DisplayName("详情失败但样本不足 3 条时不熔断，仍降级入库")
+    void smallSampleDoesNotTripBreaker() {
+        RecordingProvider provider = withPages(new RecordingProvider(listBodyWithPosts(2), true), 1);
+
+        assertThat(provider.fetch()).hasSize(2);
     }
 
     @Test
@@ -245,14 +337,16 @@ class EleduckJobProviderTest {
     }
 
     @Test
-    @DisplayName("默认每轮 1 页，页码 1→2→3 轮转并在末页回绕")
+    @DisplayName("默认每轮 3 页：页码 1→2→3 轮转并在末页回绕")
     void rotatesPagesAcrossRefreshes() {
+        // 默认 3 页/轮是刻意的：6h/轮节奏下，410 页用 1 页/轮要 102 天，会超过 60 天下架窗口
         RecordingProvider provider = new RecordingProvider(listBody(3), false);
 
-        for (int round = 0; round < 4; round++) {
-            provider.fetch();
-        }
+        provider.fetch();
+        assertThat(provider.pages).containsExactly(1, 2, 3);
 
-        assertThat(provider.pages).containsExactly(1, 2, 3, 1);
+        // 末页之后回绕到第 1 页
+        provider.fetch();
+        assertThat(provider.pages).containsExactly(1, 2, 3, 1, 2, 3);
     }
 }

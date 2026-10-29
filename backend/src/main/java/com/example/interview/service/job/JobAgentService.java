@@ -669,10 +669,21 @@ public class JobAgentService {
         return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
-    /** 去重键：归一化空白后的 公司|岗位 ，用于跨数据源去重 */
+    /**
+     * 去重键：归一化空白后的 公司|岗位|地点，用于跨数据源去重。
+     *
+     * <p><b>为什么必须带地点</b>：Workday 类租户会把同一个职位按城市重复挂
+     * （实测 NVIDIA 245 条中国岗位里有 14 组同名，其中 11 条落在同一页同一轮）。
+     * 只按「公司|岗位」去重会把它们折叠成一条 → 每轮丢 0~3 条，整个轮转周期
+     * 累计丢 11/245 ≈ 4.5%。同一职位在不同城市是不同的投递选项，不该合并。
+     *
+     * <p>代价：跨源去重时若两个源对同一岗位的地点写法不同（「北京」vs「北京市」），
+     * 会各展示一条。相比「岗位直接消失」，重复展示是更可接受的失败方向。
+     */
     private static String dedupKey(JobDto dto) {
         String company = dto.companyName() == null ? "" : dto.companyName().trim().replaceAll("\\s+", " ");
         String title = dto.title() == null ? "" : dto.title().trim().replaceAll("\\s+", " ");
-        return company + "|" + title;
+        String location = dto.location() == null ? "" : dto.location().trim().replaceAll("\\s+", " ");
+        return company + "|" + title + "|" + location;
     }
 }

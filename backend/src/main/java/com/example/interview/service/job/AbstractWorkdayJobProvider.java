@@ -44,7 +44,13 @@ public abstract class AbstractWorkdayJobProvider extends AbstractOpenApiJobProvi
     /** 取不到 total 时的保守页数上限 */
     private static final int FALLBACK_MAX_PAGE = 1;
 
+    /** 详情熔断的最小样本量：低于这个数全失败可能只是巧合，不值得让整源失败 */
+    private static final int MIN_DETAIL_SAMPLE = 3;
+
     private static final Pattern INTERN_WORD = Pattern.compile("\\bintern(ship)?\\b", Pattern.CASE_INSENSITIVE);
+
+    /** 裸子串 {@code "ux"} 会命中 Luxury / Auxiliary，必须用词边界 */
+    private static final Pattern UX_WORD = Pattern.compile("\\bux\\b", Pattern.CASE_INSENSITIVE);
 
     private final java.util.concurrent.atomic.AtomicInteger pageCursor =
             new java.util.concurrent.atomic.AtomicInteger(0);
@@ -105,6 +111,8 @@ public abstract class AbstractWorkdayJobProvider extends AbstractOpenApiJobProvi
         boolean fallback = facet == null;
         int pages = Math.max(1, pagesPerRefresh());
         List<JobDto> all = new ArrayList<>();
+        int detailAttempts = 0;
+        detailFailureCount = 0;
         for (int i = 0; i < pages; i++) {
             String body = buildBody(nextPage() * PAGE_SIZE, facet);
             JsonNode root;
@@ -118,8 +126,16 @@ public abstract class AbstractWorkdayJobProvider extends AbstractOpenApiJobProvi
             }
             updateMaxPage(root);
             for (WorkdayListing listing : listings(root, fallback)) {
+                detailAttempts++;
                 all.add(enrichWithDetail(listing));
             }
+        }
+        // 详情整体失效（端点变更 / 被限流）时不能让健康表记 success：那样管理后台是绿灯，
+        // 而所有 JD 正文都是 null，「源挂了」和「源正常但没正文」就无法区分了。
+        // 样本量下限 3：一两条全失败可能只是巧合，不值得让整源失败。
+        if (detailAttempts >= MIN_DETAIL_SAMPLE && detailFailureCount == detailAttempts) {
+            throw new IllegalStateException(
+                    "详情接口全部失败（" + detailAttempts + " 条），JD 正文缺失");
         }
         return all;
     }
@@ -132,7 +148,9 @@ public abstract class AbstractWorkdayJobProvider extends AbstractOpenApiJobProvi
         try {
             JsonNode root = objectMapper.readTree(
                     fetchRawPost(listUrl(), buildBody(0, null), referer()));
-            updateMaxPage(root);
+            // ⚠️ 这里**不能**调 updateMaxPage：此请求未带 facet，total 是全站数量
+            // （思科 22），而按 China facet 过滤后只有 11 → 会把 maxPage 污染成 2，
+            // 导致主循环白跑一轮空页。页数交给带 facet 的列表请求去定。
             chinaFacet = findChinaFacet(root);
             facetResolved = true;
             if (chinaFacet == null) {
@@ -230,6 +248,8 @@ public abstract class AbstractWorkdayJobProvider extends AbstractOpenApiJobProvi
      * 若照单全收，第一轮之后 {@code maxPage} 会被 0 覆盖成 1，游标永远停在首页。
      * 因此这里对非正数直接跳过——缺失/非法时保留原上限，避免抖动。
      * 改动此方法前请先确认上游这个行为是否仍然成立。
+     *
+     * <p>页数变小后游标可能越界，这里顺手取模归位（同时防止长期运行后 int 溢出）。
      */
     private void updateMaxPage(JsonNode root) {
         JsonNode total = root == null ? null : root.path("total");
@@ -238,14 +258,24 @@ public abstract class AbstractWorkdayJobProvider extends AbstractOpenApiJobProvi
         }
         int pages = (int) Math.ceil(total.asLong() / (double) PAGE_SIZE);
         maxPage = Math.max(1, pages);
+        pageCursor.updateAndGet(p -> p % maxPage);
     }
 
     int maxPage() {
         return maxPage;
     }
 
+    /**
+     * 取本次要请求的页号并推进游标。
+     *
+     * <p>游标是**单调递增**的，取模只在这里做：{@code maxPage} 在首次请求前还是
+     * 保守值 1（facet 发现请求不参与推导，避免未过滤的 total 污染页数），
+     * 若让游标按 {@code maxPage} 回绕，第一次就前进不了，后续永远停在首页。
+     */
     private int nextPage() {
-        return pageCursor.getAndUpdate(p -> p + 1 >= maxPage ? 0 : p + 1);
+        int limit = Math.max(1, maxPage);
+        int current = pageCursor.getAndUpdate(p -> p + 1);
+        return current % limit;
     }
 
     /**
@@ -303,7 +333,10 @@ public abstract class AbstractWorkdayJobProvider extends AbstractOpenApiJobProvi
         return listings(root, false).stream().map(WorkdayListing::dto).toList();
     }
 
-    /** 详情补 JD；失败只让该条 description 留空 */
+    /** 本轮详情拉取失败次数（单线程刷新，用普通字段即可） */
+    private int detailFailureCount;
+
+    /** 详情补 JD；单条失败只让该条 description 留空，全部失败由 {@link #fetch()} 抛出 */
     private JobDto enrichWithDetail(WorkdayListing listing) {
         try {
             JsonNode info = objectMapper.readTree(fetchRaw(detailUrl(listing.externalPath())))
@@ -335,6 +368,7 @@ public abstract class AbstractWorkdayJobProvider extends AbstractOpenApiJobProvi
                     null
             );
         } catch (Exception e) {
+            detailFailureCount++;
             log.warn("{} 岗位 {} 详情拉取失败，仅入库列表字段：{}",
                     platform(), listing.dto().externalId(), e.getMessage());
             return listing.dto();
@@ -453,14 +487,26 @@ public abstract class AbstractWorkdayJobProvider extends AbstractOpenApiJobProvi
     /**
      * 英文岗位名 → 系统 jobType。只映射词面等价的类别，其余留空交给分类服务。
      *
-     * <p>顺序有意义：Designer 先于 Product，避免「Product Designer」被判成产品。
+     * <p><b>为什么不能用 {@code "design "}（带尾随空格）</b>：实测 NVIDIA 245 条里
+     * 被判「设计」的 18 条中有 11 条是硬件工程岗 —— {@code ASIC Physical Design Engineer}、
+     * {@code System Design Engineer}、{@code Silicon Co-Design Group} 等，
+     * 因为 {@code "design "} 会命中 {@code design engineer} / {@code chip design -} /
+     * {@code co-design group}。设计桶只认 {@code designer} 这类明确的岗位名词。
+     *
+     * <p><b>为什么 {@code ux} 要用词边界</b>：裸子串会命中 {@code Auxiliary}、{@code Luxury}，
+     * 把 {@code Luxury Brand Manager} 判成设计岗。
+     *
+     * <p><b>{@code data } 收窄为词组</b>：否则 {@code Data Center Operations Manager}
+     * 会被判成技术岗而不是运营岗。
      */
     static String jobTypeOf(String title) {
         String t = title == null ? "" : title.toLowerCase();
-        if (containsAny(t, "designer", "ux", "ui design", "visual design", "design ")) return "设计";
+        if (containsAny(t, "designer", "ui design", "visual design", "ux design", "design lead")
+                || UX_WORD.matcher(t).find()) return "设计";
         if (containsAny(t, "engineer", "developer", "architect", "software", "hardware",
                 "firmware", "scientist", "researcher", "technical", "programmer",
-                "devops", "sre", "security", "asic", "verification", "data ")) return "技术";
+                "devops", "sre", "security", "asic", "verification",
+                "data engineer", "data scientist", "data analyst", "data architect")) return "技术";
         if (containsAny(t, "product manager", "product owner", "product management")) return "产品";
         if (containsAny(t, "marketing", "brand", "communications", "growth")) return "市场";
         if (containsAny(t, "sales", "account manager", "business development", "business manager")) return "销售";

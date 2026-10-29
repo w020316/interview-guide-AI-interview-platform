@@ -75,19 +75,42 @@ public class EleduckJobProvider extends AbstractOpenApiJobProvider {
      * 「远程/全职」等词，仅靠「排除求职帖」判据会原样入库，等于把诈骗警示
      * 当成岗位推荐给用户。这是本类唯一一处「宁可少收，不可错收」的过滤。
      *
-     * <p>注意不要加「曝光」：市场类岗位标题里「品牌曝光」是正常用词。
+     * <p><b>为什么用「用户举报」而不是裸「举报」</b>：`举报处理专员`、
+     * `举报审核员`、`内容安全-举报治理` 是 B站 / 小红书 / 腾讯内容安全团队的
+     * 真实岗位名，裸词根会把它们一起杀掉。警示帖的固定前缀是「用户举报」，
+     * 用这个词组既准又不会误伤。
+     *
+     * <p>同理不要加「曝光」：市场类岗位标题里「品牌曝光」是正常用词。
      */
     private static final String[] NOT_A_JOB_MARKERS = {
-            "诈骗", "举报", "警示", "避雷", "防骗", "骗局",
+            "诈骗", "用户举报", "警示", "避雷", "防骗", "骗局",
     };
 
     /** 「预算 2000 元」这类是外包接单需求，不是雇佣岗位 */
     private static final java.util.regex.Pattern OUTSOURCE_BUDGET =
             java.util.regex.Pattern.compile("预算\\s*\\d");
 
+    /**
+     * 帖子有效期：社区帖生命周期短，超过这个天数的视为已失效。
+     *
+     * <p><b>为什么必须过滤</b>：游标推进到深页时上游返回的是陈年帖——实测
+     * page 100 最老 2022-08-22、page 400 最老 2021-02-18（25/25 全部 closed）。
+     * 这些帖的 {@code closed} 字段为 false（版块归档不等于单帖关闭），
+     * {@code deadline} 又是 null，过期下架逻辑管不到，只能等 60 天陈旧下架——
+     * 而游标 102 天一轮又会把它们复活。用户会看到 2021 年的帖子排在「在招」。
+     */
+    private static final int MAX_POST_AGE_DAYS = 90;
+
+    /** 详情熔断的最小样本量：低于这个数全失败可能只是巧合，不值得让整源失败 */
+    private static final int MIN_DETAIL_SAMPLE = 3;
+
     /** 实习词边界：裸 {@code contains("intern")} 会把 Internal / International 误判成实习 */
     private static final java.util.regex.Pattern INTERN_WORD =
             java.util.regex.Pattern.compile("\\bintern(ship)?\\b", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** 裸子串 {@code "ux"} / {@code "ui"} 会命中 Luxury、build，必须用词边界 */
+    private static final java.util.regex.Pattern UIUX_WORD =
+            java.util.regex.Pattern.compile("\\b(ux|ui)\\b", java.util.regex.Pattern.CASE_INSENSITIVE);
 
     private final java.util.concurrent.atomic.AtomicInteger pageCursor =
             new java.util.concurrent.atomic.AtomicInteger(1);
@@ -95,12 +118,16 @@ public class EleduckJobProvider extends AbstractOpenApiJobProvider {
     private volatile int maxPage = FALLBACK_MAX_PAGE;
 
     /**
-     * 每轮拉取几页，默认 1。
-     * 410 页 → 按线上真实 1h/轮计算，约 17 天覆盖全量，远小于 60 天陈旧窗口，
-     * 因此默认值即可，不需要调大（调大只会增加对上游的压力）。
+     * 每轮拉取几页，默认 3。
+     *
+     * <p><b>为什么不是 1</b>：本源的刷新节奏由 {@code AbstractOpenApiJobProvider}
+     * 的 {@code minRefreshIntervalMs()} 决定，是 <b>6h/轮</b>（不是调度器的 1h）。
+     * 410 页按 1 页/轮需要 410 ÷ 4 ≈ 102 天，**超过 60 天陈旧下架窗口** ——
+     * 会出现「入库 → 60 天下架 → 102 天后再抓到 → 复活」的循环，约四成时间岗位不可见。
+     * 取 3 页/轮后约 34 天，压进窗口内。
      */
-    @org.springframework.beans.factory.annotation.Value("${app.job-agent.eleduck.pages-per-refresh:1}")
-    private int pagesPerRefresh = 1;
+    @org.springframework.beans.factory.annotation.Value("${app.job-agent.eleduck.pages-per-refresh:3}")
+    private int pagesPerRefresh = 3;
 
     public EleduckJobProvider(ObjectMapper objectMapper) {
         super(objectMapper);
@@ -131,6 +158,8 @@ public class EleduckJobProvider extends AbstractOpenApiJobProvider {
     public List<JobDto> fetch() {
         int pages = Math.max(1, pagesPerRefresh);
         List<JobDto> all = new ArrayList<>();
+        int detailAttempts = 0;
+        detailFailureCount = 0;
         for (int i = 0; i < pages; i++) {
             String body = fetchRaw(buildListUrl(nextPage()));
             JsonNode root;
@@ -142,8 +171,16 @@ public class EleduckJobProvider extends AbstractOpenApiJobProvider {
             }
             updateMaxPage(root);
             for (JobDto dto : applyQuotaForSource(parse(root))) {
+                detailAttempts++;
                 all.add(enrichWithDetail(dto));
             }
+        }
+        // 详情整体失效（端点变更 / 被限流）时不能让健康表记 success：那样管理后台是绿灯，
+        // 而所有 JD 正文都是 null，「源挂了」和「源正常但没正文」就无法区分了。
+        // 样本量下限 3：一两条全失败可能只是巧合，不值得让整源失败。
+        if (detailAttempts >= MIN_DETAIL_SAMPLE && detailFailureCount == detailAttempts) {
+            throw new IllegalStateException(
+                    "详情接口全部失败（" + detailAttempts + " 条），JD 正文缺失");
         }
         return all;
     }
@@ -199,7 +236,15 @@ public class EleduckJobProvider extends AbstractOpenApiJobProvider {
             if (!looksLikeHiring(title)) {
                 continue;
             }
+            // 深页返回的是陈年帖，closed 字段并不反映单帖失效
+            if (!isFresh(node)) {
+                continue;
+            }
             JsonNode tagsNode = node.get("tags");
+            // city 是平台受控词表，「海外」为明确取值 —— 这类帖不该进国内分栏
+            if (isOverseasPost(tagsNode)) {
+                continue;
+            }
             result.add(new JobDto(
                     clip("ed-" + id, LEN_EXTERNAL_ID),
                     clip(title, LEN_TITLE),
@@ -221,11 +266,15 @@ public class EleduckJobProvider extends AbstractOpenApiJobProvider {
         return result;
     }
 
+    /** 本轮详情拉取失败次数（单线程刷新，用普通字段即可） */
+    private int detailFailureCount;
+
     /**
      * 详情补正文：列表只有约 200 字摘要，正文在 {@code /posts/{id}}。
      *
      * <p>单条详情失败不抛异常——列表数据本身可用，退回摘要即可；
      * 抛出去会让整轮刷新失败，反而丢掉已经拿到的岗位。
+     * 但**全部失败**必须由 {@link #fetch()} 抛出去，见那里的说明。
      */
     private JobDto enrichWithDetail(JobDto dto) {
         String id = dto.externalId().startsWith("ed-")
@@ -243,6 +292,7 @@ public class EleduckJobProvider extends AbstractOpenApiJobProvider {
                     dto.recruitType(), dto.deadline(), dto.applyUrl(), description,
                     dto.requirements(), dto.tags());
         } catch (Exception e) {
+            detailFailureCount++;
             log.warn("电鸭帖子 {} 详情拉取失败，退回列表摘要：{}", id, e.getMessage());
             return dto;
         }
@@ -266,19 +316,67 @@ public class EleduckJobProvider extends AbstractOpenApiJobProvider {
         return !OUTSOURCE_BUDGET.matcher(title).find();
     }
 
-    /** 从标题抽取「某某招聘」里的公司名；抽不到返回「见岗位详情」 */
+    /**
+     * 从标题抽取「某某招聘」里的公司名；抽不到返回「见岗位详情」。
+     *
+     * <p><b>候选串含数字 / 波浪号一律视为抽取失败</b>：实测
+     * {@code 急~12K-15K招聘国内远程 海外社媒运营} 会把薪资 {@code 急~12K-15K}
+     * 当成公司名写进 {@code company_name} 列，还会污染前端的企业筛选。
+     */
     static String companyOf(String title) {
         String t = title.replaceFirst("^\\s*[\\[【(（][^\\]】)）]{1,24}[\\]】)）]\\s*", "");
         for (String kw : new String[]{"招聘", "招人", "诚招", "急招", "招募", "内推"}) {
             int i = t.indexOf(kw);
             if (i > 1) {
                 String c = t.substring(0, i).replaceAll("[\\s\\-—|,，、:：/]+$", "").trim();
-                if (!c.isBlank() && c.length() <= 40) {
+                if (!c.isBlank() && c.length() <= 40 && !c.matches(".*[\\d~～].*")) {
                     return c;
                 }
             }
         }
         return "见岗位详情";
+    }
+
+    /** 发布时间在有效期内；上游没给发布时间时不武断丢弃 */
+    static boolean isFresh(JsonNode node, java.time.LocalDateTime now) {
+        String published = text(node, "published_at");
+        if (published == null || published.isBlank()) {
+            return true;
+        }
+        try {
+            java.time.OffsetDateTime t = java.time.OffsetDateTime.parse(published);
+            return t.toLocalDateTime().isAfter(now.minusDays(MAX_POST_AGE_DAYS));
+        } catch (Exception e) {
+            // 上游换了时间格式不该让整源失败，保守放行
+            return true;
+        }
+    }
+
+    private static boolean isFresh(JsonNode node) {
+        return isFresh(node, java.time.LocalDateTime.now());
+    }
+
+    /**
+     * 是否海外岗位：电鸭的 {@code city} 是平台受控词表，「海外」「国外」是明确取值
+     * （不是自由文本，可以精确匹配）。
+     *
+     * <p>{@code overseas()} 是**适配器级**开关，无法按条切换，所以在解析阶段直接丢弃，
+     * 避免巴黎、新加坡、澳洲这类岗位混进「国内」分栏。
+     */
+    static boolean isOverseasPost(JsonNode tags) {
+        if (tags == null || !tags.isArray()) {
+            return false;
+        }
+        for (JsonNode tag : tags) {
+            if (!"city".equals(tag.path("tag_group").path("code").asText(""))) {
+                continue;
+            }
+            String name = tag.path("name").asText("").trim();
+            if ("海外".equals(name) || "国外".equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 城市取自结构化标签（tag_group.code=city）；「其他」视为未知 */
@@ -362,7 +460,7 @@ public class EleduckJobProvider extends AbstractOpenApiJobProvider {
                 "运维", "测试", "算法", "架构", "开发", "工程师", "devops", "sre", "数据",
                 "android", "ios", "全栈", "安全", "嵌入式", "ai", "agent", "大模型")) return "技术";
         if (matchAny(t, "产品经理", "产品", "product")) return "产品";
-        if (matchAny(t, "设计", "ui", "ux", "视觉")) return "设计";
+        if (matchAny(t, "设计", "视觉") || UIUX_WORD.matcher(t).find()) return "设计";
         if (matchAny(t, "运营", "operation")) return "运营";
         if (matchAny(t, "市场", "marketing", "增长", "品牌")) return "市场";
         if (matchAny(t, "销售", "sales", "商务", "bd")) return "销售";
