@@ -2,6 +2,8 @@ package com.example.interview.service.job;
 
 import com.example.interview.service.job.JobPlatformAdapter.JobDto;
 import com.example.interview.util.JsonRepairUtil;
+import com.example.interview.util.PromptSanitizer;
+import com.example.interview.util.TextUtil;
 import org.springframework.ai.chat.model.ChatModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +29,12 @@ public class JobClassifyService {
             "互联网", "金融", "制造", "能源", "教育", "医疗", "快消", "通信", "硬件", "房地产", "物流", "其他");
     private static final List<String> JOB_TYPES = List.of(
             "技术", "产品", "运营", "设计", "市场", "职能", "金融", "综合");
+
+    /** 分类摘要里的描述上限：只用于判断行业/类型，不需要全文 */
+    private static final int CLASSIFY_DESC_LEN = 150;
+
+    /** 标题与企业名的业务上限：真实岗位名远短于此，超长只可能是脏数据 */
+    private static final int CLASSIFY_FIELD_LEN = 80;
 
     private final ChatModel chatModel;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -66,12 +74,12 @@ public class JobClassifyService {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < batch.size(); i++) {
             JobDto j = batch.get(i);
-            String desc = j.description() == null ? "" : j.description();
-            if (desc.length() > 150) {
-                desc = desc.substring(0, 150);
-            }
-            sb.append(i + 1).append(". 岗位：").append(j.title())
-                    .append(" | 企业：").append(j.companyName())
+            // 岗位数据来自第三方平台抓取，标题/企业名/描述均为不可信输入：
+            // 既要过注入净化，也要压成一行——换行会让条目标号结构错位，
+            // 模型会把脏数据里的「11. 岗位：…」当成新的一条去分类。
+            String desc = PromptSanitizer.sanitize(TextUtil.truncate(j.description(), CLASSIFY_DESC_LEN));
+            sb.append(i + 1).append(". 岗位：").append(oneLine(j.title()))
+                    .append(" | 企业：").append(oneLine(j.companyName()))
                     .append(" | 描述：").append(desc).append("\n");
         }
         String prompt = """
@@ -158,6 +166,13 @@ public class JobClassifyService {
                 // v1.34.1 清理（P3）：原三元 (industry != null ? "综合" : "综合") 两分支相同，为死代码
                 jobType == null ? "综合" : jobType,
                 "校招");
+    }
+
+    /** 单行字段：净化 + 截断 + 压平换行/制表符（null 安全） */
+    private static String oneLine(String s) {
+        if (s == null) return "";
+        String flat = s.replaceAll("[\\r\\n\\t]+", " ").trim();
+        return PromptSanitizer.sanitize(TextUtil.truncate(flat, CLASSIFY_FIELD_LEN));
     }
 
     private static String matchFirst(String text, java.util.Map<String, String> rules) {
