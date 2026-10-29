@@ -69,11 +69,15 @@ public class TencentCareersJobProvider extends AbstractOpenApiJobProvider {
      *
      * <p>为什么不默认更大：拉多页会拉长单轮耗时并增加上游压力，而 60 天窗口非常宽裕
      * ——12 轮 × 6h ≈ 3 天就能覆盖 2282 条，完全够用。
-     * 想更快覆盖就调大 {@code app.jobs.tencent.pages-per-refresh}，代价是单轮变慢。
+     * 想更快覆盖就调大 {@code app.job-agent.tencent.pages-per-refresh}，代价是单轮变慢。
      *
      * <p>字段初始化给 1 是必要的：单元测试直接 {@code new} 出来的实例不走 Spring 注入。
+     *
+     * <p>⚠️ 2026-10-29 修正：此前这里写的是 {@code app.jobs.*}，而 application.yml 的
+     * 配置在 {@code app.job-agent.*} 下 —— 键名不匹配导致该配置与同名环境变量
+     * <b>从未生效</b>（永远取默认 1），是一次典型的静默配置失效。
      */
-    @org.springframework.beans.factory.annotation.Value("${app.jobs.tencent.pages-per-refresh:1}")
+    @org.springframework.beans.factory.annotation.Value("${app.job-agent.tencent.pages-per-refresh:1}")
     private int pagesPerRefresh = 1;
 
     public TencentCareersJobProvider(ObjectMapper objectMapper) {

@@ -70,10 +70,13 @@ public class AmazonChinaJobProvider extends AbstractOpenApiJobProvider {
 
     /**
      * 每轮拉取几页，默认 1（5 轮 × 6h ≈ 30h 覆盖 236 条，没必要更激进）。
-     * 调大 {@code app.jobs.amazon.pages-per-refresh} 可更快覆盖，代价是单轮变慢。
+     * 调大 {@code app.job-agent.amazon.pages-per-refresh} 可更快覆盖，代价是单轮变慢。
      * 字段初始化给 1：单元测试直接 new，不走 Spring 注入。
+     *
+     * <p>⚠️ 2026-10-29 修正：原键名为 {@code app.jobs.*}，与 application.yml 的
+     * {@code app.job-agent.*} 不匹配，配置从未生效（静默失效）。
      */
-    @org.springframework.beans.factory.annotation.Value("${app.jobs.amazon.pages-per-refresh:1}")
+    @org.springframework.beans.factory.annotation.Value("${app.job-agent.amazon.pages-per-refresh:1}")
     private int pagesPerRefresh = 1;
 
     public AmazonChinaJobProvider(ObjectMapper objectMapper) {
