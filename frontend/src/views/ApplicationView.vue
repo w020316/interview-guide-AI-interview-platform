@@ -544,6 +544,7 @@ import {
 } from '../utils/tableImport'
 import { XLSX_READ_ERROR_HINT, parseXlsxRows } from '../utils/xlsxLazy'
 import { asArray } from '../utils/safeData'
+import { createLatestGuard } from '../utils/latestRequest'
 
 interface Application {
   id: number
@@ -626,10 +627,15 @@ async function copyAdvice(text: string): Promise<void> {
 
 onMounted(load)
 
+/** C1：连续操作（确认投递/改状态）会并发触发 load，旧响应不得覆盖新台账 */
+const loadGuard = createLatestGuard()
+
 async function load() {
+  const ticket = loadGuard.begin()
   loading.value = true
   try {
     const listData = (await api.get('/api/application/list')) as unknown as { items?: Application[] }
+    if (!loadGuard.isLatest(ticket)) return
     items.value = asArray<Application>(listData?.items)
     const board = (await api.get('/api/application/board')) as unknown as {
       counts?: Record<string, number>
@@ -637,28 +643,31 @@ async function load() {
       byChannel?: ChannelStat[]
       followUps?: Application[]
     }
+    if (!loadGuard.isLatest(ticket)) return
     counts.value = board?.counts || {}
     funnel.value = board?.funnel || {}
     channels.value = asArray<ChannelStat>(board?.byChannel)
     followUps.value = asArray<Application>(board?.followUps)
   } catch (e: unknown) {
+    if (!loadGuard.isLatest(ticket)) return
     ElMessage.error(getErrMessage(e, '加载投递台账失败'))
   } finally {
-    loading.value = false
+    if (loadGuard.isLatest(ticket)) loading.value = false
   }
   // 时序数据单独加载：它是**附加视图**，取不到就不显示该区块，
   // 不能让它的失败把已加载好的台账与看板一并清空。
-  await loadTimeline()
+  if (loadGuard.isLatest(ticket)) await loadTimeline(ticket)
 }
 
-async function loadTimeline() {
+async function loadTimeline(ticket: number) {
   try {
     const data = (await api.get('/api/application/timeline')) as unknown as TimelineData
+    if (!loadGuard.isLatest(ticket)) return
     timeline.value = data && Array.isArray(data.nodes) ? data : null
   } catch {
     // 明确降级：不弹错误提示（台账本身可用），仅隐藏时序区块。
     // 若这里改成「保持上一次的数据」，用户会看到过期时间线却以为是最新的。
-    timeline.value = null
+    if (loadGuard.isLatest(ticket)) timeline.value = null
   }
 }
 
@@ -951,13 +960,24 @@ async function confirmNotice() {
   if (!noticeForm.stage) return ElMessage.warning('未识别到投递阶段，无法更新状态')
   noticePushing.value = true
   try {
-    await api.post(`/api/application/${targetId}/status`, { status: noticeForm.stage })
+    // C2：两步写入必须分开报错。此前两步共用一个 catch，状态已改成功、
+    // 只是日历写失败时也提示「写入失败」，用户会重试——而状态其实早就落库了。
+    try {
+      await api.post(`/api/application/${targetId}/status`, { status: noticeForm.stage })
+    } catch (e: unknown) {
+      ElMessage.error(getErrMessage(e, '更新投递状态失败'))
+      return
+    }
     ElMessage.success(`已更新为「${statusLabel(noticeForm.stage)}」`)
-    if (noticeForm.interviewAt) await pushCalendarEvent(targetId)
+    if (noticeForm.interviewAt) {
+      try {
+        await pushCalendarEvent(targetId)
+      } catch (e: unknown) {
+        ElMessage.error(`投递状态已更新，但面试日历未写入：${getErrMessage(e, '日历写入失败')}`)
+      }
+    }
     noticeOpen.value = false
     await load()
-  } catch (e: unknown) {
-    ElMessage.error(getErrMessage(e, '写入失败'))
   } finally {
     noticePushing.value = false
   }
