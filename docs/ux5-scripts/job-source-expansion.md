@@ -122,8 +122,11 @@
 - 注意：本地存量 `D:/xm/data/interview.mv.db` 结构过期（缺 `TOKEN_VERSION`），验证改用独立库，
   未改动用户本地数据。
 
-### 6.5 已知未验证
+### 6.5 线上部署复验（2026-10-29 18:56，v1.87.0）
 
-- **Render 出口到两家接口的可达性尚未实测**（本机探测通过，腾讯/亚马逊在 Render 上正常是间接证据）。
-  上线后应复验：`GET /api/jobs?source=美团招聘` 与 `?source=网易招聘` 是否返回数据；
-  若取不到，`/api/admin/sources` 会记录失败原因，且不影响其他源。
+- Render 出口**可达两家接口**：部署后首轮启动刷新即入库，`/api/jobs/meta` 来源数 19 → 21。
+- `GET /api/jobs?source=美团招聘` → 50 条，`?source=网易招聘` → 50 条；
+  `externalId` 全为 `mt-` / `ne-` 前缀，`salary` / `deadline` 全为 `null`，描述非空。
+- 线上前端 chunk（`JobsView-*.js`）含 `official-api` 关键词
+  `腾讯招聘/亚马逊中国/美团招聘/网易招聘`，徽章映射已生效；`verify-release.mjs --live` 通过。
+- CI（`d28adcb`）success。
