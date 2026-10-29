@@ -33,7 +33,17 @@
       <main class="chat-main">
         <div ref="chatBox" class="chat-box">
           <!-- 欢迎语 + 推荐提问 -->
-          <div v-if="messages.length === 0" class="welcome">
+          <div v-if="loadingConversation" class="welcome">
+            <div class="welcome-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="var(--brand-primary)" stroke-width="2" opacity="0.35"/>
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="var(--brand-primary)" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>正在加载会话…</h3>
+            <p>历史消息马上就好</p>
+          </div>
+          <div v-else-if="messages.length === 0" class="welcome">
             <div class="welcome-icon" aria-hidden="true">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
@@ -52,7 +62,11 @@
             <div class="msg-avatar">{{ msg.role === 'user' ? '我' : 'AI' }}</div>
             <div class="msg-bubble" :class="{ streaming: msg.role === 'assistant' && streaming && i === messages.length - 1 }">
               <template v-if="msg.role === 'user'">{{ msg.content }}</template>
-              <div v-else class="md-body" v-html="renderedContent(msg.content, msg.role === 'assistant' && streaming && i === messages.length - 1)"></div>
+              <!-- C10：流式期间用纯文本渲染（pre-wrap 保留换行），结束后才走 markdown。
+                   一边吐字一边解析 markdown，等于对同一篇不断变长的文档反复全量解析；
+                   而且未闭合的代码围栏、半截列表会让版式中途跳变。 -->
+              <div v-else-if="streaming && i === messages.length - 1" class="md-body streaming-text">{{ msg.content }}</div>
+              <div v-else class="md-body" v-html="renderedContent(msg.content)"></div>
             </div>
           </div>
 
@@ -93,6 +107,7 @@ import { apiBaseUrl } from '../api'
 import { authState, isTokenValid, clearAuth } from '../auth'
 import renderMarkdown from '../utils/markdown'
 import { AgentSseParser } from '../utils/agentSse'
+import { createLatestGuard } from '../utils/latestRequest'
 import { BaseButton } from '../components'
 
 /**
@@ -129,6 +144,10 @@ const input = ref('')
 const streaming = ref(false)
 const thinking = ref(false)
 const chatBox = ref<HTMLElement | null>(null)
+/** C8：历史会话正在加载。加载期间禁止发送，避免消息落进上一个会话 */
+const loadingConversation = ref(false)
+/** C8：快速连点会话时先发后至的旧响应不得覆盖当前会话 */
+const convGuard = createLatestGuard()
 let abortController: AbortController | null = null
 let coldRetried = false // 冷启动已重试标记：整个页面生命周期仅唤醒一次
 
@@ -139,19 +158,13 @@ onBeforeUnmount(() => {
 })
 
 /**
- * 渲染助手消息。isStreaming=true 时对"未闭合的 markdown 代码块"做保护：
- * 临时补一个闭合围栏，避免流式中(``` 未闭合)导致整段被当代码渲染、视觉闪烁。
- * 仅影响展示，不影响实际内容。
+ * 渲染助手消息（仅用于**已结束**的消息）。
+ *
+ * <p>流式中的消息走模板里的纯文本分支（见 C10），不再调用本函数：
+ * 对一篇持续变长的文档逐 token 全量解析 markdown，既贵又会让版式跳变。
  */
-function renderedContent(content: string, isStreaming: boolean = false): string {
-  let text = content ?? ''
-  if (isStreaming) {
-    const fences = text.split('```').length - 1
-    if (fences % 2 === 1) {
-      text = text + '\n```' // 临时闭合，让已输出的代码块正常渲染
-    }
-  }
-  return renderMarkdown(text)
+function renderedContent(content: string): string {
+  return renderMarkdown(content ?? '')
 }
 
 async function scrollToBottom() {
@@ -188,6 +201,13 @@ async function fetchConversations() {
 
 async function loadConversation(id: number) {
   if (streaming.value) return
+  const ticket = convGuard.begin()
+  // C8：先把「当前会话」切过去，再取消息。
+  // 此前 conversationId 只在请求成功后才赋值，慢网下加载期间发出的消息会带着
+  // **上一个**会话的 id 提交（消息落进别的会话，用户完全无感）。
+  conversationId.value = id
+  messages.value = []
+  loadingConversation.value = true
   try {
     const res = await fetch(`${apiBaseUrl}/api/agent/conversations/${id}/messages`, {
       headers: { Authorization: `Bearer ${authState.token}` },
@@ -195,15 +215,18 @@ async function loadConversation(id: number) {
     if (handleAuthFailure(res.status)) return
     if (!res.ok) throw new Error('load failed')
     const body = await res.json()
+    if (!convGuard.isLatest(ticket)) return
     const items: Array<{ role: string; content: string }> = body?.data || []
-    conversationId.value = id
     messages.value = items.map((m) => ({
       role: m.role === 'USER' ? 'user' : 'assistant',
       content: m.content,
     }))
     scrollToBottom()
   } catch {
+    if (!convGuard.isLatest(ticket)) return
     ElMessage.error('会话加载失败')
+  } finally {
+    if (convGuard.isLatest(ticket)) loadingConversation.value = false
   }
 }
 
@@ -232,6 +255,9 @@ async function removeConversation(id: number) {
 }
 
 function newConversation() {
+  // C8：作废在途的历史加载——否则刚点「新会话」，上一个会话的消息会晚一步填进来
+  convGuard.begin()
+  loadingConversation.value = false
   conversationId.value = null
   messages.value = []
   input.value = ''
@@ -252,9 +278,16 @@ function stopStreaming() {
   thinking.value = false
 }
 
+/** 流式内容写入的最小间隔（毫秒）：逐 token 写会让长回答触发上千次重渲染 */
+const STREAM_FLUSH_MS = 100
+
 async function send(preset?: string) {
   const text = (preset || input.value).trim()
   if (!text || streaming.value) return
+  if (loadingConversation.value) {
+    ElMessage.warning('会话正在加载，请稍候再发送')
+    return
+  }
   if (!authState.token || !isTokenValid(authState.token)) {
     ElMessage.error('登录已过期，请重新登录')
     clearAuth()
@@ -268,11 +301,21 @@ async function send(preset?: string) {
   streaming.value = true
   scrollToBottom()
 
+  /** C9：只有收到 done 才算完整结束 */
+  let completed = false
+  /** 是否已创建助手气泡（供 finally 判断是否提示「回答不完整」） */
+  let bubblePushed = false
+  /** 服务端下发的错误文案（供 finally 去重） */
+  let errorMsg = ''
+  /** 本次请求的控制器（stopStreaming 会把 abortController 置 null，这里保留引用以判断是否用户主动停止） */
+  let controller: AbortController | null = null
+
   try {
-    abortController = new AbortController()
+    controller = new AbortController()
+    abortController = controller
     const resp = await fetch(`${apiBaseUrl}/api/agent/chat/stream`, {
       method: 'POST',
-      signal: abortController.signal,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${authState.token}`,
@@ -294,13 +337,28 @@ async function send(preset?: string) {
 
     // 首个 token 到达前显示"思考中"，到达后切换为流式气泡
     const assistantMsg: ChatMessage = { role: 'assistant', content: '' }
-    let bubblePushed = false
+    /** C10：数组里存的是原始对象，模板读到的却是代理 —— 写裸对象不会触发重渲染，
+     *  必须取回 push 之后数组里的那个代理再写，流式文本才会随时间出现 */
+    let assistantRef: ChatMessage | null = null
     const ensureBubble = () => {
       if (!bubblePushed) {
         bubblePushed = true
         thinking.value = false
         messages.value.push(assistantMsg)
+        assistantRef = messages.value[messages.value.length - 1]
       }
+    }
+    // token 先进缓冲区，flush 时整段写入：逐 token 写入等于逐 token 重渲染 + 逐 token 滚动
+    let pendingText = ''
+    let lastFlushAt = 0
+    const flushTokens = (force = false) => {
+      if (!pendingText || !assistantRef) return
+      const now = performance.now()
+      if (!force && now - lastFlushAt < STREAM_FLUSH_MS) return
+      lastFlushAt = now
+      assistantRef.content += pendingText
+      pendingText = ''
+      scrollToBottom()
     }
 
     const reader = resp.body.getReader()
@@ -313,7 +371,6 @@ async function send(preset?: string) {
     // 表现：流式回答零星出现「�」，刷新后重新加载历史会话又正常（历史走 JSON 接口），
     // 极易被误判成「模型输出有问题」。同仓 InterviewView.vue:960 是正确的单实例写法。
     const decoder = new TextDecoder()
-    let errorMsg = ''
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
@@ -325,12 +382,12 @@ async function send(preset?: string) {
           } catch { /* meta 解析失败忽略 */ }
         } else if (evt.event === 'token') {
           ensureBubble()
-          assistantMsg.content += evt.data
-          scrollToBottom()
+          pendingText += evt.data
+          flushTokens()
         } else if (evt.event === 'error') {
           errorMsg = evt.data || 'AI 服务异常，请重试'
         } else if (evt.event === 'done') {
-          // 结束
+          completed = true
         }
       }
     }
@@ -340,16 +397,13 @@ async function send(preset?: string) {
     const tail = decoder.decode()
     if (tail) {
       for (const evt of parser.feed(tail)) {
-        if (evt.event === 'token' && bubblePushed) {
-          assistantMsg.content += evt.data
-        }
+        if (evt.event === 'token' && bubblePushed) pendingText += evt.data
       }
     }
     for (const evt of parser.flush()) {
-      if (evt.event === 'token' && bubblePushed) {
-        assistantMsg.content += evt.data
-      }
+      if (evt.event === 'token' && bubblePushed) pendingText += evt.data
     }
+    flushTokens(true)
 
     if (errorMsg) {
       ElMessage.error(errorMsg)
@@ -389,9 +443,15 @@ async function send(preset?: string) {
       ElMessage.error('网络异常，请检查网络后重试')
     }
   } finally {
+    // C9：连接被提前切断（无 done 事件）时，半截回答必须明确告知，
+    // 不能静默留在气泡里让用户以为回答就到这里
+    const wasAborted = controller?.signal.aborted === true
     streaming.value = false
     thinking.value = false
     abortController = null
+    if (bubblePushed && !completed && !wasAborted && !errorMsg) {
+      ElMessage.warning('回答可能不完整（连接提前结束），建议重新发送')
+    }
     fetchConversations()
     scrollToBottom()
   }
@@ -643,6 +703,12 @@ onMounted(() => {
 /* markdown 正文排版统一由 styles/markdown.css 的 .md-body 提供
  * （唯一来源，由 designGuards.test.ts 锁住）。此处不再重复定义
  * p / ul / ol / a / code 等元素样式 —— 那正是此前「五套实现漂移」的成因。 */
+
+/* 流式期间的纯文本渲染：保留换行与空格，流结束后再交给 markdown 排版 */
+.streaming-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 
 .thinking-dots span {
   animation: dot 1.4s infinite;
