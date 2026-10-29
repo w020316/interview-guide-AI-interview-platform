@@ -267,11 +267,27 @@
       </div>
     </div>
 
-    <!-- 分页 -->
+    <!-- 分页：首页/末页直达 + 页码跳转（162 条岗位 = 9 页，只靠「下一页」要连点 8 次） -->
     <div v-if="!favoriteMode && total > pageSize" class="pagination">
+      <button :disabled="page === 0 || loading" @click="goPage(0)">首页</button>
       <button :disabled="page === 0 || loading" @click="goPage(page - 1)">上一页</button>
       <span class="page-info">第 {{ page + 1 }} / {{ totalPages }} 页 · 共 {{ total }} 条</span>
       <button :disabled="page >= totalPages - 1 || loading" @click="goPage(page + 1)">下一页</button>
+      <button :disabled="page >= totalPages - 1 || loading" @click="goPage(totalPages - 1)">末页</button>
+      <span class="page-jump">
+        跳至
+        <input
+          v-model.number="jumpPage"
+          type="number"
+          min="1"
+          :max="totalPages"
+          aria-label="跳转页码"
+          :disabled="loading"
+          @keyup.enter="onJumpPage"
+        >
+        页
+        <button :disabled="loading" @click="onJumpPage">跳转</button>
+      </span>
     </div>
 
     <!-- 岗位详情弹窗 -->
@@ -410,6 +426,7 @@ import { validateJobKeyword } from '../utils/jobKeyword'
 import { toQueryRecruitType } from '../utils/recruitType'
 import { jobTrust, jobFreshness, classifySource, type JobTrust, type Freshness } from '../utils/jobTrust'
 import { asArray, asObject, asFiniteNumber } from '../utils/safeData'
+import { createLatestGuard } from '../utils/latestRequest'
 
 /**
  * 招聘信息广场
@@ -496,7 +513,10 @@ const refreshing = ref(false)
 const jobs = ref<JobPosting[]>([])
 const total = ref(0)
 const page = ref(0)
-const pageSize = 10
+/** 20 条/页：主流岗位列表密度；10 条时 162 条秋招岗位要翻 17 页 */
+const pageSize = 20
+/** 页码跳转输入框（1 基）：null 表示未输入 */
+const jumpPage = ref<number | null>(null)
 const detail = ref<JobPosting | null>(null)
 /** 本会话内已加入投递计划的岗位 id：用于成功后给出「查看投递看板」入口 */
 const addedPlanIds = ref<Set<number>>(new Set())
@@ -699,6 +719,10 @@ function showDetail(job: JobPosting) {
   detail.value = job
 }
 
+/** C1：列表与 meta 各自的「最后一次请求为准」守卫（快速切筛选时旧响应会覆盖新结果） */
+const jobsGuard = createLatestGuard()
+const metaGuard = createLatestGuard()
+
 async function fetchJobs() {
   // P2-04：关键词校验必须发生在**发请求之前**——含注入特征的查询串会在到达应用之前
   // 就被 Render 边缘 WAF 拦掉（返回不带 CORS 头的 403），后端入口校验根本没机会执行。
@@ -708,6 +732,7 @@ async function fetchJobs() {
     ElMessage.warning(keywordError)
     return
   }
+  const ticket = jobsGuard.begin()
   loading.value = true
   loadError.value = false
   try {
@@ -736,17 +761,29 @@ async function fetchJobs() {
     })
     // axios 拦截器已解包 Result.data，此处直接取分页结构 {total,page,size,items}
     const data = res as unknown as { total: number; items: JobPosting[] }
+    if (!jobsGuard.isLatest(ticket)) return
+    const fetchedTotal = asFiniteNumber(data?.total)
     jobs.value = asArray<JobPosting>(data?.items)
-    total.value = asFiniteNumber(data?.total)
+    total.value = fetchedTotal
+    // C5：切换筛选后总数变小会让当前页越界（列表空白但页码显示「第 4 / 3 页」），
+    // 收敛到最后一页重取；修正后的页码必然在界内，不会二次触发
+    if (fetchedTotal > 0 && page.value > 0 && page.value * pageSize >= fetchedTotal) {
+      page.value = Math.ceil(fetchedTotal / pageSize) - 1
+      void fetchJobs()
+    }
   } catch (e) {
+    if (!jobsGuard.isLatest(ticket)) return
     loadError.value = true
     ElMessage.error(getErrMessage(e, '岗位加载失败'))
   } finally {
-    loading.value = false
+    // 只有最新一次请求才有权结束 loading：旧请求先返回时若清掉 loading，
+    // 用户会在仍在加载的列表上看到「空态/旧数据」一闪而过
+    if (jobsGuard.isLatest(ticket)) loading.value = false
   }
 }
 
 async function fetchMeta() {
+  const ticket = metaGuard.begin()
   try {
     // P2-08：元数据里的「招聘类型」计数必须与当前分栏口径一致 ——
     // 否则「全部国内」分栏会显示全局数字（分栏内实有 71 条社招，chips 却显示 1883，
@@ -754,6 +791,7 @@ async function fetchMeta() {
     const res = await api.get('/api/jobs/meta', {
       params: { overseas: recruitType.value === 'OVERSEAS' },
     })
+    if (!metaGuard.isLatest(ticket)) return
     meta.value = normalizeMeta(res)
   } catch {
     // 元数据加载失败不阻断主列表
@@ -843,8 +881,22 @@ function switchTab(value: string) {
 }
 
 function goPage(p: number) {
-  page.value = p
+  // C5：页码必须收敛到 [0, totalPages-1]——筛选后总数变少时，
+  // 旧的页码会让用户停在「第 4 / 3 页」且列表空白
+  const target = Math.min(Math.max(0, Math.trunc(p)), totalPages.value - 1)
+  if (target === page.value) return
+  page.value = target
   fetchJobs()
+}
+
+function onJumpPage() {
+  const t = jumpPage.value
+  if (typeof t !== 'number' || !Number.isFinite(t)) {
+    ElMessage.warning(`请输入 1-${totalPages.value} 之间的页码`)
+    return
+  }
+  goPage(t - 1)
+  jumpPage.value = null
 }
 
 async function refreshData() {
@@ -1375,6 +1427,24 @@ onMounted(() => {
 .page-info {
   font-size: 13px;
   color: var(--c-text-secondary);
+}
+
+.page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--c-text-secondary);
+}
+
+.page-jump input {
+  width: 56px;
+  padding: 6px 8px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--c-text);
+  text-align: center;
 }
 
 .modal-mask {
