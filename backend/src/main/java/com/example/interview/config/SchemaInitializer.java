@@ -173,6 +173,10 @@ public class SchemaInitializer implements CommandLineRunner {
             "ALTER TABLE interview_question ADD COLUMN IF NOT EXISTS eval_detail TEXT",
             // H：岗位收藏偏好四档（可空，NULL=未标记，不得默认成任何一档）
             "ALTER TABLE job_favorite ADD COLUMN IF NOT EXISTS preference VARCHAR(20)",
+            // v1.86.0：首次收到回音的时间（投递洞察的响应速度口径，见 JobApplicationService#response）。
+            // 存量行不回填：拿 last_reply_at（每次状态变化都会刷新）冒充首次回音，
+            // 会得出「越活跃的投递响应越快」这种假结论。
+            "ALTER TABLE job_application ADD COLUMN IF NOT EXISTS first_reply_at TIMESTAMP",
             // ── P1-2（2026-10-21）：令牌版本列 ──
             // ⚠️ 生产库**不执行** schema.sql，只执行本数组里的 DDL。
             // 只在 schema.sql 里加 ALTER 而漏了这里 = 生产库永远没有该列：
@@ -226,6 +230,9 @@ public class SchemaInitializer implements CommandLineRunner {
     private static final String[][] REQUIRED_COLUMNS = {
             {"interview_question", "eval_detail"},
             {"job_favorite", "preference"},
+            // v1.86.0：缺列时投递洞察的「平均首次回音」会永远显示「—」（样本恒为 0），
+            // 页面照常渲染、日志干净 —— 又是一次静默失效，纳入启动自检
+            {"job_application", "first_reply_at"},
             // P1-2：令牌版本列。缺列会让 JwtAuthFilter 的版本查询抛异常，
             // 按 fail-open 语义跳过校验 → 吊销静默失效（最坏的一种缺陷：看起来一切正常）
             {"users", "token_version"}

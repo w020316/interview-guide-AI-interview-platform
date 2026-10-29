@@ -15,6 +15,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -229,7 +230,13 @@ public class JobApplicationService {
             return null;
         }
         entity.setStatus(status.toUpperCase());
-        entity.setLastReplyAt(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        entity.setLastReplyAt(now);
+        // 首次回音只写一次：存量行保持 NULL（不回填 last_reply_at —— 那是「最近」不是「首次」）。
+        // 回退状态（如 INTERVIEW → APPLIED 的手误更正）也不清空：对方确实联系过这个事实不变。
+        if (entity.getFirstReplyAt() == null && REPLY_STAGES.contains(entity.getStatus())) {
+            entity.setFirstReplyAt(now);
+        }
         if (note != null && !note.isBlank()) {
             entity.setNote(note.trim());
         }
@@ -239,7 +246,7 @@ public class JobApplicationService {
         // 从未投递直接跳到「已投递及以后」时补记投出时间，保证统计口径正确
         if (entity.getAppliedAt() == null
                 && !JobApplicationEntity.STATUS_PLANNED.equals(entity.getStatus())) {
-            entity.setAppliedAt(LocalDateTime.now());
+            entity.setAppliedAt(now);
         }
         return repository.save(entity);
     }
@@ -311,11 +318,20 @@ public class JobApplicationService {
         funnel.put("interviewOrBeyond", interviewOrBeyond);
         funnel.put("offer", offer);
 
+        List<JobApplicationEntity> silent = silentApplications(all, now);
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("total", all.size());
         result.put("counts", counts);
         result.put("statusLabels", STATUS_LABELS);
         result.put("funnel", funnel);
+        // 漏斗洞察（v1.86.0）：5 段人数 + 逐段转化率；与 funnel 同源，后者保留给既有前端
+        result.put("funnelStages", funnelStages(submitted, viewedOrBeyond, repliedOrBeyond,
+                interviewOrBeyond, offer));
+        // 响应速度：只有「投出时间 + 首次回音时间」都在的记录才进样本，样本为 0 时两个值是 null
+        result.put("response", response(all));
+        result.put("silentCount", silent.size());
+        result.put("silent", silent.stream().limit(SILENT_LIST_LIMIT).toList());
         // 渠道效果（竞品清单 #6）：回答「哪个渠道回音率最高，精力该往哪放」
         result.put("byChannel", byChannel(all));
         result.put("channelUnlabeledLabel", CHANNEL_UNLABELED);
@@ -329,12 +345,23 @@ public class JobApplicationService {
         if (a.getNextActionAt() != null && !a.getNextActionAt().isAfter(now)) {
             return true;
         }
-        if (a.getStatus() != null && PENDING_REPLY_STATUSES.contains(a.getStatus())) {
-            LocalDateTime base = a.getAppliedAt() != null ? a.getAppliedAt() : a.getUpdatedAt();
-            return base != null && base.isBefore(now.minusDays(FOLLOW_UP_SILENT_DAYS));
-        }
-        return false;
+        return isSilent(a, now);
     }
+
+    /**
+     * 「静默投递」：已投出 / 已查看、且距投出已超过 {@value #FOLLOW_UP_SILENT_DAYS} 天仍无回音。
+     *
+     * <p>与 {@link #needsFollowUp} 共用同一判定，但**不含**「用户自己设了到期提醒」那条分支——
+     * 洞察要回答的是「有多少投递石沉大海」，而不是「今天有几条提醒」。
+     */
+    public boolean isSilent(JobApplicationEntity a, LocalDateTime now) {
+        if (!PENDING_REPLY_STATUSES.contains(statusOf(a))) {
+            return false;
+        }
+        LocalDateTime base = a.getAppliedAt() != null ? a.getAppliedAt() : a.getUpdatedAt();
+        return base != null && base.isBefore(now.minusDays(FOLLOW_UP_SILENT_DAYS));
+    }
+
 
     /** 供智能体/接口复用的中文状态标签 */
     public static String label(String status) {
@@ -368,6 +395,19 @@ public class JobApplicationService {
     /** 进入面试及之后 */
     private static final Set<String> INTERVIEW_STAGES = Set.of(
             JobApplicationEntity.STATUS_INTERVIEW, JobApplicationEntity.STATUS_OFFER);
+
+    /**
+     * 收到对方回音的状态集合（响应速度口径，v1.86.0）。
+     *
+     * <p>比 {@link #REPLIED_STAGES} 多一个 REJECTED：淘汰**也是回音**，只是没有推进；
+     * 排除 VIEWED —— 它衡量的是「简历被打开」，不是「对方回应」。
+     */
+    private static final Set<String> REPLY_STAGES = Set.of(
+            JobApplicationEntity.STATUS_REPLIED, JobApplicationEntity.STATUS_INTERVIEW,
+            JobApplicationEntity.STATUS_OFFER, JobApplicationEntity.STATUS_REJECTED);
+
+    /** 「静默投递」清单上限：洞察是概览，全量记录在下方台账里 */
+    private static final int SILENT_LIST_LIMIT = 20;
 
     /** platform 为空/空白时归入的渠道名（不丢弃、不猜值） */
     public static final String CHANNEL_UNLABELED = "未标注";
@@ -436,5 +476,86 @@ public class JobApplicationService {
             out.add(m);
         }
         return out;
+    }
+
+    // ── 漏斗洞察（v1.86.0）──────────────────────────────────────────────
+    // 三条纪律：
+    //   ① 转化率的分母是**上一段/已投出**的人数，分母为 0 时给 null（不产出假 0%）；
+    //   ② 响应速度只统计「投出时间与首次回音时间都在」的记录，并如实返回样本量；
+    //   ③ 静默清单与「待跟进」共用同一判定，避免两处口径漂移。
+
+    /**
+     * 漏斗 5 段（顺序固定）：每段给出人数与两级转化率。
+     *
+     * <p>conversionFromPrev = 本段 / 上一段，conversionFromSubmitted = 本段 / 已投出；
+     * 首段（已投出）两者都是 null —— 起始段没有「转化」可言，写 100% 会让人误以为这是结论。
+     */
+    private static List<Map<String, Object>> funnelStages(int submitted, int viewed, int replied,
+                                                          int interview, int offer) {
+        int[] counts = { submitted, viewed, replied, interview, offer };
+        String[] ids = { "submitted", "viewed", "replied", "interview", "offer" };
+        String[] labels = { "已投出", "被查看", "有回复", "进面试", "拿 Offer" };
+        List<Map<String, Object>> out = new java.util.ArrayList<>(counts.length);
+        for (int i = 0; i < counts.length; i++) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", ids[i]);
+            m.put("label", labels[i]);
+            m.put("count", counts[i]);
+            m.put("conversionFromPrev", i == 0 ? null : rate(counts[i], counts[i - 1]));
+            m.put("conversionFromSubmitted", i == 0 ? null : rate(counts[i], submitted));
+            out.add(m);
+        }
+        return out;
+    }
+
+    /**
+     * 响应速度：投出 → 首次收到回音的天数。
+     *
+     * <p>样本只包含 {@code appliedAt} 与 {@code firstReplyAt} 都存在的记录：
+     * 存量数据没有 firstReplyAt（不回填，见 schema.sql），因此样本量会小于「有回复」的记录数 ——
+     * 这是如实呈现，不是缺陷。{@code sampleSize} 为 0 时 avgDays / medianDays 都是 null。
+     */
+    private static Map<String, Object> response(List<JobApplicationEntity> all) {
+        List<Double> days = new java.util.ArrayList<>();
+        for (JobApplicationEntity a : all) {
+            LocalDateTime applied = a.getAppliedAt();
+            LocalDateTime first = a.getFirstReplyAt();
+            if (applied == null || first == null || first.isBefore(applied)) {
+                continue;   // 时间倒挂属数据异常，不计入以免污染均值
+            }
+            days.add(Duration.between(applied, first).toMinutes() / 1440.0);
+        }
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("sampleSize", days.size());
+        double avg = days.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+        m.put("avgDays", days.isEmpty() ? null : round1(avg));
+        m.put("medianDays", days.isEmpty() ? null : round1(median(days)));
+        return m;
+    }
+
+    /** 中位数（对原列表排序的副本，不修改入参顺序） */
+    private static double median(List<Double> values) {
+        List<Double> sorted = new java.util.ArrayList<>(values);
+        java.util.Collections.sort(sorted);
+        int n = sorted.size();
+        return n % 2 == 1 ? sorted.get(n / 2) : (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2.0;
+    }
+
+    private static double round1(double v) {
+        return Math.round(v * 10.0) / 10.0;
+    }
+
+    /**
+     * 静默投递清单：投出超过 {@value #FOLLOW_UP_SILENT_DAYS} 天仍无回音，**最久的最前**。
+     */
+    private List<JobApplicationEntity> silentApplications(List<JobApplicationEntity> all, LocalDateTime now) {
+        return all.stream()
+                .filter(a -> isSilent(a, now))
+                .sorted((x, y) -> silentSince(x).compareTo(silentSince(y)))
+                .toList();
+    }
+
+    private LocalDateTime silentSince(JobApplicationEntity a) {
+        return a.getAppliedAt() != null ? a.getAppliedAt() : a.getUpdatedAt();
     }
 }

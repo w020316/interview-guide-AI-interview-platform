@@ -251,6 +251,174 @@ class JobApplicationServiceTest {
         assertThat(JobApplicationService.label(null)).isEqualTo("未知");
     }
 
+    // ───────── 漏斗洞察（v1.86.0）─────────
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> stages(Map<String, Object> board) {
+        return (List<Map<String, Object>>) board.get("funnelStages");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> response(Map<String, Object> board) {
+        return (Map<String, Object>) board.get("response");
+    }
+
+    @Test
+    @DisplayName("funnelStages：5 段顺序固定，逐段转化率以「上一段」为分母")
+    void funnelStages_conversions() {
+        when(repository.findByUserIdOrderByUpdatedAtDesc(USER)).thenReturn(List.of(
+                app(1L, USER, JobApplicationEntity.STATUS_APPLIED),
+                app(2L, USER, JobApplicationEntity.STATUS_VIEWED),
+                app(3L, USER, JobApplicationEntity.STATUS_VIEWED),
+                app(4L, USER, JobApplicationEntity.STATUS_REPLIED),
+                app(5L, USER, JobApplicationEntity.STATUS_INTERVIEW),
+                app(6L, USER, JobApplicationEntity.STATUS_OFFER)));
+
+        List<Map<String, Object>> s = stages(service.board(USER));
+
+        assertThat(s).extracting(m -> m.get("id"))
+                .containsExactly("submitted", "viewed", "replied", "interview", "offer");
+        assertThat(s).extracting(m -> m.get("count")).containsExactly(6, 5, 3, 2, 1);
+        // 首段没有「转化」可言，必须是 null 而不是 100%
+        assertThat(s.get(0).get("conversionFromPrev")).isNull();
+        assertThat(s.get(0).get("conversionFromSubmitted")).isNull();
+        assertThat(s.get(1).get("conversionFromPrev")).isEqualTo(0.833);   // 5/6
+        assertThat(s.get(2).get("conversionFromPrev")).isEqualTo(0.6);     // 3/5
+        assertThat(s.get(3).get("conversionFromPrev")).isEqualTo(0.667);   // 2/3
+        assertThat(s.get(4).get("conversionFromPrev")).isEqualTo(0.5);     // 1/2
+        assertThat(s.get(4).get("conversionFromSubmitted")).isEqualTo(0.167); // 1/6
+    }
+
+    @Test
+    @DisplayName("funnelStages：上一段为 0 时转化率是 null（无数据 ≠ 0%）")
+    void funnelStages_nullWhenPreviousStageEmpty() {
+        when(repository.findByUserIdOrderByUpdatedAtDesc(USER)).thenReturn(List.of(
+                app(1L, USER, JobApplicationEntity.STATUS_PLANNED)));
+
+        List<Map<String, Object>> s = stages(service.board(USER));
+
+        assertThat(s.get(0).get("count")).isEqualTo(0);
+        assertThat(s.get(1).get("conversionFromPrev")).isNull();
+        assertThat(s.get(1).get("conversionFromSubmitted")).isNull();
+    }
+
+    @Test
+    @DisplayName("response：只统计同时有投出时间与首次回音时间的记录，平均值/中位数正确")
+    void response_avgAndMedian() {
+        JobApplicationEntity a1 = app(1L, USER, JobApplicationEntity.STATUS_REPLIED);
+        a1.setAppliedAt(LocalDateTime.now().minusDays(10));
+        a1.setFirstReplyAt(a1.getAppliedAt().plusDays(2));
+        JobApplicationEntity a2 = app(2L, USER, JobApplicationEntity.STATUS_INTERVIEW);
+        a2.setAppliedAt(LocalDateTime.now().minusDays(10));
+        a2.setFirstReplyAt(a2.getAppliedAt().plusDays(4));
+        JobApplicationEntity a3 = app(3L, USER, JobApplicationEntity.STATUS_OFFER);
+        a3.setAppliedAt(LocalDateTime.now().minusDays(10));
+        a3.setFirstReplyAt(a3.getAppliedAt().plusDays(9));
+        // 存量记录：有 last_reply_at 但没有 first_reply_at → 不进样本
+        JobApplicationEntity legacy = app(4L, USER, JobApplicationEntity.STATUS_REPLIED);
+        legacy.setAppliedAt(LocalDateTime.now().minusDays(10));
+        legacy.setLastReplyAt(LocalDateTime.now().minusDays(1));
+        when(repository.findByUserIdOrderByUpdatedAtDesc(USER))
+                .thenReturn(List.of(a1, a2, a3, legacy));
+
+        Map<String, Object> r = response(service.board(USER));
+
+        assertThat(r.get("sampleSize")).isEqualTo(3);
+        assertThat(r.get("avgDays")).isEqualTo(5.0);      // (2+4+9)/3
+        assertThat(r.get("medianDays")).isEqualTo(4.0);
+    }
+
+    @Test
+    @DisplayName("response：样本为 0 时平均/中位数都是 null")
+    void response_emptySample() {
+        when(repository.findByUserIdOrderByUpdatedAtDesc(USER)).thenReturn(List.of(
+                app(1L, USER, JobApplicationEntity.STATUS_APPLIED)));
+
+        Map<String, Object> r = response(service.board(USER));
+
+        assertThat(r.get("sampleSize")).isEqualTo(0);
+        assertThat(r.get("avgDays")).isNull();
+        assertThat(r.get("medianDays")).isNull();
+    }
+
+    @Test
+    @DisplayName("response：当天回音记 0 天（0 是合法值，不能与 null 混同）")
+    void response_sameDayIsZero() {
+        JobApplicationEntity a = app(1L, USER, JobApplicationEntity.STATUS_REPLIED);
+        a.setAppliedAt(LocalDateTime.now().minusDays(3));
+        a.setFirstReplyAt(a.getAppliedAt().plusMinutes(30));
+        when(repository.findByUserIdOrderByUpdatedAtDesc(USER)).thenReturn(List.of(a));
+
+        Map<String, Object> r = response(service.board(USER));
+
+        assertThat(r.get("sampleSize")).isEqualTo(1);
+        assertThat(r.get("avgDays")).isEqualTo(0.0);
+        assertThat(r.get("medianDays")).isEqualTo(0.0);
+    }
+
+    @Test
+    @DisplayName("silent：投出超 7 天无回音进清单，最久的排最前；已回复的不进")
+    void silent_sortedAndFiltered() {
+        JobApplicationEntity old = app(1L, USER, JobApplicationEntity.STATUS_APPLIED);
+        old.setAppliedAt(LocalDateTime.now().minusDays(20));
+        JobApplicationEntity recent = app(2L, USER, JobApplicationEntity.STATUS_VIEWED);
+        recent.setAppliedAt(LocalDateTime.now().minusDays(8));
+        JobApplicationEntity fresh = app(3L, USER, JobApplicationEntity.STATUS_APPLIED);
+        fresh.setAppliedAt(LocalDateTime.now().minusDays(2));
+        JobApplicationEntity replied = app(4L, USER, JobApplicationEntity.STATUS_REPLIED);
+        replied.setAppliedAt(LocalDateTime.now().minusDays(30));
+        when(repository.findByUserIdOrderByUpdatedAtDesc(USER))
+                .thenReturn(List.of(fresh, recent, replied, old));
+
+        Map<String, Object> board = service.board(USER);
+
+        assertThat(board.get("silentCount")).isEqualTo(2);
+        @SuppressWarnings("unchecked")
+        List<JobApplicationEntity> silent = (List<JobApplicationEntity>) board.get("silent");
+        assertThat(silent).extracting(JobApplicationEntity::getId).containsExactly(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("isSilent：用户自己设的到期提醒不算静默（那是「待跟进」而非「石沉大海」）")
+    void isSilent_ignoresDueReminder() {
+        JobApplicationEntity a = app(1L, USER, JobApplicationEntity.STATUS_APPLIED);
+        a.setAppliedAt(LocalDateTime.now().minusDays(1));
+        a.setNextActionAt(LocalDateTime.now().minusDays(1));
+
+        assertThat(service.needsFollowUp(a, LocalDateTime.now())).isTrue();
+        assertThat(service.isSilent(a, LocalDateTime.now())).isFalse();
+    }
+
+    @Test
+    @DisplayName("updateStatus：首次进入「有回音」状态时记录 firstReplyAt，且只写一次")
+    void updateStatus_setsFirstReplyAtOnce() {
+        JobApplicationEntity applied = app(1L, USER, JobApplicationEntity.STATUS_APPLIED);
+        applied.setAppliedAt(LocalDateTime.now().minusDays(3));
+        when(repository.findById(1L)).thenReturn(Optional.of(applied));
+        when(repository.save(any(JobApplicationEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateStatus(USER, 1L, "REPLIED", null, null);
+        LocalDateTime first = applied.getFirstReplyAt();
+        assertThat(first).isNotNull();
+
+        // 再推进到 INTERVIEW：lastReplyAt 刷新，firstReplyAt 不变
+        JobApplicationEntity after = service.updateStatus(USER, 1L, "INTERVIEW", null, null);
+        assertThat(after.getFirstReplyAt()).isEqualTo(first);
+        assertThat(after.getLastReplyAt()).isAfterOrEqualTo(first);
+    }
+
+    @Test
+    @DisplayName("updateStatus：推进到「已查看」不算回音，firstReplyAt 保持为空")
+    void updateStatus_viewedDoesNotSetFirstReply() {
+        JobApplicationEntity applied = app(1L, USER, JobApplicationEntity.STATUS_APPLIED);
+        when(repository.findById(1L)).thenReturn(Optional.of(applied));
+        when(repository.save(any(JobApplicationEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateStatus(USER, 1L, "VIEWED", null, null);
+
+        assertThat(applied.getFirstReplyAt()).isNull();
+    }
+
     // ───────── 渠道效果（竞品清单 #6） ─────────
 
     private JobApplicationEntity appWithChannel(Long id, String status, String platform) {

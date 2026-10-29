@@ -216,6 +216,13 @@ CREATE TABLE IF NOT EXISTS job_application (
 CREATE INDEX IF NOT EXISTS idx_job_application_user ON job_application(user_id);
 CREATE INDEX IF NOT EXISTS idx_job_application_status ON job_application(status);
 
+-- v1.86.0：首次收到对方回音的时间（投递洞察的响应速度口径）。
+-- 为什么不复用 last_reply_at：它在**每次**状态变化时都会被刷新（代表「最近一次」），
+-- 用它算响应时长会得出「越活跃的投递响应越快」这种假结论。
+-- 存量行**不回填**：拿 last_reply_at 当 first_reply_at 等于把「最近」冒充「首次」，
+-- 统计宁可样本少（前端展示样本量），也不能把猜测当事实。
+ALTER TABLE job_application ADD COLUMN IF NOT EXISTS first_reply_at TIMESTAMP;
+
 -- 面试故事库表（v1.36.0：STAR 故事资产 + 六项质检快照）
 -- 洞察来源：「面试不是背答案，是经得起追问」——把真实经历预先整理成讲得清、有证据的 STAR 故事。
 CREATE TABLE IF NOT EXISTS story_bank (

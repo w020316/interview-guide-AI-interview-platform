@@ -334,6 +334,9 @@
         </div>
         <!-- v1.77.1：详情面板空间宽松，给完整三家底图供选择 -->
         <MapOpenLink v-if="detail.location" :keyword="detail.location" class="detail-map" />
+        <!-- 内容体检（v1.86.0）：它是「描述 / 要求」这两段第三方文本的体检报告，
+             因此紧贴在它们上方 —— 用户带着「哪几句要核实」的提示去读原文，比读完了再看更有用 -->
+        <JobPostingScanBlock v-if="detailScan" :report="detailScan" />
         <div v-if="detail.description" class="detail-block">
           <h4>岗位描述</h4>
           <p class="pre-wrap">{{ detail.description }}</p>
@@ -422,9 +425,11 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton, MapOpenLink, SkeletonBlock } from '../components'
+import JobPostingScanBlock from '../components/JobPostingScanBlock.vue'
 import { validateJobKeyword } from '../utils/jobKeyword'
 import { toQueryRecruitType } from '../utils/recruitType'
 import { jobTrust, jobFreshness, classifySource, type JobTrust, type Freshness } from '../utils/jobTrust'
+import { scanJobPosting, type ScanReport } from '../utils/jobPostingScan'
 import { asArray, asObject, asFiniteNumber } from '../utils/safeData'
 import { createLatestGuard } from '../utils/latestRequest'
 
@@ -922,6 +927,17 @@ async function refreshData() {
 function trustOf(job: Pick<JobPosting, 'platform' | 'applyUrl'>): JobTrust {
   return jobTrust(job.platform, job.applyUrl)
 }
+
+/**
+ * 岗位内容体检（v1.86.0）。
+ *
+ * 与 `trustOf` 的分工：`trustOf` 回答「这条岗位从哪来」，
+ * 这里回答「描述 / 要求这两段第三方文本里有没有肉眼看不见、或明显不合常理的表述」。
+ * 同样不产出可信度分 —— 规则全在 utils/jobPostingScan.ts，这里只负责在打开详情时跑一遍。
+ */
+const detailScan = computed<ScanReport | null>(() =>
+  detail.value ? scanJobPosting(detail.value) : null,
+)
 
 /**
  * 岗位有效期。文案唯一来源是 `jobFreshness`——列表卡片与详情抽屉必须走同一条规则，

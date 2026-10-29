@@ -124,6 +124,15 @@ public class JobApplicationEntity {
     @Column(name = "last_reply_at")
     private LocalDateTime lastReplyAt;
 
+    /**
+     * 首次收到对方回音的时间（v1.86.0，**只写一次**）。
+     *
+     * <p>与 {@link #lastReplyAt} 的区别：后者每次状态变化都刷新，只能回答「最近」；
+     * 响应速度（投出 → 首次回音）必须用这一列，否则统计会把「最近一次」当「首次」。
+     */
+    @Column(name = "first_reply_at")
+    private LocalDateTime firstReplyAt;
+
     /** 下次跟进时间（看板「待跟进」提醒依据） */
     @Column(name = "next_action_at")
     private LocalDateTime nextActionAt;

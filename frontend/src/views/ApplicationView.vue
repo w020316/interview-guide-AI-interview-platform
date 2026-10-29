@@ -27,9 +27,16 @@
       </div>
     </section>
 
+    <!-- 漏斗洞察（v1.86.0）：逐段转化率 + 回音时长 + 静默投递数 -->
+    <ApplicationInsightsCard
+      v-if="!loading && total > 0 && insights.stages.length"
+      :insights="insights"
+    />
+
     <!-- 转化漏斗 + 待跟进 -->
-    <section v-if="!loading && total > 0" class="card">
-      <div class="funnel">
+    <section v-if="!loading && total > 0 && (followUpItems.length > 0 || !insights.stages.length)" class="card">
+      <!-- 后端未升级（无 funnelStages）时退回旧的一行漏斗，不留空 -->
+      <div v-if="!insights.stages.length" class="funnel">
         <span class="funnel-item">已投 <b>{{ funnel.submitted || 0 }}</b></span>
         <span class="funnel-arrow">→</span>
         <span class="funnel-item">有回复 <b>{{ funnel.repliedOrBeyond || 0 }}</b></span>
@@ -509,6 +516,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton, BaseTag, MapOpenLink } from '../components'
+import ApplicationInsightsCard from '../components/ApplicationInsightsCard.vue'
+import { normalizeInsights, type ApplicationInsights } from '../utils/applicationInsights'
 import { EMPTY } from '../utils/format'
 import { parseNotice, hasAnyField, type NoticeParse } from '../utils/noticeParse'
 import { isConflictError } from '../utils/httpError'
@@ -589,6 +598,8 @@ const loading = ref(true)
 const items = ref<Application[]>([])
 const counts = ref<Record<string, number>>({})
 const funnel = ref<Record<string, number>>({})
+/** 漏斗洞察（v1.86.0）：形状兜底在 normalizeInsights 里做，模板不写防御 */
+const insights = ref<ApplicationInsights>(normalizeInsights(null))
 const channels = ref<ChannelStat[]>([])
 const followUps = ref<Application[]>([])
 const busyId = ref<number | null>(null)
@@ -646,6 +657,7 @@ async function load() {
     if (!loadGuard.isLatest(ticket)) return
     counts.value = board?.counts || {}
     funnel.value = board?.funnel || {}
+    insights.value = normalizeInsights(board)
     channels.value = asArray<ChannelStat>(board?.byChannel)
     followUps.value = asArray<Application>(board?.followUps)
   } catch (e: unknown) {
