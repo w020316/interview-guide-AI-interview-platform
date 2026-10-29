@@ -317,6 +317,38 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     }
 
     /**
+     * POST JSON 拉取（v1.87.0）。
+     *
+     * <p>美团 / 网易两家大厂招聘官网的公开接口**只接受 POST**（GET 返回 405），
+     * 但其余契约与 {@link #fetchRaw(String)} 完全一致：同一连接池、同一超时、同一 UA、
+     * 空正文与异常一律抛 {@link IllegalStateException}，由调度层登记该源的健康状态。
+     *
+     * <p>刻意不做「POST 失败自动回退 GET」：这两条路径在上游是不同端点，
+     * 回退只会把一次明确的失败变成一次含义不明的尝试。
+     */
+    protected String fetchRawPost(String url, String jsonBody, String referer) {
+        String body;
+        try {
+            var spec = restClient.post()
+                    .uri(url)
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .header("User-Agent", UA)
+                    .header("Accept", "application/json, text/plain, */*");
+            if (referer != null && !referer.isBlank()) {
+                spec = spec.header("Referer", referer);
+            }
+            body = spec.body(jsonBody).retrieve().body(String.class);
+        } catch (Exception e) {
+            log.warn("公开数据源 {} 拉取失败：{} ({})", platform(), url, e.getMessage());
+            throw new IllegalStateException("拉取失败：" + e.getMessage(), e);
+        }
+        if (body == null || body.isBlank()) {
+            throw new IllegalStateException("拉取失败：上游返回空响应体");
+        }
+        return body;
+    }
+
+    /**
      * 按**本源**的配额截断（v1.45.0）。
      *
      * <p>与静态的 {@link #applyQuota(List)} 的区别：这里走 {@link #maxItemsPerRefresh()}，
