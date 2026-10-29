@@ -620,6 +620,55 @@ class JobAgentServiceTest {
         assertThat(meta.get("lastUpdatedAt")).isNotNull();
     }
 
+    @Test
+    @DisplayName("F-10-c: 招聘类型计数排除已截止岗位，且与列表 hideExpired 的 total 相等")
+    @SuppressWarnings("unchecked")
+    void meta_recruitCountsExcludeExpired() {
+        LocalDate today = LocalDate.now();
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("x1").title("在招").companyName("A")
+                .recruitType("AUTUMN").active(true).deadline(today.plusDays(3)).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("x2").title("已截止").companyName("B")
+                .recruitType("AUTUMN").active(true).deadline(today.minusDays(1)).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("内置精选").externalId("x3").title("无截止（长期有效）").companyName("C")
+                .recruitType("AUTUMN").active(true).build());
+
+        JobAgentService service = newH2Service(List.of());
+        Map<String, Long> counts = (Map<String, Long>) service.meta(null).get("recruitCounts");
+
+        // 在招 + 无截止 = 2；已截止的那条不计入（修复前为 3，即「chip 显示 3，点进去只有 2」）
+        assertThat(counts).containsEntry("AUTUMN", 2L);
+
+        // 同一口径校验：列表在 hideExpired=true 下的 total 必须与 chip 数字相等
+        Page<JobPostingEntity> page = service.search(null, null, null, null, "AUTUMN", null,
+                null, null, null, true, 0, 50);
+        assertThat(page.getTotalElements()).isEqualTo(counts.get("AUTUMN"));
+    }
+
+    @Test
+    @DisplayName("F-10-c: 海外分栏角标（overseasCount）同样排除已截止岗位")
+    void meta_overseasCountExcludesExpired() {
+        LocalDate today = LocalDate.now();
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("RemoteOK 全球远程").externalId("o1").title("海外在招").companyName("A")
+                .recruitType("SOCIAL").active(true).deadline(today.plusDays(5)).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("RemoteOK 全球远程").externalId("o2").title("海外已截止").companyName("B")
+                .recruitType("SOCIAL").active(true).deadline(today.minusDays(2)).build());
+        jpaRepository.saveAndFlush(JobPostingEntity.builder()
+                .platform("RemoteOK 全球远程").externalId("o3").title("海外无截止").companyName("C")
+                .recruitType("SOCIAL").active(true).build());
+
+        JobAgentService service = new JobAgentService(jpaRepository, List.of(
+                new FakeAdapter("内置精选", List.of()),
+                FakeAdapter.overseas("RemoteOK 全球远程", List.of())),
+                httpAdapter, classifyService, healthRegistry, jpaTxManager);
+
+        assertThat(service.meta(true).get("overseasCount")).isEqualTo(2L);
+    }
+
     // ─────────────────── 海外分栏与数据源健康（v1.38.0） ───────────────────
 
     @Test

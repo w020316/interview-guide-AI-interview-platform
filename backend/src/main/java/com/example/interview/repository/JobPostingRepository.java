@@ -55,32 +55,52 @@ public interface JobPostingRepository extends JpaRepository<JobPostingEntity, Lo
     @Query("SELECT DISTINCT j.experience FROM JobPostingEntity j WHERE j.active = true AND j.experience IS NOT NULL ORDER BY j.experience")
     List<String> findDistinctExperiences();
 
-    /** 各招聘类型数量统计（秋招/社招/实习 Tab 角标） */
+    /**
+     * 各招聘类型数量统计（管理后台总览）。
+     *
+     * <p>此处**刻意不加截止日期过滤**：管理端同屏还展示 {@code countByActiveTrue()}，
+     * 两张数字必须能对上。用户侧的角标请用带 {@code Unexpired} 的变体。
+     */
     @Query("SELECT j.recruitType, COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.recruitType IS NOT NULL GROUP BY j.recruitType")
     List<Object[]> countByRecruitType();
 
     /**
-     * 各招聘类型数量统计（**仅限指定来源**，P2-08）。
-     * 用于「海外远程」分栏：计数须与该分栏的实际结果一致。
+     * 各招聘类型数量统计（秋招/社招/实习 Tab 角标）——**仅计未截止**。
+     *
+     * <p><b>为什么带 {@code today}</b>：角标数字必须与列表在 {@code hideExpired=true}
+     * （前端默认）下能翻到的条数一致。此前只过滤 {@code active}，已截止但尚未被
+     * 60 天规则下架的岗位仍计入，导致「chip 显示 N，点进去只有 M &lt; N」。
+     * 口径统一为：有效 = {@code active 且未截止}。
      */
-    @Query("SELECT j.recruitType, COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.recruitType IS NOT NULL AND j.platform IN :platforms GROUP BY j.recruitType")
-    List<Object[]> countByRecruitTypeInPlatforms(@Param("platforms") Collection<String> platforms);
+    @Query("SELECT j.recruitType, COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.recruitType IS NOT NULL AND (j.deadline IS NULL OR j.deadline >= :today) GROUP BY j.recruitType")
+    List<Object[]> countUnexpiredByRecruitType(@Param("today") LocalDate today);
+
+    /**
+     * 各招聘类型数量统计（**仅限指定来源**，P2-08）。
+     * 用于「海外远程」分栏：计数须与该分栏的实际结果一致（含「未截止」口径）。
+     */
+    @Query("SELECT j.recruitType, COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.recruitType IS NOT NULL AND (j.deadline IS NULL OR j.deadline >= :today) AND j.platform IN :platforms GROUP BY j.recruitType")
+    List<Object[]> countUnexpiredByRecruitTypeInPlatforms(@Param("today") LocalDate today,
+                                                          @Param("platforms") Collection<String> platforms);
 
     /**
      * 各招聘类型数量统计（**排除指定来源**，P2-08）。
      * 用于「全部国内」等国内分栏。调用方须保证 platforms 非空（JPQL 的 NOT IN 空集合无效）。
      */
-    @Query("SELECT j.recruitType, COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.recruitType IS NOT NULL AND j.platform NOT IN :platforms GROUP BY j.recruitType")
-    List<Object[]> countByRecruitTypeNotInPlatforms(@Param("platforms") Collection<String> platforms);
+    @Query("SELECT j.recruitType, COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.recruitType IS NOT NULL AND (j.deadline IS NULL OR j.deadline >= :today) AND j.platform NOT IN :platforms GROUP BY j.recruitType")
+    List<Object[]> countUnexpiredByRecruitTypeNotInPlatforms(@Param("today") LocalDate today,
+                                                             @Param("platforms") Collection<String> platforms);
 
     /**
-     * 指定来源集合的有效岗位数（v1.38.0，「海外远程」分栏 Tab 角标）。
+     * 指定来源集合的未截止有效岗位数（v1.38.0，「海外远程」分栏 Tab 角标）。
      *
      * <p>来源清单由适配器声明，因此这里用 IN 查询而不是给 platform 打布尔列——
      * 新增海外源只需适配器覆写 {{@link com.example.interview.service.job.JobPlatformAdapter#overseas()}}。
+     * 「未截止」口径与列表 {@code hideExpired} 一致，否则角标同样会虚高。
      */
-    @Query("SELECT COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND j.platform IN :platforms")
-    long countActiveByPlatformIn(@Param("platforms") Collection<String> platforms);
+    @Query("SELECT COUNT(j) FROM JobPostingEntity j WHERE j.active = true AND (j.deadline IS NULL OR j.deadline >= :today) AND j.platform IN :platforms")
+    long countUnexpiredByPlatformIn(@Param("today") LocalDate today,
+                                    @Param("platforms") Collection<String> platforms);
 
     /** 最新一次数据更新时间 */
     @Query("SELECT MAX(j.updatedAt) FROM JobPostingEntity j")

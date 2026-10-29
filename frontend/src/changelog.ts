@@ -85,9 +85,21 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.82.0'
+export const CURRENT_VERSION = '1.83.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.83.0',
+    date: '2026-10-29',
+    title: '版本 1.83.0 · 岗位截止日期不再凭空出现，角标数字与列表对得上',
+    items: [
+      { text: '招聘广场：平台精选岗位不再显示一个我们编造的截止日期，改为「以企业官网为准」——具体时间请以企业官网发布的信息为准', level: 'user' },
+      { text: '招聘广场：招聘类型角标（秋招/社招/实习…）的数字现在与点进去能看到的条数一致，不再把已截止的岗位算进去', level: 'user' },
+      { text: '后端：327 条内置岗位数据移除硬编码 deadline（247 条原为编造值），refresh 后存量行同步清空；种子文件 LocalDate.of 归零', level: 'tech' },
+      { text: '后端：countByRecruitType* 与 overseasCount 增加「未截止」口径（active 且 deadline 为空或 ≥ 今天），与列表 hideExpired 严格一致；meta 缓存改为最晚次日 00:00 失效，避免跨天残留旧计数', level: 'tech' },
+      { text: '前端：删除 JobsView 中重复的 deadlineText/deadlineClass 实现，列表卡片与详情抽屉统一走 jobFreshness（新增 kind 参数）', level: 'tech' },
+    ],
+  },
   {
     version: '1.82.0',
     date: '2026-10-20',

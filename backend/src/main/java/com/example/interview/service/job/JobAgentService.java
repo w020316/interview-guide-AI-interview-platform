@@ -471,8 +471,17 @@ public class JobAgentService {
             return cached.data();
         }
         Map<String, Object> fresh = computeMeta(overseas);
-        metaCache.put(cacheKey, new CachedMeta(fresh, now + META_CACHE_TTL_MS));
+        // 计数依赖「今天」（已截止岗位被排除），因此缓存最晚只能活到次日 00:00——
+        // 固定 TTL 会在跨天后继续返回昨天的口径，chips 数字与列表对不上。
+        metaCache.put(cacheKey, new CachedMeta(fresh, Math.min(now + META_CACHE_TTL_MS, startOfNextDayMillis())));
         return fresh;
+    }
+
+    /** 次日 00:00 的毫秒时间戳（按 JVM 默认时区，与 {@code LocalDate.now()} 同源） */
+    private static long startOfNextDayMillis() {
+        return LocalDate.now().plusDays(1)
+                .atStartOfDay(java.time.ZoneId.systemDefault())
+                .toInstant().toEpochMilli();
     }
 
     /** 缓存条目：结果 + 过期时间戳（毫秒） */
@@ -492,16 +501,17 @@ public class JobAgentService {
         meta.put("degrees", repository.findDistinctDegrees());
         meta.put("experiences", repository.findDistinctExperiences());
 
-        // 各招聘类型计数：与当前分栏口径保持一致（P2-08）
+        // 各招聘类型计数：与当前分栏口径保持一致（P2-08），且与列表 hideExpired 口径一致（F-10-c）
         List<String> overseasSources = overseasPlatforms();
+        LocalDate today = LocalDate.now();
         List<Object[]> rows;
         if (overseas == null || overseasSources.isEmpty()) {
             // 不分栏，或系统未声明任何海外源（此时分栏过滤无意义）→ 维持全局口径
-            rows = repository.countByRecruitType();
+            rows = repository.countUnexpiredByRecruitType(today);
         } else if (overseas) {
-            rows = repository.countByRecruitTypeInPlatforms(overseasSources);
+            rows = repository.countUnexpiredByRecruitTypeInPlatforms(today, overseasSources);
         } else {
-            rows = repository.countByRecruitTypeNotInPlatforms(overseasSources);
+            rows = repository.countUnexpiredByRecruitTypeNotInPlatforms(today, overseasSources);
         }
         Map<String, Long> recruitCounts = new LinkedHashMap<>();
         for (Object[] row : rows) {
@@ -512,7 +522,7 @@ public class JobAgentService {
         // v1.38.0：海外/远程分栏元数据——前端据此渲染「海外远程」Tab 与角标，
         // 也用于在来源 chips 上区分海外源
         meta.put("overseasSources", overseasSources);
-        meta.put("overseasCount", overseasSources.isEmpty() ? 0L : repository.countActiveByPlatformIn(overseasSources));
+        meta.put("overseasCount", overseasSources.isEmpty() ? 0L : repository.countUnexpiredByPlatformIn(today, overseasSources));
 
         LocalDateTime last = repository.findLastUpdatedAt();
         meta.put("lastUpdatedAt", last == null ? null : last.toString());
