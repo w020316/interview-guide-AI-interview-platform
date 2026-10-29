@@ -58,10 +58,14 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
      * 必须用同一个上限，否则不同源的描述长度会不一致。
      *
      * <p><b>v1.64.0 由 1200 提到 6000</b>：线上抽样发现外部源 JD 的入库长度**中位数正好是 1200**
-     * （Arbeitnow / RemoteOK / Himalayas / Jobicy 四源一致，Jobicy 更是每条都恰好 1200）
-     * —— 说明不是数据碰巧，而是全被这个常量截断了。真实 JD 常见 2000~5000 字，
+     * （当时取样自 Arbeitnow / RemoteOK / Himalayas / Jobicy 四源，结论一致，Jobicy 更是
+     * 每条都恰好 1200）—— 说明不是数据碰巧，而是全被这个常量截断了。真实 JD 常见 2000~5000 字，
      * 而「任职要求」通常写在「岗位职责」之后，截断会把**后半段整段丢掉**，
      * 而「JD 拆解 / 差距诊断」正是要拿要求去比对简历。
+     *
+     * <p>注：上述四源中的 Arbeitnow / Himalayas / Jobicy 已于 v1.89.0 下线，
+     * 但「1200 是入库截断值、不是上游真实长度」这个取证结论对**当前仍在用的源同样成立**，
+     * 故保留原记录（口径未变，不要因为源下线就把这段删掉）。
      *
      * <p>列类型是 {@code TEXT}（PostgreSQL 上限 1GB），**1200 从来不是数据库约束**。
      */
@@ -108,7 +112,9 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     protected AbstractOpenApiJobProvider(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         // ⚠️ 刻意**不**在这里改 setInstanceFollowRedirects。曾一度为「让 ETag 与 URL 精确对应」
-        // 把它关掉，但这条 HTTP 管道同时服务 5 个海外源 + WWR + HN——而这些源的测试
+        // 把它关掉，但这条 HTTP 管道同时服务全部走公开 API 的源（海外：RemoteOK / Remotive /
+        // WeWorkRemotely / HN Who is hiring / 科技公司官方板；国内：V2EX 酷工作、腾讯招聘、
+        // 亚马逊中国、电鸭、美团、网易等）——而这些源的测试
         // **不打真实网络**，回归全绿并不能证明它们不依赖重定向。为了一个次要的对应关系
         // 去动所有源共用的连接行为，风险收益不成比例。条件请求不需要它。
         var factory = new SimpleClientHttpRequestFactory();
@@ -120,8 +126,10 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     /**
      * 公开 API 数据源统一归类为「海外 / 远程」。
      *
-     * <p>这三家接口的岗位以欧美远程为主，与国内校招/社招场景差异明显，
-     * 因此在招聘广场独立成栏，不混进国内列表。
+     * <p>走本基类的海外源（RemoteOK / Remotive / WeWorkRemotely / HN Who is hiring /
+     * 科技公司官方板）岗位以欧美远程为主，与国内校招/社招场景差异明显，
+     * 因此在招聘广场独立成栏，不混进国内列表。国内源（V2EX、腾讯招聘等）继承本基类
+     * 但覆写了 {@link #overseas()} 返回 false。
      */
     @Override
     public boolean overseas() {
@@ -135,28 +143,40 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
     }
 
     /**
-     * 单个海外源每轮最多入库的岗位数（v1.39.0 引入，v1.80.0 由 25 收紧到 15）。
+     * 单个海外源每轮最多入库的岗位数（v1.39.0 引入 25；v1.80.0 收紧到 15；v1.89.0 收紧到 10）。
      *
-     * <p><b>为什么需要上限</b>：这些公开 API 单次返回 50~100+ 条，五个源合计
-     * 一轮可灌入 400 余条英文海外岗位，而国内活源几乎没有产出。
+     * <p><b>为什么需要上限</b>：这些公开 API 单次返回 50~100+ 条，配额放开时
+     * 一轮可灌入数百条英文海外岗位，而国内活源几乎不产出。
      * 结果是招聘广场被海外远程岗位淹没，与「国内校招 / 社招」的产品定位相反。
      *
      * <p><b>为什么从 25 收紧到 15（v1.80.0）</b>：用户反馈「国外岗位太多」。
      * 线上实测国内 9252 : 海外 8875，几乎 1:1。根因是国内缺活源，已通过新增
      * {@link TencentCareersJobProvider}（每轮 200 条）解决；同时把海外配额收紧 40%，
-     * 让比例回到国内占多数。5 × 15 = 75 条/轮，仍足以让「海外远程」分栏不显得像坏了。
+     * 让比例回到国内占多数。
+     *
+     * <p><b>为什么再从 15 收紧到 10（v1.89.0，2026-10-29）</b>：同时下线了
+     * Arbeitnow / Jobicy / Himalayas 三个源（配额收紧后它们是单位收益最低的三个：
+     * 岗位高度重叠、以欧美远程为主、与国内校招/社招场景相关度最低）。
+     * 因此海外源由 8 个降到 5 个（RemoteOK / Remotive / WeWorkRemotely /
+     * HN Who is hiring / 科技公司官方板），单轮海外入库量
+     * 由 <b>8 × 15 = 120 条</b> 降到 <b>5 × 10 = 50 条</b>，下降约 58%。
+     * 这里不能只看「15 → 10 降了 33%」：源少了 3 个，实际收缩幅度更大，
+     * 这也是 50 条仍能让「海外远程」分栏不显得像坏了的原因。
      *
      * <p><b>为什么不是更低</b>：低于 10 会让该分栏只剩零星几条，
      * 用户会以为功能失效；高于 20 则失去配额的意义。
+     *
+     * <p>⚠️ 国内源全部覆写了 {@link #maxItemsPerRefresh()}，因此改动本值
+     * <b>只影响海外源</b>，不会悄悄削减国内岗位量。
      */
-    protected static final int MAX_ITEMS_PER_REFRESH = 15;
+    protected static final int MAX_ITEMS_PER_REFRESH = 10;
 
     /**
      * 本源的每轮入库配额（v1.45.0 起可覆写）。
      *
-     * <p>默认沿用 {@link #MAX_ITEMS_PER_REFRESH}（海外源的取值 25）。
-     * 国内中文活源（如 V2EX 酷工作）单轮返回条数少、但**国内岗位总量本来就稀缺**，
-     * 给它 25 的配额没有意义；这类源应当覆写成本方法返回更大的值。
+     * <p>默认沿用 {@link #MAX_ITEMS_PER_REFRESH}（海外源的取值，v1.89.0 起为 10）。
+     * 国内中文活源（如 V2EX 酷工作、腾讯招聘）单轮返回条数少、但**国内岗位总量本来就稀缺**，
+     * 给它个小配额没有意义；这类源应当覆写成本方法返回更大的值。
      */
     protected int maxItemsPerRefresh() {
         return MAX_ITEMS_PER_REFRESH;
@@ -443,7 +463,8 @@ public abstract class AbstractOpenApiJobProvider implements JobPlatformAdapter {
      * <p>它曾用「发帖日 + N 天」**推算** deadline，而上游从未提供截止信息 ——
      * 那个 N 天是我们编的。后果是常青岗被 {@code deactivateExpired} 每轮误下架，
      * 哪怕上游仍在正常招聘。**各源现在一律传 {@code null}（除非上游确实给了，
-     * 如 Himalayas 的 {@code expiryDate}），语义上「没有就说没有」。**
+     * 如 Himalayas 的 {@code expiryDate}——该源已于 v1.89.0 下线，此处仅作历史取证记录；
+     * 当前仍在用的源都拿不到截止信息，一律传 {@code null}）。**语义上「没有就说没有」。
      *
      * <p>{@code deadline == null} 是合法状态，见 MEMORY.md §9.2：
      * 前端显示「长期有效」、SQL 比较自动跳过、陈旧清理交给 {@code updatedAt}。

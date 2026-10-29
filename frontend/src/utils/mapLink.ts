@@ -65,7 +65,7 @@ const NON_PLACE_MARKERS = [
   '另招',
   'remote', 'online', 'worldwide', 'anywhere', 'virtual', 'zoom',
   // 区域/国家级泛化写法（不是一个可导航的地点）。
-  // `欧洲` 有确凿来源：ArbeitnowJobProvider 非远程分支会返回中文「欧洲」。
+  // 保留 `欧洲`：历史数据里可能仍有该地点值（已下线的 Arbeitnow 源曾返回它）。
   'europe', 'apac', 'emea', 'global', 'usa', 'united states', '欧洲',
 ]
 

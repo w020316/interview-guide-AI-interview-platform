@@ -85,9 +85,23 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.88.0'
+export const CURRENT_VERSION = '1.89.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.89.0',
+    date: '2026-10-29',
+    title: '版本 1.89.0 · 招聘广场精简海外岗位',
+    items: [
+      { text: '招聘广场精简了海外岗位：去掉三个内容重复度高的海外来源，保留主流的几个远程技术岗来源', level: 'user' },
+      { text: '每次从海外来源收录的数量也调低了，海外分栏不会一次性被灌满', level: 'user' },
+      { text: '国内岗位不受影响——国内分栏的展示、数量和筛选都与之前一致', level: 'user' },
+      { text: '此前已从这三个来源收录的岗位不会再出现在国内分栏里', level: 'user' },
+      { text: '后端：删除 ArbeitnowJobProvider（欧洲本地岗，对国内求职者基本无用）、JobicyJobProvider、HimalayasJobProvider 三个海外源；海外公开 API 的单轮入库配额由 15 降到 10', level: 'tech' },
+      { text: '后端：已入库的历史岗位在服务启动时自动置为无效（只下架、不物理删除，数据与申请链接都保留，需要时可回滚恢复；运维脚本见 scripts/sql/2026-10-29-retire-overseas-job-sources.sql）。为什么必须这么做：适配器删掉后这三个平台名不再属于后端声明的海外源清单，而国内分栏的判据是「平台名不在海外清单里」——不处理的话，它们会以「国内岗位」的身份继续出现在国内分栏里，比不显示错得更离谱，且要等 60 天陈旧下架才会自然消失。清理是幂等的，可用 app.job-agent.retired-cleanup-enabled=false 关闭（恢复某个源时这是第一步，否则改回 active 的行会在下次重启时被再次下架）', level: 'tech' },
+      { text: '后端：科技公司官方板改为跨公司轮转取数——此前按板顺序拼接，单板最多 12 条而单源配额只有 10，配额收紧后第一家公司就能吃满，另外 7 家永远进不了库。现在每轮先每家公司各取 1 条再取第 2 条，8 家公司在 10 条配额内全部有代表，板内顺序保持不变', level: 'tech' },
+    ],
+  },
   {
     version: '1.88.0',
     date: '2026-10-29',

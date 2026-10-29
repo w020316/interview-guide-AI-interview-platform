@@ -2,7 +2,7 @@
  * 岗位数据可信度标注（竞品清单 #22）
  *
  * ── 为什么是「标注」而不是「评分」 ────────────────────────────────
- * 招聘广场聚合了十几个数据源：官方公开 API（RemoteOK / Himalayas / Jobicy …）、
+ * 招聘广场聚合了十几个数据源：官方公开 API（RemoteOK / Remotive …）、
  * 官方 RSS（WeWorkRemotely）、社区活源（V2EX 酷工作 / HN Who is hiring）、
  * 以及本项目维护的内置精选。它们的**可核验程度天差地别**——
  * 官方 API 每条都有直达申请链接，而 HN 的评论帖经常只有一段描述、没有申请入口。
@@ -101,9 +101,12 @@ const KIND_KEYWORDS: ReadonlyArray<readonly [JobSourceKind, readonly string[]]> 
   [
     'official-api',
     [
-      'RemoteOK', 'Remotive', 'Arbeitnow', 'Jobicy', 'Himalayas',
+      'RemoteOK', 'Remotive',
       '腾讯招聘', '亚马逊中国', '美团招聘', '网易招聘',
       '英伟达招聘', '思科招聘',
+      // v1.89.0 补：Ashby / Greenhouse 是**雇主自己发布**的公开接口（一手岗位、
+      // 带直达申请链接），此前漏登记，导致整源每轮 10 条岗位被标成「其他来源」
+      '科技公司官方板',
     ],
   ],
   // 官方 RSS

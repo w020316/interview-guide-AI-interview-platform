@@ -44,8 +44,11 @@ import java.util.List;
  * </ol>
  *
  * <p><b>真正可用的中文岗位来源是本地聚合库</b>（{@code JobAgentService}）——
- * 它由 13 个真实可用的数据源刷新：海外 5 源（RemoteOK/Remotive/Arbeitnow/Himalayas/Jobicy）
- * + V2EX 酷工作 + Ashby / Greenhouse 官方招聘板。**联网抓国内站不可行时不假装可行。**
+ * 它由一批真实可用的数据源刷新：海外侧为 RemoteOK / Remotive / WeWorkRemotely /
+ * HN Who is hiring / 科技公司官方板（Ashby、Greenhouse），国内侧为 V2EX 酷工作、
+ * 腾讯招聘、亚马逊中国、电鸭、美团、网易等官方源。**联网抓国内站不可行时不假装可行。**
+ * （这里刻意不写「N 个源」：数字随适配器增减而漂移，写死必然过期——
+ *   权威清单永远是 {@code JobPlatformAdapter} 的实现类本身。）
  *
  * <p>原有设计约束（仍适用）：
  * <ol>

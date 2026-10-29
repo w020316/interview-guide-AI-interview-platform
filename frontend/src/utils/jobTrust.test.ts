@@ -12,12 +12,12 @@ import {
 
 describe('classifySource —— 来源类型归类', () => {
   it('官方公开 API 的源全部归为 official-api', () => {
+    // v1.89.0：Arbeitnow（欧洲）/ Jobicy / Himalayas 三个海外源已下线，只留两个主力远程源
     const apis = [
       'RemoteOK 全球远程',
       'Remotive 全球远程',
-      'Arbeitnow 欧洲',
-      'Jobicy 全球远程',
-      'Himalayas 全球远程',
+      // v1.89.0 补登记：Ashby / Greenhouse 雇主自行发布的公开接口，此前漏了归类
+      '科技公司官方板',
     ]
     for (const name of apis) {
       expect(classifySource(name), name).toBe('official-api')
@@ -257,7 +257,7 @@ describe('sourceMixLabel —— 列表级来源汇总', () => {
   })
 
   it('相同类型去重后只出现一次', () => {
-    const label = sourceMixLabel(['RemoteOK', 'Remotive', 'Jobicy'])
+    const label = sourceMixLabel(['RemoteOK', 'Remotive', '腾讯招聘'])
     expect(label).toBe('本页来源：官方接口')
   })
 

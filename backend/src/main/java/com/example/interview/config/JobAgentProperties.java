@@ -32,11 +32,29 @@ public class JobAgentProperties {
     /**
      * 是否启用免费公开招聘数据 API（v1.37.0）。
      *
-     * <p>接入 RemoteOK / Remotive / Arbeitnow 等公开 JSON 接口以扩充岗位量。
-     * 这些源以海外与远程岗位为主，若发现与国内校招/社招场景不匹配，
-     * 可通过 {@code app.job-agent.open-api-enabled=false} 一键关闭，无需改代码与发版。
+     * <p>接入 RemoteOK / Remotive / WeWorkRemotely / HN Who is hiring / 科技公司官方板等
+     * 公开 JSON 接口以扩充岗位量。这些源以海外与远程岗位为主，若发现与国内校招/社招场景
+     * 不匹配，可通过 {@code app.job-agent.open-api-enabled=false} 一键关闭，
+     * 无需改代码与发版。
      */
     private boolean openApiEnabled = true;
+
+    /**
+     * 启动时是否下架「已退休数据源」的存量岗位（v1.89.0）。
+     *
+     * <p>v1.89.0 下线了 Arbeitnow / Jobicy / Himalayas 三个海外源。它们的适配器删掉后，
+     * 库里的历史岗位仍 {@code active=true}，会被国内分栏当成国内岗位显示
+     * （海外源清单由适配器推导，名字消失即不再被 {@code NOT IN} 排除）。
+     * 因此启动时统一置 {@code active=false}（**不物理删除**）。
+     *
+     * <p><b>这个开关存在的唯一理由：让「恢复」可行。</b>
+     * 若将来要恢复某个源，正确顺序是
+     * ① 先用 {@code JOB_RETIRED_CLEANUP_ENABLED=false} 关掉本清理，
+     * ② 再在库里把对应行的 {@code active} 改回 true，
+     * ③ 最后补回适配器并恢复开关。
+     * 若只做 ② 而不做 ①，下次重启会立刻把它重新下架——开关就是为此而存在。
+     */
+    private boolean retiredCleanupEnabled = true;
 
     public boolean isOpenApiEnabled() {
         return openApiEnabled;
@@ -44,6 +62,14 @@ public class JobAgentProperties {
 
     public void setOpenApiEnabled(boolean openApiEnabled) {
         this.openApiEnabled = openApiEnabled;
+    }
+
+    public boolean isRetiredCleanupEnabled() {
+        return retiredCleanupEnabled;
+    }
+
+    public void setRetiredCleanupEnabled(boolean retiredCleanupEnabled) {
+        this.retiredCleanupEnabled = retiredCleanupEnabled;
     }
 
     public Map<String, PlatformConfig> getPlatforms() {

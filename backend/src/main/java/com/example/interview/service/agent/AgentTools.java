@@ -268,9 +268,12 @@ public class AgentTools {
                              String recruitType, Boolean overseas) {
         try {
             String type = normalizeRecruitType(recruitType);
-            // v1.38.0：默认只检索国内岗位。海外/远程源（RemoteOK、Remotive、Jobicy、
-            // Himalayas、Arbeitnow）的岗位是英文的，用户问「社招岗位」时混进来会明显降低
-            // 回答可用性；只有用户明确想看海外/远程机会时才由模型传 overseas=true。
+            // v1.38.0：默认只检索国内岗位。海外/远程源（RemoteOK、Remotive、
+            // WeWorkRemotely、HN Who is hiring、科技公司官方板）的岗位是英文的，
+            // 用户问「社招岗位」时混进来会明显降低回答可用性；
+            // 只有用户明确想看海外/远程机会时才由模型传 overseas=true。
+            // （v1.89.0 下线了 Arbeitnow / Jobicy / Himalayas，清单以适配器声明为准，
+            //   此处枚举仅作说明，勿把它当权威清单。）
             boolean onlyOverseas = Boolean.TRUE.equals(overseas);
             var page = jobAgentService.search(
                     blankToNull(keyword), blankToNull(industry), blankToNull(jobType), blankToNull(location),

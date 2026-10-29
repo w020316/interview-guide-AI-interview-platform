@@ -605,8 +605,11 @@ public class JobAgentService {
      * 否则「技能只出现在被漏掉的那个字段」的岗位会被预筛**静默丢弃**，结果集不再等价。
      * `concat` 拼接的是 title / tags / description / requirements / **jobType** 五个字段，
      * 此前这里只覆盖了前四个，**漏了 `jobType`** —— 而 `jobType` 是真实填充的字段
-     * （`HttpJobPlatformAdapter` 读 `jobType/category/positionType`；Arbeitnow/Himalayas/HN
-     * 各自 `jobTypeOf()`；`JobClassifyService` 还会用 AI 生成），完全可能承载「Java 开发」这类技能词。
+     * （`HttpJobPlatformAdapter` 读 `jobType/category/positionType`；RemoteOK / Remotive /
+     * WeWorkRemotely / HN Who is hiring / 科技公司官方板 / V2EX / 电鸭 / 美团 / Workday 系
+     * 各自有 `jobTypeOf()`；`JobClassifyService` 还会用 AI 生成），完全可能承载
+     * 「Java 开发」这类技能词。（原文举的 Arbeitnow / Himalayas 两例已于 v1.89.0 随适配器删除，
+     * 但**结论不变**：jobType 必须参与预筛。）
      *
      * <p>匹配口径与 {@code JobMatchService.SKILL_MATCHERS} 对齐（大小写不敏感子串）：DB 侧只要
      * **足够宽松**即可（宁多勿漏），精确的词边界判定仍由内存匹配负责，不会改变最终得分。

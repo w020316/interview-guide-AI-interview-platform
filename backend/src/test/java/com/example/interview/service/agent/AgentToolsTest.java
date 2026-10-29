@@ -443,9 +443,11 @@ class AgentToolsTest {
     /**
      * v1.38.0：检索默认只查国内岗位。
      *
-     * <p>海外源（RemoteOK/Remotive/Jobicy/Himalayas/Arbeitnow）的岗位是英文的，
-     * 用户问「社招岗位」时混进来会明显降低回答可用性；只有用户明确要海外/远程机会
-     * 才传 overseas=true。这条断言防止「默认值被改成不限」导致英文岗位回流。
+     * <p>海外源（RemoteOK / Remotive / WeWorkRemotely / HN Who is hiring / 科技公司官方板）
+     * 的岗位是英文的，用户问「社招岗位」时混进来会明显降低回答可用性；只有用户明确要
+     * 海外/远程机会才传 overseas=true。这条断言防止「默认值被改成不限」导致英文岗位回流。
+     * （v1.89.0 下线的 Arbeitnow / Jobicy / Himalayas 已从清单移除；清单权威来源是
+     *   {@code JobPlatformAdapter#overseas()}，此处枚举仅为说明。）
      */
     @Test
     @DisplayName("searchJobs：overseas=true 才查海外；缺省/false/旧签名重载都只查国内")

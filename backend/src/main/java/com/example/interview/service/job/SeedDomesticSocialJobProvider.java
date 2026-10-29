@@ -7,13 +7,15 @@ import java.util.List;
 /**
  * 社会招聘精选数据源（v1.39.0）
  *
- * <p><b>引入背景</b>：接入免费公开 API（RemoteOK / Remotive / Arbeitnow / Himalayas / Jobicy）
+ * <p><b>引入背景</b>：接入免费公开 API（当时是 RemoteOK / Remotive / Arbeitnow /
+ * Himalayas / Jobicy 等海外源；其中 Arbeitnow / Himalayas / Jobicy 已于 v1.89.0 下线）
  * 后，海外远程岗位单轮可入库数百条，而国内种子数据合计仅约 130 条且以「校招 / 秋招」为主，
  * 招聘广场的实际观感变成「一屏英文海外岗位」，与「国内校招 / 社招」的产品定位相反。
  *
  * <p>本次从两侧同时收紧：
  * <ul>
- *   <li>供给侧 —— {@link AbstractOpenApiJobProvider} 增加单源单轮入库配额（25 条）；</li>
+ *   <li>供给侧 —— {@link AbstractOpenApiJobProvider} 增加单源单轮入库配额
+ *       （当时 25 条；v1.80.0 收紧到 15，v1.89.0 收紧到 10，并下线了 3 个收益最低的源）；</li>
  *   <li>需求侧 —— 新增本数据源，把国内**社招**基数补上来，让国内岗位在数量上占多数。</li>
  * </ul>
  *

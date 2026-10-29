@@ -77,7 +77,7 @@ describe('isMappableLocation', () => {
       '西部各省区基层', '各省乡镇基层',
       // 全角括号括注的多地点（不含分隔符，需单独一条词）
       '深圳（另招济南）',
-      // 区域/国家级泛化（`欧洲` 有确凿来源：ArbeitnowJobProvider 非远程分支返回该值）
+      // 区域/国家级泛化（历史数据里仍可能有这些值）
       '欧洲', 'USA Only', 'EMEA', 'Global',
     ]) {
       expect(isMappableLocation(t), `泛化地点不应上图: ${t}`).toBe(false)

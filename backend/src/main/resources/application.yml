@@ -268,7 +268,7 @@ app:
     #    导致「与前端同步」这个约定在公开接口上一直没生效（两个端点报两个版本号）。
     #    现已改为读本配置；改版本时除了这里与 changelog.ts，无需再动代码。
     name: ${APP_INFO_NAME:interview-guide}
-    version: ${APP_INFO_VERSION:1.88.0}
+    version: ${APP_INFO_VERSION:1.89.0}
     description: ${APP_INFO_DESCRIPTION:AI 智能面试辅助平台后端}
     # 构建日期，CI 注入；未配置时 fallback 为当天
     build-date: ${APP_INFO_BUILD_DATE:}
@@ -296,6 +296,16 @@ app:
     channels: []
     # 定时刷新：每 1 小时拉取一次各平台岗位（v1.27.0 由 6h 收紧，满足“每小时实时更新”）
     refresh-fixed-delay-ms: ${JOB_REFRESH_DELAY:3600000}
+    # ── 已退休数据源的存量下架（v1.89.0，2026-10-29）─────────────────────────
+    # v1.89.0 下线了 Arbeitnow / Jobicy / Himalayas 三个海外源（配额收紧后
+    # 它们性价比最低）。适配器删掉后，库里这三个 platform 的历史岗位仍 active=true，
+    # 而「海外源清单」是由适配器声明推导的——名字一消失，它们就不再被国内分栏的
+    # NOT IN 判据排除，反而会**当成国内岗位显示出来**。
+    #
+    # 处理方式：启动时幂等下架（active=false，**不物理删除**），见 RetiredJobSourceCleaner。
+    # 关掉本开关（JOB_RETIRED_CLEANUP_ENABLED=false）是「恢复已退休源」流程的第一步，
+    # 否则改回 active=true 的行会在下次重启时被再次下架。
+    retired-cleanup-enabled: ${JOB_RETIRED_CLEANUP_ENABLED:true}
     # ── 实时源的翻页轮转（P1-6，2026-10-21；v1.88.0 扩到七家）────────────────
     # 此前 pageIndex / offset 是写死或缺省的：腾讯永远只抓第 1 页（200/2287 ≈ 8.7%），
     # 亚马逊永远只取前 50 条（50/236 ≈ 21%），其余岗位从上线起就没进过库。

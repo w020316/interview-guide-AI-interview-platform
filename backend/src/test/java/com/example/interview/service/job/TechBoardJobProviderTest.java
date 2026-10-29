@@ -276,4 +276,65 @@ class TechBoardJobProviderTest {
             throw new IllegalStateException(e);
         }
     }
+
+    // ─────────── v1.89.0：跨板交织（配额收紧后 7/8 家公司永久进不了库的修复） ───────────
+
+    private static JobDto job(String title) {
+        return new JobDto("id-" + title, title, "某公司", "互联网", "技术", "远程",
+                null, "不限", "不限", "SOCIAL", null, "https://example.com/" + title, null, null, null);
+    }
+
+    private static List<JobDto> board(String prefix, int n) {
+        List<JobDto> list = new java.util.ArrayList<>();
+        for (int i = 1; i <= n; i++) {
+            list.add(job(prefix + i));
+        }
+        return list;
+    }
+
+    @Test
+    @DisplayName("交织顺序：先每板取第 1 条，再每板取第 2 条（板内顺序保持不变）")
+    void interleave_takesOneFromEachBoardPerRound() {
+        List<JobDto> merged = TechBoardJobProvider.interleaveByBoard(List.of(
+                board("A", 2), board("B", 2), board("C", 2)));
+
+        assertThat(merged).extracting(JobDto::title)
+                .containsExactly("A1", "B1", "C1", "A2", "B2", "C2");
+    }
+
+    @Test
+    @DisplayName("空板 / null 板直接跳过，不留下空占位")
+    void interleave_skipsEmptyBoards() {
+        List<JobDto> merged = TechBoardJobProvider.interleaveByBoard(java.util.Arrays.asList(
+                board("A", 2), List.of(), null, board("D", 1)));
+
+        assertThat(merged).extracting(JobDto::title).containsExactly("A1", "D1", "A2");
+        assertThat(TechBoardJobProvider.interleaveByBoard(List.of())).isEmpty();
+        assertThat(TechBoardJobProvider.interleaveByBoard(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("截断到配额 10 时，8 家板每家都至少有代表（旧实现只会有第一家）")
+    void interleave_thenQuota_everyBoardStillRepresented() {
+        List<List<JobDto>> boards = new java.util.ArrayList<>();
+        // 8 家公司各 12 条（MAX_PER_BOARD），配额 10
+        for (int i = 0; i < 8; i++) {
+            boards.add(board(("B" + i + "-"), 12));
+        }
+
+        List<JobDto> merged = TechBoardJobProvider.interleaveByBoard(boards);
+        List<JobDto> capped = new java.util.ArrayList<>(merged.subList(0, 10));
+
+        assertThat(capped).hasSize(10);
+        // 每块板的第 1 条都在前 8 位 → 8 家公司全部有曝光
+        for (int i = 0; i < 8; i++) {
+            String prefix = "B" + i + "-";
+            assertThat(capped).extracting(JobDto::title)
+                    .as("第 %d 家公司在配额 10 内必须有代表", i)
+                    .contains(prefix + "1");
+        }
+        // 旧实现（按板 addAll 后截断）会得到 10 条全部来自第一家 —— 反向对照
+        assertThat(capped).extracting(JobDto::title)
+                .doesNotContain("B7-2");
+    }
 }

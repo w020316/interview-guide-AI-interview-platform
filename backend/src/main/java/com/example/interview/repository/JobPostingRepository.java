@@ -154,6 +154,26 @@ public interface JobPostingRepository extends JpaRepository<JobPostingEntity, Lo
     int deactivateStaleThirdParty(@Param("builtin") String builtin,
                                  @Param("threshold") LocalDateTime threshold);
 
+    /**
+     * 已退休数据源的存量岗位 → <b>批量下架</b>（v1.89.0，2026-10-29）。
+     *
+     * <p><b>为什么需要它</b>：适配器被删除后，该 platform 的历史岗位仍然 {@code active=true}。
+     * 而「海外源清单」是由适配器声明推导的（{@code JobAgentService#overseasPlatforms()}），
+     * 名字从清单里一消失，这些岗位就会被 {@code overseas=false} 的 {@code NOT IN} 判据
+     * 当成**国内岗位**显示出来——比「不显示」错得更离谱。同时
+     * {@code findDistinctPlatforms()} 仍会把它们列进「数据来源」筛选，点进去必然空列表。
+     *
+     * <p><b>为什么是 {@code UPDATE active=false} 而不是 {@code DELETE}</b>：下架可恢复——
+     * 恢复只需要把 {@code active} 改回 true（或临时改回 {@link #deactivateByPlatforms} 的平台清单）。
+     * 物理删除没有任何回退路径，且这些行里仍有可用的岗位正文与直达链接。
+     *
+     * <p>{@code AND j.active = true}：只统计「本次真正被下架」的行数，让日志里的
+     * 「下架 N 条」具备观测价值（第二次调用必须是 0，即幂等）。
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE JobPostingEntity j SET j.active = false WHERE j.platform IN :platforms AND j.active = true")
+    int deactivateByPlatforms(@Param("platforms") Collection<String> platforms);
+
     /** 物理清理长期未刷新的非内置数据（P1-6：阈值由 60 天放宽到 180 天，仅作最终清理） */
     @Modifying
     @Query("DELETE FROM JobPostingEntity j WHERE j.platform <> :builtin AND j.updatedAt < :date")

@@ -422,8 +422,25 @@ const RECRUIT_TYPES = RECRUIT_TYPE_CODES.map((v) => ({ v, l: RECRUIT_TYPE_LABELS
  */
 const DONUT_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
 
-/** 海外数据源标识（与招聘广场的来源 chips 保持一致） */
-const OVERSEAS_MARKERS = ['RemoteOK', 'Remotive', 'Arbeitnow']
+/**
+ * 海外数据源标识（用 brand 词做 `includes` 匹配，与招聘广场的来源 chips 保持一致）。
+ *
+ * v1.89.0 同步为现役 5 源（下线 Arbeitnow / Jobicy / Himalayas，补上此前漏掉的
+ * WeWorkRemotely / HN Who is hiring / 科技公司官方板）。
+ *
+ * ⚠️ 已知局限：这里吃的是**数据库里的平台名**，而数据源分布表还会显示已退休源的
+ * 历史行（v1.89.0 下线的 3 个源已 active=false，但统计行仍在）。品牌词覆盖不到的行
+ * 一律按「国内」展示——对已退休的 3 个源来说这只影响那一个标签的外观，不影响任何计数；
+ * 真正的权威判定优先用后端给的 {@code s.overseas}。改成「从后端动态取平台归属」
+ * 需要接口改造，超出本次范围。
+ */
+const OVERSEAS_MARKERS = [
+  'RemoteOK',
+  'Remotive',
+  'WeWorkRemotely',
+  'HN Who is hiring',
+  '科技公司官方板',
+]
 
 const activeTab = ref<TabKey>('overview')
 const overview = ref<Overview | null>(null)

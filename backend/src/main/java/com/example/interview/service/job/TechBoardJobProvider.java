@@ -74,7 +74,14 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
     private static final String ASHBY_URL = "https://api.ashbyhq.com/posting-api/job-board/%s";
     private static final String GREENHOUSE_URL = "https://boards-api.greenhouse.io/v1/boards/%s/jobs";
 
-    /** 单个雇主最多取多少条（防止某家一次性灌入数百条淹没其他源） */
+    /**
+     * 单个雇主最多取多少条（防止某家一次性灌入数百条淹没其他源）。
+     *
+     * <p>⚠️ 本值（12）**大于**单源配额（{@link #maxItemsPerRefresh()}，v1.89.0 起为 10）。
+     * 这正是必须做跨板交织（{@link #interleaveByBoard(List)}）的直接原因：
+     * 按板顺序拼接时，第一块板自己就能把配额吃满，后面 7 家永远是 0 条。
+     * 改这两个数中的任意一个之前，先看清楚它们之间的关系。
+     */
     private static final int MAX_PER_BOARD = 12;
 
     private final JobAgentProperties properties;
@@ -114,19 +121,23 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
      * <p>⚠️ <b>304 不参与「本轮取到 0 条」的计数</b>：{@code BoardFetch.notModified} 单独
      * 标记未变更的板，用于日志如实说明「本轮跳过 N 家（内容未变）」，而不是让它在
      * 结果里看起来像「这几家公司没有岗位」。这是本项目反复吃亏的「安静失败」防范。
+     *
+     * <p><b>v1.89.0 跨板交织</b>：合并时不再「一块板接一块板地 {@code addAll}」，
+     * 而是走 {@link #interleaveByBoard(List)}。原因见该方法的注释——按板顺序拼接时，
+     * 单源配额一旦小于首块板的条数，后面几家公司**永远进不了库**。
      */
     @Override
     public List<JobDto> fetch() {
-        List<JobDto> all = new ArrayList<>();
+        List<List<JobDto>> boards = new ArrayList<>();
         int notModified = 0;
         for (String[] board : ASHBY_BOARDS) {
             var r = fetchAshby(board[0], board[1]);
-            all.addAll(r.jobs());
+            boards.add(r.jobs());
             if (r.notModified()) notModified++;
         }
         for (String[] board : GREENHOUSE_BOARDS) {
             var r = fetchGreenhouse(board[0], board[1]);
-            all.addAll(r.jobs());
+            boards.add(r.jobs());
             if (r.notModified()) notModified++;
         }
         if (notModified > 0) {
@@ -136,7 +147,50 @@ public class TechBoardJobProvider extends AbstractOpenApiJobProvider {
         // v1.60.0：若**全部**公司都 304，说明本轮整源无变化。此时返回空列表是安全的——
         // JobAgentService 对空列表只做 `continue`，既不下架也不删除（见该处注释），
         // 因此不会把「未变更」误判成「岗位消失」。
-        return applyQuotaForSource(all);
+        return applyQuotaForSource(interleaveByBoard(boards));
+    }
+
+    /**
+     * 把「每块板一个列表」交织成一条列表：先每板取第 1 条，再每板取第 2 条……（v1.89.0）。
+     *
+     * <p><b>为什么需要它（这不是优化，是修 bug）</b>：本源单轮总配额是
+     * {@link #maxItemsPerRefresh()}（v1.89.0 起 10），而单板上限是 {@link #MAX_PER_BOARD}（12）。
+     * 合并时若按板顺序 {@code addAll}，配额会在**第一块板内部**就被用光：
+     * 配额 15 时只有 OpenAI(12) + Linear(3) 能进库，配额 10 时**只有 OpenAI 进得去**，
+     * 另外 7 家公司每轮都是 0 条——「保留科技公司官方板」就名存实亡了。
+     * 交织之后 10 条/轮 = 8 家各 1 条 + 前 2 家各多 1 条，总量不变而每家都有曝光。
+     *
+     * <p><b>为什么不用持久化游标（每轮从上次的位置接着取）</b>：
+     * ① 本项目部署在 Render，重启/缩容会丢掉内存态，要持久化就得加一张表或一列；
+     * ② 轮转状态本身会随时间漂移，出现「某家公司连续几轮没轮到」时很难解释；
+     * ③ 交织是**无状态纯函数**，同一份输入永远得到同一份输出，可单测、可复现。
+     * 用一点「板内仍按原顺序」的确定性换掉了整套状态管理，得不偿失的反面。
+     *
+     * <p>板内顺序保持不变（上游通常按相关度/发布时间返回），空板与 null 直接跳过，
+     * 因此该方法对「某家公司今天没有岗位」是安全的——不会留下空洞占位。
+     *
+     * @param boards 每块板已解析出的岗位列表（顺序即优先级）；允许 null 或空
+     * @return 交织后的岗位列表（未截断，截断由调用方用配额完成）
+     */
+    static List<JobDto> interleaveByBoard(List<List<JobDto>> boards) {
+        if (boards == null || boards.isEmpty()) {
+            return List.of();
+        }
+        int maxSize = 0;
+        for (List<JobDto> board : boards) {
+            if (board != null && board.size() > maxSize) {
+                maxSize = board.size();
+            }
+        }
+        List<JobDto> merged = new ArrayList<>();
+        for (int i = 0; i < maxSize; i++) {
+            for (List<JobDto> board : boards) {
+                if (board != null && i < board.size()) {
+                    merged.add(board.get(i));
+                }
+            }
+        }
+        return merged;
     }
 
     /** 单板拉取结果：岗位列表 + 该板本次是否 304 */

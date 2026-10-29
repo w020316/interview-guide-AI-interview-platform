@@ -822,8 +822,19 @@ function toggleHideExpired() {
  *
  * 仅作为**兜底**：优先使用后端声明的清单（适配器自己知道是不是海外源，新增海外源时
  * 前端零改动）；只有接口未返回该字段（老版本后端）时才回退到品牌名匹配。
+ *
+ * ⚠️ 兜底只覆盖品牌名，权威清单始终以后端 `meta.overseasSources` 为准。
+ * v1.89.0 同步为现役 5 源：下线了 Arbeitnow / Jobicy / Himalayas，
+ * 同时补上此前漏掉的 WeWorkRemotely / HN Who is hiring / 科技公司官方板
+ * ——旧清单既指向已下线的品牌，也漏了 3 个现役源，兜底路径会把它们错判成国内源。
  */
-const OVERSEAS_SOURCE_MARKERS = ['RemoteOK', 'Remotive', 'Arbeitnow', 'Jobicy', 'Himalayas']
+const OVERSEAS_SOURCE_MARKERS = [
+  'RemoteOK',
+  'Remotive',
+  'WeWorkRemotely',
+  'HN Who is hiring',
+  '科技公司官方板',
+]
 
 const overseasSet = computed(() => new Set(meta.value.overseasSources || []))
 
