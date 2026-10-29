@@ -224,7 +224,15 @@ public class AgentTools {
         if (spec == null) {
             return "错误：未知工具 " + action + "，可用工具：" + String.join("/", registry.keySet());
         }
-        Map<String, Object> params = parseParams(paramsJson);
+        Map<String, Object> params;
+        try {
+            params = parseParams(action, paramsJson);
+        } catch (ToolParamsException e) {
+            // 模型输出不可解析时不能静默按空参数执行：那会把「参数丢了」伪装成
+            // 「参数确实为空」，工具返回业务拦截文案（如「关键词不能为空」），
+            // 模型据此反复重试同一个坏 JSON，用户只看到绕圈而看不到真实原因。
+            return "错误：" + e.getMessage();
+        }
         try {
             return spec.executor().apply(paramsJson, params);
         } catch (Exception e) {
@@ -801,21 +809,42 @@ public class AgentTools {
         return v instanceof Number n ? n.intValue() : 0;
     }
 
-    private Map<String, Object> parseParams(String paramsJson) {
+    /**
+     * 解析工具参数：null/空白视作「没有参数」（模型可以合法地省略 params）；
+     * 非法 JSON 或非对象 JSON 则抛 {@link ToolParamsException}，由 dispatch 转成协议错误回给模型。
+     */
+    private Map<String, Object> parseParams(String action, String paramsJson) {
         Map<String, Object> params = new LinkedHashMap<>();
         if (paramsJson == null || paramsJson.isBlank()) {
             return params;
         }
-        try {
-            var node = objectMapper.readTree(paramsJson);
-            if (node.isObject()) {
-                node.fields().forEachRemaining(e -> params.put(e.getKey(), e.getValue().isValueNode()
-                        ? e.getValue().asText() : e.getValue().toString()));
-            }
-        } catch (Exception ignored) {
-            // 参数解析失败按空参数处理
+        var node = readJsonOrNull(paramsJson);
+        if (node == null) {
+            throw new ToolParamsException("工具参数不是合法 JSON，请按参数说明重新调用 " + action
+                    + "，params 必须是 {\"key\":\"value\"} 形式的 JSON 对象");
         }
+        if (!node.isObject()) {
+            throw new ToolParamsException("工具参数必须是 JSON 对象，请按参数说明重新调用 " + action
+                    + "，params 必须是 {\"key\":\"value\"} 形式的 JSON 对象");
+        }
+        node.fields().forEachRemaining(e -> params.put(e.getKey(), e.getValue().isValueNode()
+                ? e.getValue().asText() : e.getValue().toString()));
         return params;
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode readJsonOrNull(String json) {
+        try {
+            return objectMapper.readTree(json);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 工具参数协议错误（区别于工具执行期的业务异常，message 直接回给模型） */
+    private static final class ToolParamsException extends RuntimeException {
+        ToolParamsException(String message) {
+            super(message);
+        }
     }
 
     private static String str(Map<String, Object> params, String key) {

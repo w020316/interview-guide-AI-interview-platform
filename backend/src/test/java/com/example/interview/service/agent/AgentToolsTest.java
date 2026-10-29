@@ -344,14 +344,33 @@ class AgentToolsTest {
     }
 
     @Test
-    @DisplayName("dispatch：params 为 null/空/非法 JSON 时按空参数处理")
-    void dispatchBlankOrInvalidParams() {
+    @DisplayName("dispatch：params 为 null/空白时按空参数处理（模型可省略参数）")
+    void dispatchBlankParams() {
         // null → searchKnowledge(null) → 拦截文案
         assertThat(newTools().dispatch("searchKnowledge", null)).contains("不能为空");
-        // 非法 JSON → 解析失败按空参数 → 同样拦截
-        assertThat(newTools().dispatch("searchKnowledge", "not-json{")).contains("不能为空");
-        // 非 object JSON（数组）→ 空参数
-        assertThat(newTools().dispatch("searchKnowledge", "[1,2]")).contains("不能为空");
+        assertThat(newTools().dispatch("searchKnowledge", "   ")).contains("不能为空");
+    }
+
+    @Test
+    @DisplayName("dispatch：params 非法 JSON / 非对象返回协议错误，不再静默按空参数执行")
+    void dispatchInvalidParamsReturnsProtocolError() {
+        // B5：此前非法 JSON 被吞成空参数，模型看到的只是「关键词不能为空」，
+        // 无法知道自己输出的是坏 JSON，会反复重试同一个坏参数。
+        String badJson = newTools().dispatch("searchKnowledge", "not-json{");
+        assertThat(badJson).startsWith("错误：")
+                .contains("不是合法 JSON")
+                .contains("searchKnowledge")
+                .doesNotContain("不能为空");
+
+        String nonObject = newTools().dispatch("searchKnowledge", "[1,2]");
+        assertThat(nonObject).startsWith("错误：")
+                .contains("必须是 JSON 对象")
+                .contains("searchKnowledge")
+                .doesNotContain("不能为空");
+
+        // 合法 JSON 对象仍正常执行（不应被新校验误伤）
+        when(interviewSessionService.listWrongQuestionsByUser(anyString(), anyInt())).thenReturn(List.of());
+        assertThat(newTools().dispatch("listWrongQuestions", "{\"limit\":3}")).contains("暂无错题");
     }
 
     @Test
