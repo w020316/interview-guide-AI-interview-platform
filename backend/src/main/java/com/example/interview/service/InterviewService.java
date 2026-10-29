@@ -61,6 +61,20 @@ public class InterviewService {
     /** 岗位描述最大长度（v1.34.1 P2-4：与简历同等截断，此前 JD 未截断） */
     private static final int MAX_JD_LEN = 800;
 
+    /**
+     * 角色句里引用的岗位名最大长度。
+     *
+     * <p>此前整段 JD（最多 800 字）被直接塞进首句「你是一位资深的 __ 面试官」，
+     * 一句话里夹着岗位职责与任职要求，模型对「面试官身份」的把握被稀释，
+     * 首句也失去可读性。角色名只取岗位名级别的短文本，完整 JD 单独成段。
+     */
+    private static final int MAX_JOB_ROLE_LEN = 40;
+
+    /** 评分入参的业务级上限：面试题 500 / 参考答案 1500 / 用户回答 3000（字符） */
+    private static final int MAX_EVAL_QUESTION_LEN = 500;
+    private static final int MAX_EVAL_REFERENCE_LEN = 1500;
+    private static final int MAX_EVAL_ANSWER_LEN = 3000;
+
     /** 出题缓存存活时长（毫秒）：与 Redis 侧 1 小时保持一致（v1.34.1 P2-5） */
     private static final long CACHE_TTL_MILLIS = 60 * 60 * 1000L;
 
@@ -151,8 +165,12 @@ public class InterviewService {
             String safeResume = PromptSanitizer.sanitize(truncatedResume);
             String safeFocus = PromptSanitizer.sanitize(focusCategories == null || focusCategories.isBlank() ? "" : focusCategories);
             String safeDiff = PromptSanitizer.sanitize(difficulty == null ? "" : difficulty.trim().toUpperCase());
+            // 角色句只放「岗位名」级别的短文本；未指定岗位时退化为不带定语的「资深面试官」
+            String jobRole = safeJobDesc.isBlank() ? "" : "的" + TextUtil.truncate(safeJobDesc, MAX_JOB_ROLE_LEN);
             String prompt = new StringBuilder()
-                    .append("你是一位资深的").append(safeJobDesc).append("面试官，请为候选人生成 ").append(count).append(" 道面试题。\n\n")
+                    .append("你是一位资深").append(jobRole)
+                    .append("面试官，请为候选人生成 ").append(count).append(" 道面试题。\n\n")
+                    .append("【目标岗位】\n").append(safeJobDesc.isBlank() ? "未指定，请根据简历推断岗位方向" : safeJobDesc).append("\n\n")
                     .append("【简历亮点】\n").append(safeResume).append("\n\n")
                     .append("【参考知识点】\n").append(relatedKnowledge.isEmpty() ? "无" : relatedKnowledge).append("\n\n")
                     .append("【出题原则】\n")
@@ -237,9 +255,9 @@ public class InterviewService {
             // 用户输入经 PromptSanitizer 消毒，避免 prompt 注入
             String prompt = new StringBuilder()
                     .append("你是一位面试官，请评估以下回答。\n\n")
-                    .append("【面试题】\n").append(PromptSanitizer.sanitize(question)).append("\n\n")
-                    .append("【参考答案】\n").append(PromptSanitizer.sanitize(referenceAnswer == null ? "" : referenceAnswer)).append("\n\n")
-                    .append("【用户回答】\n").append(PromptSanitizer.sanitize(userAnswer)).append("\n\n")
+                    .append("【面试题】\n").append(PromptSanitizer.sanitize(TextUtil.truncate(question, MAX_EVAL_QUESTION_LEN))).append("\n\n")
+                    .append("【参考答案】\n").append(PromptSanitizer.sanitize(TextUtil.truncate(referenceAnswer == null ? "" : referenceAnswer, MAX_EVAL_REFERENCE_LEN))).append("\n\n")
+                    .append("【用户回答】\n").append(PromptSanitizer.sanitize(TextUtil.truncate(userAnswer, MAX_EVAL_ANSWER_LEN))).append("\n\n")
                     .append("请从完整性（30%）、准确性（40%）、表达能力（30%）三个维度评分，并给出改进建议。\n\n")
                     .append("【评分注意事项】\n")
                     .append("1. 先判断回答是否贴合问题：若答非所问或与题目无关，准确性应显著低分并如实说明\n")
@@ -295,9 +313,9 @@ public class InterviewService {
         try {
             String prompt = new StringBuilder()
                     .append("你是一位面试官，请结合用户随回答附带的图片评估以下回答。\n\n")
-                    .append("【面试题】\n").append(PromptSanitizer.sanitize(question)).append("\n\n")
-                    .append("【参考答案】\n").append(PromptSanitizer.sanitize(referenceAnswer == null ? "" : referenceAnswer)).append("\n\n")
-                    .append("【用户回答】\n").append(PromptSanitizer.sanitize(userAnswer)).append("\n\n")
+                    .append("【面试题】\n").append(PromptSanitizer.sanitize(TextUtil.truncate(question, MAX_EVAL_QUESTION_LEN))).append("\n\n")
+                    .append("【参考答案】\n").append(PromptSanitizer.sanitize(TextUtil.truncate(referenceAnswer == null ? "" : referenceAnswer, MAX_EVAL_REFERENCE_LEN))).append("\n\n")
+                    .append("【用户回答】\n").append(PromptSanitizer.sanitize(TextUtil.truncate(userAnswer, MAX_EVAL_ANSWER_LEN))).append("\n\n")
                     .append("【图片说明】\n图片为用户作答时的附图（如代码截图/草图/证书），请结合图片内容与文字作答综合评估。\n\n")
                     .append("请从完整性（30%）、准确性（40%）、表达能力（30%）三个维度评分，并给出改进建议。\n\n")
                     .append("【评分注意事项】\n")

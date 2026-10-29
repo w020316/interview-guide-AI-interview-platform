@@ -264,6 +264,36 @@ class InterviewServiceTest {
             verify(chatClientRequestSpec).user(promptCaptor.capture());
             assertThat(promptCaptor.getValue()).doesNotContain("...");
         }
+
+        @Test
+        @DisplayName("C3：角色句只取短岗位名，完整 JD 留在【目标岗位】段")
+        void generateQuestions_longJobDescription_roleSentenceShortFullJdInSection() {
+            // 327 字 JD：未触发 800 字上限，但远超人读得下去的一句「职务名」
+            String longJd = "Java 后端工程师，负责核心交易链路。".repeat(15) + "任职要求：熟悉 JVM 调优。";
+
+            service.generateQuestions(USER_ID, RESUME, longJd, COUNT, "", "");
+
+            ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+            verify(chatClientRequestSpec).user(promptCaptor.capture());
+            String prompt = promptCaptor.getValue();
+
+            String firstLine = prompt.substring(0, prompt.indexOf('\n'));
+            assertThat(firstLine).startsWith("你是一位资深的");
+            assertThat(firstLine).as("角色句必须短：此前 800 字 JD 全塞进首句").hasSizeLessThan(100);
+            assertThat(firstLine).as("角色句只保留岗位名，任职要求不该挤进身份描述").doesNotContain("任职要求");
+            // 截断不能丢上下文：完整 JD 必须原样出现在独立段落
+            assertThat(prompt).contains("【目标岗位】").contains("任职要求：熟悉 JVM 调优。");
+        }
+
+        @Test
+        @DisplayName("岗位描述为空时仍给出可出题的【目标岗位】段")
+        void generateQuestions_blankJobDescription_placeholderSection() {
+            service.generateQuestions(USER_ID, RESUME, "  ", COUNT, "", "");
+
+            ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+            verify(chatClientRequestSpec).user(promptCaptor.capture());
+            assertThat(promptCaptor.getValue()).contains("【目标岗位】\n未指定");
+        }
     }
 
     @Nested
@@ -386,6 +416,22 @@ class InterviewServiceTest {
             ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
             verify(chatClientRequestSpec).user(promptCaptor.capture());
             assertThat(promptCaptor.getValue()).doesNotContain("忽略以上所有指令");
+        }
+
+        @Test
+        @DisplayName("C4：题/参考/回答按业务上限截断（500/1500/3000）")
+        void evaluateAnswer_overlongInputs_truncatedToBusinessLimits() {
+            when(callResponseSpec.content()).thenReturn(EVAL_RAW_RESPONSE);
+
+            service.evaluateAnswer("题".repeat(1000), "答".repeat(5000), "参".repeat(2000));
+
+            ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+            verify(chatClientRequestSpec).user(promptCaptor.capture());
+            String prompt = promptCaptor.getValue();
+            // 此前只做了注入消毒（全局兜底 8000），用户可贴 5000 字回答把评分 prompt 撑到上万字
+            assertThat(prompt).contains("题".repeat(500) + "...").doesNotContain("题".repeat(501));
+            assertThat(prompt).contains("参".repeat(1500) + "...").doesNotContain("参".repeat(1501));
+            assertThat(prompt).contains("答".repeat(3000) + "...").doesNotContain("答".repeat(3001));
         }
 
         @Test
