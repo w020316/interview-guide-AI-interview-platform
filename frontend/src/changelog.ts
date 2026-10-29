@@ -85,9 +85,25 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.83.0'
+export const CURRENT_VERSION = '1.84.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.84.0',
+    date: '2026-10-29',
+    title: '版本 1.84.0 · 弱密码当场说清楚，招聘列表能一步跳到任意页',
+    items: [
+      { text: '注册时密码太常见、太简单或含用户名，输入时就会提示具体原因，不用等到提交才被拒', level: 'user' },
+      { text: '登录失败的提示会常驻在表单上方，不再 3 秒后自动消失；登录后只会跳转到站内页面', level: 'user' },
+      { text: '招聘广场新增「首页 / 末页」与页码跳转，每页岗位从 10 条增加到 20 条', level: 'user' },
+      { text: '快速切换筛选条件时，列表、投递看板、收藏、错题本、日程不会再被前一次请求的结果覆盖', level: 'user' },
+      { text: '投递通知确认时，「状态已更新」与「加入面试日历」分开提示：日历没写进去不再连累状态更新', level: 'user' },
+      { text: '智能体回答在生成过程中即时刷新（纯文本），结束后再统一排版为 Markdown；网络中途断开会明确提示「回答可能不完整」', level: 'user' },
+      { text: '修复智能体会话切换竞态：慢网下点开会话后立刻发消息，消息会落进刚点开的会话，不再串到上一个会话', level: 'tech' },
+      { text: '前端：新增 utils/latestRequest 请求守卫、utils/passwordPolicy 与后端 PasswordPolicy 同规则镜像、utils/safeRedirect 站内跳转白名单，均带单测', level: 'tech' },
+      { text: '后端：出题角色句改用短岗位名（完整 JD 单列【目标岗位】段）；评分入参补业务级截断（题 500 / 参考 1500 / 回答 3000）；岗位分类 prompt 的第三方标题/企业名过注入净化并压平换行', level: 'tech' },
+    ],
+  },
   {
     version: '1.83.0',
     date: '2026-10-29',
