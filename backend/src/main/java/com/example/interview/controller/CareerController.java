@@ -1,7 +1,10 @@
 package com.example.interview.controller;
 
+import com.example.interview.common.RateLimitExceededException;
 import com.example.interview.common.Result;
 import com.example.interview.service.career.CareerProfileService;
+import com.example.interview.service.career.SalaryCoachService;
+import com.example.interview.util.PerUserRateLimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +44,19 @@ public class CareerController {
 
     @Autowired
     private CareerProfileService careerProfileService;
+
+    /** 谈薪助手（v1.85.0）：本地做金额换算，AI 只出策略与话术 */
+    @Autowired
+    private SalaryCoachService salaryCoachService;
+
+    /**
+     * 谈薪按用户限流（30 次/分钟）。
+     *
+     * <p>与 {@code AiRateLimitFilter} 的全局 AI 限流是两层不同目的：过滤器按路径做统一配额，
+     * 这里防的是单用户短时间反复生成同一份建议（改一个数字就重调一次模型）。
+     * 出口统一走 {@link RateLimitExceededException} → 真 429。
+     */
+    private final PerUserRateLimiter salaryLimiter = new PerUserRateLimiter(30, 60_000L);
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -96,6 +112,74 @@ public class CareerController {
 
         String json = careerProfileService.plan(userId, targetJob, resumeText, mineSummary);
         return Result.success(parseToMap(json, "plan"));
+    }
+
+    /**
+     * 谈薪助手（v1.85.0）
+     * POST /api/career/salary
+     * Body: {"mode":"EXPECTATION|OFFER|NEGOTIATION","targetJob":"Java 后端","city":"杭州",
+     *        "years":3,"currentMonthly":18000,"expectedMonthly":25000,
+     *        "offerMonthly":22000,"offerMonths":15,"competing":"…","situation":"…"}
+     *
+     * <p>薪资字段全部可选，但填了就按「元/月（税前）」理解并做边界校验；金额换算在服务端完成，
+     * 缺失数据返回 null 而不是 0。AI 只负责策略与话术，不提供任何市场行情数字。
+     */
+    @Operation(summary = "谈薪助手（期望报价 / offer 评估 / 还价话术）")
+    @PostMapping("/salary")
+    public Result<Map<String, Object>> salary(@RequestBody Map<String, Object> req) {
+        String userId = currentUserId();
+        SalaryCoachService.SalaryRequest payload;
+        try {
+            payload = buildSalaryRequest(req);
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        }
+        if (!salaryLimiter.allow(userId)) {
+            throw new RateLimitExceededException("谈薪建议生成太频繁了，请稍后再试");
+        }
+        return Result.success(salaryCoachService.coach(userId, payload));
+    }
+
+    /** 请求体 → 服务入参；非法数字/越界数值抛 IllegalArgumentException（→ 400） */
+    private static SalaryCoachService.SalaryRequest buildSalaryRequest(Map<String, Object> req) {
+        SalaryCoachService.Mode mode = SalaryCoachService.Mode.parse(str(req.get("mode")));
+        String targetJob = str(req.get("targetJob"));
+        if (targetJob == null || targetJob.isBlank()) {
+            throw new IllegalArgumentException("请填写目标岗位（targetJob 不能为空）");
+        }
+        return new SalaryCoachService.SalaryRequest(
+                mode,
+                targetJob,
+                strOrEmpty(req.get("city")),
+                number(req.get("years"), "工作年限", 0, 60),
+                number(req.get("currentMonthly"), "当前月薪", 1, 1_000_000),
+                number(req.get("expectedMonthly"), "期望月薪", 1, 1_000_000),
+                number(req.get("offerMonthly"), "offer 月薪", 1, 1_000_000),
+                number(req.get("offerMonths"), "年薪月数", 1, 36),
+                strOrEmpty(req.get("competing")),
+                strOrEmpty(req.get("situation")));
+    }
+
+    /**
+     * 可选数值字段解析：空值返回 null；非数字或越界抛 IllegalArgumentException。
+     *
+     * <p>不把「填错」静默当作「没填」——那会让用户以为建议已经考虑了他的薪资，
+     * 实际模型拿到的却是「未填写」。
+     */
+    private static Integer number(Object value, String label, int min, int max) {
+        if (value == null || value.toString().isBlank()) {
+            return null;
+        }
+        int parsed;
+        try {
+            parsed = (int) Math.round(Double.parseDouble(value.toString().trim()));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(label + "请填写数字");
+        }
+        if (parsed < min || parsed > max) {
+            throw new IllegalArgumentException(label + "需在 " + min + " ~ " + max + " 之间");
+        }
+        return parsed;
     }
 
     /** JSON 字符串 → Map；解析失败返回带 raw 的兜底结构（保证前端不白屏） */

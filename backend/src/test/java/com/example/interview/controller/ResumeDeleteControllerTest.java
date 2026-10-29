@@ -51,6 +51,7 @@ class ResumeDeleteControllerTest {
     @MockBean private ResumeAnalysisService resumeAnalysisService;
     @MockBean private ResumeParseService resumeParseService;
     @MockBean private ResumeImageOcrService resumeImageOcrService;
+    @MockBean private com.example.interview.service.ResumeExportCheckService resumeExportCheckService;
 
     /** @WebMvcTest 会装配 WebMvcConfigurer 注册的拦截器；boolean 默认 false → 表现为 503 */
     @MockBean private RateLimitInterceptor rateLimitInterceptor;

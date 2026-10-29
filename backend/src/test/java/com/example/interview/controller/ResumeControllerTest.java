@@ -4,6 +4,9 @@ import com.example.interview.entity.ResumeEntity;
 import com.example.interview.interceptor.RateLimitInterceptor;
 import com.example.interview.security.JwtUtil;
 import com.example.interview.service.ResumeAnalysisService;
+import com.example.interview.service.ResumeExportCheckService;
+import com.example.interview.service.ResumeExportCheckService.CheckItem;
+import com.example.interview.service.ResumeExportCheckService.ExportCheckReport;
 import com.example.interview.service.ResumeParseService;
 import com.example.interview.service.ResumeService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -68,6 +71,10 @@ class ResumeControllerTest {
     /** v1.45.0：简历图片识别（截图 → 文本）——控制器新增依赖，@WebMvcTest 必须补 mock */
     @MockBean
     private com.example.interview.service.ResumeImageOcrService resumeImageOcrService;
+
+    /** v1.85.0：导出体检（本地 PDFBox 规则） */
+    @MockBean
+    private ResumeExportCheckService resumeExportCheckService;
 
     @MockBean
     private JwtUtil jwtUtil;
@@ -541,6 +548,80 @@ class ResumeControllerTest {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value(404))
                     .andExpect(jsonPath("$.message").value("简历不存在：999"));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/resume/export-check 导出体检（v1.85.0）")
+    class ExportCheck {
+
+        private MockMultipartFile pdf(String name, byte[] bytes) {
+            return new MockMultipartFile("file", name, "application/pdf", bytes);
+        }
+
+        @Test
+        @DisplayName("合法 PDF：返回结构化报告")
+        void exportCheck_ok_returnsReport() throws Exception {
+            ExportCheckReport report = new ExportCheckReport(
+                    "warn", "这份 PDF 可以被读取，另有 1 项建议优化", 2, 820,
+                    List.of(new CheckItem("pdf-open", "PDF 结构", "pass", "可正常打开，共 2 页"),
+                            new CheckItem("pages", "页数", "warn", "2 页")));
+            when(resumeExportCheckService.check(any(MultipartFile.class))).thenReturn(report);
+
+            mockMvc.perform(multipart("/api/resume/export-check")
+                            .file(pdf("resume.pdf", "%PDF-1.7 content".getBytes())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.verdict").value("warn"))
+                    .andExpect(jsonPath("$.data.pageCount").value(2))
+                    .andExpect(jsonPath("$.data.charCount").value(820))
+                    .andExpect(jsonPath("$.data.checks[0].id").value("pdf-open"))
+                    .andExpect(jsonPath("$.data.checks[0].status").value("pass"));
+        }
+
+        @Test
+        @DisplayName("空文件返回 400")
+        void exportCheck_emptyFile_returns400() throws Exception {
+            mockMvc.perform(multipart("/api/resume/export-check")
+                            .file(new MockMultipartFile("file", "empty.pdf", "application/pdf", new byte[0])))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("请上传导出的 PDF 文件"));
+        }
+
+        @Test
+        @DisplayName("非 PDF 扩展名返回 400，并引导先导出")
+        void exportCheck_nonPdf_returns400() throws Exception {
+            mockMvc.perform(multipart("/api/resume/export-check")
+                            .file(new MockMultipartFile("file", "resume.docx", "application/pdf",
+                                    "%PDF-1.7".getBytes())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value(
+                            "导出体检只支持 PDF：请先点「导出 PDF」，再把保存下来的文件上传体检"));
+        }
+
+        @Test
+        @DisplayName("后缀是 .pdf 但内容不是 PDF：按 magic bytes 拦下，不进入解析器")
+        void exportCheck_badMagic_returns400() throws Exception {
+            mockMvc.perform(multipart("/api/resume/export-check")
+                            .file(pdf("fake.pdf", "PK\u0003\u0004 其实是 zip".getBytes())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("文件内容不是合法的 PDF"));
+
+            verify(resumeExportCheckService, never()).check(any(MultipartFile.class));
+        }
+
+        @Test
+        @DisplayName("Content-Type 不符（如 image/png）返回 400")
+        void exportCheck_wrongContentType_returns400() throws Exception {
+            mockMvc.perform(multipart("/api/resume/export-check")
+                            .file(new MockMultipartFile("file", "resume.pdf", "image/png",
+                                    "%PDF-1.7".getBytes())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("文件类型不受支持"));
         }
     }
 }

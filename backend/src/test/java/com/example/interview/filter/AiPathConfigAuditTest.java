@@ -81,9 +81,10 @@ class AiPathConfigAuditTest {
         table.put("/api/resume/import-url", "/api/resume/import-url");
         // ResumeDocumentController:165 POST /documents/{id}/autofill
         table.put("/api/resume/documents/*/autofill", "/api/resume/documents/5/autofill");
-        // CareerController:65 / :87
+        // CareerController:81 / :103 / :128 POST /salary（v1.85.0）
         table.put("/api/career/mine", "/api/career/mine");
         table.put("/api/career/plan", "/api/career/plan");
+        table.put("/api/career/salary", "/api/career/salary");
         // StoryBankController:78 / :107 / :134
         table.put("/api/story-bank/extract", "/api/story-bank/extract");
         table.put("/api/story-bank/*/check", "/api/story-bank/42/check");

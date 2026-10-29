@@ -177,6 +177,7 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
             + ",/api/resume/documents/*/autofill"
             + ",/api/career/mine"
             + ",/api/career/plan"
+            + ",/api/career/salary"
             + ",/api/story-bank/extract"
             + ",/api/story-bank/*/check"
             + ",/api/story-bank/*/followup"

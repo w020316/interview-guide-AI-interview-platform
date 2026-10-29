@@ -1,10 +1,13 @@
 package com.example.interview.controller;
 
+import com.example.interview.common.RateLimitExceededException;
 import com.example.interview.common.Result;
 import com.example.interview.entity.ResumeEntity;
 import com.example.interview.service.ResumeAnalysisService;
+import com.example.interview.service.ResumeExportCheckService;
 import com.example.interview.service.ResumeParseService;
 import com.example.interview.service.ResumeService;
+import com.example.interview.util.PerUserRateLimiter;
 import com.example.interview.util.SsrUrlValidator;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
@@ -70,6 +73,19 @@ public class ResumeController {
 
     @Autowired
     private ResumeService resumeService;
+
+    /** 导出体检（纯本地 PDFBox 解析，不调用 AI） */
+    @Autowired
+    private ResumeExportCheckService resumeExportCheckService;
+
+    /**
+     * 导出体检按用户限流（20 次/分钟）。
+     *
+     * <p>不挂进 AI 限流链路：它不消耗模型额度，但解析 PDF 有 CPU/内存成本，
+     * 仍需要一道闸门防止脚本无限上传。限流出口统一走
+     * {@link RateLimitExceededException} → 真 429，与项目既有约定一致。
+     */
+    private final PerUserRateLimiter exportCheckLimiter = new PerUserRateLimiter(20, 60_000L);
 
     /** 从 SecurityContext 获取当前登录用户 ID */
     private String currentUserId() {
@@ -202,6 +218,58 @@ public class ResumeController {
         } catch (Exception e) {
             log.error("简历解析失败 filename={}", originalFilename, e);
             return Result.error("简历解析失败，请检查文件是否损坏或重试");
+        }
+    }
+
+    /**
+     * 导出体检：检查「导出的 PDF 能不能被招聘系统读出来」（v1.85.0）
+     * POST /api/resume/export-check
+     * Form-data: file=&lt;导出的 PDF&gt;
+     *
+     * <p>只接受 PDF：这项能力的检查对象是**导出产物**（浏览器打印生成的 PDF），
+     * 不是源文件。粘贴文本/上传 docx 分析那条链路已有独立入口。
+     *
+     * <p>结果是一份确定性报告（页数 / 文字层 / 联系方式 / 关键板块 / 时间信息 / 字符完整度），
+     * 同样的文件永远得到同样的结论；不经过任何 AI，简历原文也不会离开服务端。
+     */
+    @PostMapping("/export-check")
+    public Result<ResumeExportCheckService.ExportCheckReport> exportCheck(
+            @RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return Result.error(400, "请上传导出的 PDF 文件");
+        }
+        if (file.getSize() > ResumeExportCheckService.MAX_FILE_BYTES) {
+            return Result.error(400, "文件大小不能超过 10MB");
+        }
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return Result.error(400, "文件名不能为空");
+        }
+        if (!originalFilename.toLowerCase().endsWith(".pdf")) {
+            return Result.error(400, "导出体检只支持 PDF：请先点「导出 PDF」，再把保存下来的文件上传体检");
+        }
+        String contentType = file.getContentType();
+        if (contentType != null && !contentType.toLowerCase().startsWith("application/pdf")
+                && !"application/octet-stream".equalsIgnoreCase(contentType)) {
+            return Result.error(400, "文件类型不受支持");
+        }
+        if (!hasPdfMagic(file)) {
+            return Result.error(400, "文件内容不是合法的 PDF");
+        }
+        if (!exportCheckLimiter.allow(currentUserId())) {
+            throw new RateLimitExceededException("体检太频繁了，请一分钟后再试");
+        }
+        return Result.success(resumeExportCheckService.check(file));
+    }
+
+    /** PDF 文件头校验（%PDF-），防止改了后缀的非 PDF 文件进入解析器 */
+    private static boolean hasPdfMagic(MultipartFile file) {
+        try (java.io.InputStream is = file.getInputStream()) {
+            byte[] head = new byte[5];
+            int read = is.read(head);
+            return read == 5 && "%PDF-".equals(new String(head));
+        } catch (IOException e) {
+            return false;
         }
     }
 

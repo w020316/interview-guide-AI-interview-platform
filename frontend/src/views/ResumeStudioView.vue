@@ -144,6 +144,7 @@
             {{ autofilling ? '正在读取…' : '从已有简历填充' }}
           </BaseButton>
           <BaseButton variant="ghost" size="sm" :disabled="saving" @click="save">保存</BaseButton>
+          <BaseButton variant="ghost" size="sm" @click="exportCheckVisible = true">导出体检</BaseButton>
           <BaseButton variant="primary" size="sm" @click="onExportPdf">导出 PDF</BaseButton>
         </div>
       </header>
@@ -197,6 +198,9 @@
           </div>
         </div>
       </div>
+
+      <!-- 导出体检：解析「刚保存的 PDF」，判断招聘系统能否正常读取（纯本地规则，不调 AI） -->
+      <ExportCheckDialog v-model:visible="exportCheckVisible" />
     </template>
   </div>
 </template>
@@ -219,6 +223,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BaseButton from '../components/BaseButton.vue'
+import ExportCheckDialog from '../components/ExportCheckDialog.vue'
 import ResumeDocForm from '../components/ResumeDocForm.vue'
 import ResumeDocPreview from '../components/ResumeDocPreview.vue'
 import api, { getErrMessage } from '../api'
@@ -264,6 +269,8 @@ const saving = ref(false)
 /** AI 自动填充进行中：这是耗时操作（接近一次对话），必须有明确加载态 */
 const autofilling = ref(false)
 const mobilePane = ref<'edit' | 'preview'>('edit')
+/** 导出体检弹窗：检查「打印出来的那份 PDF」能否被 ATS 读取 */
+const exportCheckVisible = ref(false)
 const viewportRef = ref<HTMLElement | null>(null)
 const viewportWidth = ref(A4_WIDTH)
 
@@ -1172,6 +1179,9 @@ watch(mode, async () => {
   }
 
   .editor-actions {
+    /* 手机上 5 个控件（模板 / 填充 / 保存 / 体检 / 导出）平分一行会挤爆，
+       允许换行：主操作「导出 PDF」留在最后一行，符合阅读顺序 */
+    flex-wrap: wrap;
     justify-content: space-between;
   }
 
