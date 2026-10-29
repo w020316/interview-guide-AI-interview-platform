@@ -121,7 +121,7 @@ app:
       #   /api/session/**：create/{id}/questions/answer 全部只读写数据库，
       #     真正的出题与评分在 /api/interview/questions、/api/interview/evaluate
       #   /api/favorite/bank/start：控制器注释明确「不重新调用 AI 生成题目」
-      paths: ${AI_USER_RATE_LIMIT_PATHS:/api/agent/,/api/interview/,/api/job/,/api/jobs/refresh,/api/knowledge/ask,/api/knowledge/import,/api/knowledge/search,/api/resume/analyze,/api/resume/upload,/api/resume/optimize,/api/resume/import-url,/api/resume/documents/*/autofill,/api/career/mine,/api/career/plan,/api/story-bank/extract,/api/story-bank/*/check,/api/story-bank/*/followup,/api/application/*/tailor}
+      paths: ${AI_USER_RATE_LIMIT_PATHS:/api/agent/,/api/interview/,/api/job/,/api/jobs/refresh,/api/knowledge/ask,/api/knowledge/import,/api/knowledge/search,/api/resume/analyze,/api/resume/upload,/api/resume/optimize,/api/resume/import-url,/api/resume/documents/*/autofill,/api/career/mine,/api/career/plan,/api/career/salary,/api/story-bank/extract,/api/story-bank/*/check,/api/story-bank/*/followup,/api/application/*/tailor}
       requests: ${AI_USER_RATE_LIMIT_REQUESTS:60}
       # 高成本前缀与其配额（覆盖上面的 requests，不会双重计数）
       expensive-paths: ${AI_USER_RATE_LIMIT_EXPENSIVE_PATHS:/api/agent/}
@@ -268,7 +268,7 @@ app:
     #    导致「与前端同步」这个约定在公开接口上一直没生效（两个端点报两个版本号）。
     #    现已改为读本配置；改版本时除了这里与 changelog.ts，无需再动代码。
     name: ${APP_INFO_NAME:interview-guide}
-    version: ${APP_INFO_VERSION:1.82.0}
+    version: ${APP_INFO_VERSION:1.86.0}
     description: ${APP_INFO_DESCRIPTION:AI 智能面试辅助平台后端}
     # 构建日期，CI 注入；未配置时 fallback 为当天
     build-date: ${APP_INFO_BUILD_DATE:}

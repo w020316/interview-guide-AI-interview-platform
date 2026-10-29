@@ -85,9 +85,40 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.84.0'
+export const CURRENT_VERSION = '1.86.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.86.0',
+    date: '2026-10-29',
+    title: '版本 1.86.0 · 岗位详情先体检，投递漏斗看得见流失',
+    items: [
+      { text: '岗位详情新增「内容体检」：逐条标出押金/培训费、无薪试岗、正文私留微信手机号、薪资前后不一致、申请链接可疑等文本风险，并附上命中的原文片段，方便你自己核实', level: 'user' },
+      { text: '内容体检只做文本规则检查：不给出「可信 / 不可信」的结论，也不拦截投递；没有命中时明确写「未命中规则」，而不是假装岗位没问题', level: 'user' },
+      { text: '投递看板新增「漏斗洞察」：把已投出 → 被查看 → 有回复 → 进面试 → 拿 Offer 五段人数与逐段转化率放在一起，并指出流失最多的一步', level: 'user' },
+      { text: '新增「平均首次回音」：单独记录对方第一次回音的时间，给出平均天数与中位数；没有足够样本时显示「—」并注明样本量，不会把缺失数据当成 0 天', level: 'user' },
+      { text: '新增「静默投递」统计：已投出超过 7 天仍无回音的投递有多少条，方便集中跟进', level: 'user' },
+      { text: '后端：PromptSanitizer 在截断前剥离零宽字符、BOM、双向控制符、变体选择符与 HTML 注释，并扩展中英文注入句式识别，防止不可见字符把指令拆开绕过净化', level: 'tech' },
+      { text: '后端：job_application 新增 first_reply_at 列（首次进入有回复/面试/Offer/淘汰时写一次），存量行不回填——拿最近回复时间冒充首次回音会得出「越活跃响应越快」的假结论', level: 'tech' },
+      { text: '后端：/api/application/board 新增 funnelStages / response / silentCount / silent 字段，转化率分母为上一阶段人数，除数为 0 时返回 null 而非 0', level: 'tech' },
+      { text: '前端：新增 utils/jobPostingScan 与 utils/applicationInsights 纯函数（形状兜底 + 缺失保持 null）及 JobPostingScanBlock / ApplicationInsightsCard 组件，样本不足 3 条时不展示流失结论', level: 'tech' },
+    ],
+  },
+  {
+    version: '1.85.0',
+    date: '2026-10-29',
+    title: '版本 1.85.0 · 导出前先体检，谈薪时心里有数',
+    items: [
+      { text: '简历模板编辑器新增「导出体检」：把导出的 PDF 传上去，逐项检查文字层、联系方式、关键板块、时间信息与特殊字符，直接告诉你招聘系统能不能正常读到这份简历', level: 'user' },
+      { text: '导出体检只在本站服务端解析：不调用 AI，也不保存你的文件；结论里的联系方式只报「有没有找到」，不会把邮箱和手机号显示出来', level: 'user' },
+      { text: '新增「谈薪助手」：被问期望薪资、拿到 offer 要不要接、被压价怎么回，三种场景分别给出判断依据、可以直接照着说的话术，以及对方施压时的应对问答', level: 'user' },
+      { text: '谈薪助手的涨幅、年薪折算、与期望的差距都按你自己填的金额算；没填的数字留空显示「—」，不会被当成 0，也不提供任何市场薪资行情数字', level: 'user' },
+      { text: '求职工具菜单新增「谈薪助手」入口（登录后可见），页面里也能对三种场景随时切换', level: 'user' },
+      { text: '后端：新增 ResumeExportCheckService（PDFBox 纯本地规则，7 项检查，10 页 / 10MB 上限，加密与损坏文件明确拒绝，报告不回显邮箱与手机号）', level: 'tech' },
+      { text: '后端：新增 SalaryCoachService（三场景提示词写死「禁止输出市场数据 / 禁止编造事实」，金额在服务端 round1 计算，缺数据返回 null）；/api/career/salary 同步进 AI 限流清单（application.yml + 常量 + 审计测试三处一致）', level: 'tech' },
+      { text: '前端：utils/exportCheck 与 utils/salary 做形状兜底（结论只降不升、缺失数据保持 null），新增 64 条用例覆盖归一层与两个页面的关键交互', level: 'tech' },
+    ],
+  },
   {
     version: '1.84.0',
     date: '2026-10-29',
