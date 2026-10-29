@@ -40,9 +40,11 @@ jobs:
 
       - name: Run Maven test
         # 测试均为 @WebMvcTest + Mockito，不依赖真实 PostgreSQL/Redis
-        # JWT_SECRET 等敏感变量使用占位值，测试不读取真实配置
+        # JWT_SECRET 是 CI 专用的假值（**不能**写成含 placeholder/change-me 等占位词的字面量：
+        # JwtUtil 的启动守卫会拒绝这类密钥，上下文加载测试（ApplicationContextSmokeTest /
+        # TokenVersionRevocationTest）会因此整类失败——2026-10-21 起 CI 红了好几天才被这份注释解释）
         env:
-          JWT_SECRET: ci-placeholder-secret-for-testing-only-not-for-production
+          JWT_SECRET: ci-only-dummy-7f3c9a1e6b2d4f8a0c5e9b3d7a1f6c2e
         run: mvn -B -ntp test
 
       - name: Upload test reports
