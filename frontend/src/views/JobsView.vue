@@ -250,8 +250,8 @@
                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
-          <span class="deadline" :class="deadlineClass(job.deadline)">
-            {{ deadlineText(job.deadline) }}
+          <span class="deadline" :class="deadlineClassOf(job)">
+            {{ freshnessOf(job).label }}
           </span>
           <a
             v-if="job.applyUrl"
@@ -408,7 +408,7 @@ import api, { getErrMessage } from '../api'
 import { BaseButton, MapOpenLink, SkeletonBlock } from '../components'
 import { validateJobKeyword } from '../utils/jobKeyword'
 import { toQueryRecruitType } from '../utils/recruitType'
-import { jobTrust, jobFreshness, type JobTrust, type Freshness } from '../utils/jobTrust'
+import { jobTrust, jobFreshness, classifySource, type JobTrust, type Freshness } from '../utils/jobTrust'
 import { asArray, asObject, asFiniteNumber } from '../utils/safeData'
 
 /**
@@ -871,28 +871,20 @@ function trustOf(job: Pick<JobPosting, 'platform' | 'applyUrl'>): JobTrust {
   return jobTrust(job.platform, job.applyUrl)
 }
 
-/** 岗位有效期（与 deadlineText 同口径，但额外给出 urgent 供 UI 强调） */
-function freshnessOf(job: Pick<JobPosting, 'deadline'>): Freshness {
-  return jobFreshness(job.deadline)
+/**
+ * 岗位有效期。文案唯一来源是 `jobFreshness`——列表卡片与详情抽屉必须走同一条规则，
+ * 否则会出现「卡片说长期有效、抽屉说以企业官网为准」的自相矛盾。
+ */
+function freshnessOf(job: Pick<JobPosting, 'deadline' | 'platform'>): Freshness {
+  return jobFreshness(job.deadline, new Date(), classifySource(job.platform))
 }
 
-function deadlineText(deadline: string | null): string {
-  if (!deadline) return '长期有效'
-  const d = new Date(deadline + 'T23:59:59')
-  const diff = Math.ceil((d.getTime() - Date.now()) / 86400000)
-  if (diff < 0) return '已截止'
-  if (diff <= 7) return `仅剩 ${diff} 天`
-  if (diff <= 30) return `${diff} 天后截止`
-  return `截止 ${deadline}`
-}
-
-function deadlineClass(deadline: string | null): string {
-  if (!deadline) return ''
-  const d = new Date(deadline + 'T23:59:59')
-  const diff = Math.ceil((d.getTime() - Date.now()) / 86400000)
-  if (diff < 0) return 'closed'
-  if (diff <= 7) return 'urgent'
-  return ''
+/** 截止状态的强调样式（纯视觉，不产出任何文案断言） */
+function deadlineClassOf(job: Pick<JobPosting, 'deadline' | 'platform'>): string {
+  const f = freshnessOf(job)
+  if (f.daysLeft === null) return ''
+  if (f.daysLeft < 0) return 'closed'
+  return f.urgent ? 'urgent' : ''
 }
 
 function formatTime(iso: string): string {

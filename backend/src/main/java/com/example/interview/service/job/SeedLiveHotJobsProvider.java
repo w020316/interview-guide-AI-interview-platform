@@ -2,7 +2,6 @@ package com.example.interview.service.job;
 
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -132,7 +131,7 @@ public class SeedLiveHotJobsProvider implements JobPlatformAdapter {
 
                 // ── P1：2026-2027 届秋招 技术热点公司 ──
                 new JobDto("live-by-sd-2027", "2027校园招聘（全量技术岗）", "字节跳动",
-                        "互联网", "技术", "北京/上海/深圳/广州/杭州/成都", null, "本科", "2026.9-2027.8毕业", AUTUMN, LocalDate.of(2027, 5, 31),
+                        "互联网", "技术", "北京/上海/深圳/广州/杭州/成都", null, "本科", "2026.9-2027.8毕业", AUTUMN, null,
                         "https://jobs.bytedance.com/campus",
                         "已开放投递（2026.8-2027.5.31），含大模型/算法/后端/前端/客户端/测开全方向。",
                         "1. 本科及以上，2026.9-2027.8 毕业；2. 技术岗需扎实基础；3. 投递截止 2027-05-31。",
@@ -212,7 +211,7 @@ public class SeedLiveHotJobsProvider implements JobPlatformAdapter {
                         "1. 本科及以上，5-10 年 Java 经验；2. 熟悉保险核心/理赔系统优先。",
                         "社招,Java,保险,金融"),
                 new JobDto("live-sz-xinwanda-java-2026", "Java开发工程师（应届）", "欣旺达",
-                        "制造", "技术", "深圳", "7k-21k·13薪", "本科", "应届", AUTUMN, LocalDate.of(2026, 12, 31),
+                        "制造", "技术", "深圳", "7k-21k·13薪", "本科", "应届", AUTUMN, null,
                         "https://m.liepin.com/lptjob/85199827/",
                         "上市公司，负责公司系统逻辑设计/功能开发，应届可投，截止 12-31。",
                         "1. 本科及以上，2026 届应届；2. 熟悉 Java 基础与常用框架。",

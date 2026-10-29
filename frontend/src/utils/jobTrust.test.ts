@@ -173,6 +173,23 @@ describe('jobFreshness —— 新鲜度（如实转述，不评分）', () => {
     }
   })
 
+  it('平台精选 + 无截止日期 → 「以企业官网为准」，不断言「长期有效」', () => {
+    // 精选岗位的日期由本平台手工维护，招聘方从未公开截止时间——
+    // 此时说「长期有效」等于替招聘方承诺一个我们没有依据的期限。
+    for (const v of [null, undefined, '', '  ']) {
+      const f = jobFreshness(v, today, 'curated')
+      expect(f.label, String(v)).toBe('以企业官网为准')
+      expect(f.daysLeft, String(v)).toBeNull()
+      expect(f.urgent, String(v)).toBe(false)
+    }
+  })
+
+  it('有明确截止日期时，精选岗位仍按真实日期计算（中性文案只作用于「无日期」）', () => {
+    const f = jobFreshness('2026-10-08', today, 'curated')
+    expect(f.label).toBe('仅剩 5 天')
+    expect(f.urgent).toBe(true)
+  })
+
   // ⚠️ 天数口径说明：deadline 按「当天 23:59:59」锚定（与 JobsView.deadlineText 一致），
   // 再从 today 时刻向上取整。因此 from 10-04T10:00 看 10-08 是 ceil(4.58) = 5，不是 4。
   // 下面锁定的是**真实值**（已用 node 复算），不是直觉值——直觉值会写错，正如我第一版。

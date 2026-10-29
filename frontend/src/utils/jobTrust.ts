@@ -72,7 +72,7 @@ export const SOURCE_KIND_META: Record<JobSourceKind, SourceKindMeta> = {
   },
   curated: {
     label: '平台精选',
-    hint: '由本平台整理维护的精选岗位，截止日期经过人工确认',
+    hint: '由本平台整理维护的精选岗位；招聘方未公开截止时间，具体以企业官网为准',
   },
   partner: {
     label: '合作渠道',
@@ -209,8 +209,11 @@ export function jobTrust(
 /**
  * 岗位新鲜度（如实转述，不评分）。
  *
- * @param deadline 截止日期 `yyyy-MM-dd`；null → 「长期有效」
+ * @param deadline 截止日期 `yyyy-MM-dd`；null → 见下方 `kind` 说明
  * @param today 注入「今天」以便单测（默认取系统时间）
+ * @param kind 来源类型。平台精选的岗位不设截止日期（招聘方未公开），
+ *             此时显示「以企业官网为准」而不是断言「长期有效」——
+ *             后者是在替招聘方承诺一个我们并未核实过的期限
  * @returns 短标签 + 是否需要醒目提示（≤7 天标为 urgent）
  */
 export interface Freshness {
@@ -225,14 +228,18 @@ export interface Freshness {
 /**
  * 计算岗位新鲜度。
  *
- * <p>与 `JobsView.vue` 既有的 `deadlineText()` 口径保持一致（同样按当天 23:59:59 取整，
- * 同样把已过期标为「已截止」），但**额外返回结构化字段**供标注入口使用。
+ * <p>按当天 23:59:59 取整，把已过期标为「已截止」，
+ * 并**额外返回结构化字段**供标注入口使用。
  */
 export function jobFreshness(
   deadline: string | null | undefined,
   today: Date = new Date(),
+  kind?: JobSourceKind,
 ): Freshness {
   if (!deadline || !deadline.trim()) {
+    if (kind === 'curated') {
+      return { label: '以企业官网为准', urgent: false, daysLeft: null }
+    }
     return { label: '长期有效', urgent: false, daysLeft: null }
   }
   const d = new Date(deadline + 'T23:59:59')
