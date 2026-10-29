@@ -88,6 +88,18 @@
           <span>登录已过期，请重新登录</span>
         </div>
 
+        <!-- 持久错误条（C13）：错误原因此前只通过 ElMessage 弹出，3 秒后消失，
+             用户回头想再看一遍失败原因时已经找不到。这里把它常驻在表单上方，
+             直到下一次提交或成功才清除。 -->
+        <div v-if="lastError" class="auth-error-tip" role="alert">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 7.5v5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="16.5" r="1.1" fill="currentColor"/>
+          </svg>
+          <span>{{ lastError }}</span>
+        </div>
+
         <form v-if="activeTab === 'login'" @submit.prevent="handleLogin" class="auth-form">
           <div class="field">
             <label>用户名</label>
@@ -183,7 +195,7 @@
                 </svg>
               </button>
             </div>
-            <span v-if="regForm.password && regForm.password.length < 6" class="field-error">密码至少 6 位</span>
+            <span v-if="regPasswordError" class="field-error">{{ regPasswordError }}</span>
           </div>
           <div class="field">
             <label>邮箱 <span class="hint">可选</span></label>
@@ -233,6 +245,8 @@ import api, { getErrMessage, isColdStartError } from '../api'
 import { setAuth } from '../auth'
 import { ensureAwake, isBackendKnownReady, prewarmBackend, wakeState } from '../utils/backendWake'
 import { SESSION_EXPIRED_FLAG } from '../utils/sessionGuard'
+import { safeRedirect } from '../utils/safeRedirect'
+import { validatePassword } from '../utils/passwordPolicy'
 
 const router = useRouter()
 const route = useRoute()
@@ -296,8 +310,20 @@ const retryLabel = computed(() =>
 // 表单校验
 const isUsernameValid = computed(() => /^[A-Za-z0-9_\u4e00-\u9fa5]{2,32}$/.test(regForm.value.username))
 const isEmailValid = computed(() => !regForm.value.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regForm.value.email))
+/**
+ * 密码即时校验：长度先拦，再走后端同款强度规则。
+ * 只在用户已经输入后才展示，避免一进页面就满屏飘红。
+ */
+const regPasswordError = computed(() => {
+  const p = regForm.value.password
+  if (!p) return ''
+  if (p.length < 6) return '密码至少 6 位'
+  if (p.length > 64) return '密码长度不能超过 64 位'
+  return validatePassword(p, regForm.value.username) ?? ''
+})
 const isFormValid = computed(() =>
   isUsernameValid.value &&
+  !regPasswordError.value &&
   regForm.value.password.length >= 6 &&
   isEmailValid.value
 )
@@ -315,11 +341,9 @@ onMounted(() => {
   }
 })
 
-/** 登录/注册成功后跳转：redirect 必须以 / 开头的相对路径，防止开放重定向 */
+/** 登录/注册成功后跳转：redirect 必须收敛为站内路径，防止开放重定向 */
 function redirectAfterAuth() {
-  const r = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
-  const safe = typeof r === 'string' && r.startsWith('/') ? r : '/'
-  router.push(safe)
+  router.push(safeRedirect(route.query.redirect, window.location.origin))
 }
 
 /**
@@ -394,8 +418,10 @@ async function handleRegister() {
     return ElMessage.warning('用户名至少 2 位')
   if (!/^[A-Za-z0-9_\u4e00-\u9fa5]+$/.test(regForm.value.username))
     return ElMessage.warning('用户名只能包含中文、字母、数字和下划线')
-  if (!regForm.value.password || regForm.value.password.length < 6)
+  if (!regForm.value.password)
     return ElMessage.warning('密码至少 6 位')
+  if (regPasswordError.value)
+    return ElMessage.warning(regPasswordError.value)
   if (regForm.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regForm.value.email))
     return ElMessage.warning('邮箱格式不正确')
   if (loading.value) return // 防双触发：回车与表单 submit 同时触发时兜底
@@ -689,6 +715,23 @@ async function handleRegister() {
   border-radius: var(--radius-md);
 }
 .session-expired-tip svg {
+  flex: 0 0 auto;
+}
+
+.auth-error-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--c-danger);
+  background: var(--c-danger-light);
+  border: 1px solid var(--c-danger-border);
+  border-radius: var(--radius-md);
+}
+.auth-error-tip svg {
   flex: 0 0 auto;
 }
 
