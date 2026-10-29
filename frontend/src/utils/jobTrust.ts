@@ -97,8 +97,14 @@ export const SOURCE_KIND_META: Record<JobSourceKind, SourceKindMeta> = {
  * 保留顺序只是为了让「更具体的源」优先。
  */
 const KIND_KEYWORDS: ReadonlyArray<readonly [JobSourceKind, readonly string[]]> = [
-  // 官方公开 JSON API
-  ['official-api', ['RemoteOK', 'Remotive', 'Arbeitnow', 'Jobicy', 'Himalayas']],
+  // 官方公开 JSON API（含大厂自建招聘官网，v1.87.0 补齐国内四家）
+  [
+    'official-api',
+    [
+      'RemoteOK', 'Remotive', 'Arbeitnow', 'Jobicy', 'Himalayas',
+      '腾讯招聘', '亚马逊中国', '美团招聘', '网易招聘',
+    ],
+  ],
   // 官方 RSS
   ['official-rss', ['WeWorkRemotely']],
   // 社区人工发帖

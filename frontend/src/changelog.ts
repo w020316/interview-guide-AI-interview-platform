@@ -85,9 +85,24 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.86.0'
+export const CURRENT_VERSION = '1.87.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.87.0',
+    date: '2026-10-29',
+    title: '版本 1.87.0 · 招聘广场多了两家大厂的在招岗位',
+    items: [
+      { text: '招聘广场新增「美团招聘」「网易招聘」两个实时来源：岗位来自企业招聘官网的在招列表，不是示例数据，也不再依赖我们手工整理', level: 'user' },
+      { text: '这两个来源会带上完整的岗位职责与任职要求原文，方便直接对照自己的简历看差距', level: 'user' },
+      { text: '新增岗位按页轮转、每次只更新一小批，列表不会被一次性灌满；旧岗位只要企业还在招就会持续保留', level: 'user' },
+      { text: '企业没有公开的薪资、学历、截止时间，数据里保持为空、不推算；页面沿用既有展示约定：薪资未知显示「面议」，截止未知显示「长期有效」', level: 'user' },
+      { text: '来源徽章修正：腾讯招聘、亚马逊中国、美团招聘、网易招聘统一标为「官方接口」（此前腾讯、亚马逊显示为「其他来源」）', level: 'user' },
+      { text: '后端：新增 MeituanJobProvider / NeteaseJobProvider（POST 公开接口，页数由 totalCount / pages 动态推导，游标轮转，单轮 50 条）；基类补 fetchRawPost，超时与失败语义与 GET 一致', level: 'tech' },
+      { text: '后端：修复 pages-per-refresh 配置键名不匹配（代码读 app.jobs.*、配置在 app.job-agent.*），此前该配置与同名环境变量从未生效；新增 JobPagesConfigTest 把 @Value 键与 application.yml 对撞，防止再次静默失效', level: 'tech' },
+      { text: '测试：两份 Provider 单测覆盖真实响应解析、不编造缺失字段、页数推导、游标轮转与异常结构；JobAgent/OpenApi 既有测试不受影响', level: 'tech' },
+    ],
+  },
   {
     version: '1.86.0',
     date: '2026-10-29',

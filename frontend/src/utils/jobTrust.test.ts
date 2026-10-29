@@ -11,7 +11,7 @@ import {
 } from './jobTrust'
 
 describe('classifySource —— 来源类型归类', () => {
-  it('官方公开 API 的 5 个源全部归为 official-api', () => {
+  it('官方公开 API 的源全部归为 official-api', () => {
     const apis = [
       'RemoteOK 全球远程',
       'Remotive 全球远程',
@@ -20,6 +20,13 @@ describe('classifySource —— 来源类型归类', () => {
       'Himalayas 全球远程',
     ]
     for (const name of apis) {
+      expect(classifySource(name), name).toBe('official-api')
+    }
+  })
+
+  it('大厂自建招聘官网（国内实时源）同样归为 official-api', () => {
+    // v1.87.0：腾讯 / 亚马逊此前漏归类，美团 / 网易新增
+    for (const name of ['腾讯招聘', '亚马逊中国', '美团招聘', '网易招聘']) {
       expect(classifySource(name), name).toBe('official-api')
     }
   })
