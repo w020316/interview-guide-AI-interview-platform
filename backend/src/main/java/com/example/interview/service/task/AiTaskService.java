@@ -204,6 +204,41 @@ public class AiTaskService {
         return repository.save(task);
     }
 
+    // ── 查询（M2）────────────────────────────────────────────────────────
+
+    /** 归属校验后取任务；非本人一律 404（不暴露任务是否存在） */
+    @Transactional(readOnly = true)
+    public AiTaskEntity findOwned(String userId, Long id) {
+        requireText(userId, "userId", 64);
+        return repository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("任务不存在或无权操作"));
+    }
+
+    /** 我的任务分页列表；status 为空表示全部 */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<AiTaskEntity> listOwned(String userId, String status,
+                                                                       int page, int size) {
+        requireText(userId, "userId", 64);
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 50);
+        org.springframework.data.domain.Pageable pageable =
+                org.springframework.data.domain.PageRequest.of(safePage, safeSize);
+        if (status == null || status.isBlank()) {
+            return repository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+        }
+        return repository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status.toUpperCase(), pageable);
+    }
+
+    /** 未完成/失败计数（导航角标与「完成提醒」数据源） */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> summary(String userId) {
+        requireText(userId, "userId", 64);
+        return java.util.Map.of(
+                "queued", repository.countByUserIdAndStatus(userId, AiTaskStatus.QUEUED.name()),
+                "running", repository.countByUserIdAndStatus(userId, AiTaskStatus.RUNNING.name()),
+                "failed", repository.countByUserIdAndStatus(userId, AiTaskStatus.FAILED.name()));
+    }
+
     // ── 内部 ────────────────────────────────────────────────────────────
 
     private AiTaskEntity requireTask(Long id) {

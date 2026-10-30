@@ -43,4 +43,15 @@ public interface AiTaskRepository extends JpaRepository<AiTaskEntity, Long> {
 
     /** 归属校验后取任务（取消/查询用，防 IDOR） */
     Optional<AiTaskEntity> findByIdAndUserId(Long id, String userId);
+
+    /** 我的任务列表（分页，最近创建在前） */
+    org.springframework.data.domain.Page<AiTaskEntity> findByUserIdOrderByCreatedAtDesc(
+            String userId, org.springframework.data.domain.Pageable pageable);
+
+    /** 我的任务列表（按状态过滤） */
+    org.springframework.data.domain.Page<AiTaskEntity> findByUserIdAndStatusOrderByCreatedAtDesc(
+            String userId, String status, org.springframework.data.domain.Pageable pageable);
+
+    /** 某状态下我的任务数（summary 角标用） */
+    long countByUserIdAndStatus(String userId, String status);
 }
