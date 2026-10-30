@@ -1,0 +1,296 @@
+[
+ {
+  "path": "/jobs",
+  "w": 375,
+  "h": 667,
+  "theme": "light",
+  "url": "/jobs",
+  "vw": 375,
+  "overflowX": false,
+  "small": [],
+  "low": [],
+  "cls": 0.316,
+  "lcp": 700
+ },
+ {
+  "path": "/jobs",
+  "w": 768,
+  "h": 1024,
+  "theme": "light",
+  "url": "/jobs",
+  "vw": 768,
+  "overflowX": false,
+  "small": [],
+  "low": [],
+  "cls": 0.087,
+  "lcp": 876
+ },
+ {
+  "path": "/jobs",
+  "w": 1024,
+  "h": 768,
+  "theme": "light",
+  "url": "/jobs",
+  "vw": 1024,
+  "overflowX": false,
+  "small": [
+   {
+    "tag": "button",
+    "cls": "",
+    "w": 65,
+    "h": 35
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "w": 78,
+    "h": 35
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "w": 78,
+    "h": 35
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "w": 65,
+    "h": 35
+   },
+   {
+    "tag": "input",
+    "cls": "",
+    "w": 56,
+    "h": 29
+   },
+   {
+    "tag": "button",
+    "cls": "",
+    "w": 65,
+    "h": 35
+   },
+   {
+    "tag": "button",
+    "cls": "version-link",
+    "w": 55,
+    "h": 24
+   }
+  ],
+  "low": [],
+  "cls": 0.144,
+  "lcp": 676
+ },
+ {
+  "path": "/jobs",
+  "w": 1440,
+  "h": 900,
+  "theme": "light",
+  "url": "/jobs",
+  "vw": 1440,
+  "overflowX": false,
+  "small": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "router-link-active router-link-exact-act",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "button",
+    "cls": "nav-link nav-trigger",
+    "w": 118,
+    "h": 44
+   },
+   {
+    "tag": "button",
+    "cls": "theme-toggle",
+    "w": 44,
+    "h": 44
+   }
+  ],
+  "low": [],
+  "cls": 0.066,
+  "lcp": 704
+ },
+ {
+  "path": "/login",
+  "w": 375,
+  "h": 667,
+  "theme": "light",
+  "url": "/",
+  "vw": 375,
+  "overflowX": false,
+  "small": [],
+  "low": [],
+  "cls": 0.316,
+  "lcp": 356
+ },
+ {
+  "path": "/admin",
+  "w": 1920,
+  "h": 1080,
+  "theme": "light",
+  "url": "/admin",
+  "vw": 1920,
+  "overflowX": false,
+  "small": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "button",
+    "cls": "nav-link nav-trigger",
+    "w": 118,
+    "h": 44
+   },
+   {
+    "tag": "button",
+    "cls": "theme-toggle",
+    "w": 44,
+    "h": 44
+   }
+  ],
+  "low": [],
+  "cls": 0.046,
+  "lcp": 640
+ },
+ {
+  "path": "/admin",
+  "w": 1920,
+  "h": 1080,
+  "theme": "dark",
+  "url": "/admin",
+  "vw": 1920,
+  "overflowX": false,
+  "small": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "button",
+    "cls": "nav-link nav-trigger",
+    "w": 118,
+    "h": 44
+   },
+   {
+    "tag": "button",
+    "cls": "theme-toggle",
+    "w": 44,
+    "h": 44
+   }
+  ],
+  "low": [],
+  "cls": 0.046,
+  "lcp": 556
+ },
+ {
+  "path": "/admin",
+  "w": 375,
+  "h": 667,
+  "theme": "dark",
+  "url": "/admin",
+  "vw": 375,
+  "overflowX": false,
+  "small": [],
+  "low": [],
+  "cls": 0.316,
+  "lcp": 384
+ }
+]
