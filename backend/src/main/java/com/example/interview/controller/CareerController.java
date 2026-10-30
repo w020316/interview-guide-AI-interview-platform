@@ -39,8 +39,13 @@ public class CareerController {
 
     private static final Logger log = LoggerFactory.getLogger(CareerController.class);
 
-    /** 用户自述经历的请求体上限（与 Service 侧截断一致，避免超大 body 直灌模型） */
-    private static final int MAX_NARRATIVE_LEN = 3000;
+    /**
+     * 用户自述经历的请求体上限。
+     * P2-12：直接引用服务层常量 —— 此前这里写 3000 却在下面按 {@code *2}（6000）校验，
+     * 3000~6000 字的输入通过校验后被服务层静默截断到 3000，用户毫无感知。
+     */
+    private static final int MAX_NARRATIVE_LEN =
+            com.example.interview.service.career.CareerProfileService.MAX_NARRATIVE_LEN;
 
     @Autowired
     private CareerProfileService careerProfileService;
@@ -85,8 +90,8 @@ public class CareerController {
         if (narrative == null || narrative.isBlank()) {
             return Result.error(400, "请先描述你的真实经历（narrative 不能为空）");
         }
-        if (narrative.length() > MAX_NARRATIVE_LEN * 2) {
-            return Result.error(400, "经历描述过长，请精简后再试（建议 3000 字以内）");
+        if (narrative.length() > MAX_NARRATIVE_LEN) {
+            return Result.error(400, "经历描述过长，请精简后再试（最多 " + MAX_NARRATIVE_LEN + " 字）");
         }
         String targetTrack = str(req.get("targetTrack"));
 

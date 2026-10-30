@@ -917,17 +917,45 @@ function onJumpPage() {
   jumpPage.value = null
 }
 
+/**
+ * 手动刷新（P2-03，2026-10-30 质量循环）。
+ *
+ * <p>后端已改为异步：POST 立刻返回 202 + 状态，真正的抓取/入库在后台跑。
+ * 这里轮询 `/api/jobs/refresh/status` 直到 DONE / FAILED / BUSY，再重新拉列表。
+ *
+ * <p>为什么不再等单个 120s 请求：多源抓取 + AI 分类可能远超 120s，
+ * 同步接口超时后后端仍在跑，用户重试又撞上「刷新中」——看起来永远失败。
+ */
 async function refreshData() {
   refreshing.value = true
   try {
-    await api.post('/api/jobs/refresh', null, { timeout: 120000 })
-    ElMessage.success('岗位数据已刷新')
+    const started = await api.post('/api/jobs/refresh', null, { timeout: 30000 }) as unknown as RefreshStatus
+    let state = started?.state || 'RUNNING'
+    // 最多轮询 100 次 × 3s = 5 分钟；超时后如实提示「仍在进行」，不谎报成功
+    for (let i = 0; i < 100 && (state === 'RUNNING' || state === 'IDLE'); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      const s = await api.get('/api/jobs/refresh/status') as unknown as RefreshStatus
+      state = s?.state || 'RUNNING'
+    }
+    if (state === 'DONE') {
+      ElMessage.success('岗位数据已刷新')
+    } else if (state === 'FAILED') {
+      ElMessage.warning('刷新失败，请稍后重试')
+    } else {
+      ElMessage.info('刷新仍在进行中，列表会稍后自动更新')
+    }
     await Promise.all([fetchJobs(), fetchMeta()])
   } catch (e) {
     ElMessage.error(getErrMessage(e, '刷新失败，请稍后重试'))
   } finally {
     refreshing.value = false
   }
+}
+
+/** 刷新任务状态（与后端 JobAgentService.RefreshStatus 对应） */
+interface RefreshStatus {
+  state?: 'IDLE' | 'RUNNING' | 'DONE' | 'FAILED' | 'BUSY'
+  error?: string
 }
 
 /**

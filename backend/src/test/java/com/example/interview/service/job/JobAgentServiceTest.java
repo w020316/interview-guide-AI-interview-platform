@@ -913,4 +913,29 @@ class JobAgentServiceTest {
         // 4 个 emoji = 8 个 UTF-16 单元；按 2 个「字符」裁剪应得到 2 个完整 emoji
         assertThat(JobAgentService.clip("😀😀😀😀", 2)).isEqualTo("😀😀");
     }
+
+    /**
+     * P2-02（2026-10-30）：健康状态必须反映「入库是否成功」。
+     * 原实现在 adapter.fetch() 返回后立刻 recordSuccess ——「拉取成功但入库全失败」
+     * 在管理后台显示为健康，运维看不到任何异常。
+     */
+    @Test
+    @DisplayName("P2-02：拉取成功但入库失败 → 健康状态记为失败")
+    void healthMarkedFailureWhenUpsertFails() {
+        when(repository.findByPlatformAndExternalIdIn(anyString(), anyList()))
+                .thenThrow(new RuntimeException("Data too long for column 'title'"));
+
+        JobAgentService service = new JobAgentService(repository,
+                List.of(new FakeAdapter("内置精选",
+                        List.of(dto("e1", "Java 工程师", "阿里", "互联网", "技术")))),
+                httpAdapter, classifyService, healthRegistry, txManager);
+
+        service.refresh();
+
+        JobSourceHealthRegistry.Health h = healthRegistry.get("内置精选");
+        assertThat(h).isNotNull();
+        assertThat(h.healthy()).as("入库失败绝不能记为健康").isFalse();
+        assertThat(h.lastError()).contains("入库失败");
+    }
+
 }

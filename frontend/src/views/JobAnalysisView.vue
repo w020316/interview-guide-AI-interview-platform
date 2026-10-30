@@ -54,7 +54,8 @@
           <span v-if="importedCompany">@ {{ importedCompany }}</span>
         </div>
 
-        <BaseTextarea v-model="jdText" :rows="10" placeholder="把招聘网站上的岗位描述全文粘贴到这里..." />
+        <BaseTextarea v-model="jdText" :rows="10" :maxlength="MAX_TEXT_LEN" placeholder="把招聘网站上的岗位描述全文粘贴到这里..." />
+        <p class="field-count">{{ jdText.length }}/{{ MAX_TEXT_LEN }}</p>
         <BaseButton variant="gradient" :loading="loading" :disabled="loading" @click="analyzeJd">
           {{ loading ? '分析中...' : '开始分析' }}
         </BaseButton>
@@ -128,12 +129,13 @@
       <div class="input-card">
         <div class="field-row">
           <label>岗位描述（JD）</label>
-          <BaseTextarea v-model="jdText" :rows="6" placeholder="粘贴岗位描述..." />
+          <BaseTextarea v-model="jdText" :rows="6" :maxlength="MAX_TEXT_LEN" placeholder="粘贴岗位描述..." />
+          <p class="field-count">{{ jdText.length }}/{{ MAX_TEXT_LEN }}</p>
         </div>
         <div class="field-row">
           <label>你的简历</label>
           <div class="resume-input-group">
-            <BaseTextarea v-model="resumeText" :rows="8" placeholder="粘贴简历内容，或点击下方按钮上传简历文件..." />
+            <BaseTextarea v-model="resumeText" :rows="8" :maxlength="MAX_TEXT_LEN" placeholder="粘贴简历内容，或点击下方按钮上传简历文件..." />
             <div class="resume-upload-bar">
               <el-upload accept=".pdf,.txt,.html,.htm,.md,.markdown,application/pdf,text/plain,text/html,text/markdown"
                 :before-upload="handleResumeUpload" :show-file-list="false" :http-request="() => {}">
@@ -223,11 +225,13 @@
       <div class="input-card">
         <div class="field-row">
           <label>岗位描述（JD）</label>
-          <BaseTextarea v-model="jdText" :rows="6" placeholder="粘贴岗位描述..." />
+          <BaseTextarea v-model="jdText" :rows="6" :maxlength="MAX_TEXT_LEN" placeholder="粘贴岗位描述..." />
+          <p class="field-count">{{ jdText.length }}/{{ MAX_TEXT_LEN }}</p>
         </div>
         <div class="field-row">
           <label>你的简历</label>
-          <BaseTextarea v-model="resumeText" :rows="8" placeholder="粘贴简历内容..." />
+          <BaseTextarea v-model="resumeText" :rows="8" :maxlength="MAX_TEXT_LEN" placeholder="粘贴简历内容..." />
+          <p class="field-count">{{ resumeText.length }}/{{ MAX_TEXT_LEN }}</p>
         </div>
         <div class="field-row">
           <label>生成类型</label>
@@ -278,6 +282,13 @@ import { BaseButton, BaseTextarea, BaseInput } from '../components'
 const tab = ref<'analyze' | 'gap' | 'letter'>('analyze')
 const jdText = ref('')
 const resumeText = ref('')
+
+/**
+ * 输入长度上限（P2-06）：与后端 `JobAnalysisService.MAX_TEXT_LEN` 同口径。
+ * 后端超限返回 400，前端 maxlength 让用户根本输入不进去，并显示实时字数，
+ * 避免「粘贴 8000 字 → 后端静默截断一半」的旧行为。
+ */
+const MAX_TEXT_LEN = 4000
 
 // ── Tab 1: JD 分析 ──
 const loading = ref(false)
@@ -588,6 +599,15 @@ function gapStatusClass(status: string): string {
   font-weight: 500;
   color: var(--c-text);
   margin-bottom: 8px;
+}
+
+/* 字数计数（P2-06）：右对齐、低对比，只在接近上限时才需要被注意 */
+.field-count {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+  color: var(--c-text-tertiary);
 }
 
 .input-card textarea,

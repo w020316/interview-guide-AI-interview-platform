@@ -363,20 +363,42 @@ class JobAgentControllerTest {
                 .andExpect(jsonPath("$.data.items[0].job.title").value("Java 后端工程师"));
     }
 
+    /** 构造一次已完成的刷新状态（P2-03 异步契约） */
+    private static JobAgentService.RefreshStatus doneStatus(int upserted, int inserted, int updated) {
+        return new JobAgentService.RefreshStatus("DONE",
+                new JobAgentService.RefreshResult(upserted, inserted, updated, 3, 0, 1),
+                null, System.currentTimeMillis());
+    }
+
+    /**
+     * P2-03（2026-10-30）：刷新改为异步。POST 立刻返回 202 + 任务状态，
+     * 前端轮询 /refresh/status —— 避免同步等待超过前端超时后误判失败。
+     */
     @Test
-    @DisplayName("POST /api/jobs/refresh: 正常刷新返回统计结果")
-    void refresh_success_returnsStats() throws Exception {
-        when(jobAgentService.refresh())
-                .thenReturn(new JobAgentService.RefreshResult(2, 1, 1, 3, 0, 1));
+    @DisplayName("POST /api/jobs/refresh: 受理后返回 202 + 任务状态")
+    void refresh_accepted_returns202() throws Exception {
+        when(jobAgentService.startRefreshAsync()).thenReturn(doneStatus(2, 1, 1));
 
         mockMvc.perform(post("/api/jobs/refresh"))
-                .andExpect(status().isOk())
+                .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.upserted").value(2))
-                .andExpect(jsonPath("$.data.inserted").value(1))
-                .andExpect(jsonPath("$.data.updated").value(1))
-                .andExpect(jsonPath("$.data.expired").value(3))
-                .andExpect(jsonPath("$.data.removed").value(1));
+                .andExpect(jsonPath("$.data.state").value("DONE"))
+                .andExpect(jsonPath("$.data.result.upserted").value(2))
+                .andExpect(jsonPath("$.data.result.inserted").value(1))
+                .andExpect(jsonPath("$.data.result.updated").value(1))
+                .andExpect(jsonPath("$.data.result.expired").value(3))
+                .andExpect(jsonPath("$.data.result.removed").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /api/jobs/refresh/status: 返回当前任务状态")
+    void refreshStatus_returnsState() throws Exception {
+        when(jobAgentService.refreshStatus()).thenReturn(doneStatus(1, 1, 0));
+
+        mockMvc.perform(get("/api/jobs/refresh/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value("DONE"))
+                .andExpect(jsonPath("$.data.result.upserted").value(1));
     }
 
     @Test
@@ -391,18 +413,28 @@ class JobAgentControllerTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value(429))
                 .andExpect(jsonPath("$.message").value("刷新过于频繁，请 5 分钟后再试"));
-        verify(jobAgentService, never()).refresh();
+        verify(jobAgentService, never()).startRefreshAsync();
     }
 
+    /**
+     * P2-03：已有任务在跑时不再返回 429，而是直接回当前状态（且不消耗用户额度）。
+     * 429 会让前端以为「刷新失败」，实际任务仍在跑，重试也无意义。
+     */
     @Test
-    @DisplayName("POST /api/jobs/refresh: 已有刷新任务执行中返回 429")
-    void refresh_busy_returns429() throws Exception {
-        when(jobAgentService.refresh()).thenReturn(null);
+    @DisplayName("POST /api/jobs/refresh: 已有任务在跑时返回 RUNNING 状态且不扣额度")
+    void refresh_alreadyRunning_returnsRunningState() throws Exception {
+        when(jobAgentService.refreshStatus()).thenReturn(
+                new JobAgentService.RefreshStatus("RUNNING", null, null, System.currentTimeMillis()));
+        // 先耗尽配额：若实现走了限流分支会 429，从而暴露「重复扣额度」
+        PerUserRateLimiter limiter = (PerUserRateLimiter)
+                ReflectionTestUtils.getField(controller, "refreshLimiter");
+        limiter.allow(USER_ID);
 
         mockMvc.perform(post("/api/jobs/refresh"))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.code").value(429))
-                .andExpect(jsonPath("$.message").value("岗位数据正在刷新中，请稍后再试"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.state").value("RUNNING"));
+        verify(jobAgentService, never()).startRefreshAsync();
     }
 
     @Test
@@ -416,13 +448,12 @@ class JobAgentControllerTest {
                 ReflectionTestUtils.getField(controller, "refreshLimiter");
         limiter.allow("someone-else");
         limiter.allow(USER_ID);
-        when(jobAgentService.refresh())
-                .thenReturn(new JobAgentService.RefreshResult(1, 1, 0, 0, 0, 0));
+        when(jobAgentService.startRefreshAsync()).thenReturn(doneStatus(1, 1, 0));
 
         mockMvc.perform(post("/api/jobs/refresh"))
-                .andExpect(status().isOk())
+                .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.upserted").value(1));
+                .andExpect(jsonPath("$.data.result.upserted").value(1));
     }
 
     @Test

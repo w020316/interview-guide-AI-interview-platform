@@ -50,7 +50,7 @@ public class JobAnalysisService {
      * 4000 字（中文约 2500~3000 token）在现有链路上是安全的，且已覆盖绝大多数 JD。
      * 简历侧用同一常量，理由相同（项目经历常被写在简历后半段）。
      */
-    private static final int MAX_TEXT_LEN = 4000;
+    public static final int MAX_TEXT_LEN = 4000;
 
     /**
      * JD 岗位分析：拆解岗位要求
@@ -172,7 +172,10 @@ public class JobAnalysisService {
      */
     public String generateLetter(String resumeText, String jobDescription, String type) {
         String truncatedResume = TextUtil.truncate(resumeText, MAX_TEXT_LEN);
-        String truncatedJd = TextUtil.truncate(jobDescription, 600);
+        // P2-06（2026-10-30）：此前这里单独把 JD 截到 600 字，而控制器不做任何长度校验 ——
+        // 用户粘贴 2000 字 JD 时后 1400 字被静默丢弃，生成的求职信基于残缺岗位信息。
+        // 统一到 MAX_TEXT_LEN（与 analyze/gap 一致），控制器超限时直接 400 并提示。
+        String truncatedJd = TextUtil.truncate(jobDescription, MAX_TEXT_LEN);
 
         String typeDesc = switch (type) {
             case "email" -> "一封专业的申请邮件（投递简历时发送给 HR），邮件需包含：邮件主题、简短问候、正文（说明应聘岗位、核心优势、求职意向）、结尾礼仪语。语气专业但不生硬。";

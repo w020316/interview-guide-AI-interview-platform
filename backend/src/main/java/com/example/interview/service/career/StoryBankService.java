@@ -36,8 +36,8 @@ public class StoryBankService {
 
     private static final Logger log = LoggerFactory.getLogger(StoryBankService.class);
 
-    /** 用户自述/简历要点最大长度 */
-    private static final int MAX_NARRATIVE_LEN = 3000;
+    /** 用户自述/简历要点最大长度（P2-12：public 供控制器引用，避免两处常量各自演进） */
+    public static final int MAX_NARRATIVE_LEN = 3000;
 
     /** 目标岗位/赛道最大长度 */
     private static final int MAX_TRACK_LEN = 200;

@@ -46,8 +46,13 @@ public class StoryBankController {
 
     private static final Logger log = LoggerFactory.getLogger(StoryBankController.class);
 
-    /** 请求体文本上限（与 Service 侧截断一致） */
-    private static final int MAX_TEXT_LEN = 6000;
+    /**
+     * 请求体文本上限。
+     * P2-12：改为直接引用服务层常量。此前这里是 6000，而服务层按 3000 截断、
+     * 报错文案又写「建议 3000 字以内」—— 三处口径互不一致。
+     */
+    private static final int MAX_TEXT_LEN =
+            com.example.interview.service.career.StoryBankService.MAX_NARRATIVE_LEN;
 
     @Autowired
     private StoryBankService storyBankService;
@@ -83,7 +88,7 @@ public class StoryBankController {
             return Result.error(400, "请先描述你的真实经历（narrative 不能为空）");
         }
         if (narrative.length() > MAX_TEXT_LEN) {
-            return Result.error(400, "经历描述过长，请精简后再试（建议 3000 字以内）");
+            return Result.error(400, "经历描述过长，请精简后再试（最多 " + MAX_TEXT_LEN + " 字）");
         }
         String targetTrack = strOrEmpty(req.get("targetTrack"));
 

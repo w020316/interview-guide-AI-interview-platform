@@ -32,6 +32,9 @@ public class JobAnalysisController {
     /** 仅用于判断「AI 抽取结果是否三字段全空」，与业务 JSON 序列化无关 */
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** 与 JobAnalysisService.MAX_TEXT_LEN 同口径（P2-06：超限返回 400，而不是静默截断） */
+    private static final int MAX_TEXT_LEN = JobAnalysisService.MAX_TEXT_LEN;
+
     @Autowired
     private JobAnalysisService jobAnalysisService;
 
@@ -153,6 +156,11 @@ public class JobAnalysisController {
         if (jobDescription == null || jobDescription.trim().isEmpty()) {
             return Result.error(400, "岗位描述不能为空");
         }
+        // P2-06：超长输入必须显式拒绝。此前服务层会静默截断到 4000 字，
+        // 用户粘贴 8000 字 JD 时 AI 结论建立在被砍掉一半的输入上，而界面毫无提示。
+        if (jobDescription.length() > MAX_TEXT_LEN) {
+            return Result.error(400, "岗位描述过长（最多 " + MAX_TEXT_LEN + " 字），请精简后重试");
+        }
         // currentUserId() 用于触发认证校验，确保已登录
         currentUserId();
         String result = jobAnalysisService.analyzeJobDescription(jobDescription);
@@ -174,6 +182,12 @@ public class JobAnalysisController {
         }
         if (jobDescription == null || jobDescription.trim().isEmpty()) {
             return Result.error(400, "岗位描述不能为空");
+        }
+        if (resumeText.length() > MAX_TEXT_LEN) {
+            return Result.error(400, "简历内容过长（最多 " + MAX_TEXT_LEN + " 字），请精简后重试");
+        }
+        if (jobDescription.length() > MAX_TEXT_LEN) {
+            return Result.error(400, "岗位描述过长（最多 " + MAX_TEXT_LEN + " 字），请精简后重试");
         }
         currentUserId();
         String result = jobAnalysisService.diagnoseGap(resumeText, jobDescription);
@@ -197,6 +211,12 @@ public class JobAnalysisController {
         }
         if (jobDescription == null || jobDescription.trim().isEmpty()) {
             return Result.error(400, "岗位描述不能为空");
+        }
+        if (resumeText.length() > MAX_TEXT_LEN) {
+            return Result.error(400, "简历内容过长（最多 " + MAX_TEXT_LEN + " 字），请精简后重试");
+        }
+        if (jobDescription.length() > MAX_TEXT_LEN) {
+            return Result.error(400, "岗位描述过长（最多 " + MAX_TEXT_LEN + " 字），请精简后重试");
         }
         currentUserId();
         String result = jobAnalysisService.generateLetter(resumeText, jobDescription, type);

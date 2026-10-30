@@ -91,6 +91,57 @@ public class JobAgentService {
                                 int deactivated, int removed) {
     }
 
+    /**
+     * 异步刷新状态（P2-03，2026-10-30 质量循环）。
+     *
+     * <p><b>为什么改成异步</b>：多源刷新可能远超前端 120s 超时。同步接口超时后，
+     * 后端仍在跑，用户重试又撞上 CAS 直接返回 null（提示「刷新中」），体验割裂且容易误判成失败。
+     * 现在 POST 立刻返回 202 + 状态，前端轮询 {@code /refresh/status}。
+     *
+     * @param state RUNNING / DONE / FAILED / BUSY（BUSY = 定时任务或其它实例正在刷新）
+     */
+    public record RefreshStatus(String state, RefreshResult result, String error, long updatedAt) {
+    }
+
+    private volatile RefreshStatus asyncRefreshStatus =
+            new RefreshStatus("IDLE", null, null, 0L);
+
+    /** 刷新执行线程（单线程即可：refresh() 自身有 CAS 互斥） */
+    private final java.util.concurrent.ExecutorService refreshExecutor =
+            java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+
+    /** 最近一次异步刷新状态（供前端轮询） */
+    public RefreshStatus refreshStatus() {
+        return asyncRefreshStatus;
+    }
+
+    /**
+     * 启动一次异步刷新；已有任务在跑时不重复启动，直接返回当前状态。
+     *
+     * <p>用 {@code synchronized} 保护「检查状态 → 置 RUNNING → 提交任务」这段临界区，
+     * 并发双击不会各自起一个线程。刷新本体仍由 {@link #refresh()} 的 CAS 兜底。
+     */
+    public synchronized RefreshStatus startRefreshAsync() {
+        if ("RUNNING".equals(asyncRefreshStatus.state())) {
+            return asyncRefreshStatus;
+        }
+        asyncRefreshStatus = new RefreshStatus("RUNNING", null, null, System.currentTimeMillis());
+        refreshExecutor.submit(() -> {
+            try {
+                RefreshResult result = refresh();
+                asyncRefreshStatus = result == null
+                        // 定时任务/其它请求正在刷新：如实告知 BUSY，让前端稍后重试
+                        ? new RefreshStatus("BUSY", null, null, System.currentTimeMillis())
+                        : new RefreshStatus("DONE", result, null, System.currentTimeMillis());
+            } catch (Exception e) {
+                log.warn("异步岗位刷新失败：{}", e.getMessage());
+                asyncRefreshStatus = new RefreshStatus("FAILED", null,
+                        "刷新失败，请稍后重试", System.currentTimeMillis());
+            }
+        });
+        return asyncRefreshStatus;
+    }
+
     /** 是否有刷新任务正在执行（管理后台总览展示） */
     public boolean isRefreshing() {
         return refreshRunning.get();
@@ -129,6 +180,8 @@ public class JobAgentService {
 
         // 分组收集：平台名 -> 岗位列表
         Map<String, List<JobDto>> platformJobs = new LinkedHashMap<>();
+        // P2-02：拉取耗时先存起来，等**入库成功之后**再登记健康状态
+        Map<String, Long> fetchCostMs = new HashMap<>();
         for (JobPlatformAdapter adapter : adapters) {
             if (adapter == httpAdapter) {
                 continue; // 第三方平台单独处理
@@ -149,8 +202,9 @@ public class JobAgentService {
             try {
                 List<JobDto> fetched = adapter.fetch();
                 platformJobs.put(name, fetched);
-                healthRegistry.recordSuccess(name, fetched == null ? 0 : fetched.size(),
-                        System.currentTimeMillis() - startedAt);
+                fetchCostMs.put(name, System.currentTimeMillis() - startedAt);
+                // P2-02：**不在这里记 success**。此前「拉取成功但入库全失败」会显示为健康，
+                // 运维看后台一切正常、实际岗位一条都没进来。成功必须在 upsertBatch 之后记。
             } catch (Exception e) {
                 // 失败隔离：单个源失败不影响其他源；同时登记健康状态，供管理后台告警
                 log.warn("平台 {} 岗位拉取失败：{}", name, e.getMessage());
@@ -161,11 +215,10 @@ public class JobAgentService {
             long startedAt = System.currentTimeMillis();
             Map<String, List<JobDto>> thirdParty = httpAdapter.fetchAllByPlatform();
             platformJobs.putAll(thirdParty);
-            // 第三方适配器是「一个适配器按渠道名展开」，因此逐渠道登记健康状态
+            // 第三方适配器是「一个适配器按渠道名展开」，逐渠道记录拉取耗时（成功在入库后记）
+            long cost = System.currentTimeMillis() - startedAt;
             for (var entry : thirdParty.entrySet()) {
-                healthRegistry.recordSuccess(entry.getKey(),
-                        entry.getValue() == null ? 0 : entry.getValue().size(),
-                        System.currentTimeMillis() - startedAt);
+                fetchCostMs.put(entry.getKey(), cost);
             }
         } catch (Exception e) {
             log.warn("第三方平台岗位拉取失败：{}", e.getMessage());
@@ -209,10 +262,14 @@ public class JobAgentService {
                 upserted += pending.size();
                 inserted += r.inserted();
                 updated += r.updated();
+                // P2-02：入库成功后才登记健康（拉取成功 + 入库失败 ≠ 健康）
+                healthRegistry.recordSuccess(platform, jobs.size(), fetchCostMs.getOrDefault(platform, 0L));
                 log.info("平台 {} 岗位刷新完成：{} 条", platform, jobs.size());
             } catch (Exception e) {
-                // 单平台失败不影响整体刷新
+                // 单平台失败不影响整体刷新，但必须如实登记失败（否则后台显示一切正常）
                 log.warn("平台 {} 岗位刷新失败：{}", platform, e.getMessage());
+                healthRegistry.recordFailure(platform, "入库失败：" + e.getMessage(),
+                        fetchCostMs.getOrDefault(platform, 0L));
             }
         }
 

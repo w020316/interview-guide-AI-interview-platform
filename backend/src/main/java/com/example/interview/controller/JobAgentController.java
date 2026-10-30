@@ -248,9 +248,14 @@ public class JobAgentController {
      * 都看不见限流发生，前端 error 分支也不会有 429 提示（契约 §4/§5）。
      * body 仍保持 {@code Result} 结构，兼容按 code 判读的调用方。
      */
-    @Operation(summary = "手动刷新岗位数据")
+    @Operation(summary = "手动刷新岗位数据（异步：返回 202 + 任务状态）")
     @PostMapping("/refresh")
-    public Result<JobAgentService.RefreshResult> refresh(HttpServletResponse response) {
+    public Result<Map<String, Object>> refresh(HttpServletResponse response) {
+        // 已有任务在跑：直接告知状态，**不消耗**本次用户的刷新额度
+        JobAgentService.RefreshStatus current = jobAgentService.refreshStatus();
+        if (current != null && "RUNNING".equals(current.state())) {
+            return Result.success(refreshStatusPayload(current));
+        }
         // 按用户限流：同一用户 5 分钟内仅允许手动刷新一次，防刷第三方抓取配额（B-10）；管理员无限制（v1.31.4）
         if (!com.example.interview.security.RoleUtil.isCurrentUserAdmin()
                 && !refreshLimiter.allow(currentUserId())) {
@@ -258,13 +263,40 @@ public class JobAgentController {
             response.setHeader("Retry-After", "300");
             return Result.error(429, "刷新过于频繁，请 5 分钟后再试");
         }
-        JobAgentService.RefreshResult result = jobAgentService.refresh();
-        if (result == null) {
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.setHeader("Retry-After", "30");
-            return Result.error(429, "岗位数据正在刷新中，请稍后再试");
+        JobAgentService.RefreshStatus status = jobAgentService.startRefreshAsync();
+        // P2-03：202 表示「已受理，结果请轮询」——避免前端等满 120s 后误判失败
+        response.setStatus(HttpServletResponse.SC_ACCEPTED);
+        return Result.success(refreshStatusPayload(status));
+    }
+
+    /**
+     * 刷新任务状态（P2-03）。
+     * GET /api/jobs/refresh/status
+     */
+    @Operation(summary = "查询岗位刷新任务状态")
+    @GetMapping("/refresh/status")
+    public Result<Map<String, Object>> refreshStatus() {
+        currentUserId();
+        return Result.success(refreshStatusPayload(jobAgentService.refreshStatus()));
+    }
+
+    /** 刷新状态 → 前端可读结构（result 为 null 时字段缺失，不填 0 冒充统计） */
+    private static Map<String, Object> refreshStatusPayload(JobAgentService.RefreshStatus status) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        if (status == null) {
+            payload.put("state", "IDLE");
+            payload.put("updatedAt", 0L);
+            return payload;
         }
-        return Result.success(result);
+        payload.put("state", status.state());
+        payload.put("updatedAt", status.updatedAt());
+        if (status.result() != null) {
+            payload.put("result", status.result());
+        }
+        if (status.error() != null) {
+            payload.put("error", status.error());
+        }
+        return payload;
     }
 
     // ── 岗位收藏（v1.23.3）──

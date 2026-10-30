@@ -33,8 +33,12 @@ public class CareerProfileService {
 
     private static final Logger log = LoggerFactory.getLogger(CareerProfileService.class);
 
-    /** 用户自述经历最大长度（截断后送 AI，避免 prompt 过长拖慢推理） */
-    private static final int MAX_NARRATIVE_LEN = 3000;
+    /**
+     * 用户自述经历最大长度（截断后送 AI，避免 prompt 过长拖慢推理）。
+     * P2-12：改为 public，供控制器直接引用 —— 此前控制器写的是 {@code MAX*2}（6000），
+     * 3000~6000 字的输入能通过校验、随后被服务层静默砍半。
+     */
+    public static final int MAX_NARRATIVE_LEN = 3000;
 
     /** 简历文本最大长度 */
     private static final int MAX_RESUME_LEN = 2000;
