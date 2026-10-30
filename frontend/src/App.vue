@@ -179,6 +179,15 @@
                       </span>
                       <span class="dd-text"><b>个人中心</b></span>
                     </router-link>
+                    <button class="dd-item compact" type="button" role="menuitem" @click="showMyTasks">
+                      <span class="dd-ico">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M9 11l3 3 8-8 M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </span>
+                      <span class="dd-text"><b>我的任务</b></span>
+                    </button>
                     <router-link v-if="isAdmin()" to="/admin" class="dd-item compact" role="menuitem">
                       <span class="dd-ico">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -260,6 +269,20 @@
               </div>
             </template>
 
+            <!-- 移动端额外入口：任务列表不是路由页，无法放进 navigation.ts 的分组，单列一组 -->
+            <template v-if="authState.token">
+              <p class="md-title">任务</p>
+              <div class="md-grid is-single">
+                <button class="md-item md-btn" type="button" @click="showMyTasks">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M9 11l3 3 8-8 M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span>我的任务</span>
+                </button>
+              </div>
+            </template>
+
           </div>
         </transition>
 
@@ -324,6 +347,8 @@
 
       <!-- 全局 AI 任务中心（N3）：进行中 / 完成通知，常驻右下角，视图零改动 -->
       <AiTaskCenter />
+      <!-- 我的任务抽屉（M4）：任务历史、取消、跳回对应页面 -->
+      <MyTasksDrawer />
     </div>
   </el-config-provider>
 </template>
@@ -338,6 +363,7 @@ import { logoutRequestConfig } from './utils/logout'
 import api from './api'
 import ChangelogDialog from './components/ChangelogDialog.vue'
 import AiTaskCenter from './components/AiTaskCenter.vue'
+import MyTasksDrawer from './components/MyTasksDrawer.vue'
 import RouteErrorBoundary from './components/RouteErrorBoundary.vue'
 import { CURRENT_VERSION } from './changelog'
 import { theme, toggleTheme as toggle } from './theme'
@@ -345,6 +371,7 @@ import { ICONS, primaryNav, toolNav, buildMobileGroups } from './navigation'
 import type { NavItem } from './navigation'
 import { needRefresh, isOnline, applyUpdate, dismissUpdate } from './utils/pwa'
 import { startTaskBadgeWatcher, taskBadgeCount } from './utils/taskBadge'
+import { openTaskDrawer } from './utils/myTasks'
 
 const router = useRouter()
 const route = useRoute()
@@ -515,6 +542,13 @@ watch(
 function openChangelog() {
   hasUnreadChangelog.value = false
   showChangelog.value = true
+}
+
+/** 打开「我的任务」抽屉：先收掉导航菜单，避免两层浮层叠在一起 */
+function showMyTasks(): void {
+  closeMenu()
+  mobileOpen.value = false
+  openTaskDrawer()
 }
 
 function toggleTheme() {
@@ -1137,6 +1171,13 @@ function logout() {
 .md-item svg {
   flex-shrink: 0;
   opacity: 0.75;
+}
+
+/* 「我的任务」是按钮而不是链接（不是路由页）：补齐按钮缺省样式 */
+.md-btn {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 
 .md-item.active {
