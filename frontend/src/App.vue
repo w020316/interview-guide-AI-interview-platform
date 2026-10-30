@@ -270,8 +270,10 @@
         </RouteErrorBoundary>
       </main>
 
-      <!-- 页脚 -->
-      <footer class="app-footer">
+      <!-- 页脚
+           渲染时机见 script 中的 chromeReady：等首个路由内容挂载后再出现，
+           避免「页脚先落在视口底部、内容到达后又被推走」造成的整页位移。 -->
+      <footer v-if="chromeReady" class="app-footer">
         <div class="footer-inner">
           <div class="footer-brand">
             <span class="brand-mark">
@@ -447,8 +449,24 @@ function measureScrollable() {
 useResizeObserver(document.body, measureScrollable)
 watch(() => route.path, () => nextTick(measureScrollable))
 
+/**
+ * 页脚渲染时机（2026-10-30 阶段五遗留项）。
+ *
+ * <p>实测证据：移动端 CLS 0.316，唯一来源是 `.app-footer` —— 首屏路由组件是动态 import，
+ * 挂载前 `<main>` 为空、页脚被 flex 布局顶到视口底部；组件挂载后内容变高，页脚被整体推开，
+ * 这一次位移就吃掉了整页的 CLS 预算（桌面同样存在，只是相对视口更小）。
+ *
+ * <p>处理：等路由器就绪 + 内容挂载一帧后再渲染页脚。页脚是**非关键内容**，
+ * 延后一帧对用户不可感，却能让它从一开始就落在真实内容之后（视口外），位移不再被计入。
+ * 这不是「隐藏元素以美化指标」：页脚始终存在，只是不再参与首次布局抖动。
+ */
+const chromeReady = ref(false)
+
 onMounted(() => {
   measureScrollable()
+  void router.isReady().then(() =>
+    nextTick(() => requestAnimationFrame(() => { chromeReady.value = true })),
+  )
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onKeydown)
   window.addEventListener('scroll', onScroll, { passive: true })
