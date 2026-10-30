@@ -191,6 +191,18 @@ class AiTaskServiceTest {
         assertThat(service.claimNext(NOW, 120)).isEmpty();
     }
 
+    @Test
+    @DisplayName("便捷入口 claimNext(int) 必须声明 @Transactional（自调用绕过代理，缺注解 = 任务永远停在 QUEUED）")
+    void claimNextSingleArgRequiresTransaction() throws Exception {
+        // 单测里 service 是 new 出来的，代理不存在，事务注解缺失无法被断言到行为 ——
+        // 只能直接锁注解本身。2026-10-30 本地启动实测正是这个入口缺注解导致领取一直失败。
+        assertThat(AiTaskService.class.getMethod("claimNext", int.class)
+                .isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class))
+                .as("claimNext(int) 内部是自调用，必须自己带 @Transactional，否则 @Modifying 查询抛"
+                        + "「Executing an update/delete query」")
+                .isTrue();
+    }
+
     // ── 清理（M4）────────────────────────────────────────────────────────
 
     @Test

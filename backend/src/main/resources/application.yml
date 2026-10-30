@@ -54,6 +54,15 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
+  # 定时任务线程池（2026-10-30 本地实测后调整）
+  # 默认池大小 1：所有 @Scheduled 共用一条线程。岗位刷新的外部源抓取实测要跑几分钟，
+  # 期间它把这条线程占满，任务中心的 5s 轮询拿不到执行机会 —— 实测「任务创建 18s 后仍 QUEUED」。
+  # 3 = 岗位刷新占 1 + 任务中心轮询占 1 + 向量落盘(3s)/登录清理(5min)等短任务占 1。
+  task:
+    scheduling:
+      pool:
+        size: ${APP_SCHEDULING_POOL_SIZE:3}
+
 server:
   port: ${PORT:8080}
 

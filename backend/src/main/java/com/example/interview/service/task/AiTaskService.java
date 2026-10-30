@@ -97,6 +97,16 @@ public class AiTaskService {
 
     // ── 领取 ────────────────────────────────────────────────────────────
 
+    /**
+     * 领取一个任务（便捷入口，调度器用这个）。
+     *
+     * <p>⚠️ 必须与下面的重载一样标 {@code @Transactional}：本方法内部是<b>自调用</b>
+     * （{@code claimNext(now, lease)}），绕过了 Spring 代理，二参重载上的事务注解不会生效。
+     * 而 {@code AiTaskRepository#claim} 是 {@code @Modifying} 查询，没有事务时 Hibernate 直接抛
+     * 「Executing an update/delete query」—— 表现是任务永远停在 QUEUED
+     * （2026-10-30 本地启动实测发现；单测走的是二参重载，从未覆盖到这个入口）。
+     */
+    @Transactional
     public Optional<AiTaskEntity> claimNext(int leaseSeconds) {
         return claimNext(LocalDateTime.now(), leaseSeconds);
     }
