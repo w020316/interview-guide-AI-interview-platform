@@ -1266,7 +1266,8 @@ function formatTime(t?: string) {
   transition: background var(--transition-fast);
 }
 .link-btn:hover {
-  background: var(--c-danger-bg, rgba(239, 68, 68, 0.08));
+  /* designGuards：仓库未定义 --c-danger-bg，直接用浅红实色（错误态统一口径） */
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .search-rank {

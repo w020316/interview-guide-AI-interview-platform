@@ -160,7 +160,8 @@ onMounted(load)
 
 <style scoped>
 .job-detail-page {
-  max-width: 860px;
+  /* designGuards：页面容器只允许 900（阅读/编辑列）/ 1080（宽页面）两档 */
+  max-width: 900px;
   margin: 0 auto;
   padding: 8px 0 40px;
 }
@@ -215,7 +216,8 @@ onMounted(load)
   padding: 10px 18px;
   border-radius: var(--radius-md);
   background: var(--brand-primary);
-  color: #fff;
+  /* 品牌实色底上必须用随主题翻转的 on-primary，不能写死白字（暗色会看不清） */
+  color: var(--c-on-primary);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
