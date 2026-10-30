@@ -1,0 +1,2402 @@
+[
+ {
+  "route": "/jobs",
+  "name": "jobs",
+  "viewport": "1920x1080",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/jobs__1920x1080__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/jobs",
+  "h1": "招聘信息广场",
+  "vw": 1920,
+  "vh": 1080,
+  "scrollWidth": 1920,
+  "scrollHeight": 1080,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "router-link-active router-link-exact-active nav-li",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 170,
+  "aborted": true
+ },
+ {
+  "route": "/career",
+  "name": "career",
+  "viewport": "1920x1080",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/career__1920x1080__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/career",
+  "h1": "求职诊断",
+  "vw": 1920,
+  "vh": 1080,
+  "scrollWidth": 1920,
+  "scrollHeight": 1949,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 402,
+  "aborted": true
+ },
+ {
+  "route": "/applications",
+  "name": "applications",
+  "viewport": "1920x1080",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/applications__1920x1080__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/applications",
+  "h1": "投递看板",
+  "vw": 1920,
+  "vh": 1080,
+  "scrollWidth": 1920,
+  "scrollHeight": 1080,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "router-link-active router-link-exact-active nav-li",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 122,
+  "aborted": true
+ },
+ {
+  "route": "/progress",
+  "name": "progress",
+  "viewport": "1920x1080",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/progress__1920x1080__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/progress",
+  "h1": "成长趋势",
+  "vw": 1920,
+  "vh": 1080,
+  "scrollWidth": 1920,
+  "scrollHeight": 1080,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 162,
+  "aborted": true
+ },
+ {
+  "route": "/profile",
+  "name": "profile",
+  "viewport": "1920x1080",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/profile__1920x1080__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/profile",
+  "h1": "个人中心",
+  "vw": 1920,
+  "vh": 1080,
+  "scrollWidth": 1920,
+  "scrollHeight": 2026,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 428,
+  "aborted": true
+ },
+ {
+  "route": "/knowledge",
+  "name": "knowledge",
+  "viewport": "1920x1080",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/knowledge__1920x1080__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/knowledge",
+  "h1": "知识库",
+  "vw": 1920,
+  "vh": 1080,
+  "scrollWidth": 1920,
+  "scrollHeight": 1080,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 91,
+  "aborted": true
+ },
+ {
+  "route": "/jobs",
+  "name": "jobs",
+  "viewport": "1440x900",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/jobs__1440x900__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/jobs",
+  "h1": "招聘信息广场",
+  "vw": 1440,
+  "vh": 900,
+  "scrollWidth": 1440,
+  "scrollHeight": 1034,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "router-link-active router-link-exact-active nav-li",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 170,
+  "aborted": true
+ },
+ {
+  "route": "/career",
+  "name": "career",
+  "viewport": "1440x900",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/career__1440x900__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/career",
+  "h1": "求职诊断",
+  "vw": 1440,
+  "vh": 900,
+  "scrollWidth": 1440,
+  "scrollHeight": 1949,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 402,
+  "aborted": true
+ },
+ {
+  "route": "/applications",
+  "name": "applications",
+  "viewport": "1440x900",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/applications__1440x900__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/applications",
+  "h1": "投递看板",
+  "vw": 1440,
+  "vh": 900,
+  "scrollWidth": 1440,
+  "scrollHeight": 900,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "router-link-active router-link-exact-active nav-li",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 122,
+  "aborted": true
+ },
+ {
+  "route": "/progress",
+  "name": "progress",
+  "viewport": "1440x900",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/progress__1440x900__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/progress",
+  "h1": "成长趋势",
+  "vw": 1440,
+  "vh": 900,
+  "scrollWidth": 1440,
+  "scrollHeight": 986,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 162,
+  "aborted": true
+ },
+ {
+  "route": "/profile",
+  "name": "profile",
+  "viewport": "1440x900",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/profile__1440x900__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/profile",
+  "h1": "个人中心",
+  "vw": 1440,
+  "vh": 900,
+  "scrollWidth": 1440,
+  "scrollHeight": 2026,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 428,
+  "aborted": true
+ },
+ {
+  "route": "/knowledge",
+  "name": "knowledge",
+  "viewport": "1440x900",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/knowledge__1440x900__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/knowledge",
+  "h1": "知识库",
+  "vw": 1440,
+  "vh": 900,
+  "scrollWidth": 1440,
+  "scrollHeight": 900,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 91,
+  "aborted": true
+ },
+ {
+  "route": "/jobs",
+  "name": "jobs",
+  "viewport": "1366x768",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/jobs__1366x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/jobs",
+  "h1": "招聘信息广场",
+  "vw": 1366,
+  "vh": 768,
+  "scrollWidth": 1366,
+  "scrollHeight": 1034,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "router-link-active router-link-exact-active nav-li",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 170,
+  "aborted": true
+ },
+ {
+  "route": "/career",
+  "name": "career",
+  "viewport": "1366x768",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/career__1366x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/career",
+  "h1": "求职诊断",
+  "vw": 1366,
+  "vh": 768,
+  "scrollWidth": 1366,
+  "scrollHeight": 1949,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 402,
+  "aborted": true
+ },
+ {
+  "route": "/applications",
+  "name": "applications",
+  "viewport": "1366x768",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/applications__1366x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/applications",
+  "h1": "投递看板",
+  "vw": 1366,
+  "vh": 768,
+  "scrollWidth": 1366,
+  "scrollHeight": 768,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "router-link-active router-link-exact-active nav-li",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 122,
+  "aborted": true
+ },
+ {
+  "route": "/progress",
+  "name": "progress",
+  "viewport": "1366x768",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/progress__1366x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/progress",
+  "h1": "成长趋势",
+  "vw": 1366,
+  "vh": 768,
+  "scrollWidth": 1366,
+  "scrollHeight": 986,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 162,
+  "aborted": true
+ },
+ {
+  "route": "/profile",
+  "name": "profile",
+  "viewport": "1366x768",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/profile__1366x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/profile",
+  "h1": "个人中心",
+  "vw": 1366,
+  "vh": 768,
+  "scrollWidth": 1366,
+  "scrollHeight": 2026,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 428,
+  "aborted": true
+ },
+ {
+  "route": "/knowledge",
+  "name": "knowledge",
+  "viewport": "1366x768",
+  "kind": "desktop",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/knowledge__1366x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/knowledge",
+  "h1": "知识库",
+  "vw": 1366,
+  "vh": 768,
+  "scrollWidth": 1366,
+  "scrollHeight": 768,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 71,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 99,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 90,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 99,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 91,
+  "aborted": true
+ },
+ {
+  "route": "/jobs",
+  "name": "jobs",
+  "viewport": "1024x768",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/jobs__1024x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/jobs",
+  "h1": "招聘信息广场",
+  "vw": 1024,
+  "vh": 768,
+  "scrollWidth": 1024,
+  "scrollHeight": 1028,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 65,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "router-link-active router-link-exact-active nav-li",
+    "label": "招聘广场",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 83,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 91,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 170,
+  "aborted": true
+ },
+ {
+  "route": "/career",
+  "name": "career",
+  "viewport": "1024x768",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/career__1024x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/career",
+  "h1": "求职诊断",
+  "vw": 1024,
+  "vh": 768,
+  "scrollWidth": 1024,
+  "scrollHeight": 1949,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 65,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 83,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 91,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 402,
+  "aborted": true
+ },
+ {
+  "route": "/applications",
+  "name": "applications",
+  "viewport": "1024x768",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/applications__1024x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/applications",
+  "h1": "投递看板",
+  "vw": 1024,
+  "vh": 768,
+  "scrollWidth": 1024,
+  "scrollHeight": 768,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 65,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "router-link-active router-link-exact-active nav-li",
+    "label": "投递看板",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 83,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 91,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 122,
+  "aborted": true
+ },
+ {
+  "route": "/progress",
+  "name": "progress",
+  "viewport": "1024x768",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/progress__1024x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/progress",
+  "h1": "成长趋势",
+  "vw": 1024,
+  "vh": 768,
+  "scrollWidth": 1024,
+  "scrollHeight": 986,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 65,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 83,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 91,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 162,
+  "aborted": true
+ },
+ {
+  "route": "/profile",
+  "name": "profile",
+  "viewport": "1024x768",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/profile__1024x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/profile",
+  "h1": "个人中心",
+  "vw": 1024,
+  "vh": 768,
+  "scrollWidth": 1024,
+  "scrollHeight": 2026,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 65,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 83,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 91,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 428,
+  "aborted": true
+ },
+ {
+  "route": "/knowledge",
+  "name": "knowledge",
+  "viewport": "1024x768",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/knowledge__1024x768__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/knowledge",
+  "h1": "知识库",
+  "vw": 1024,
+  "vh": 768,
+  "scrollWidth": 1024,
+  "scrollHeight": 768,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "首页",
+    "w": 65,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "简历分析",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "招聘广场",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "投递看板",
+    "w": 91,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "JD 拆解",
+    "w": 83,
+    "h": 44
+   },
+   {
+    "tag": "a",
+    "cls": "nav-link",
+    "label": "模拟面试",
+    "w": 91,
+    "h": 44
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 65,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 91,
+  "aborted": true
+ },
+ {
+  "route": "/jobs",
+  "name": "jobs",
+  "viewport": "768x1024",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/jobs__768x1024__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/jobs",
+  "h1": "招聘信息广场",
+  "vw": 768,
+  "vh": 1024,
+  "scrollWidth": 768,
+  "scrollHeight": 1137,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "label",
+    "cls": "hide-expired-toggle",
+    "label": "",
+    "w": 101,
+    "h": 21
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 170,
+  "aborted": true
+ },
+ {
+  "route": "/career",
+  "name": "career",
+  "viewport": "768x1024",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/career__768x1024__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/career",
+  "h1": "求职诊断",
+  "vw": 768,
+  "vh": 1024,
+  "scrollWidth": 768,
+  "scrollHeight": 1993,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 402,
+  "aborted": true
+ },
+ {
+  "route": "/applications",
+  "name": "applications",
+  "viewport": "768x1024",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/applications__768x1024__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/applications",
+  "h1": "投递看板",
+  "vw": 768,
+  "vh": 1024,
+  "scrollWidth": 768,
+  "scrollHeight": 1024,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 122,
+  "aborted": true
+ },
+ {
+  "route": "/progress",
+  "name": "progress",
+  "viewport": "768x1024",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/progress__768x1024__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/progress",
+  "h1": "成长趋势",
+  "vw": 768,
+  "vh": 1024,
+  "scrollWidth": 768,
+  "scrollHeight": 1024,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 162,
+  "aborted": true
+ },
+ {
+  "route": "/profile",
+  "name": "profile",
+  "viewport": "768x1024",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/profile__768x1024__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/profile",
+  "h1": "个人中心",
+  "vw": 768,
+  "vh": 1024,
+  "scrollWidth": 768,
+  "scrollHeight": 2238,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 428,
+  "aborted": true
+ },
+ {
+  "route": "/knowledge",
+  "name": "knowledge",
+  "viewport": "768x1024",
+  "kind": "tablet",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/knowledge__768x1024__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/knowledge",
+  "h1": "知识库",
+  "vw": 768,
+  "vh": 1024,
+  "scrollWidth": 768,
+  "scrollHeight": 1024,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 91,
+  "aborted": true
+ },
+ {
+  "route": "/jobs",
+  "name": "jobs",
+  "viewport": "414x896",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/jobs__414x896__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/jobs",
+  "h1": "招聘信息广场",
+  "vw": 414,
+  "vh": 896,
+  "scrollWidth": 414,
+  "scrollHeight": 1414,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "label",
+    "cls": "hide-expired-toggle",
+    "label": "",
+    "w": 101,
+    "h": 21
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 170,
+  "aborted": true
+ },
+ {
+  "route": "/career",
+  "name": "career",
+  "viewport": "414x896",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/career__414x896__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/career",
+  "h1": "求职诊断",
+  "vw": 414,
+  "vh": 896,
+  "scrollWidth": 414,
+  "scrollHeight": 2116,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 402,
+  "aborted": true
+ },
+ {
+  "route": "/applications",
+  "name": "applications",
+  "viewport": "414x896",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/applications__414x896__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/applications",
+  "h1": "投递看板",
+  "vw": 414,
+  "vh": 896,
+  "scrollWidth": 414,
+  "scrollHeight": 896,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 122,
+  "aborted": true
+ },
+ {
+  "route": "/progress",
+  "name": "progress",
+  "viewport": "414x896",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/progress__414x896__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/progress",
+  "h1": "成长趋势",
+  "vw": 414,
+  "vh": 896,
+  "scrollWidth": 414,
+  "scrollHeight": 1064,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 162,
+  "aborted": true
+ },
+ {
+  "route": "/profile",
+  "name": "profile",
+  "viewport": "414x896",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/profile__414x896__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/profile",
+  "h1": "个人中心",
+  "vw": 414,
+  "vh": 896,
+  "scrollWidth": 414,
+  "scrollHeight": 2382,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 428,
+  "aborted": true
+ },
+ {
+  "route": "/knowledge",
+  "name": "knowledge",
+  "viewport": "414x896",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/knowledge__414x896__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/knowledge",
+  "h1": "知识库",
+  "vw": 414,
+  "vh": 896,
+  "scrollWidth": 414,
+  "scrollHeight": 896,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 91,
+  "aborted": true
+ },
+ {
+  "route": "/jobs",
+  "name": "jobs",
+  "viewport": "375x667",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/jobs__375x667__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/jobs",
+  "h1": "招聘信息广场",
+  "vw": 375,
+  "vh": 667,
+  "scrollWidth": 375,
+  "scrollHeight": 1554,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [
+   {
+    "tag": "label",
+    "cls": "hide-expired-toggle",
+    "label": "",
+    "w": 101,
+    "h": 21
+   }
+  ],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 170,
+  "aborted": true
+ },
+ {
+  "route": "/career",
+  "name": "career",
+  "viewport": "375x667",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/career__375x667__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/career",
+  "h1": "求职诊断",
+  "vw": 375,
+  "vh": 667,
+  "scrollWidth": 375,
+  "scrollHeight": 2163,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 402,
+  "aborted": true
+ },
+ {
+  "route": "/applications",
+  "name": "applications",
+  "viewport": "375x667",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/applications__375x667__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/applications",
+  "h1": "投递看板",
+  "vw": 375,
+  "vh": 667,
+  "scrollWidth": 375,
+  "scrollHeight": 748,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 122,
+  "aborted": true
+ },
+ {
+  "route": "/progress",
+  "name": "progress",
+  "viewport": "375x667",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/progress__375x667__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/progress",
+  "h1": "成长趋势",
+  "vw": 375,
+  "vh": 667,
+  "scrollWidth": 375,
+  "scrollHeight": 1064,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 162,
+  "aborted": true
+ },
+ {
+  "route": "/profile",
+  "name": "profile",
+  "viewport": "375x667",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/profile__375x667__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/profile",
+  "h1": "个人中心",
+  "vw": 375,
+  "vh": 667,
+  "scrollWidth": 375,
+  "scrollHeight": 2430,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": true,
+  "hasRouteError": false,
+  "hasEmptyState": true,
+  "mainTextLength": 428,
+  "aborted": true
+ },
+ {
+  "route": "/knowledge",
+  "name": "knowledge",
+  "viewport": "375x667",
+  "kind": "mobile",
+  "theme": "light",
+  "dir": "error",
+  "screenshot": "error/knowledge__375x667__light.png",
+  "consoleErrors": [
+   "Failed to load resource: net::ERR_FAILED"
+  ],
+  "failedRequests": [],
+  "title": "AI 智能面试辅助平台",
+  "finalPath": "/knowledge",
+  "h1": "知识库",
+  "vw": 375,
+  "vh": 667,
+  "scrollWidth": 375,
+  "scrollHeight": 795,
+  "overflowX": false,
+  "offenders": [],
+  "touchSmall": [],
+  "clipped": [],
+  "contrastLow": [],
+  "headerHeight": 57,
+  "headerVisible": true,
+  "hasLoadError": false,
+  "hasRouteError": false,
+  "hasEmptyState": false,
+  "mainTextLength": 91,
+  "aborted": true
+ }
+]

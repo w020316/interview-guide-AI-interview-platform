@@ -1,0 +1,52 @@
+pairs=72 unique=62 uniqueSeverity={"HIGH":22,"MODERATE":30,"LOW":6,"CRITICAL":4} pairSeverity={"HIGH":24,"MODERATE":36,"LOW":8,"CRITICAL":4}
+HIGH_CRITICAL=26
+CRITICAL	GHSA-pc63-qcmh-9cmg	org.springframework:spring-webmvc@6.1.21	Spring Framework Improper Path Limitation in XsltView
+CRITICAL	GHSA-9qf2-26p9-2q2q	org.springframework:spring-webflux@6.1.21	Spring Framework Header Predicate Bypass in WebFlux Functional Endpoints
+CRITICAL	GHSA-fvh3-672c-7p6c	org.springframework.ai:spring-ai-vector-store@1.0.0	Spring AI: SpEL injection is triggered when a user-supplied value is used as a filter expression key
+CRITICAL	GHSA-mf92-479x-3373	org.springframework.security:spring-security-web@6.3.10	Spring Security HTTP Headers Are not Written Under Some Conditions
+HIGH	GHSA-wwpq-f5c3-7hvx	org.springframework.boot:spring-boot@3.3.13	Spring Boot accepts predictable temp directory without ownership verification
+HIGH	GHSA-3chg-m5w7-qfv5	org.springframework:spring-webmvc@6.1.21	Spring Framework Cross-site Scripting via JavaScriptUtils
+HIGH	GHSA-x23c-287f-qqv5	org.springframework:spring-webmvc@6.1.21	Spring Framework Denial of Service via Versioned Resources in Spring MVC and WebFlux
+HIGH	GHSA-r5w3-xv2f-j59q	org.springframework:spring-expression@6.1.21	Spring Framework Algorithmic Denial of Service via SpEL Expressions
+HIGH	GHSA-q62f-h9x2-gcqc	org.springframework.ai:spring-ai-model@1.0.0	Spring AI: ChatMemory DEFAULT_CONVERSATION_ID causes unintended cross-user data leakage
+HIGH	GHSA-5852-phmh-8fhr	org.springframework.ai:spring-ai-client-chat@1.0.0	Spring AI: Prompt Injection via Memory Poisoning in PromptChatMemoryAdvisor
+HIGH	GHSA-qc4j-qjqx-vr58	org.springframework.ai:spring-ai-vector-store@1.0.0	Spring AI has a VectorStore FilterExpression Converter injection
+HIGH	GHSA-rp9g-qx29-88cp	org.springframework.ai:spring-ai-vector-store@1.0.0	JSONPath Injection in Spring AI Vector Stores FilterExpressionConverter
+HIGH	GHSA-65r4-943x-97jj	org.jsoup:jsoup@1.18.3	jsoup XmlTreeBuilder vulnerable to memory exhaustion through deeply nested namespace declarations
+HIGH	GHSA-9fw2-h3hf-293r	org.springframework.data:spring-data-commons@3.3.13	Spring Data Commons: Heap exhaustion from unbounded property-lookup cache retaining crafted string keys
+HIGH	GHSA-g3pr-3p32-fp23	io.micrometer:micrometer-core@1.13.15	Micrometer HTTP server instrumentations DoS
+HIGH	GHSA-cxp5-3px4-pw24	com.fasterxml.jackson.core:jackson-databind@2.17.3	jackson-databind quadratic forward-reference completion 
+HIGH	GHSA-j3rv-43j4-c7qm	com.fasterxml.jackson.core:jackson-databind@2.17.3	jackson-databind has a PolymorphicTypeValidator bypass via generic type parameters that allows arbitrary class instantiation
+HIGH	GHSA-q4xh-88c3-wmh7	com.fasterxml.jackson.core:jackson-databind@2.17.3	jackson-databind: Duration XMLGregorianCalendar Unbounded Number Parse DoS
+HIGH	GHSA-rmj7-2vxq-3g9f	com.fasterxml.jackson.core:jackson-databind@2.17.3	jackson-databind has an array subtype allowlist bypass in BasicPolymorphicTypeValidator (allowIfSubTypeIsArray)
+HIGH	GHSA-wv8q-qhhj-9h54	com.fasterxml.jackson.core:jackson-databind@2.17.3	jackson-databind retains every unknown raw type ID 
+HIGH	GHSA-7hhh-6rmp-j9qf	com.fasterxml.jackson.core:jackson-core@2.17.3	jackson-core: UTF8DataInputJsonParser._reportInvalidToken() missing maxErrorTokenLength limit -> unbounded StringBuilder growth (DoS)
+HIGH	GHSA-p6pp-m3f8-5c89	com.fasterxml.jackson.core:jackson-core@2.17.3	 jackson-core: ReDoS: quadratic backtracking in NumberInput.PATTERN_FLOAT via looksLikeValidNumber()
+HIGH	GHSA-r7wm-3cxj-wff9	com.fasterxml.jackson.core:jackson-core@2.17.3	jackson-core: Async parser maxNumberLength bypass via chunked digit accumulation (incomplete fix for GHSA-72hv-8253-57qq)
+HIGH	GHSA-mgvc-8q2h-5pgc	org.springframework.boot:spring-boot-starter-actuator@3.3.13	Spring Boot has an Authentication Bypass under Actuator CloudFoundry endpoints
+HIGH	GHSA-rqfh-9r24-8c9r	org.assertj:assertj-core@3.25.3	AssertJ has XML External Entity (XXE) vulnerability when parsing untrusted XML via isXmlEqualTo assertion
+HIGH	GHSA-jmp9-x22r-554x	org.springframework:spring-core@6.1.21	Spring Framework annotation detection mechanism may result in improper authorization
+---BY_PACKAGE---
+13	org.springframework:spring-webmvc@6.1.21
+12	com.fasterxml.jackson.core:jackson-databind@2.17.3
+4	org.springframework:spring-webflux@6.1.21
+4	com.fasterxml.jackson.core:jackson-core@2.17.3
+3	org.springframework:spring-expression@6.1.21
+3	org.springframework.ai:spring-ai-vector-store@1.0.0
+3	org.springframework.data:spring-data-commons@3.3.13
+3	org.springframework.security:spring-security-web@6.3.10
+2	org.jsoup:jsoup@1.18.3
+2	org.springframework:spring-core@6.1.21
+1	org.springframework.boot:spring-boot@3.3.13
+1	org.springframework.boot:spring-boot-autoconfigure@3.3.13
+1	org.apache.logging.log4j:log4j-api@2.23.1
+1	org.springframework.ai:spring-ai-model@1.0.0
+1	org.springframework.retry:spring-retry@2.0.12
+1	org.springframework.ai:spring-ai-client-chat@1.0.0
+1	org.springframework.data:spring-data-keyvalue@3.3.13
+1	org.apache.commons:commons-lang3@3.14.0
+1	io.micrometer:micrometer-core@1.13.15
+1	org.springframework.boot:spring-boot-starter-actuator@3.3.13
+1	org.assertj:assertj-core@3.25.3
+1	org.xmlunit:xmlunit-core@2.9.1
+1	org.springframework.security:spring-security-core@6.3.10

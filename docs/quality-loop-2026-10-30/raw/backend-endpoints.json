@@ -1,0 +1,557 @@
+[
+  {
+    "file": "AdminController.java",
+    "method": "GET",
+    "path": "/api/admin/overview"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "POST",
+    "path": "/api/admin/jobs/refresh"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "GET",
+    "path": "/api/admin/sources"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "GET",
+    "path": "/api/admin/jobs"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "POST",
+    "path": "/api/admin/jobs/{id}/deactivate"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "POST",
+    "path": "/api/admin/jobs/{id}/activate"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "DELETE",
+    "path": "/api/admin/jobs/{id}"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "GET",
+    "path": "/api/admin/users"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "POST",
+    "path": "/api/admin/users/{id}/ban"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "POST",
+    "path": "/api/admin/users/{id}/unban"
+  },
+  {
+    "file": "AdminController.java",
+    "method": "GET",
+    "path": "/api/admin/metrics"
+  },
+  {
+    "file": "AgentController.java",
+    "method": "POST",
+    "path": "/api/agent/chat/stream"
+  },
+  {
+    "file": "AgentController.java",
+    "method": "GET",
+    "path": "/api/agent/conversations"
+  },
+  {
+    "file": "AgentController.java",
+    "method": "GET",
+    "path": "/api/agent/conversations/{id}/messages"
+  },
+  {
+    "file": "AgentController.java",
+    "method": "DELETE",
+    "path": "/api/agent/conversations/{id}"
+  },
+  {
+    "file": "AuthController.java",
+    "method": "POST",
+    "path": "/api/auth/register"
+  },
+  {
+    "file": "AuthController.java",
+    "method": "POST",
+    "path": "/api/auth/login"
+  },
+  {
+    "file": "AuthController.java",
+    "method": "POST",
+    "path": "/api/auth/logout"
+  },
+  {
+    "file": "AuthController.java",
+    "method": "POST",
+    "path": "/api/auth/change-password"
+  },
+  {
+    "file": "AuthController.java",
+    "method": "GET",
+    "path": "/api/auth/me"
+  },
+  {
+    "file": "CareerController.java",
+    "method": "POST",
+    "path": "/api/career/mine"
+  },
+  {
+    "file": "CareerController.java",
+    "method": "POST",
+    "path": "/api/career/plan"
+  },
+  {
+    "file": "CareerController.java",
+    "method": "POST",
+    "path": "/api/career/salary"
+  },
+  {
+    "file": "FavoriteController.java",
+    "method": "GET",
+    "path": "/api/favorite/list"
+  },
+  {
+    "file": "FavoriteController.java",
+    "method": "GET",
+    "path": "/api/favorite/ids"
+  },
+  {
+    "file": "FavoriteController.java",
+    "method": "POST",
+    "path": "/api/favorite/toggle"
+  },
+  {
+    "file": "FavoriteController.java",
+    "method": "POST",
+    "path": "/api/favorite/bank/start"
+  },
+  {
+    "file": "FavoriteController.java",
+    "method": "POST",
+    "path": "/api/favorite/add"
+  },
+  {
+    "file": "HealthController.java",
+    "method": "GET",
+    "path": "/api/info"
+  },
+  {
+    "file": "HealthController.java",
+    "method": "GET",
+    "path": "/api/health"
+  },
+  {
+    "file": "HealthController.java",
+    "method": "GET",
+    "path": "/api/health/detail"
+  },
+  {
+    "file": "InterviewController.java",
+    "method": "POST",
+    "path": "/api/interview/questions"
+  },
+  {
+    "file": "InterviewController.java",
+    "method": "POST",
+    "path": "/api/interview/evaluate"
+  },
+  {
+    "file": "InterviewController.java",
+    "method": "POST",
+    "path": "/api/interview/upload-image"
+  },
+  {
+    "file": "InterviewController.java",
+    "method": "POST",
+    "path": "/api/interview/followup"
+  },
+  {
+    "file": "InterviewController.java",
+    "method": "POST",
+    "path": "/api/interview/ask/stream"
+  },
+  {
+    "file": "InterviewEventController.java",
+    "method": "GET",
+    "path": "/api/calendar/event/list"
+  },
+  {
+    "file": "InterviewEventController.java",
+    "method": "POST",
+    "path": "/api/calendar/event"
+  },
+  {
+    "file": "InterviewEventController.java",
+    "method": "PUT",
+    "path": "/api/calendar/event/{id}"
+  },
+  {
+    "file": "InterviewEventController.java",
+    "method": "DELETE",
+    "path": "/api/calendar/event/{id}"
+  },
+  {
+    "file": "InterviewSessionController.java",
+    "method": "POST",
+    "path": "/api/session/create"
+  },
+  {
+    "file": "InterviewSessionController.java",
+    "method": "GET",
+    "path": "/api/session/list"
+  },
+  {
+    "file": "InterviewSessionController.java",
+    "method": "GET",
+    "path": "/api/session/{sessionId}"
+  },
+  {
+    "file": "InterviewSessionController.java",
+    "method": "PUT",
+    "path": "/api/session/{sessionId}/finish"
+  },
+  {
+    "file": "InterviewSessionController.java",
+    "method": "DELETE",
+    "path": "/api/session/{sessionId}"
+  },
+  {
+    "file": "InterviewSessionController.java",
+    "method": "GET",
+    "path": "/api/session/{sessionId}/questions"
+  },
+  {
+    "file": "InterviewSessionController.java",
+    "method": "POST",
+    "path": "/api/session/{sessionId}/questions"
+  },
+  {
+    "file": "InterviewSessionController.java",
+    "method": "POST",
+    "path": "/api/session/answer"
+  },
+  {
+    "file": "JobAgentController.java",
+    "method": "GET",
+    "path": "/api/jobs"
+  },
+  {
+    "file": "JobAgentController.java",
+    "method": "GET",
+    "path": "/api/jobs/{id}"
+  },
+  {
+    "file": "JobAgentController.java",
+    "method": "GET",
+    "path": "/api/jobs/meta"
+  },
+  {
+    "file": "JobAgentController.java",
+    "method": "POST",
+    "path": "/api/jobs/match"
+  },
+  {
+    "file": "JobAgentController.java",
+    "method": "POST",
+    "path": "/api/jobs/refresh"
+  },
+  {
+    "file": "JobAgentController.java",
+    "method": "GET",
+    "path": "/api/jobs/favorite"
+  },
+  {
+    "file": "JobAgentController.java",
+    "method": "POST",
+    "path": "/api/jobs/favorite/preference"
+  },
+  {
+    "file": "JobAgentController.java",
+    "method": "GET",
+    "path": "/api/jobs/favorite/ids"
+  },
+  {
+    "file": "JobAgentController.java",
+    "method": "POST",
+    "path": "/api/jobs/favorite/toggle"
+  },
+  {
+    "file": "JobAnalysisController.java",
+    "method": "POST",
+    "path": "/api/job/import-url"
+  },
+  {
+    "file": "JobAnalysisController.java",
+    "method": "POST",
+    "path": "/api/job/analyze"
+  },
+  {
+    "file": "JobAnalysisController.java",
+    "method": "POST",
+    "path": "/api/job/gap"
+  },
+  {
+    "file": "JobAnalysisController.java",
+    "method": "POST",
+    "path": "/api/job/letter"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "GET",
+    "path": "/api/application/list"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "GET",
+    "path": "/api/application/board"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "GET",
+    "path": "/api/application/timeline"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "POST",
+    "path": "/api/application/draft"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "POST",
+    "path": "/api/application/{id}/confirm"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "POST",
+    "path": "/api/application/{id}/status"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "POST",
+    "path": "/api/application/{id}/tailor"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "GET",
+    "path": "/api/application/{id}/apply-kit"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "DELETE",
+    "path": "/api/application/{id}"
+  },
+  {
+    "file": "JobApplicationController.java",
+    "method": "POST",
+    "path": "/api/application/import"
+  },
+  {
+    "file": "KnowledgeController.java",
+    "method": "GET",
+    "path": "/api/knowledge/search"
+  },
+  {
+    "file": "KnowledgeController.java",
+    "method": "POST",
+    "path": "/api/knowledge/ask"
+  },
+  {
+    "file": "KnowledgeController.java",
+    "method": "POST",
+    "path": "/api/knowledge/import"
+  },
+  {
+    "file": "KnowledgeController.java",
+    "method": "POST",
+    "path": "/api/knowledge/import/batch"
+  },
+  {
+    "file": "KnowledgeController.java",
+    "method": "GET",
+    "path": "/api/knowledge/status"
+  },
+  {
+    "file": "KnowledgeController.java",
+    "method": "GET",
+    "path": "/api/knowledge/wrong-questions"
+  },
+  {
+    "file": "KnowledgeController.java",
+    "method": "GET",
+    "path": "/api/knowledge/question-summary"
+  },
+  {
+    "file": "KnowledgeController.java",
+    "method": "GET",
+    "path": "/api/knowledge/recent-questions"
+  },
+  {
+    "file": "KnowledgeController.java",
+    "method": "DELETE",
+    "path": "/api/knowledge/{docId}"
+  },
+  {
+    "file": "MeController.java",
+    "method": "GET",
+    "path": "/api/me/export"
+  },
+  {
+    "file": "MeController.java",
+    "method": "POST",
+    "path": "/api/me/import"
+  },
+  {
+    "file": "MeController.java",
+    "method": "GET",
+    "path": "/api/me/ai-key"
+  },
+  {
+    "file": "MeController.java",
+    "method": "PUT",
+    "path": "/api/me/ai-key"
+  },
+  {
+    "file": "MeController.java",
+    "method": "DELETE",
+    "path": "/api/me/ai-key"
+  },
+  {
+    "file": "MeController.java",
+    "method": "POST",
+    "path": "/api/me/ai-key/test"
+  },
+  {
+    "file": "ResumeController.java",
+    "method": "POST",
+    "path": "/api/resume/analyze"
+  },
+  {
+    "file": "ResumeController.java",
+    "method": "POST",
+    "path": "/api/resume/upload"
+  },
+  {
+    "file": "ResumeController.java",
+    "method": "POST",
+    "path": "/api/resume/export-check"
+  },
+  {
+    "file": "ResumeController.java",
+    "method": "GET",
+    "path": "/api/resume/history"
+  },
+  {
+    "file": "ResumeController.java",
+    "method": "GET",
+    "path": "/api/resume/{id}"
+  },
+  {
+    "file": "ResumeController.java",
+    "method": "DELETE",
+    "path": "/api/resume/{id}"
+  },
+  {
+    "file": "ResumeController.java",
+    "method": "POST",
+    "path": "/api/resume/optimize"
+  },
+  {
+    "file": "ResumeController.java",
+    "method": "POST",
+    "path": "/api/resume/import-url"
+  },
+  {
+    "file": "ResumeDocumentController.java",
+    "method": "GET",
+    "path": "/api/resume/templates"
+  },
+  {
+    "file": "ResumeDocumentController.java",
+    "method": "GET",
+    "path": "/api/resume/documents"
+  },
+  {
+    "file": "ResumeDocumentController.java",
+    "method": "POST",
+    "path": "/api/resume/documents"
+  },
+  {
+    "file": "ResumeDocumentController.java",
+    "method": "GET",
+    "path": "/api/resume/documents/{id}"
+  },
+  {
+    "file": "ResumeDocumentController.java",
+    "method": "PUT",
+    "path": "/api/resume/documents/{id}"
+  },
+  {
+    "file": "ResumeDocumentController.java",
+    "method": "DELETE",
+    "path": "/api/resume/documents/{id}"
+  },
+  {
+    "file": "ResumeDocumentController.java",
+    "method": "POST",
+    "path": "/api/resume/documents/{id}/autofill"
+  },
+  {
+    "file": "StatsController.java",
+    "method": "GET",
+    "path": "/api/stats/dashboard"
+  },
+  {
+    "file": "StatsController.java",
+    "method": "GET",
+    "path": "/api/stats/trend"
+  },
+  {
+    "file": "StoryBankController.java",
+    "method": "GET",
+    "path": "/api/story-bank"
+  },
+  {
+    "file": "StoryBankController.java",
+    "method": "POST",
+    "path": "/api/story-bank/extract"
+  },
+  {
+    "file": "StoryBankController.java",
+    "method": "POST",
+    "path": "/api/story-bank"
+  },
+  {
+    "file": "StoryBankController.java",
+    "method": "POST",
+    "path": "/api/story-bank/{id}/check"
+  },
+  {
+    "file": "StoryBankController.java",
+    "method": "POST",
+    "path": "/api/story-bank/{id}/followup"
+  },
+  {
+    "file": "StoryBankController.java",
+    "method": "PUT",
+    "path": "/api/story-bank/{id}"
+  },
+  {
+    "file": "StoryBankController.java",
+    "method": "DELETE",
+    "path": "/api/story-bank/{id}"
+  },
+  {
+    "file": "TodoController.java",
+    "method": "GET",
+    "path": "/api/todo/today"
+  }
+]

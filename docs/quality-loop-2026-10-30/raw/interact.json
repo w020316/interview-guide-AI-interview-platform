@@ -1,0 +1,35 @@
+{
+ "menuToggleExists": 1,
+ "afterMenuClick": {
+  "navVisible": false,
+  "linkCount": 7,
+  "bodyOverflowLocked": false
+ },
+ "themeToggle": {
+  "before": 4435,
+  "h1": "light",
+  "after": {
+   "theme": "dark",
+   "h": 4435,
+   "stored": "dark"
+  }
+ },
+ "buttonHover": {
+  "base": {
+   "bg": "rgba(0, 0, 0, 0)",
+   "shadow": "rgba(15, 118, 110, 0.12) 0px 2px 8px 0px",
+   "transform": "none",
+   "transition": "color 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1), transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1)"
+  },
+  "hovered": {
+   "bg": "rgba(0, 0, 0, 0)",
+   "shadow": "rgba(15, 118, 110, 0.4) 0px 6px 16px 0px",
+   "transform": "matrix(1, 0, 0, 1, 0, -1)"
+  },
+  "changed": true
+ },
+ "focusVisible": {
+  "tag": "div",
+  "outline": "solid 2px rgb(15, 118, 110)"
+ }
+}
