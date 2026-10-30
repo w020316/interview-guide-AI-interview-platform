@@ -187,11 +187,17 @@
             <BaseButton v-if="qIndex === questions.length - 1" variant="success" @click="finishSession">结束面试</BaseButton>
           </div>
 
+          <!-- E-09：评分失败 → 页面内一条提示 + 原地重试（答案与附图已保留，无需重录） -->
+          <div v-if="evalFailed && !evalLoading" class="eval-failed" role="alert">
+            <span class="eval-failed-text">评分失败：{{ evalFailMsg }}</span>
+            <BaseButton variant="gradient" size="sm" @click="submitAnswer">重试评估</BaseButton>
+          </div>
+
           <!-- 评分等待反馈（P2-21）：让用户看得出是在评估，而不是卡死了 -->
           <div v-if="evalLoading" class="eval-waiting" role="status" aria-live="polite">
             <span class="eval-waiting-dot" aria-hidden="true"></span>
             <span class="eval-waiting-text">
-              {{ evalLongWait ? 'AI 正在深度评估你的回答，请稍候…' : 'AI 正在评估你的回答…' }}
+              {{ evalLongWait ? 'AI 正在深度评估你的回答，请稍候…' : 'AI 正在评估你的回答（通常 10–30 秒）…' }}
             </span>
             <span class="eval-waiting-elapsed">已用 {{ evalElapsed }}s</span>
           </div>
@@ -413,6 +419,9 @@ const qIndex = ref(0)
 const userAnswer = ref('')
 const evalLoading = ref(false)
 const evalResult = ref<EvalResult | null>(null)
+// E-09：评分失败的内联状态（含可重试按钮），替代两条重复 Toast
+const evalFailed = ref(false)
+const evalFailMsg = ref('')
 
 // ── 评分等待反馈（P2-21）──
 /**
@@ -1065,6 +1074,9 @@ async function submitAnswer() {
   const answeredImageUrl = imageUrl.value
   evalLoading.value = true
   evalResult.value = null
+  // E-09：重试时先清掉上一次的失败提示
+  evalFailed.value = false
+  evalFailMsg.value = ''
   startEvalTimer()
   try {
     // 1. 评估回答（AI 返回评分 + 改进建议；可选携带附图 imageUrl 做多模态评估 v1.30.0）
@@ -1119,7 +1131,11 @@ async function submitAnswer() {
       ElMessage.warning('该题未成功入库，本次回答不会记入面试历史与错题本')
     }
   } catch (e: unknown) {
-    ElMessage.error(getErrMessage(e, '评估失败'))
+    // E-09：评分失败改为**页面内一条可操作提示**（含「重试评估」按钮），
+    // 不再让顶部「AI 服务暂时不可用」与右下「作答评分失败」两条 Toast 重复出现。
+    // 答案与附图保留在输入框里，重试直接复用，无需重新录入。
+    evalFailed.value = true
+    evalFailMsg.value = getErrMessage(e, '评分失败')
   } finally {
     stopEvalTimer()
     evalLoading.value = false
@@ -1993,6 +2009,28 @@ onUnmounted(() => {
 /* ── 评分等待反馈（P2-21）──
    评分耗时 11s~71s 波动大，此前界面上只有按钮 loading，
    用户无法区分「AI 正在评估」与「已经卡死」。 */
+/* E-09：评分失败提示（一条 + 原地重试），与等待条同一视觉族 */
+.eval-failed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--c-danger-light);
+  border: 1px solid var(--c-danger);
+  font-size: 13px;
+  color: var(--c-danger);
+  line-height: 1.6;
+}
+
+.eval-failed-text {
+  flex: 1;
+  min-width: 200px;
+}
+
 .eval-waiting {
   display: flex;
   align-items: center;
