@@ -1,0 +1,34 @@
+{
+ "e01": {
+  "planBtn": true,
+  "favBtn": true,
+  "planToast": [
+   "已加入投递计划，可在「投递看板」跟踪进度"
+  ],
+  "boardLink": 1,
+  "favToast": [
+   "已加入投递计划，可在「投递看板」跟踪进度",
+   "已收藏，截止前会提醒你"
+  ],
+  "favState": [
+   "已收藏（点击取消）"
+  ]
+ },
+ "e02": {
+  "progress": "第 3 / 3 题",
+  "hint": "本题此前已作答，得分 25 分；如需重答，请输入新回答后再次提交。",
+  "answerBoxEmpty": true,
+  "finishBtn": true,
+  "toast": [
+   "已载入 3 道题，本场已全部作答，可直接「结束面试」查看复盘"
+  ]
+ },
+ "e03": {
+  "reportVisible": true,
+  "bodyHasReport": true,
+  "head": "AI 面试助手\n智能面试准备平台\n首页\n简历分析\n招聘广场\n投递看板\nJD 拆解\n模拟面试\n求职工具\nQ\nqa_user\nAI 模拟面试\n\n基于岗位与简历生成题目，AI 实时提示，自动评估打分\n\n目标岗位\n简历摘要 （可选）\n题目数量\n−\n+\n建议 5 题，约 20-30 分钟（3-10 题）\n难度偏好 （自适应按历史成绩）\n自适应\n打基础\n稳中有升\n挑战自我\n开始面试\nAI 面试助手\n\n基于 Spring Boot 3.3 + Spring AI 1.0 + Vue 3 构建，为求职者打造的智能面试准备平台\n\n©",
+  "overlayTags": [
+   "report-mask"
+  ]
+ }
+}
