@@ -48,6 +48,18 @@
         <p v-else class="detail-no-url">该岗位没有可安全打开的投递链接，请回到原平台搜索岗位名。</p>
       </header>
 
+      <!-- E-01：详情页此前只有「前往官方申请」与「返回列表」，从抽屉跳来后收藏/入台账动作全部丢失。
+           这里补齐与抽屉一致的动作，接口完全复用（/api/jobs/favorite/toggle、/api/application/draft）。 -->
+      <div class="detail-actions">
+        <BaseButton variant="primary" :loading="planLoading" :disabled="planned" @click="addToPlan">
+          {{ planned ? '已加入投递计划' : '加入投递计划' }}
+        </BaseButton>
+        <BaseButton variant="ghost" :loading="favLoading" @click="toggleFavorite">
+          {{ favorited ? '已收藏（点击取消）' : '收藏岗位' }}
+        </BaseButton>
+        <BaseButton v-if="planned" variant="ghost" @click="goBoard">查看投递看板</BaseButton>
+      </div>
+
       <!-- 标签 -->
       <section v-if="tagList.length" class="detail-section">
         <h2>岗位标签</h2>
@@ -77,6 +89,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton, BaseTag, LoadErrorState } from '../components'
 import { recruitTypeLabel } from '../utils/recruitType'
@@ -117,6 +130,60 @@ const job = ref<JobDetail | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
 
+// E-01：收藏 / 投递计划状态。只在本页展示与操作，接口与招聘广场完全一致。
+const favorited = ref(false)
+const favLoading = ref(false)
+const planLoading = ref(false)
+const planned = ref(false)
+
+function jobId(): number {
+  return Number(route.params.id)
+}
+
+/** 读取收藏状态（失败静默：动作条仍可用，点击时会给出错误提示） */
+async function loadFavoriteState() {
+  try {
+    const res = (await api.get('/api/jobs/favorite')) as unknown as {
+      items?: Array<{ jobId?: number }>
+    }
+    favorited.value = Array.isArray(res?.items) && res.items.some((f) => f.jobId === jobId())
+  } catch {
+    favorited.value = false
+  }
+}
+
+async function toggleFavorite() {
+  favLoading.value = true
+  try {
+    const res = (await api.post('/api/jobs/favorite/toggle', { jobId: jobId() })) as unknown as {
+      favorited?: boolean
+    }
+    favorited.value = !!res?.favorited
+    ElMessage.success(favorited.value ? '已收藏，截止前会提醒你' : '已取消收藏')
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '收藏操作失败'))
+  } finally {
+    favLoading.value = false
+  }
+}
+
+async function addToPlan() {
+  planLoading.value = true
+  try {
+    await api.post('/api/application/draft', { jobId: jobId() })
+    planned.value = true
+    ElMessage.success('已加入投递计划，可在「投递看板」跟踪进度')
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '加入投递计划失败'))
+  } finally {
+    planLoading.value = false
+  }
+}
+
+function goBoard() {
+  router.push('/applications')
+}
+
 const tagList = computed(() =>
   (job.value?.tags || '')
     .split(/[,，、|]/)
@@ -136,6 +203,8 @@ async function load() {
   loadError.value = false
   try {
     job.value = (await api.get(`/api/jobs/${id}`)) as unknown as JobDetail
+    // 动作状态与详情并行获取（互不阻塞；收藏失败不阻断详情展示）
+    void loadFavoriteState()
   } catch (e: unknown) {
     // 404 是确定性结论（岗位不存在），其余按加载失败处理并保留重试
     const status = (e as { response?: { status?: number } })?.response?.status
@@ -231,6 +300,13 @@ onMounted(load)
   margin: 0;
   font-size: 13px;
   color: var(--c-text-tertiary);
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .detail-section {
