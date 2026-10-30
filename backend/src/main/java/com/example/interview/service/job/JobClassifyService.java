@@ -135,38 +135,63 @@ public class JobClassifyService {
         return list;
     }
 
-    /** 规则分类兜底 */
+    /**
+     * 规则分类兜底。
+     *
+     * <p><b>P2-04（2026-10-30 质量循环）</b>：规则表从 {@code Map.ofEntries} 改为有序
+     * {@code List<Rule>}。{@code Map.ofEntries} 的迭代顺序在规范上**不保证**，实测随机化
+     * （取决于 Map 的盐值）——同一个岗位在不同实例/不同进程上可能被判成不同行业，
+     * 也会让单测偶发失败。显式列表按声明顺序匹配，语义是确定的。
+     */
     public Classification classifyByRule(JobDto job) {
         String text = (job.title() + " " + job.companyName() + " " + (job.description() == null ? "" : job.description()))
                 .toLowerCase();
-        String industry = matchFirst(text, java.util.Map.ofEntries(
-                java.util.Map.entry("金融|银行|证券|基金|保险|投行", "金融"),
-                java.util.Map.entry("互联网|科技|软件|电商|游戏|在线", "互联网"),
-                java.util.Map.entry("电池|汽车|制造|工业|半导体|芯片", "制造"),
-                java.util.Map.entry("电网|能源|电力|石油|光伏", "能源"),
-                java.util.Map.entry("教育|学校|培训", "教育"),
-                java.util.Map.entry("医院|医药|生物|健康", "医疗"),
-                java.util.Map.entry("快消|零售|食品|饮料", "快消"),
-                java.util.Map.entry("通信|电信|5g", "通信"),
-                java.util.Map.entry("硬件|电子|无人机|家电", "硬件"),
-                java.util.Map.entry("地产|房地产|置业", "房地产"),
-                java.util.Map.entry("物流|快递|供应链", "物流")
-        ));
-        String jobType = matchFirst(text, java.util.Map.ofEntries(
-                java.util.Map.entry("开发|工程师|算法|架构|测试|运维|研发|程序员|软件", "技术"),
-                java.util.Map.entry("产品经理|产品", "产品"),
-                java.util.Map.entry("运营|用户增长|活动策划", "运营"),
-                java.util.Map.entry("设计|ui|ux|视觉", "设计"),
-                java.util.Map.entry("市场|营销|品牌|销售|商务", "市场"),
-                java.util.Map.entry("人力|行政|财务|法务|人事", "职能"),
-                java.util.Map.entry("量化|风控|投行|分析师|金融", "金融")
-        ));
+        String industry = matchFirst(text, INDUSTRY_RULES);
+        String jobType = matchFirst(text, JOB_TYPE_RULES);
         return new Classification(
                 industry == null ? "其他" : industry,
                 // v1.34.1 清理（P3）：原三元 (industry != null ? "综合" : "综合") 两分支相同，为死代码
                 jobType == null ? "综合" : jobType,
                 "校招");
     }
+
+    /** 一条规则：{@code |} 分隔的关键词命中任一即命中本规则 */
+    private record Rule(String keywords, String category) {
+        boolean matches(String text) {
+            for (String kw : keywords.split("\\|")) {
+                if (text.contains(kw)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /** 行业规则（顺序即优先级：靠前的更具体，先命中先生效） */
+    private static final List<Rule> INDUSTRY_RULES = List.of(
+            new Rule("金融|银行|证券|基金|保险|投行", "金融"),
+            new Rule("互联网|科技|软件|电商|游戏|在线", "互联网"),
+            new Rule("电池|汽车|制造|工业|半导体|芯片", "制造"),
+            new Rule("电网|能源|电力|石油|光伏", "能源"),
+            new Rule("教育|学校|培训", "教育"),
+            new Rule("医院|医药|生物|健康", "医疗"),
+            new Rule("快消|零售|食品|饮料", "快消"),
+            new Rule("通信|电信|5g", "通信"),
+            new Rule("硬件|电子|无人机|家电", "硬件"),
+            new Rule("地产|房地产|置业", "房地产"),
+            new Rule("物流|快递|供应链", "物流")
+    );
+
+    /** 职位类型规则（顺序即优先级） */
+    private static final List<Rule> JOB_TYPE_RULES = List.of(
+            new Rule("开发|工程师|算法|架构|测试|运维|研发|程序员|软件", "技术"),
+            new Rule("产品经理|产品", "产品"),
+            new Rule("运营|用户增长|活动策划", "运营"),
+            new Rule("设计|ui|ux|视觉", "设计"),
+            new Rule("市场|营销|品牌|销售|商务", "市场"),
+            new Rule("人力|行政|财务|法务|人事", "职能"),
+            new Rule("量化|风控|投行|分析师|金融", "金融")
+    );
 
     /** 单行字段：净化 + 截断 + 压平换行/制表符（null 安全） */
     private static String oneLine(String s) {
@@ -175,12 +200,10 @@ public class JobClassifyService {
         return PromptSanitizer.sanitize(TextUtil.truncate(flat, CLASSIFY_FIELD_LEN));
     }
 
-    private static String matchFirst(String text, java.util.Map<String, String> rules) {
-        for (var e : rules.entrySet()) {
-            for (String kw : e.getKey().split("\\|")) {
-                if (text.contains(kw)) {
-                    return e.getValue();
-                }
+    private static String matchFirst(String text, List<Rule> rules) {
+        for (Rule rule : rules) {
+            if (rule.matches(text)) {
+                return rule.category();
             }
         }
         return null;

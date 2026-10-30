@@ -107,8 +107,11 @@ class RagSearchServiceTest {
         assertThat(arr.get(0).get("id").asText()).isEqualTo("d1");
         assertThat(arr.get(0).get("content").asText()).isEqualTo("HashMap 内容");
         assertThat(arr.get(0).get("score").asDouble()).isEqualTo(0.92);
-        // d2 无 distance metadata → 默认 0.0
-        assertThat(arr.get(1).get("score").asDouble()).isZero();
+        // P2-08：d2 无 distance metadata → null（「未知」），绝不能写成 0.0
+        // （0 的语义是「完全相同/最强相关」，与「未知」相反）
+        assertThat(arr.get(1).get("score").isNull()).isTrue();
+        assertThat(arr.get(1).get("distance").isNull()).isTrue();
+        assertThat(arr.get(1).get("similarity").isNull()).isTrue();
     }
 
     @Test

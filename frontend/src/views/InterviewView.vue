@@ -179,7 +179,7 @@
             <BaseButton variant="gradient" :loading="evalLoading" :disabled="evalLoading" @click="submitAnswer">
               {{ evalLoading ? '评估中…' : '提交回答' }}
             </BaseButton>
-            <BaseButton v-if="qIndex < questions.length - 1" variant="ghost" @click="nextQuestion">跳过本题</BaseButton>
+            <BaseButton v-if="qIndex < questions.length - 1" variant="ghost" :disabled="evalLoading" @click="nextQuestion">跳过本题</BaseButton>
             <BaseButton v-if="qIndex === questions.length - 1" variant="success" @click="finishSession">结束面试</BaseButton>
           </div>
 
@@ -243,7 +243,7 @@
         </div>
         <div class="action-row">
           <BaseButton variant="ghost" :loading="followingUp" :disabled="followingUp" @click="deepFollowUp">深挖提问</BaseButton>
-          <BaseButton v-if="qIndex < questions.length - 1" variant="gradient" @click="nextQuestion">下一题</BaseButton>
+          <BaseButton v-if="qIndex < questions.length - 1" variant="gradient" :disabled="evalLoading" @click="nextQuestion">下一题</BaseButton>
           <BaseButton v-else variant="success" @click="finishSession">结束面试</BaseButton>
         </div>
       </div>
@@ -292,6 +292,7 @@ import { BaseButton, BaseInput, BaseTextarea } from '../components'
 import ReportPanel from '../components/ReportPanel.vue'
 // P2-17：复用已有的增量 SSE 解析器（状态在实例上，天然支持跨 chunk 的事件）
 import { AgentSseParser } from '../utils/agentSse'
+import { buildEvaluateBody, buildSessionAnswerBody, snapshotQuestion } from '../utils/interviewAnswer'
 
 const router = useRouter()
 const route = useRoute()
@@ -1035,19 +1036,19 @@ function stopStream() {
 async function submitAnswer() {
   if (evalLoading.value) return // 防并发：Ctrl+Enter 可绕过按钮 disabled，此处兜底
   if (!userAnswer.value.trim()) return ElMessage.warning('请输入回答')
+  // P1-06：在 await 之前**快照**被评估的题面、题号与作答。
+  // 原实现在 await 之后继续读 currentQ.value —— 评估通常 3-15s，这期间用户点「下一题」
+  // 就会把 A 题的回答与评分写到 B 题名下（历史回顾错配、A 题永远「未作答」，且事后无法自动修复）。
+  const answered = snapshotQuestion(currentQ.value)
+  const answeredText = userAnswer.value
+  const answeredImageUrl = imageUrl.value
   evalLoading.value = true
   evalResult.value = null
   startEvalTimer()
   try {
     // 1. 评估回答（AI 返回评分 + 改进建议；可选携带附图 imageUrl 做多模态评估 v1.30.0）
-    const data = await api.post('/api/interview/evaluate', {
-      question: currentQ.value.question,
-      userAnswer: userAnswer.value,
-      // P2-24：此前漏传参考答案，后端 getOrDefault("referenceAnswer","") 恒为空串，
-      // 导致提示词里「评分须结合【参考答案】要点逐项核对」完全落空、评分退化为凭模型印象。
-      referenceAnswer: currentQ.value.referenceAnswer || undefined,
-      imageUrl: imageUrl.value || undefined
-    }) as unknown as string
+    const data = await api.post('/api/interview/evaluate',
+      buildEvaluateBody(answered, answeredText, answeredImageUrl)) as unknown as string
     evalResult.value = safeParse<EvalResult>(data, {})
 
     // 维度明细（第三批 A）：以原始对象承载，**不在此处 `?? 0` 兜底**——
@@ -1063,10 +1064,11 @@ async function submitAnswer() {
 
     // 收集本次回答的评估结果，供面试结束后的综合复盘报告使用
     if (evalResult.value && typeof evalResult.value.overallScore === 'number') {
+      // 只用快照：切题后 currentQ 已指向下一题，读它会污染复盘数据
       sessionEvals.value.push({
-        question: currentQ.value.question,
-        category: currentQ.value.category,
-        difficulty: currentQ.value.difficulty,
+        question: answered.question,
+        category: answered.category,
+        difficulty: answered.difficulty,
         overallScore: evalResult.value.overallScore,
         evalDetail,
       })
@@ -1074,16 +1076,11 @@ async function submitAnswer() {
 
     // 2. 持久化用户答案 + 评估分 + 维度明细到后端（关联 questionId）
     //    失败不阻塞流程，仅记录日志（历史回顾会缺失本次答题记录）
-    const questionId = currentQ.value.id
-    if (questionId != null) {
+    const persistBody = buildSessionAnswerBody(
+      answered, answeredText, evalResult.value.overallScore, evalDetail)
+    if (persistBody) {
       try {
-        await api.post('/api/session/answer', {
-          questionId,
-          userAnswer: userAnswer.value,
-          evaluationScore: evalResult.value.overallScore ?? null,
-          // 后端校验：合法 JSON 且 ≤4000 字；非法则 400。故序列化成字符串后再传。
-          evalDetail: evalDetail ? JSON.stringify(evalDetail) : null
-        })
+        await api.post('/api/session/answer', persistBody)
       } catch (persistErr) {
         console.warn('答案持久化失败，历史回顾将缺失本次记录：', persistErr)
         ElMessage.warning('本次回答保存失败，不会记入面试历史与错题本')
@@ -1104,6 +1101,9 @@ async function submitAnswer() {
 }
 
 function nextQuestion() {
+  // P1-06 兜底：评估进行中禁止切题（Ctrl+Enter 等快捷路径同样被挡住）。
+  // 评估通常 3-15s，这期间切题会让返回的答案/评分写到「下一题」名下。
+  if (evalLoading.value) return
   if (qIndex.value < questions.value.length - 1) {
     qIndex.value++
     userAnswer.value = ''

@@ -282,16 +282,15 @@ public class RagSearchService {
                 // （余弦距离，**越小越相似**），前端若按「分越高越好」渲染/排序会得到相反语义。
                 // 现补充语义明确的 distance 与 similarity，并保留 score 作为历史契约字段
                 //（语义同 distance，不改变既有前端行为）。
-                Object rawDistance = doc.getMetadata().get("distance");
-                item.put("score", rawDistance == null ? 0.0 : rawDistance);
-                if (rawDistance instanceof Number n) {
-                    double d = n.doubleValue();
-                    item.put("distance", d);                       // 余弦距离：越小越相似
-                    item.put("similarity", Math.max(0.0, 1.0 - d)); // 归一化相似度：越大越相似
-                } else {
-                    item.put("distance", null);
-                    item.put("similarity", null);
-                }
+                // P2-08（2026-10-30 质量循环）：距离缺失时**不能**写成 0.0。
+                // 余弦距离 0 表示「完全相同」，是**最强相关**；而缺失只表示「不知道」。
+                // 此前把两者混为一谈，前端按分数排序时「未知」会被排到最前（最相关），
+                // 与本项目「无数据 ≠ 0」的契约相违背。统一置 null，前端按「—」渲染。
+                Double distance = extractDistance(doc);
+                item.put("score", distance);   // 历史契约字段（语义同 distance）
+                item.put("distance", distance); // 余弦距离：越小越相似
+                item.put("similarity", distance == null ? null
+                        : Math.max(0.0, 1.0 - distance)); // 归一化相似度：越大越相似
                 result.add(item);
             }
             String json = objectMapper.writeValueAsString(result);

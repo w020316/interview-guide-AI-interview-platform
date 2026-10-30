@@ -264,9 +264,11 @@ public class JobAgentService {
         if (pending.isEmpty()) {
             return new UpsertResult(0, 0);
         }
+        // P2-01：external_id 列宽 128。查询与写入必须用**同一个裁剪后的值**，
+        // 否则超长 id 会「查不到 → 当新增 → 插入失败」，或在截断后每次都被当成新岗位。
         List<String> externalIds = new ArrayList<>(pending.size());
         for (PendingUpsert p : pending) {
-            externalIds.add(p.dto().externalId());
+            externalIds.add(clip(p.dto().externalId(), LEN_EXTERNAL_ID));
         }
         // 同一 externalId 理论上唯一（uk 约束），putIfAbsent 防御异常数据
         Map<String, JobPostingEntity> existing = new HashMap<>();
@@ -278,11 +280,12 @@ public class JobAgentService {
         int inserted = 0;
         for (PendingUpsert p : pending) {
             JobDto dto = p.dto();
-            JobPostingEntity entity = existing.get(dto.externalId());
+            String externalId = clip(dto.externalId(), LEN_EXTERNAL_ID);
+            JobPostingEntity entity = existing.get(externalId);
             if (entity == null) {
                 entity = JobPostingEntity.builder()
-                        .platform(platform)
-                        .externalId(dto.externalId())
+                        .platform(clip(platform, LEN_PLATFORM))
+                        .externalId(externalId)
                         .build();
                 inserted++;
             }
@@ -293,30 +296,84 @@ public class JobAgentService {
         return new UpsertResult(inserted, toSave.size() - inserted);
     }
 
-    /** 字段装配（新增与更新共用，与原逐条 upsert 保持完全一致的赋值与兜底规则） */
+    /**
+     * 字段装配（新增与更新共用，与原逐条 upsert 保持完全一致的赋值与兜底规则）。
+     *
+     * <p><b>P2-01（2026-10-30 质量循环）</b>：所有字符串字段按实体列宽裁剪。
+     * 此前只有 {@code applyUrl} 有 500 字符校验，其它字段完全不管：
+     * 上游一条脏数据（如 title 混入整段 JD）就会让 {@code saveAll} 触发
+     * 「Data too long for column」→ 整批回滚 → 外层只 log.warn → 该渠道本轮 0 入库，
+     * 管理后台看不到任何异常。按列宽裁剪把「整批失败」降级为「单条字段被截断」。
+     */
     private void applyJobFields(JobPostingEntity entity, JobDto dto, JobClassifyService.Classification cls) {
-        entity.setTitle(dto.title());
-        entity.setCompanyName(dto.companyName());
+        entity.setTitle(clip(dto.title(), LEN_TITLE));
+        entity.setCompanyName(clip(dto.companyName(), LEN_COMPANY));
         // P1-04：投递链接只允许 http(s)。第三方源是外部输入，一条 javascript: 链接
         // 在前端会被绑到 href/window.open，而 JWT 就在 localStorage 里。
         entity.setApplyUrl(com.example.interview.util.UrlSafety.sanitize(dto.applyUrl()));
         entity.setDescription(dto.description());
         entity.setRequirements(dto.requirements());
-        entity.setRecruitType(isBlank(dto.recruitType()) ? "AUTUMN" : dto.recruitType());
+        entity.setRecruitType(clip(isBlank(dto.recruitType()) ? "AUTUMN" : dto.recruitType(), LEN_RECRUIT_TYPE));
         entity.setDeadline(dto.deadline());
-        entity.setLocation(dto.location());
-        entity.setSalary(dto.salary());
-        entity.setDegree(JobFieldNormalizer.normalizeDegree(dto.degree()));
-        entity.setExperience(JobFieldNormalizer.normalizeExperience(dto.experience()));
+        entity.setLocation(clip(dto.location(), LEN_LOCATION));
+        entity.setSalary(clip(dto.salary(), LEN_SALARY));
+        entity.setDegree(clip(JobFieldNormalizer.normalizeDegree(dto.degree()), LEN_DEGREE));
+        entity.setExperience(clip(JobFieldNormalizer.normalizeExperience(dto.experience()), LEN_EXPERIENCE));
         entity.setActive(true);
 
         // 行业/职位类型：优先用平台数据，缺失时用 AI/规则分类补全
-        entity.setIndustry(!isBlank(dto.industry()) ? dto.industry()
-                : (cls != null && !isBlank(cls.industry()) ? cls.industry() : entity.getIndustry()));
-        entity.setJobType(!isBlank(dto.jobType()) ? dto.jobType()
-                : (cls != null && !isBlank(cls.jobType()) ? cls.jobType() : entity.getJobType()));
-        entity.setTags(!isBlank(dto.tags()) ? dto.tags()
-                : (cls != null && !isBlank(cls.tags()) ? cls.tags() : entity.getTags()));
+        entity.setIndustry(clip(!isBlank(dto.industry()) ? dto.industry()
+                : (cls != null && !isBlank(cls.industry()) ? cls.industry() : entity.getIndustry()), LEN_INDUSTRY));
+        entity.setJobType(clip(!isBlank(dto.jobType()) ? dto.jobType()
+                : (cls != null && !isBlank(cls.jobType()) ? cls.jobType() : entity.getJobType()), LEN_JOB_TYPE));
+        entity.setTags(clip(!isBlank(dto.tags()) ? dto.tags()
+                : (cls != null && !isBlank(cls.tags()) ? cls.tags() : entity.getTags()), LEN_TAGS));
+        if (wasClipped(dto)) {
+            log.warn("岗位字段超出列宽已截断：platform={} externalId={}", entity.getPlatform(), entity.getExternalId());
+        }
+    }
+
+    // ── 与 JobPostingEntity 的 @Column(length) 一一对应（改实体时必须同步）──
+    private static final int LEN_TITLE = 200;
+    private static final int LEN_COMPANY = 200;
+    private static final int LEN_INDUSTRY = 50;
+    private static final int LEN_JOB_TYPE = 50;
+    private static final int LEN_LOCATION = 100;
+    private static final int LEN_SALARY = 100;
+    private static final int LEN_DEGREE = 50;
+    private static final int LEN_EXPERIENCE = 50;
+    private static final int LEN_RECRUIT_TYPE = 20;
+    private static final int LEN_TAGS = 500;
+    private static final int LEN_EXTERNAL_ID = 128;
+    private static final int LEN_PLATFORM = 50;
+
+    /**
+     * 按**字符**（码点）裁剪，代理对安全 —— 按 {@code String.length()} 裁会把 emoji
+     * 切成半个字符，落库后是乱码，而 PostgreSQL 的 VARCHAR(n) 计数也是字符而非字节。
+     */
+    static String clip(String value, int maxChars) {
+        if (value == null) {
+            return null;
+        }
+        if (value.codePointCount(0, value.length()) <= maxChars) {
+            return value;
+        }
+        int end = value.offsetByCodePoints(0, maxChars);
+        return value.substring(0, end);
+    }
+
+    /** 诊断用：判断**输入**是否发生过截断（必须在裁剪前判断，裁完再判永远是 false） */
+    private static boolean wasClipped(JobDto dto) {
+        return over(dto.title(), LEN_TITLE) || over(dto.companyName(), LEN_COMPANY)
+                || over(dto.location(), LEN_LOCATION) || over(dto.salary(), LEN_SALARY)
+                || over(dto.industry(), LEN_INDUSTRY) || over(dto.jobType(), LEN_JOB_TYPE)
+                || over(dto.degree(), LEN_DEGREE) || over(dto.experience(), LEN_EXPERIENCE)
+                || over(dto.recruitType(), LEN_RECRUIT_TYPE) || over(dto.tags(), LEN_TAGS)
+                || over(dto.externalId(), LEN_EXTERNAL_ID);
+    }
+
+    private static boolean over(String value, int maxChars) {
+        return value != null && value.codePointCount(0, value.length()) > maxChars;
     }
 
     /** 岗位详情（仅返回有效岗位） */
@@ -627,9 +684,16 @@ public class JobAgentService {
         // 那会把「已下架但命中技能」的岗位也带出来（active 条件被 OR 短路掉）。
         java.util.List<org.springframework.data.jpa.domain.Specification<JobPostingEntity>> skillSpecs =
                 new java.util.ArrayList<>();
+        // P2-05：技能数不设上限时会产生 5×N 个 `%kw%` 谓词——前后通配无法走索引，
+        // 技能越多查询越慢。这里只取传入顺序的前 N 个（由 JobMatchService.extractSkills 的
+        // 词表遍历顺序决定，稳定可复现），更多技能不会丢分——内存匹配仍对候选做全量打分。
+        int used = 0;
         for (String raw : skills) {
             if (isBlank(raw)) {
                 continue;
+            }
+            if (used++ >= MAX_DB_SKILL_PREDICATES) {
+                break;
             }
             // DB 侧只做「至少出现该技能子串」的宽松过滤；精确词边界留给内存匹配。
             // 技能画像来自 SKILL 词表（纯字母/中文），无 LIKE 通配符，escapeLike 仍是防御性写法。
@@ -651,8 +715,19 @@ public class JobAgentService {
         }
         var active = org.springframework.data.jpa.domain.Specification
                 .<JobPostingEntity>where((root, query, cb) -> cb.isTrue(root.get("active")));
-        return repository.findAll(active.and(skillGroup));
+        // P2-05：结果必须有上限。内存打分是 O(岗位数 × 技能数)，不设界时随库增长；
+        // 按 updatedAt 倒序取「最近刷新过的」岗位（数据库里 99% 的岗位是本轮刚 upsert 的）。
+        var pageable = PageRequest.of(0, MAX_MATCH_CANDIDATES,
+                org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Direction.DESC, "updatedAt"));
+        return repository.findAll(active.and(skillGroup), pageable).getContent();
     }
+
+    /** DB 预筛参与的技能上限（每个技能 5 个 LIKE 谓词，前后通配无法走索引） */
+    private static final int MAX_DB_SKILL_PREDICATES = 8;
+
+    /** 内存匹配候选上限（与下游 JobMatchService 的 top-N 相比留足余量） */
+    private static final int MAX_MATCH_CANDIDATES = 300;
 
     /**
      * 有效岗位总数（v1.38.0）。

@@ -899,4 +899,18 @@ class JobAgentServiceTest {
         assertThat(kept).as("内置数据不参与第三方清理").isNotNull();
         assertThat(kept.getActive()).isTrue();
     }
+
+    /**
+     * P2-01（2026-10-30）：字段按列宽裁剪，且必须按**码点**而不是 UTF-16 长度，
+     * 否则 emoji 会被切成半个代理对，落库成乱码。
+     */
+    @Test
+    @DisplayName("P2-01：clip 按码点裁剪，代理对不被切断")
+    void clip_byCodePoint_keepsSurrogatePairs() {
+        assertThat(JobAgentService.clip(null, 3)).isNull();
+        assertThat(JobAgentService.clip("abc", 5)).isEqualTo("abc");
+        assertThat(JobAgentService.clip("abcdef", 3)).isEqualTo("abc");
+        // 4 个 emoji = 8 个 UTF-16 单元；按 2 个「字符」裁剪应得到 2 个完整 emoji
+        assertThat(JobAgentService.clip("😀😀😀😀", 2)).isEqualTo("😀😀");
+    }
 }

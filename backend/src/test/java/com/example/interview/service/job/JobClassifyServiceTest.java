@@ -204,6 +204,18 @@ class JobClassifyServiceTest {
         assertThat(c.tags()).isEqualTo("校招");
     }
 
+    /**
+     * P2-04（2026-10-30）：规则表原为 {@code Map.ofEntries}，迭代顺序在规范上不保证、
+     * 实测随机化 → 同一岗位在不同进程上可能判成不同行业（也让单测偶发失败）。
+     * 改为有序列表后，「同时命中多条规则」必须稳定取声明顺序的第一条。
+     */
+    @Test
+    @DisplayName("classifyByRule: 多条规则同时命中时按声明顺序取第一条（P2-04）")
+    void classifyByRule_multipleMatches_usesDeclarationOrder() {
+        // 标题命中「银行」（金融规则），公司名命中「互联网」「科技」（互联网规则）
+        assertRule("银行软件开发", "某互联网科技公司", "金融", "技术");
+    }
+
     @Test
     @DisplayName("classifyByRule: 描述中的关键词也参与匹配")
     void classifyByRule_matchesDescriptionKeywords() {
