@@ -49,8 +49,18 @@ public class AgentController {
     /** SSE meta 事件 JSON 序列化（线程安全，避免手拼 JSON 转义不全） */
     private static final com.fasterxml.jackson.databind.ObjectMapper META_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
 
-    /** SSE 会话准备/事件推送专用线程池（虚拟线程，随用随建） */
-    private final java.util.concurrent.ExecutorService sseExecutor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+    /**
+     * SSE 会话准备/事件推送专用线程池（虚拟线程，随用随建）。
+     *
+     * <p><b>P1-05（2026-10-30 质量循环）</b>：裸虚拟线程<b>不继承</b> {@code SecurityContext}
+     * （{@code SecurityContextHolder} 默认 MODE_THREADLOCAL），异步任务里
+     * {@code SelfKeyAwareChatModel.userChatModelOrNull()} 恒为 null ——
+     * 用户配置的自持 AI Key 在「AI 助手」链路上完全不生效，每轮都在消耗平台额度。
+     * 这里用 Spring Security 的委托装饰器：任务提交时捕获当前上下文，执行时设置、结束后还原。
+     */
+    private final java.util.concurrent.ExecutorService sseExecutor =
+            new org.springframework.security.concurrent.DelegatingSecurityContextExecutorService(
+                    java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
 
     private final AgentService agentService;
 

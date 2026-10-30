@@ -115,4 +115,34 @@ class SelfKeyAwareChatModelTest {
 
         verify(platformModel).call(any(Prompt.class));
     }
+
+    /**
+     * P1-05（2026-10-30）：流式链路此前被整体漏掉（直接 return platformModel.stream）。
+     * 「实时面试提问」「AI 助手」两条主链路走的正是 stream()，所以自持 Key 从未生效。
+     */
+    @Test
+    @DisplayName("stream：未配置自持 Key → 走平台模型（与 call 口径一致）")
+    void stream_withoutSelfKey_usesPlatform() {
+        when(userAiKeyService.settingOf("u1")).thenReturn(Optional.empty());
+        var model = new SelfKeyAwareChatModel(platformModel, userAiKeyService);
+
+        model.stream(new Prompt("hi"));
+
+        verify(platformModel).stream(any(Prompt.class));
+    }
+
+    @Test
+    @DisplayName("stream：配置自持 Key → 走用户端点，失败转业务异常且不回落平台链")
+    void stream_withSelfKey_failureDoesNotFallBack() {
+        when(userAiKeyService.settingOf("u1")).thenReturn(Optional.of(
+                new UserAiKeyService.Setting("sk-xxxxxxxxxxxxxxxxxxxx",
+                        "https://self-key.invalid", "gpt-x")));
+        var model = new SelfKeyAwareChatModel(platformModel, userAiKeyService);
+
+        // .invalid 是保留 TLD：DNS 必然失败，不依赖网络与真实计费
+        assertThatThrownBy(() -> model.stream(new Prompt("hi")).blockLast())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("自持 AI Key 调用失败");
+        verify(platformModel, never()).stream(any(Prompt.class));
+    }
 }

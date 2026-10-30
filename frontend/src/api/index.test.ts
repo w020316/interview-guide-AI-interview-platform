@@ -105,6 +105,22 @@ describe('api/index 请求拦截器（fulfilled）', () => {
     const out = await reqFulfilled(cfg)
     expect(out.timeout).toBe(AUTH_TIMEOUT)
   })
+
+  // P2-15 回归：axios 合并配置时会把实例默认 timeout 填进 config，
+  // 原判断 `config.timeout === undefined` 永远不成立 → AI 兜底从未生效（实际 90s）。
+  it('AI 接口处于实例默认超时时抬到 AI_TIMEOUT', async () => {
+    localStorage.setItem('token', validToken())
+    const cfg: any = { headers: {}, url: '/api/agent/chat/stream', timeout: DEFAULT_TIMEOUT }
+    const out = await reqFulfilled(cfg)
+    expect(out.timeout).toBe(AI_TIMEOUT)
+  })
+
+  it('AI 请求显式指定其它超时（非默认值）时不覆盖调用方意图', async () => {
+    localStorage.setItem('token', validToken())
+    const cfg: any = { headers: {}, url: '/api/resume/analyze', timeout: 5000 }
+    const out = await reqFulfilled(cfg)
+    expect(out.timeout).toBe(5000)
+  })
 })
 
 describe('api/index 响应拦截器（fulfilled）', () => {

@@ -30,7 +30,13 @@ import java.util.Map;
  *
  * <p>集成点：AiConfig 把平台 FallbackChatModel 包在本类里作为 @Primary ChatModel，
  * 下游的 ChatClient（Agent/求职信/故事库/定制简历）与 JobClassifyService 自动生效。
- * 仅覆盖 call(Prompt)——后端没有流式 AI 调用（已核实），stream() 委托平台模型。
+ * call(Prompt) 与 stream(Prompt) 都按同一规则路由（P1-05：流式链路此前被漏掉，
+ * 导致「实时面试提问」「AI 助手」两条主链路完全不读用户 Key）。
+ *
+ * <p><b>线程上下文前提</b>：路由依赖 {@code SecurityContextHolder}。SSE 场景在
+ * 虚拟线程 / Reactor 线程里执行，必须由调用方显式传播上下文
+ * （见 AgentController / InterviewController 的 {@code DelegatingSecurityContextExecutorService}，
+ * 以及 AgentService.runStream 的上下文恢复），否则这里只会看到匿名上下文。
  */
 public class SelfKeyAwareChatModel implements ChatModel {
 
@@ -75,10 +81,7 @@ public class SelfKeyAwareChatModel implements ChatModel {
         } catch (Exception e) {
             // 自持 Key 失败**不回落平台链**（会静默消耗平台额度、掩盖配置问题），
             // 转为可读的业务异常（503）：用户能明确知道是自己的 Key 出了问题
-            String msg = String.valueOf(e.getMessage() == null ? e : e.getMessage());
-            throw new BusinessException(
-                    "自持 AI Key 调用失败，请检查 Key/端点/模型配置，或在「个人中心 → AI 设置」清除后重试："
-                            + msg.substring(0, Math.min(160, msg.length())), e);
+            throw userKeyFailure(e);
         }
     }
 
@@ -152,10 +155,37 @@ public class SelfKeyAwareChatModel implements ChatModel {
                 .build();
     }
 
+    /**
+     * 流式调用（P1-05，2026-10-30 质量循环）。
+     *
+     * <p><b>此前这里是空的</b>：直接 {@code return platformModel.stream(prompt)}，
+     * 注释写「后端没有流式 AI 调用（已核实）」。但「实时面试提问」
+     * （{@code /api/interview/ask/stream}）与「AI 助手」（{@code /api/agent/chat/stream}）
+     * 走的恰恰是 {@code ChatClient...stream()} —— 也就是说两条主链路上，用户配置的自持 Key
+     * 从来不生效，每一轮都在消耗平台额度，而用户完全无从感知。
+     *
+     * <p>现在与 {@link #call(Prompt)} 对称：解析到用户模型就走用户模型；
+     * 用户侧流失败同样**不回落平台链**（否则会静默消耗平台额度、掩盖 Key 配置问题）。
+     */
     @Override
     public Flux<ChatResponse> stream(Prompt prompt) {
-        // 后端没有流式 AI 调用（已核实全部为 .call()）；自持 Key 的流式路由留待有流式需求时再接
-        return platformModel.stream(prompt);
+        ChatModel user = userChatModelOrNull();
+        if (user == null) {
+            return platformModel.stream(prompt);
+        }
+        return user.stream(prompt)
+                .onErrorMap(e -> userKeyFailure(e));
+    }
+
+    /** 把自持 Key 的失败包装成带明确文案的业务异常（流式与非流式共用同一口径） */
+    private static BusinessException userKeyFailure(Throwable e) {
+        if (e instanceof BusinessException be) {
+            return be;
+        }
+        String msg = String.valueOf(e.getMessage() == null ? e : e.getMessage());
+        return new BusinessException(
+                "自持 AI Key 调用失败，请检查 Key/端点/模型配置，或在「个人中心 → AI 设置」清除后重试："
+                        + msg.substring(0, Math.min(160, msg.length())), e);
     }
 
     @Override

@@ -174,12 +174,23 @@ async function scrollToBottom() {
   }
 }
 
-/** 会话接口 401/403 统一处理：清除登录态并跳转（与 api 拦截器行为一致） */
+/**
+ * 会话接口的鉴权失败处理（P2-16）。
+ *
+ * <p><b>401 与 403 语义不同，不能合在一起清号</b>：
+ * 401 = 没登录 / token 失效 → 清会话、跳登录；
+ * 403 = 已登录但无权（如权益不足、账号受限）→ 只提示，**保留会话与已输入的内容**。
+ * 原实现把 403 也当成会话失效，用户在一个业务 403 上被静默登出并丢掉正在写的问题。
+ */
 function handleAuthFailure(status: number): boolean {
-  if (status === 401 || status === 403) {
+  if (status === 401) {
     ElMessage.error('登录已过期，请重新登录')
     clearAuth()
     window.location.href = '/login?redirect=' + encodeURIComponent('/agent')
+    return true
+  }
+  if (status === 403) {
+    ElMessage.error('当前账号没有权限使用该功能。会话已保留，请检查账号状态后重试')
     return true
   }
   return false
@@ -324,11 +335,8 @@ async function send(preset?: string) {
     })
 
     if (!resp.ok) {
-      if (resp.status === 401 || resp.status === 403) {
-        ElMessage.error('登录已过期，请重新登录')
-        clearAuth()
-        window.location.href = '/login?redirect=' + encodeURIComponent('/agent')
-      } else {
+      // P2-16：401 清会话跳登录；403 只提示并保留输入（不静默登出）
+      if (!handleAuthFailure(resp.status)) {
         ElMessage.error(`智能体请求失败（HTTP ${resp.status}）`)
       }
       return

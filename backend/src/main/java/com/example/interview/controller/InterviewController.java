@@ -63,8 +63,16 @@ public class InterviewController {
     @Autowired(required = false)
     private MeterRegistry meterRegistry;
 
-    /** SSE 推送使用虚拟线程池，避免阻塞 Tomcat 工作线程 */
-    private final ExecutorService sseExecutor = Executors.newVirtualThreadPerTaskExecutor();
+    /**
+     * SSE 推送使用虚拟线程池，避免阻塞 Tomcat 工作线程。
+     *
+     * <p><b>P1-05（2026-10-30 质量循环）</b>：裸虚拟线程不继承 {@code SecurityContext}，
+     * 任务内 {@code chatClient.stream()} 走 {@code SelfKeyAwareChatModel} 时取不到当前用户，
+     * 自持 Key 永不生效。用 Spring Security 的委托装饰器在提交时捕获上下文。
+     */
+    private final ExecutorService sseExecutor =
+            new org.springframework.security.concurrent.DelegatingSecurityContextExecutorService(
+                    Executors.newVirtualThreadPerTaskExecutor());
 
     /** 心跳调度器：定期发送注释行，避免反向代理/浏览器超时断开 */
     private final ScheduledExecutorService heartbeat = new ScheduledThreadPoolExecutor(1);

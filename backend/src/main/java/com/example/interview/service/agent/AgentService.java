@@ -218,7 +218,15 @@ public class AgentService {
                                 java.util.function.Consumer<String> onToken,
                                 Runnable onComplete,
                                 java.util.function.Consumer<String> onError) {
-        return Mono.fromRunnable(() -> executeLoop(session, onToken, onComplete, onError))
+        // P1-05：ReAct 循环最终跑在 boundedElastic 线程上（subscribeOn 会换线程），
+        // 而 SecurityContextHolder 是 ThreadLocal —— 不显式搬运，模型路由永远看不到当前用户，
+        // 自持 AI Key 在「AI 助手」链路失效。在**提交线程**（已由 Controller 的委托执行器
+        // 还原了上下文）捕获，任务内设置、结束后还原。
+        org.springframework.security.core.context.SecurityContext securityContext =
+                org.springframework.security.core.context.SecurityContextHolder.getContext();
+        return Mono.fromRunnable(() ->
+                        com.example.interview.util.SecurityContextPropagation.runWith(securityContext,
+                                () -> executeLoop(session, onToken, onComplete, onError)))
                 .subscribeOn(Schedulers.boundedElastic())
                 .subscribe();
     }
@@ -616,8 +624,13 @@ public class AgentService {
         if (conversationId == null || firstMessage == null || firstMessage.isBlank()) {
             return;
         }
+        // P1-05：标题生成同样是一次模型调用，必须带上当前用户上下文，
+        // 否则自持 Key 用户在这一步会悄悄改用平台额度（且平台链失败时标题静默退回默认值）
+        org.springframework.security.core.context.SecurityContext securityContext =
+                org.springframework.security.core.context.SecurityContextHolder.getContext();
         // 不阻塞主流程：交给 boundedElastic 异步执行
-        reactor.core.scheduler.Schedulers.boundedElastic().schedule(() -> {
+        reactor.core.scheduler.Schedulers.boundedElastic().schedule(() ->
+                com.example.interview.util.SecurityContextPropagation.runWith(securityContext, () -> {
             try {
                 String prompt = "把下面这条用户的求职相关请求概括为一个中文会话标题，≤20字，只输出标题本身，不加引号、标点可有可无：\n" + firstMessage;
                 String title = com.example.interview.ai.AiConcurrencyGuard.call(() ->
@@ -639,7 +652,7 @@ public class AgentService {
             } catch (Exception e) {
                 log.warn("智能体会话标题生成失败（保持默认标题）：{}", e.getMessage());
             }
-        });
+        }));
     }
 
     private static String shorten(String s, int max) {

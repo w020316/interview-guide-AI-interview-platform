@@ -290,6 +290,8 @@ import { firstUnansweredIndex, isResumableSession } from '../utils/interviewResu
 import { buildReportView, buildScopeText, findDim, type ReportCompareView, type ReportEvalInput } from '../utils/reportView'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 import ReportPanel from '../components/ReportPanel.vue'
+// P2-17：复用已有的增量 SSE 解析器（状态在实例上，天然支持跨 chunk 的事件）
+import { AgentSseParser } from '../utils/agentSse'
 
 const router = useRouter()
 const route = useRoute()
@@ -944,12 +946,15 @@ async function streamHint() {
       signal: abortController.signal
     })
     if (!resp.ok) {
-      if (resp.status === 401 || resp.status === 403) {
+      // P2-16：401 才清会话跳登录；403 是业务无权（如权益不足），保留会话与已输入内容
+      if (resp.status === 401) {
         ElMessage.error('登录已过期，请重新登录')
         clearAuth()
         if (window.location.pathname !== '/login') {
           window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
         }
+      } else if (resp.status === 403) {
+        ElMessage.error('当前账号没有权限使用该功能。会话已保留，请检查账号状态后重试')
       } else {
         ElMessage.error(`AI 提示请求失败（HTTP ${resp.status}）`)
       }
@@ -958,35 +963,36 @@ async function streamHint() {
     if (!resp.body) throw new Error('Response body is null')
     reader = resp.body.getReader()
     const decoder = new TextDecoder()
-    let buffer = ''
+    // P2-17：事件状态必须跨 chunk 保存。原实现在每个 chunk 内声明 currentEvent，
+    // 网络把一个事件切在两块时 `event:token` 与 `data:...` 会分家，事件类型丢失。
+    const parser = new AgentSseParser()
+    const handleEvents = async (events: { event: string; data: string }[]) => {
+      for (const evt of events) {
+        if (evt.event === 'error') {
+          ElMessage.error(evt.data || 'AI 服务异常，请重试')
+          await reader?.cancel()
+          return 'stop'
+        }
+        if (evt.event === 'done' || evt.data === '[DONE]') {
+          await reader?.cancel()
+          return 'stop'
+        }
+        if (evt.event === 'token' && evt.data) {
+          streamContent.value += evt.data
+        }
+        // start 事件与心跳注释忽略
+      }
+      return 'continue'
+    }
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-      let currentEvent = 'message'
-      for (const line of lines) {
-        if (line.startsWith('event:')) {
-          currentEvent = line.slice(6).trim()
-        } else if (line.startsWith('data:')) {
-          const data = line.slice(5).trim()
-          if (currentEvent === 'error') {
-            ElMessage.error(data || 'AI 服务异常，请重试')
-            await reader.cancel()
-            return
-          }
-          if (currentEvent === 'done' || data === '[DONE]') {
-            await reader.cancel()
-            return
-          }
-          if (currentEvent === 'token' && data) {
-            streamContent.value += data
-          }
-          // start 事件和 comment 行忽略
-          currentEvent = 'message'
-        }
+      if (done) {
+        // 流结束但最后一行可能没有结尾空行：冲刷残余事件
+        if ((await handleEvents(parser.flush())) === 'stop') return
+        break
       }
+      const fed = parser.feed(decoder.decode(value, { stream: true }))
+      if ((await handleEvents(fed)) === 'stop') return
     }
   } catch (e: unknown) {
     if ((e as Error).name === 'AbortError') {

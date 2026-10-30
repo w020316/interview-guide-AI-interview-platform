@@ -213,8 +213,10 @@ api.interceptors.request.use((config) => {
   } else {
     config.headers['Content-Type'] = 'application/json'
   }
-  // AI 调用方未显式指定超时时，按 AI 接口兜底（避免用 90s 卡死长推理）
-  if (config.timeout === undefined && isAiRequest(config.url)) {
+  // AI 调用方未显式指定超时时，按 AI 接口兜底（避免用 90s 卡死长推理）。
+  // P2-15：这里必须同时判断「等于实例默认值」——axios 在合并配置时就把实例默认的
+  // 90000 填进了 config.timeout，`=== undefined` 永远不成立，AI 兜底实际上从未生效。
+  if (isAiRequest(config.url) && (config.timeout === undefined || config.timeout === DEFAULT_TIMEOUT)) {
     config.timeout = AI_TIMEOUT
   }
   // 认证接口使用更长超时（Render 冷启动兜底）
