@@ -1,0 +1,18 @@
+{
+ "afterNav": {
+  "url": "http://localhost:5173/interview",
+  "hasAnswerBox": true,
+  "buttons": [
+   "求职工具",
+   "Qqa_user",
+   "AI 实时提示▾",
+   "语音作答",
+   "上传附图（截图/草图/证书）",
+   "提交回答",
+   "跳过本题",
+   "v1.89.0"
+  ],
+  "head": "AI 面试助手\n智能面试准备平台\n首页\n简历分析\n招聘广场\n投递看板\nJD 拆解\n模拟面试\n求职工具\nQ\nqa_user\nAI 模拟面试\n\n基于岗位与简历生成题目，AI 实时提示，自动评估打分\n\n目标岗位\nJava 后端工程师\n\n面试进度\n第 1 / 3 题\n基础概念\nEASY\n请简述 Spring 注解 @Component 与 @Service 的区别及使用场景\nAI 实时提示\n▾\n你的回答\n 语音作答\n 上传附图（截图/草图/证书）\n提交回答\n跳过本题\nAI 面试助手\n\n基于 Spring Boot 3.3 "
+ },
+ "finishVisible": 0
+}

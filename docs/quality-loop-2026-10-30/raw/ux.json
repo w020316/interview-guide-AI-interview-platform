@@ -1,0 +1,442 @@
+{
+ "stamp": "2026-10-30T10-58-07",
+ "scenarios": [
+  {
+   "name": "s2-find-job-apply",
+   "steps": [
+    {
+     "label": "打开招聘广场",
+     "start": 1793357186371,
+     "ok": true,
+     "ms": 2563
+    },
+    {
+     "label": "关键词搜索",
+     "start": 1793357188934,
+     "ok": true,
+     "ms": 1657
+    },
+    {
+     "label": "打开岗位抽屉",
+     "start": 1793357190591,
+     "ok": true,
+     "ms": 1066
+    },
+    {
+     "label": "加入投递计划（抽屉内）",
+     "start": 1793357191657,
+     "ok": true,
+     "ms": 1737
+    },
+    {
+     "label": "打开完整岗位详情页",
+     "start": 1793357193394,
+     "ok": true,
+     "ms": 1209
+    },
+    {
+     "label": "查看投递看板",
+     "start": 1793357194603,
+     "ok": true,
+     "ms": 1394
+    }
+   ],
+   "network": [
+    {
+     "method": "GET",
+     "url": "/api/info?_t=1793357186683",
+     "status": 200,
+     "ms": 10
+    },
+    {
+     "method": "GET",
+     "url": "/api/jobs/favorite",
+     "status": 200,
+     "ms": 342
+    },
+    {
+     "method": "GET",
+     "url": "/api/jobs/meta?overseas=false",
+     "status": 200,
+     "ms": 442
+    },
+    {
+     "method": "GET",
+     "url": "/api/jobs?recruitType=AUTUMN&overseas=false&hideExpired=true&page=0&size=20",
+     "status": 200,
+     "ms": 476
+    },
+    {
+     "method": "GET",
+     "url": "/api/jobs?keyword=Java&recruitType=AUTUMN&overseas=false&hideExpired=true&page=0&size=20",
+     "status": 200,
+     "ms": 28
+    },
+    {
+     "method": "POST",
+     "url": "/api/application/draft",
+     "status": 200,
+     "ms": 301
+    },
+    {
+     "method": "GET",
+     "url": "/api/info?_t=1793357193503",
+     "status": 200,
+     "ms": 3
+    },
+    {
+     "method": "GET",
+     "url": "/api/jobs/518",
+     "status": 200,
+     "ms": 16
+    },
+    {
+     "method": "GET",
+     "url": "/api/info?_t=1793357194688",
+     "status": 200,
+     "ms": 2
+    },
+    {
+     "method": "GET",
+     "url": "/api/application/list",
+     "status": 200,
+     "ms": 15
+    },
+    {
+     "method": "GET",
+     "url": "/api/application/board",
+     "status": 200,
+     "ms": 18
+    },
+    {
+     "method": "GET",
+     "url": "/api/application/timeline",
+     "status": 200,
+     "ms": 29
+    }
+   ],
+   "finalUrl": "http://localhost:5173/applications"
+  },
+  {
+   "name": "s3-interview-loop",
+   "steps": [
+    {
+     "label": "打开发模拟面试",
+     "start": 1793357196248,
+     "ok": true,
+     "ms": 687
+    },
+    {
+     "label": "填写岗位并开始",
+     "start": 1793357196935,
+     "ok": true,
+     "ms": 198
+    },
+    {
+     "label": "等待题目生成",
+     "start": 1793357197133,
+     "ok": true,
+     "ms": 107899
+    },
+    {
+     "label": "回答第 1 题",
+     "start": 1793357305034,
+     "ok": true,
+     "ms": 73
+    },
+    {
+     "label": "提交并等待评估 1",
+     "start": 1793357305107,
+     "ok": true,
+     "ms": 13270
+    },
+    {
+     "label": "切到下一题 1",
+     "start": 1793357318380,
+     "ok": true,
+     "ms": 850
+    },
+    {
+     "label": "回答第 2 题",
+     "start": 1793357319233,
+     "ok": true,
+     "ms": 85
+    },
+    {
+     "label": "提交并等待评估 2",
+     "start": 1793357319318,
+     "ok": true,
+     "ms": 26514
+    },
+    {
+     "label": "切到下一题 2",
+     "start": 1793357345836,
+     "ok": true,
+     "ms": 876
+    },
+    {
+     "label": "回答第 3 题",
+     "start": 1793357346716,
+     "ok": true,
+     "ms": 85
+    },
+    {
+     "label": "提交并等待评估 3",
+     "start": 1793357346801,
+     "ok": true,
+     "ms": 28547
+    },
+    {
+     "label": "查看历史记录",
+     "start": 1793357375351,
+     "ok": true,
+     "ms": 1385
+    }
+   ],
+   "network": [
+    {
+     "method": "GET",
+     "url": "/api/info?_t=1793357196541",
+     "status": 200,
+     "ms": 3
+    },
+    {
+     "method": "GET",
+     "url": "/api/session/list",
+     "status": 200,
+     "ms": 18
+    },
+    {
+     "method": "GET",
+     "url": "/api/session/0872ec25-cce0-49da-9372-4a7d4958aa7b/questions",
+     "status": 200,
+     "ms": 23
+    },
+    {
+     "method": "GET",
+     "url": "/api/knowledge/question-summary",
+     "status": 200,
+     "ms": 15
+    },
+    {
+     "method": "GET",
+     "url": "/api/stats/trend",
+     "status": 200,
+     "ms": 17
+    },
+    {
+     "method": "POST",
+     "url": "/api/interview/questions",
+     "status": 200,
+     "ms": 77095
+    },
+    {
+     "method": "POST",
+     "url": "/api/session/create",
+     "status": 200,
+     "ms": 17
+    },
+    {
+     "method": "POST",
+     "url": "/api/session/032a87e7-f3c7-43aa-9b0b-fae69f3b46cc/questions",
+     "status": 200,
+     "ms": 23
+    },
+    {
+     "method": "POST",
+     "url": "/api/interview/evaluate",
+     "status": 200,
+     "ms": 11575
+    },
+    {
+     "method": "POST",
+     "url": "/api/session/answer",
+     "status": 200,
+     "ms": 43
+    },
+    {
+     "method": "POST",
+     "url": "/api/interview/evaluate",
+     "status": 200,
+     "ms": 24881
+    },
+    {
+     "method": "POST",
+     "url": "/api/session/answer",
+     "status": 200,
+     "ms": 15
+    },
+    {
+     "method": "POST",
+     "url": "/api/interview/evaluate",
+     "status": 200,
+     "ms": 26894
+    },
+    {
+     "method": "POST",
+     "url": "/api/session/answer",
+     "status": 200,
+     "ms": 28
+    },
+    {
+     "method": "GET",
+     "url": "/api/info?_t=1793357375444",
+     "status": 200,
+     "ms": 2
+    },
+    {
+     "method": "GET",
+     "url": "/api/session/list",
+     "status": 200,
+     "ms": 21
+    }
+   ],
+   "finalUrl": "http://localhost:5173/history"
+  },
+  {
+   "name": "s1-onboarding-resume",
+   "steps": [
+    {
+     "label": "打开登录页",
+     "start": 1793357887813,
+     "ok": true,
+     "ms": 589
+    },
+    {
+     "label": "切到注册并提交",
+     "start": 1793357888402,
+     "ok": true,
+     "ms": 804
+    },
+    {
+     "label": "注册后落地页",
+     "start": 1793357889206,
+     "ok": true,
+     "ms": 688
+    },
+    {
+     "label": "打开发简历分析页",
+     "start": 1793357889894,
+     "ok": true,
+     "ms": 227
+    },
+    {
+     "label": "粘贴简历并开始分析",
+     "start": 1793357890121,
+     "ok": true,
+     "ms": 1778
+    },
+    {
+     "label": "等待 AI 分析结果",
+     "start": 1793357891899,
+     "ok": true,
+     "ms": 20982
+    }
+   ],
+   "network": [
+    {
+     "method": "GET",
+     "url": "/api/info?_t=1793357888119",
+     "status": 200,
+     "ms": 11
+    },
+    {
+     "method": "POST",
+     "url": "/api/auth/register",
+     "status": 200,
+     "ms": 85
+    },
+    {
+     "method": "GET",
+     "url": "/api/resume/history",
+     "status": 200,
+     "ms": 60
+    },
+    {
+     "method": "GET",
+     "url": "/api/todo/today?days=3",
+     "status": 200,
+     "ms": 63
+    },
+    {
+     "method": "GET",
+     "url": "/api/info?_t=1793357889967",
+     "status": 200,
+     "ms": 3
+    },
+    {
+     "method": "POST",
+     "url": "/api/resume/analyze",
+     "status": 200,
+     "ms": 21336
+    }
+   ],
+   "finalUrl": "http://localhost:5173/resume"
+  }
+ ],
+ "s2JobsMetrics": {
+  "url": "/jobs",
+  "ttfb": 13,
+  "domContentLoaded": 370,
+  "loadEvent": 372,
+  "fcp": 456,
+  "lcp": 724,
+  "cls": 0.071
+ },
+ "s2SearchCount": 5,
+ "s2DetailHref": "/jobs/518",
+ "s2PlanButtonExists": 1,
+ "s2PlanToast": [
+  "已加入投递计划，可在「投递看板」跟踪进度"
+ ],
+ "s2DetailUrl": "http://localhost:5173/jobs/518",
+ "s2DetailHasPlan": 0,
+ "s2DetailHasFavorite": 0,
+ "s2BoardText": "投递看板\n\n本地投递台账：人工确认投递、跟踪回复、针对岗位定制简历。平台不代替你投递，只帮你把「投了什么、谁回了、该催谁」管清楚。\n\n粘贴通知识别\n从表格导入\n1\n投递总数\n1\n待投递\n0\n已投递\n0\n已查看\n0\n有回复\n0\n面试中\n0\n已拿 Offer\n0\n已淘汰\n0\n已放弃\n漏斗洞察\n每一步的转化率都以「上一步的人数」为分母，看得到流失发生在哪一步\n已投出\n0\n—\n被查看\n0\n—\n有回复\n0\n—\n进面试\n0\n—\n拿 Offer\n0\n—\n投出 → 拿 Offer\n—\n平均首次回音\n—\n静默投递\n0 条\n已投出超过 7 天仍无回音\n\n还没有可用的回音时长数据：首次回音时间从本版本起开始记录，此",
+ "s3PrepMetrics": {
+  "url": "/interview",
+  "ttfb": 14,
+  "domContentLoaded": 354,
+  "loadEvent": 357,
+  "fcp": 376,
+  "lcp": 376,
+  "cls": 0.011
+ },
+ "s3QuestionCount": "",
+ "s3Eval1Failed": false,
+ "s3Eval1": "AI 模拟面试\n\n基于岗位与简历生成题目，AI 实时提示，自动评估打分\n\n目标岗位\nJava 后端工程师\n\n面试进度\n第 1 / 3 题\n基础概念\nEASY\n请简述 Spring 注解 @Component 与 @Service 的区别及使用场景\nAI 实时提示\n▾\n你的回答\n 语音作答\n 上传附图（截图/草图/证书）\n提交回答\n跳过本题\nAI 评估结果\n15\n综合\n10\n完整性\n15\n准确性\n20\n表达力\n改进建议\n聚焦题目，直接说明 @Component 与 @Service 的区别\n学习 Spring 注解语义和使用场景\n避免使用无关案例\n深挖提问\n下一题",
+ "s3Eval2Failed": false,
+ "s3Eval2": "AI 模拟面试\n\n基于岗位与简历生成题目，AI 实时提示，自动评估打分\n\n目标岗位\nJava 后端工程师\n\n面试进度\n第 2 / 3 题\n接口设计\nMEDIUM\n请设计一个订单创建 REST 接口，包括输入参数、业务流程、异常处理和返回结果，并说明如何使用 Spring Boot 实现\nAI 实时提示\n▾\n你的回答\n 语音作答\n 上传附图（截图/草图/证书）\n提交回答\n跳过本题\nAI 评估结果\n31\n综合\n20\n完整性\n10\n准确性\n70\n表达力\n改进建议\n请按照题目要求给出DTO定义、请求映射、业务流程、异常处理及返回结果示例\n深挖提问\n下一题",
+ "s3Eval3Failed": false,
+ "s3Eval3": "AI 模拟面试\n\n基于岗位与简历生成题目，AI 实时提示，自动评估打分\n\n目标岗位\nJava 后端工程师\n\n面试进度\n第 3 / 3 题\n系统设计\nHARD\n在一个微服务架构中，订单服务需要调用库存服务创建订单，但库存服务偶尔不可用导致订单创建失败。请描述如何设计系统以保证订单创建的可靠性、幂等性和最终一致性，并给出代码层面会使用的技术或框架\nAI 实时提示\n▾\n你的回答\n 语音作答\n 上传附图（截图/草图/证书）\n提交回答\n结束面试\nAI 评估结果\n25\n综合\n5\n完整性\n5\n准确性\n70\n表达力\n改进建议\n聚焦题目要求，阐述重试与熔断机制\n说明幂等性令牌生成与 Redis 存储\n描述基于 Kafka 的事件驱动和 Saga 补偿流程\n举例使用 Resilience4j、Spring Cloud Stream 等框架\n深挖提问\n结束面试",
+ "s3HistoryText": "历史面试记录\n\n回顾历次模拟面试的题目、回答与评分\n\nJava 后端工程师\n2026/10/30 18:47:54\n进行中\n继续作答\n查看题目\n复盘报告\nJava 后端工程师\n2026/10/30 18:42:56\n进行中\n继续作答\n查看题目\n复盘报告",
+ "s1LandingMetrics": {
+  "url": "/login",
+  "ttfb": 12,
+  "domContentLoaded": 365,
+  "loadEvent": 367,
+  "fcp": 0,
+  "lcp": 0,
+  "cls": 0.022
+ },
+ "s1AfterRegister": {
+  "url": "http://localhost:5173/",
+  "hasToken": true
+ },
+ "s1ResumeMetrics": {
+  "url": "/resume",
+  "ttfb": 12,
+  "domContentLoaded": 80,
+  "loadEvent": 80,
+  "fcp": 88,
+  "lcp": 88,
+  "cls": 0
+ },
+ "s1ResultText": "各维度问题与建议\n岗位匹配度\n85分\nAI 建议\n可进一步补充在大型分布式系统的经验，以更契合高并发场景\n项目/工作经历含金量\n90分\nAI 建议\n可增加对技术难点的详细阐述，如缓存一致性策略\n简历表述清晰度\n80分\nAI 建议\n建议使用动词开头的短句，突出关键技术点\n求职意向匹配度\n70分\nAI 建议\n在简历中加入职业规划与岗位目标的说明，体现长期投入\n85\n分\n参考总分 · 优秀 · 简历竞争力强\n\n总分仅供参考。按上面的维度问题清单逐条修改，改完重新分析，对比问题清单少了哪些。\n\n带着这份简历去模拟面试\n\n自动携带简历摘要与目标岗位「Java 后端工程师」，AI 将据此定制面试题\n\n核心优势\n快速提升系统性能\n主导数据库慢查询治理\n团队领导与协作经验\n改进建议\n补充职业规划与岗位契合度\n强化技术难点说明\n优化简历语言表达\n查看 AI 原始返回\n一键生成优化简历\n\n基于分析建议自动改写",
+ "runs": [
+  "2026-10-30T10-57-32",
+  "2026-10-30T10-57-32",
+  "2026-10-30T10-58-07",
+  "2026-10-30T10-58-07"
+ ]
+}

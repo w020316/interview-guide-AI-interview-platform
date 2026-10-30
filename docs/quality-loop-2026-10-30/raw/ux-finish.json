@@ -1,0 +1,31 @@
+{
+ "stamp": "finish-2026-10-30T10-51-48",
+ "log": [
+  {
+   "label": "打开历史记录",
+   "ok": true,
+   "ms": 1605
+  },
+  {
+   "label": "继续作答最近一场",
+   "ok": false,
+   "ms": 30067,
+   "error": "TimeoutError: page.waitForSelector: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('textarea[placeholder*=\"请输入你的回答\"]') to be visible\u001b[22m\n"
+  },
+  {
+   "label": "结束面试并生成复盘",
+   "ok": false,
+   "ms": 30001,
+   "error": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /结束面试/ })\u001b[22m\n"
+  },
+  {
+   "label": "progressText",
+   "text": "成长趋势\n\n用数据看见每一次面试的进步，定位薄弱维度\n\n我的准备度\nC 级 · 仍需补强\n已完成 3 / 14 项，还差 11 项可以更稳。\n简历\n已上传简历\n尚未上传简历\n简历\n简历分数达到 80 分\n暂无简历评分\n岗位目标\n已收藏心仪岗位\n尚未收藏岗位\n岗位目标\n已建立投递台账\n已达成 1 条记录\n岗位目标\n完成 1 次 JD 拆解\n可在「JD 拆解」完成一次\n自述\n投递\n已投出 ≥1 份\n尚未投出\n投递\n收到过面试邀约\n暂无面试邀约\n面试训练\n完成 ≥3 场模拟面试\n当前 0 场\n面试训练\n模拟面试平均分 ≥70\n当前 24 分\n知识储备\n已开始刷题（作答 ≥1 题）\n已达成 3 题作答\n知识储备\n刷题覆盖率 ≥50%\n当前 3/6\n材料准备\n项目故事库 ≥3 条\n当前 0 条\n材料准备\n准备 1 分钟自我介绍\n准备一段 60 秒自我介绍\n自述\n材料准备\n准备求职信\n为心仪岗位准备一"
+  },
+  {
+   "label": "查看成长趋势",
+   "ok": true,
+   "ms": 1738
+  }
+ ]
+}
