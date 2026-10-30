@@ -177,6 +177,33 @@ class AiTaskServiceTest {
     }
 
     @Test
+    @DisplayName("M3：成功时写入结果正文，进度与终态同 M1 语义")
+    void succeedWithResult_writesText() {
+        AiTaskEntity running = task(AiTaskStatus.RUNNING.name(), 1, 1);
+        when(repository.findById(1L)).thenReturn(Optional.of(running));
+        when(repository.save(any(AiTaskEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AiTaskEntity done = service.markSucceededWithResult(1L, null, "[{\"question\":\"q\"}]");
+
+        assertThat(done.getStatus()).isEqualTo(AiTaskStatus.SUCCEEDED.name());
+        assertThat(done.getProgress()).isEqualTo(100);
+        assertThat(done.getResultText()).isEqualTo("[{\"question\":\"q\"}]");
+        assertThat(done.getLeaseUntil()).isNull();
+        assertThat(done.getFinishedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("M3：结果正文超上限 → 拒绝（不静默截断成坏 JSON）")
+    void succeedWithResult_tooLong() {
+        String tooLong = "x".repeat(AiTaskService.MAX_RESULT_TEXT_LEN + 1);
+
+        assertThatThrownBy(() -> service.markSucceededWithResult(1L, null, tooLong))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("任务结果超出上限");
+        verify(repository, never()).save(any(AiTaskEntity.class));
+    }
+
+    @Test
     @DisplayName("可重试失败且未到上限 → 回 QUEUED 并保留 attempt")
     void fail_retryable_requeues() {
         AiTaskEntity running = task(AiTaskStatus.RUNNING.name(), 1, 2);

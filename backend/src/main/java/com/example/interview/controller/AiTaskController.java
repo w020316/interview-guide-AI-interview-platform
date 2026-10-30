@@ -3,6 +3,7 @@ package com.example.interview.controller;
 import com.example.interview.common.Result;
 import com.example.interview.entity.AiTaskEntity;
 import com.example.interview.service.task.AiTaskService;
+import com.example.interview.service.task.AiTaskStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
@@ -100,6 +101,30 @@ public class AiTaskController {
             return Result.error(503, DISABLED_MSG);
         }
         return Result.success(taskService.findOwned(currentUserId(), id));
+    }
+
+    /**
+     * 取任务结果正文（M3）。
+     *
+     * <p>为什么不把正文塞进 {@code GET /api/tasks/{id}}：列表接口一次最多返回 50 条，
+     * 带正文会把响应撑到 MB 级；且正文只在「任务成功」时才有意义。
+     *
+     * <p>未成功时返回 409 而不是空结果：前端据此区分「还没跑完」与「跑完了但没产物」。
+     */
+    @Operation(summary = "取任务结果正文（仅成功的任务）")
+    @GetMapping("/{id}/result")
+    public Result<Map<String, Object>> result(@PathVariable Long id) {
+        if (!enabled) {
+            return Result.error(503, DISABLED_MSG);
+        }
+        AiTaskEntity task = taskService.findOwned(currentUserId(), id);
+        if (!AiTaskStatus.SUCCEEDED.name().equals(task.getStatus())) {
+            return Result.error(409, "任务尚未成功完成（当前 " + task.getStatus() + "）");
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("resultRef", task.getResultRef());
+        data.put("resultText", task.getResultText());
+        return Result.success(data);
     }
 
     @Operation(summary = "我的任务列表（分页）")

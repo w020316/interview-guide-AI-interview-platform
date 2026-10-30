@@ -89,6 +89,25 @@ public class AiTaskEntity {
     @Column(name = "result_ref", length = 64)
     private String resultRef;
 
+    /**
+     * 结果正文（M3 新增，可空）。
+     *
+     * <p><b>为什么还是存了正文</b>：出题/评分的结果（题目 JSON、评分 JSON）原本只回给前端、
+     * 不落任何业务表；异步化之后用户可能已经离开页面，结果必须能在他回来时取回，
+     * 因此没有「业务表」可以挂 {@code resultRef}。
+     *
+     * <p>与「任务表不存大文本」的边界：只允许 {@code interview.questions} /
+     * {@code interview.evaluate} 这两类写入，且服务层有硬上限（见 {@code AiTaskService#saveResultText}）；
+     * 简历正文、会话记录等大文本仍然只走各自的业务表。
+     *
+     * <p>{@code @JsonIgnore}：列表接口一次最多返回 50 条，若带上正文会把响应撑到 MB 级。
+     * 正文单独由 {@code GET /api/tasks/{id}/result} 取。
+     */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @lombok.ToString.Exclude
+    @Column(name = "result_text", columnDefinition = "TEXT")
+    private String resultText;
+
     /** 失败原因码（机器可读，如 UPSTREAM_429 / CONFIG_1211 / UNKNOWN） */
     @Column(name = "error_code", length = 32)
     private String errorCode;

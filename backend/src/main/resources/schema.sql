@@ -285,6 +285,7 @@ CREATE TABLE IF NOT EXISTS ai_task (
     max_attempt     SMALLINT     NOT NULL DEFAULT 1,
     payload         TEXT,
     result_ref      VARCHAR(64),
+    result_text     TEXT,
     error_code      VARCHAR(32),
     error_message   VARCHAR(200),
     lease_until     TIMESTAMP,
@@ -294,6 +295,9 @@ CREATE TABLE IF NOT EXISTS ai_task (
 );
 CREATE INDEX IF NOT EXISTS idx_ai_task_user ON ai_task(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_task_status ON ai_task(status);
+-- M3（2026-10-30）：任务结果正文。出题/评分的结果原本只回前端、不落业务表，
+-- 异步化后用户可能已离开页面，必须有地方取回，故在任务表存一份（有服务层硬上限）。
+ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS result_text TEXT;
 -- 幂等键不加唯一约束：FAILED 之后允许同键新建（见 AiTaskStatus.ACTIVE），
 -- 唯一性由服务层按「未失败状态」判定；H2/PostgreSQL 的部分唯一索引语法不一致，故不落库约束。
 

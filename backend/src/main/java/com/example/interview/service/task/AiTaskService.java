@@ -40,6 +40,8 @@ public class AiTaskService {
     static final int MAX_KEY_LEN = 96;
     /** 单任务最大执行次数上限：防止配置失误造成长时间重试风暴 */
     static final int MAX_ATTEMPT_LIMIT = 5;
+    /** 结果正文长度上限（M3）：出题 5–20 题的 JSON 实测 4–8KB，20K 留足余量且不让任务表膨胀 */
+    static final int MAX_RESULT_TEXT_LEN = 20_000;
 
     private final AiTaskRepository repository;
 
@@ -127,6 +129,35 @@ public class AiTaskService {
     @Transactional
     public AiTaskEntity markSucceeded(Long id, String resultRef) {
         return markSucceeded(id, resultRef, LocalDateTime.now());
+    }
+
+    /**
+     * 执行成功（M3）：同时写入结果正文。
+     *
+     * <p>单独命名而非重载 {@link #markSucceeded(Long, String, LocalDateTime)}，
+     * 避免 `markSucceeded(1L, "x", null)` 在 String / LocalDateTime 之间产生歧义。
+     *
+     * @param resultText 结果正文（出题/评分）；超出 {@link #MAX_RESULT_TEXT_LEN} 直接判失败，
+     *                   不静默截断——截断后的 JSON 在前端只会「解析失败」，
+     *                   错误现场反而更难定位
+     */
+    @Transactional
+    public AiTaskEntity markSucceededWithResult(Long id, String resultRef, String resultText) {
+        if (resultText != null && resultText.length() > MAX_RESULT_TEXT_LEN) {
+            throw new IllegalArgumentException(
+                    "任务结果超出上限（" + MAX_RESULT_TEXT_LEN + " 字符），请减少单次生成数量");
+        }
+        AiTaskEntity task = requireTask(id);
+        requireTransit(task, AiTaskStatus.SUCCEEDED);
+        task.setStatus(AiTaskStatus.SUCCEEDED.name());
+        task.setProgress(100);
+        task.setResultRef(resultRef);
+        task.setResultText(resultText);
+        task.setErrorCode(null);
+        task.setErrorMessage(null);
+        task.setFinishedAt(LocalDateTime.now());
+        task.setLeaseUntil(null);
+        return repository.save(task);
     }
 
     @Transactional

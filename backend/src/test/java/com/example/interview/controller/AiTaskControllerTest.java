@@ -195,6 +195,30 @@ class AiTaskControllerTest {
     }
 
     @Test
+    @DisplayName("结果正文：任务未成功 → 409（区分「还没跑完」与「跑完没产物」）")
+    void result_notSucceeded_409() throws Exception {
+        when(taskService.findOwned(anyString(), eq(7L))).thenReturn(task(AiTaskStatus.RUNNING.name()));
+
+        mockMvc.perform(get("/api/tasks/7/result"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(409))
+                .andExpect(jsonPath("$.message").value("任务尚未成功完成（当前 RUNNING）"));
+    }
+
+    @Test
+    @DisplayName("结果正文：任务成功 → 返回 resultRef 与 resultText")
+    void result_ok() throws Exception {
+        AiTaskEntity done = task(AiTaskStatus.SUCCEEDED.name());
+        done.setResultText("[{\"question\":\"q\"}]");
+        when(taskService.findOwned(anyString(), eq(7L))).thenReturn(done);
+
+        mockMvc.perform(get("/api/tasks/7/result"))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.resultText").value("[{\"question\":\"q\"}]"))
+                .andExpect(jsonPath("$.data.resultRef", org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
     @DisplayName("开关关闭 → 503（明确告知，而不是静默返回空列表）")
     void disabled_503() throws Exception {
         ReflectionTestUtils.setField(controller, "enabled", false);

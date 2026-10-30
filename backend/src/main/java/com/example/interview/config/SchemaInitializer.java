@@ -216,7 +216,10 @@ public class SchemaInitializer implements CommandLineRunner {
                     + "source_resume_id BIGINT, "
                     + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
                     + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-            "CREATE INDEX IF NOT EXISTS idx_resume_document_user ON resume_document(user_id)"
+            "CREATE INDEX IF NOT EXISTS idx_resume_document_user ON resume_document(user_id)",
+            // ── 阶段六 M3（2026-10-30）：任务结果正文 ──
+            // 出题/评分的结果不落业务表，异步化后必须能取回；上限由 AiTaskService#saveResultText 控制。
+            "ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS result_text TEXT"
     };
 
     /**
@@ -239,7 +242,10 @@ public class SchemaInitializer implements CommandLineRunner {
             // 按 fail-open 语义跳过校验 → 吊销静默失效（最坏的一种缺陷：看起来一切正常）
             {"users", "token_version"},
             // P2-14：封禁列。缺列时封禁只存内存，重启即解禁（同样是静默失效）
-            {"users", "banned"}
+            {"users", "banned"},
+            // 阶段六 M3：缺列时异步出题/评分任务成功但「结果取不回」——
+            // 前端只会一直显示「排队中/执行中」，与静默失效等价，纳入启动自检
+            {"ai_task", "result_text"}
     };
 
     /** 必须存在的新表 */
