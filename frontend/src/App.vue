@@ -503,9 +503,13 @@ const chromeReady = ref(false)
 
 onMounted(() => {
   measureScrollable()
-  void router.isReady().then(() =>
-    nextTick(() => requestAnimationFrame(() => { chromeReady.value = true })),
-  )
+  void router
+    .isReady()
+    // 路由就绪失败（导航被取消、守卫抛错）时也必须渲染页脚 ——
+    // 否则 v-if 永远为假，页脚会从页面上永久消失，这比一次布局位移严重得多。
+    .catch(() => undefined)
+    .then(() => nextTick(() => requestAnimationFrame(() => { chromeReady.value = true })))
+
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onKeydown)
   window.addEventListener('scroll', onScroll, { passive: true })
