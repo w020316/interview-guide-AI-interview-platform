@@ -354,6 +354,24 @@ app:
     # 启动时播种系统预置共享知识（shared=true，全部用户可检索）
     # 关闭场景：本地联调不想消耗 embedding 调用、单元测试、或运维想手动维护知识库
     seed-enabled: ${RAG_SEED_ENABLED:true}
+  # ── 认证限流（P1-01，2026-10-30 质量循环）─────────────────────────────
+  # 登录失败的两个维度**故意不对称**（详见 AuthController 的注释）：
+  #   · IP 维度只做粗粒度防刷：50 次 / 1 分钟锁。原因是生产 remoteAddr 在未配置
+  #     受信代理前缀时是网关公网 IP，全站共用一个桶；阈值 5 会被一个人锁死全站登录。
+  #   · 账号维度保持 5 次 / 5 分钟：它不随 IP 轮换失效，是定向爆破的真正防线。
+  auth:
+    register-limit-per-hour: ${APP_AUTH_REGISTER_LIMIT_PER_HOUR:5}
+    change-password-limit-per-hour: ${APP_AUTH_CHANGE_PASSWORD_LIMIT_PER_HOUR:5}
+    login-ip-max-fail: ${APP_AUTH_LOGIN_IP_MAX_FAIL:50}
+    login-ip-lock-seconds: ${APP_AUTH_LOGIN_IP_LOCK_SECONDS:60}
+    login-account-max-fail: ${APP_AUTH_LOGIN_ACCOUNT_MAX_FAIL:5}
+    login-account-lock-seconds: ${APP_AUTH_LOGIN_ACCOUNT_LOCK_SECONDS:300}
+  security:
+    # 平台边缘节点（Render）的公网 IP 前缀，逗号分隔，前缀匹配。
+    # 默认空 = 只信任私网/回环代理（保守策略，不会放宽 XFF 信任边界）。
+    # 配置后 ClientIpUtil 才会解析 X-Forwarded-For，得到真实客户端 IP。
+    # ⚠️ 取值必须**实测**（登录失败日志里的 remoteAddr / xff 字段），不要猜网段。
+    trusted-proxy-prefixes: ${APP_SECURITY_TRUSTED_PROXY_PREFIXES:}
   cors:
     # 允许的前端来源（逗号分隔）。支持通配（Spring 的 allowedOriginPatterns）。
     # 修改部署域名时改环境变量 CORS_ALLOWED_ORIGINS 即可，无需改代码。

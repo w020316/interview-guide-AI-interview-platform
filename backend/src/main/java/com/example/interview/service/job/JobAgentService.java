@@ -297,7 +297,9 @@ public class JobAgentService {
     private void applyJobFields(JobPostingEntity entity, JobDto dto, JobClassifyService.Classification cls) {
         entity.setTitle(dto.title());
         entity.setCompanyName(dto.companyName());
-        entity.setApplyUrl(dto.applyUrl());
+        // P1-04：投递链接只允许 http(s)。第三方源是外部输入，一条 javascript: 链接
+        // 在前端会被绑到 href/window.open，而 JWT 就在 localStorage 里。
+        entity.setApplyUrl(com.example.interview.util.UrlSafety.sanitize(dto.applyUrl()));
         entity.setDescription(dto.description());
         entity.setRequirements(dto.requirements());
         entity.setRecruitType(isBlank(dto.recruitType()) ? "AUTUMN" : dto.recruitType());

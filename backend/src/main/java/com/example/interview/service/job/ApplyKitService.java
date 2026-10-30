@@ -70,7 +70,8 @@ public class ApplyKitService {
         job.put("platform", app.getPlatform());
         job.put("location", app.getLocation());
         job.put("salary", app.getSalary());
-        job.put("applyUrl", app.getApplyUrl());
+        // P1-04 读侧兜底：存量脏数据不经前端过滤也不该被下发成可点击链接
+        job.put("applyUrl", com.example.interview.util.UrlSafety.sanitize(app.getApplyUrl()));
         job.put("deadline", app.getDeadline() == null ? null : app.getDeadline().toString());
         job.put("status", app.getStatus());
         result.put("job", job);

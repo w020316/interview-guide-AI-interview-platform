@@ -170,6 +170,15 @@ services:
       # 管理员账号名单（逗号分隔）；命中者享有无限制刷新等管理能力
       - key: APP_ADMIN_USERNAMES
         value: "小吴同学"
+      # ── 受信代理前缀（P1-01，2026-10-30 质量循环）────────────────────
+      # Render 边缘网关在应用侧表现为**公网 IP**，不在默认信任的私网段内。
+      # 不配置时 ClientIpUtil 不会解析 X-Forwarded-For → 全站用户共用一个 IP 桶
+      # （登录失败 IP 维度已放宽到 50 次/1 分钟锁，不会一人锁死全站，但审计与
+      # 精确限流仍失效）。取值必须**实测**，不要猜网段：
+      #   ① 登录失败日志会打印 `ip=... xff=...`；对照两者即可得到边缘段前缀；
+      #   ② 回填到面板（sync: false 表示值只在 Render Dashboard 维护，不入仓库）。
+      - key: APP_SECURITY_TRUSTED_PROXY_PREFIXES
+        sync: false
       # 种子管理员：启动时若账号不存在则自动创建
       - key: SEED_ADMIN_USERNAME
         value: "小吴同学"

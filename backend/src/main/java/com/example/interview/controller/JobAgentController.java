@@ -300,7 +300,8 @@ public class JobAgentController {
         row.put("location", f.getLocation());
         row.put("salary", f.getSalary());
         row.put("deadline", f.getDeadline());
-        row.put("applyUrl", f.getApplyUrl());
+        // P1-04 读侧兜底：收藏快照是历史数据，前端会把它绑到 :href
+        row.put("applyUrl", com.example.interview.util.UrlSafety.sanitize(f.getApplyUrl()));
         // 第三批 H：偏好档位（无则 null=未标记，不得默认成任何一档）
         row.put("preference", f.getPreference());
         row.put("createdAt", f.getCreatedAt());

@@ -190,7 +190,8 @@ public class ApplicationTimelineService {
         n.put("stage", a.getStatus());
         n.put("stageLabel", JobApplicationService.label(a.getStatus()));
         n.put("channel", channelOf(a));
-        n.put("applyUrl", a.getApplyUrl());
+        // P1-04 读侧兜底：时间线直接把值交给前端 :href，必须过滤协议
+        n.put("applyUrl", com.example.interview.util.UrlSafety.sanitize(a.getApplyUrl()));
         return n;
     }
 

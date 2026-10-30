@@ -91,7 +91,8 @@ public class JobFavoriteService {
                 .location(job.getLocation())
                 .salary(job.getSalary())
                 .deadline(job.getDeadline())
-                .applyUrl(job.getApplyUrl())
+                // P1-04：收藏快照会长期留在库里，入快照时过滤非 http(s) 链接
+                .applyUrl(com.example.interview.util.UrlSafety.sanitize(job.getApplyUrl()))
                 .build();
         if (jobFavoriteRepository.findByUserIdAndJobId(userId, job.getId()).isPresent()) {
             return true;

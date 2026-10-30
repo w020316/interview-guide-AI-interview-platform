@@ -95,14 +95,41 @@ public class AuthController {
         changePasswordLimiter = new com.example.interview.util.PerUserRateLimiter(changePasswordLimitPerHour, 60 * 60 * 1000L);
     }
 
-    /** 最大失败次数（超过则锁定） */
-    private static final int MAX_FAIL_COUNT = 5;
+    /**
+     * IP 维度：粗粒度防刷（P1-01，2026-10-30 质量循环）。
+     *
+     * <p><b>为什么从 5 次提到 50 次</b>：生产环境的 {@code remoteAddr} 是 Render 边缘网关的
+     * 公网 IP（不是私网），而 {@code ClientIpUtil} 只在「直连是受信代理」时才解析 XFF。
+     * 未配置受信代理前缀之前，<b>全站所有用户共用同一个 IP 桶</b>——
+     * 阈值 5 意味着任意一个人连错 5 次密码就能锁死全站登录 5 分钟，是零成本的账号体系 DoS。
+     *
+     * <p>因此两个维度故意不对称：IP 维度只承担「同一来源的脚本刷量」，
+     * 阈值放宽、锁定缩短；账号维度仍是 5 次 / 5 分钟，保住「定向爆破」的防线
+     * （它不随 IP 轮换而失效，见 {@link #accountFailMap}）。
+     * 即便平台代理段始终取证失败，这组配比也不会出现「一人锁全站」。
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.auth.login-ip-max-fail:50}")
+    private int loginIpMaxFail;
+
+    @org.springframework.beans.factory.annotation.Value("${app.auth.login-ip-lock-seconds:60}")
+    private long loginIpLockSeconds;
 
     /** 账号维度最大失败次数（P1-02：不随 IP 轮换而重置，见 accountFailMap 注释） */
-    private static final int MAX_FAIL_COUNT_PER_ACCOUNT = 5;
+    @org.springframework.beans.factory.annotation.Value("${app.auth.login-account-max-fail:5}")
+    private int loginAccountMaxFail;
 
-    /** 锁定时长（5 分钟） */
-    private static final long LOCK_DURATION_MS = 5 * 60 * 1000L;
+    @org.springframework.beans.factory.annotation.Value("${app.auth.login-account-lock-seconds:300}")
+    private long loginAccountLockSeconds;
+
+    /** 账号维度锁定时长（默认 5 分钟），单测/日志文案复用 */
+    private long accountLockMs() {
+        return Math.max(1, loginAccountLockSeconds) * 1000L;
+    }
+
+    /** IP 维度锁定时长（默认 1 分钟） */
+    private long ipLockMs() {
+        return Math.max(1, loginIpLockSeconds) * 1000L;
+    }
 
     /** 登录失败信息 */
     private static class LoginFailInfo {
@@ -115,14 +142,15 @@ public class AuthController {
      *
      * @return 处于锁定中返回剩余分钟数（>0），未锁定返回 0
      */
-    private long lockedRemainingMinutes(ConcurrentHashMap<String, LoginFailInfo> map, String key, int threshold) {
+    private long lockedRemainingMinutes(ConcurrentHashMap<String, LoginFailInfo> map, String key,
+                                        int threshold, long lockDurationMs) {
         LoginFailInfo info = map.get(key);
         if (info == null || info.count.get() < threshold) {
             return 0;
         }
         long elapsed = System.currentTimeMillis() - info.lastFailTime;
-        if (elapsed < LOCK_DURATION_MS) {
-            return (LOCK_DURATION_MS - elapsed) / 60000 + 1;
+        if (elapsed < lockDurationMs) {
+            return (lockDurationMs - elapsed) / 60000 + 1;
         }
         map.remove(key);
         return 0;
@@ -139,16 +167,17 @@ public class AuthController {
     /** 定期清理过期的登录失败计数，防止内存泄漏 */
     private void cleanupExpiredLoginFails() {
         long now = System.currentTimeMillis();
-        cleanupMap(loginFailMap, MAX_FAIL_COUNT, now);
-        cleanupMap(accountFailMap, MAX_FAIL_COUNT_PER_ACCOUNT, now);
+        cleanupMap(loginFailMap, loginIpMaxFail, ipLockMs(), now);
+        cleanupMap(accountFailMap, loginAccountMaxFail, accountLockMs(), now);
     }
 
-    private void cleanupMap(ConcurrentHashMap<String, LoginFailInfo> map, int threshold, long now) {
+    private void cleanupMap(ConcurrentHashMap<String, LoginFailInfo> map, int threshold,
+                            long lockDurationMs, long now) {
         map.entrySet().removeIf(entry -> {
             LoginFailInfo info = entry.getValue();
             // 锁定过期或 30 分钟无失败则清理
             return info.count.get() >= threshold
-                    ? (now - info.lastFailTime) > LOCK_DURATION_MS
+                    ? (now - info.lastFailTime) > lockDurationMs
                     : (now - info.lastFailTime) > 30 * 60 * 1000L;
         });
     }
@@ -263,12 +292,14 @@ public class AuthController {
         String accountKey = username.trim().toLowerCase(java.util.Locale.ROOT);
 
         // 检查是否被锁定：IP 与账号任一维度命中即拒绝。
-        // 账号维度是轮换 IP 无法绕过的兜底——这正是原实现的缺口。
-        long ipLockedMin = lockedRemainingMinutes(loginFailMap, clientIp, MAX_FAIL_COUNT);
+        // 账号维度是轮换 IP 无法绕过的兜底——这正是原实现的缺口；
+        // IP 维度阈值放宽（50 次 / 1 分钟锁），避免「一人连错 5 次锁死全站」。
+        long ipLockedMin = lockedRemainingMinutes(loginFailMap, clientIp, loginIpMaxFail, ipLockMs());
         if (ipLockedMin > 0) {
             throw new RateLimitExceededException("登录失败次数过多，请 " + ipLockedMin + " 分钟后再试");
         }
-        long accountLockedMin = lockedRemainingMinutes(accountFailMap, accountKey, MAX_FAIL_COUNT_PER_ACCOUNT);
+        long accountLockedMin = lockedRemainingMinutes(
+                accountFailMap, accountKey, loginAccountMaxFail, accountLockMs());
         if (accountLockedMin > 0) {
             throw new RateLimitExceededException("该账号登录失败次数过多，请 " + accountLockedMin + " 分钟后再试");
         }
@@ -280,12 +311,20 @@ public class AuthController {
             int ipFails = recordFail(loginFailMap, clientIp);
             int accountFails = recordFail(accountFailMap, accountKey);
 
-            // 以「更接近锁定的那一维」为准，保证提示的剩余次数与实际一致
-            int remaining = Math.min(MAX_FAIL_COUNT - ipFails, MAX_FAIL_COUNT_PER_ACCOUNT - accountFails);
+            // P1-01：登录失败必须留下可审计的「解析后 IP + 原始 XFF」。
+            // 受信代理未配置时两者会不一致，这正是后续校正网段的唯一线索。
+            log.warn("登录失败 ip={} account={} xff={}", clientIp, accountKey, clipHeader(request));
+
+            // 以「更接近锁定的那一维」为准，保证提示的剩余次数与实际一致。
+            // 账号维度阈值远严于 IP 维度，正常情况下来自账号维度的剩余次数更小。
+            int remaining = Math.min(loginIpMaxFail - ipFails, loginAccountMaxFail - accountFails);
             if (remaining > 0) {
                 return Result.error(401, "用户名或密码错误，还可尝试 " + remaining + " 次");
+            } else if (accountFails >= loginAccountMaxFail) {
+                throw new RateLimitExceededException("该账号登录失败次数过多，请 5 分钟后再试");
             } else {
-                throw new RateLimitExceededException("登录失败次数过多，请 5 分钟后再试");
+                // 走到这里说明触发的是 IP 粗粒度桶（锁定只有 1 分钟，不能照抄账号维度的文案）
+                throw new RateLimitExceededException("登录失败次数过多，请稍后再试");
             }
         }
 
@@ -494,5 +533,14 @@ public class AuthController {
      */
     private String resolveClientIp(HttpServletRequest request) {
         return com.example.interview.util.ClientIpUtil.resolve(request);
+    }
+
+    /** 日志里的 XFF 截断到 200 字符：该头由客户端可写，不应成为日志膨胀/注入的入口 */
+    private static String clipHeader(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff == null || xff.isBlank()) {
+            return "-";
+        }
+        return xff.length() <= 200 ? xff : xff.substring(0, 200) + "…";
     }
 }

@@ -66,7 +66,7 @@
           </div>
           <div class="fu-actions">
             <button v-if="it.advice.message" class="fu-copy" @click="copyAdvice(it.advice.message)">复制跟进消息</button>
-            <a v-if="it.app.applyUrl" :href="it.app.applyUrl" target="_blank" rel="noopener noreferrer" class="fu-link">去投递页 →</a>
+            <a v-if="safeExternalUrl(it.app.applyUrl)" :href="safeExternalUrl(it.app.applyUrl)!" target="_blank" rel="noopener noreferrer" class="fu-link">去投递页 →</a>
           </div>
         </div>
       </div>
@@ -134,7 +134,7 @@
             </div>
             <div v-else-if="n.channel" class="tl-meta">
               <span>渠道：{{ n.channel }}</span>
-              <a v-if="n.applyUrl" :href="n.applyUrl" target="_blank" rel="noopener noreferrer" class="tl-link">前往投递 →</a>
+              <a v-if="safeExternalUrl(n.applyUrl)" :href="safeExternalUrl(n.applyUrl)!" target="_blank" rel="noopener noreferrer" class="tl-link">前往投递 →</a>
             </div>
             <div v-if="n.note" class="tl-note">{{ n.note }}</div>
           </div>
@@ -215,7 +215,7 @@
         </div>
 
         <div class="app-actions">
-          <a v-if="a.applyUrl" :href="a.applyUrl" target="_blank" rel="noopener noreferrer" class="mini-btn">前往投递</a>
+          <a v-if="safeExternalUrl(a.applyUrl)" :href="safeExternalUrl(a.applyUrl)!" target="_blank" rel="noopener noreferrer" class="mini-btn">前往投递</a>
           <button
             v-if="a.status === 'PLANNED'"
             class="mini-btn primary"
@@ -364,10 +364,10 @@
 
           <div class="modal-actions">
             <BaseButton variant="ghost" @click="closeApplyKit">关闭</BaseButton>
-            <BaseButton v-if="kit.job.applyUrl" variant="primary" @click="openApplyUrl">
+            <BaseButton v-if="safeExternalUrl(kit.job.applyUrl)" variant="primary" @click="openApplyUrl">
               打开投递页
             </BaseButton>
-            <span v-else class="no-url-hint">该岗位没有投递链接，请到原平台搜索岗位名</span>
+            <span v-else class="no-url-hint">该岗位没有可安全打开的投递链接，请到原平台搜索岗位名</span>
           </div>
         </template>
       </div>
@@ -554,6 +554,8 @@ import {
 import { XLSX_READ_ERROR_HINT, parseXlsxRows } from '../utils/xlsxLazy'
 import { asArray } from '../utils/safeData'
 import { createLatestGuard } from '../utils/latestRequest'
+// P1-04：applyUrl 来自外部（第三方源 / Excel 导入 / AI），渲染前必须过协议白名单
+import { safeExternalUrl } from '../utils/safeLink'
 
 interface Application {
   id: number
@@ -814,8 +816,12 @@ async function copyGreeting() {
 }
 
 function openApplyUrl() {
-  const url = kit.value?.job.applyUrl
-  if (!url) return
+  const url = safeExternalUrl(kit.value?.job.applyUrl)
+  if (!url) {
+    // 协议不合规时不打开：静默失败会让用户以为按钮坏了
+    ElMessage.warning('该岗位链接不可信，已阻止打开。请回到原平台搜索岗位名。')
+    return
+  }
   // noopener/noreferrer：不给目标页任何反向控制本页的能力
   window.open(url, '_blank', 'noopener,noreferrer')
 }

@@ -224,7 +224,7 @@
           <div class="jc-row">
             <div class="jc-cell jc-label">申请入口</div>
             <div v-for="j in compareItems" :key="j.jobId" class="jc-cell">
-              <a v-if="j.applyUrl" :href="j.applyUrl" target="_blank" rel="noopener noreferrer" class="jc-link">前往 →</a>
+              <a v-if="safeExternalUrl(j.applyUrl)" :href="safeExternalUrl(j.applyUrl)!" target="_blank" rel="noopener noreferrer" class="jc-link">前往 →</a>
               <span v-else>{{ EMPTY }}</span>
             </div>
           </div>
@@ -256,6 +256,8 @@ import {
 import { BaseButton, BaseTag, MapOpenLink } from '../components'
 import { asArray } from '../utils/safeData'
 import { createLatestGuard } from '../utils/latestRequest'
+// P1-04：收藏快照是历史数据，渲染前过滤非 http(s) 链接
+import { safeExternalUrl } from '../utils/safeLink'
 
 const router = useRouter()
 

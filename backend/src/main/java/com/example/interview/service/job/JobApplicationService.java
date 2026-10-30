@@ -144,7 +144,8 @@ public class JobApplicationService {
                 .location(job.getLocation())
                 .salary(job.getSalary())
                 .deadline(job.getDeadline())
-                .applyUrl(job.getApplyUrl())
+                // P1-04：存量岗位可能带历史脏数据，入台账时再过滤一次协议
+                .applyUrl(com.example.interview.util.UrlSafety.sanitize(job.getApplyUrl()))
                 .status(JobApplicationEntity.STATUS_PLANNED)
                 .note(note)
                 .build();
@@ -173,7 +174,8 @@ public class JobApplicationService {
                 .location(favorite.getLocation())
                 .salary(favorite.getSalary())
                 .deadline(favorite.getDeadline())
-                .applyUrl(favorite.getApplyUrl())
+                // P1-04：收藏快照同样是历史数据入口，入台账时过滤协议
+                .applyUrl(com.example.interview.util.UrlSafety.sanitize(favorite.getApplyUrl()))
                 .status(JobApplicationEntity.STATUS_PLANNED)
                 .note(note)
                 .build();

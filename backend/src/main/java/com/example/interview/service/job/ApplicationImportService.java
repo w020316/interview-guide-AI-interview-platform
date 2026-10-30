@@ -278,7 +278,8 @@ public class ApplicationImportService {
                 .location(trimToNull(str(raw.get("location"))))
                 .salary(trimToNull(str(raw.get("salary"))))
                 .deadline(parseDate(raw.get("deadline")))
-                .applyUrl(trimToNull(str(raw.get("applyUrl"))))
+                // P1-04：Excel 导入是普通用户可自造 payload 的入口，链接必须过协议白名单
+                .applyUrl(safeApplyUrl(raw))
                 .status(parseStatus(raw.get("status")))
                 .note(trimToNull(str(raw.get("note"))))
                 .build();
@@ -292,7 +293,8 @@ public class ApplicationImportService {
         n.put("location", trimToNull(str(raw.get("location"))));
         n.put("salary", trimToNull(str(raw.get("salary"))));
         n.put("deadline", parseDate(raw.get("deadline")));
-        n.put("applyUrl", trimToNull(str(raw.get("applyUrl"))));
+        // 预览与实际落库用同一份值：预览显示「有链接」而落库后为空，会让用户以为数据丢了
+        n.put("applyUrl", safeApplyUrl(raw));
         n.put("status", parseStatus(raw.get("status")));
         n.put("note", trimToNull(str(raw.get("note"))));
         return n;
@@ -314,7 +316,7 @@ public class ApplicationImportService {
             }
         }
         if (isBlank(e.getApplyUrl())) {
-            putIfPresent(patch, "applyUrl", trimToNull(str(raw.get("applyUrl"))));
+            putIfPresent(patch, "applyUrl", safeApplyUrl(raw));
         }
         if (isBlank(e.getNote())) {
             putIfPresent(patch, "note", trimToNull(str(raw.get("note"))));
@@ -428,6 +430,30 @@ public class ApplicationImportService {
         }
         String t = s.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    /**
+     * 导入行的投递链接（P1-04）：只保留 http(s)。
+     *
+     * <p>非法链接按「无链接」落库，而不是把整行判为致命错误 —— 群表格里
+     * 大量行是「公司/岗位」有效但链接栏随手填的（如「详见官网」），
+     * 整行作废会让用户觉得导入功能不可用。值被丢弃时记 warn 供排查。
+     */
+    private static String safeApplyUrl(Map<String, Object> raw) {
+        String candidate = trimToNull(str(raw.get("applyUrl")));
+        if (candidate == null) {
+            return null;
+        }
+        String safe = com.example.interview.util.UrlSafety.sanitize(candidate);
+        if (safe == null) {
+            log.warn("导入行投递链接协议不合规，已忽略该字段：{}", clipForLog(candidate));
+        }
+        return safe;
+    }
+
+    /** 日志里不打印完整 payload（可能是超长 data: 串），截断到 80 字符 */
+    private static String clipForLog(String s) {
+        return s.length() <= 80 ? s : s.substring(0, 80) + "…";
     }
 
     /** 导入计划（分类结果 + 致命错误）。 */

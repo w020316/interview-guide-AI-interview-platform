@@ -422,6 +422,44 @@ class AuthControllerTest {
                     .andExpect(jsonPath("$.code").value(429))
                     .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("该账号")));
         }
+
+        /**
+         * P1-01（2026-10-30）：IP 维度必须与账号维度不对称。
+         *
+         * <p>生产 remoteAddr 未配置受信代理时是网关公网 IP，全站共用同一个桶；
+         * 阈值若仍为 5，任意人连错 5 次就能锁死全站登录。这里验证
+         * 「同一 IP 下 5 个不同账号各错一次」不会触发任何锁定，下一个账号仍能正常尝试。
+         */
+        @Test
+        @DisplayName("同一 IP 下 5 个不同账号各错一次：不触发全站锁定（P1-01）")
+        void login_sameIpDifferentAccounts_doesNotLockWholeSite() throws Exception {
+            for (int i = 0; i < 5; i++) {
+                String user = "ip-bucket-probe-" + i;
+                when(userRepository.findByUsername(user)).thenReturn(Optional.empty());
+                String body = objectMapper.writeValueAsString(Map.of(
+                        "username", user, "password", "wrong"));
+
+                mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .with(req -> { req.setRemoteAddr("198.51.100.77"); return req; })
+                                .content(body))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.code").value(401));
+            }
+
+            // 第 6 个全新账号：IP 桶若按旧阈值（5）已被锁死，这里会是 429
+            String fresh = "ip-bucket-probe-fresh";
+            when(userRepository.findByUsername(fresh)).thenReturn(Optional.empty());
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "username", fresh, "password", "wrong"));
+
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .with(req -> { req.setRemoteAddr("198.51.100.77"); return req; })
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(401));
+        }
     }
 
     @Nested

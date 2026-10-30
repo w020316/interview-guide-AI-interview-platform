@@ -321,6 +321,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useScroll, useResizeObserver } from '@vueuse/core'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { authState, clearAuth, isAdmin } from './auth'
+import { logoutRequestConfig } from './utils/logout'
 import api from './api'
 import ChangelogDialog from './components/ChangelogDialog.vue'
 import AiTaskCenter from './components/AiTaskCenter.vue'
@@ -473,9 +474,12 @@ function toggleTheme() {
 
 function logout() {
   closeMenu()
-  // JWT 无状态登出：只需前端清除 token 并跳转。后端接口失败/挂起（冷启动/网络）都不应阻塞退出，
-  // 因此改为后台静默调用（v1.31.4 修复：此前 await 挂起导致"点击退出无反应"）
-  api.post('/api/auth/logout').catch(() => {})
+  // P1-03：必须在 clearAuth() 之前拿到旧 token，并**显式**放进请求头。
+  // 原实现先删 token、再异步发请求 —— 拦截器读到空 token，请求等于是匿名的，
+  // 后端取不到 userId 就无法吊销，JWT 仍可用满 24h。
+  // 这里同步构造请求（配置已带上旧 token），随后立即清本地状态保证退出无延迟。
+  const token = authState.token
+  api.post('/api/auth/logout', null, logoutRequestConfig(token)).catch(() => {})
   clearAuth()
   router.push('/login')
 }

@@ -254,8 +254,8 @@
             {{ freshnessOf(job).label }}
           </span>
           <a
-            v-if="job.applyUrl"
-            :href="job.applyUrl"
+            v-if="safeExternalUrl(job.applyUrl)"
+            :href="safeExternalUrl(job.applyUrl)!"
             target="_blank"
             rel="noopener noreferrer"
             class="apply-btn"
@@ -388,8 +388,8 @@
         </div>
         <div class="detail-footer">
           <a
-            v-if="detail.applyUrl"
-            :href="detail.applyUrl"
+            v-if="safeExternalUrl(detail.applyUrl)"
+            :href="safeExternalUrl(detail.applyUrl)!"
             target="_blank"
             rel="noopener noreferrer"
             class="apply-btn primary"
@@ -432,6 +432,8 @@ import { jobTrust, jobFreshness, classifySource, type JobTrust, type Freshness }
 import { scanJobPosting, type ScanReport } from '../utils/jobPostingScan'
 import { asArray, asObject, asFiniteNumber } from '../utils/safeData'
 import { createLatestGuard } from '../utils/latestRequest'
+// P1-04：applyUrl 来自第三方岗位源，渲染前必须过协议白名单
+import { safeExternalUrl } from '../utils/safeLink'
 
 /**
  * 招聘信息广场
