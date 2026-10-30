@@ -269,6 +269,34 @@ CREATE TABLE IF NOT EXISTS user_ai_setting (
     updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 阶段六 M1（2026-10-30）：AI 异步任务表
+-- 设计见 docs/quality-loop-2026-10-30/06-调研与立项.md：
+--   · 单实例 + 免费层无持久 worker，故不引入 broker，用「任务表 + 调度器」；
+--   · payload 只存入参快照，正文写业务表，通过 result_ref 关联（避免表膨胀）；
+--   · status / lease_until 支撑「抢占 + 租约」，进程崩溃后任务可被重新领取。
+CREATE TABLE IF NOT EXISTS ai_task (
+    id              BIGSERIAL    PRIMARY KEY,
+    user_id         VARCHAR(64)  NOT NULL,
+    type            VARCHAR(32)  NOT NULL,
+    idempotency_key VARCHAR(96)  NOT NULL,
+    status          VARCHAR(16)  NOT NULL,
+    progress        SMALLINT     NOT NULL DEFAULT 0,
+    attempt         SMALLINT     NOT NULL DEFAULT 0,
+    max_attempt     SMALLINT     NOT NULL DEFAULT 1,
+    payload         TEXT,
+    result_ref      VARCHAR(64),
+    error_code      VARCHAR(32),
+    error_message   VARCHAR(200),
+    lease_until     TIMESTAMP,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at      TIMESTAMP,
+    finished_at     TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_ai_task_user ON ai_task(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_task_status ON ai_task(status);
+-- 幂等键不加唯一约束：FAILED 之后允许同键新建（见 AiTaskStatus.ACTIVE），
+-- 唯一性由服务层按「未失败状态」判定；H2/PostgreSQL 的部分唯一索引语法不一致，故不落库约束。
+
 -- 预置知识数据
 INSERT INTO knowledge_doc (category, title, content, source) VALUES
 ('Java 基础', 'HashMap 原理', 'HashMap 基于哈希表实现，JDK 8 后采用数组+链表+红黑树结构。', 'JavaGuide'),
