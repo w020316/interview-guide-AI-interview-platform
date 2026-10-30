@@ -5,6 +5,14 @@
       <p>用数据看见每一次面试的进步，定位薄弱维度</p>
     </header>
 
+    <!-- P2-19：加载失败必须显式说明，不能把「未知」渲染成「0 次练习 / 暂无记录」 -->
+    <LoadErrorState
+      v-if="loadError"
+      class="fade-in-up"
+      description="成长数据没能取到，这不代表你还没练习过。请检查网络后重试。"
+      @retry="loadMain"
+    />
+
     <!-- 准备度检测（第三批 G）：规则化「客观完成度」，与「求职诊断」（AI 能力画像）互补 -->
     <section class="readiness-card fade-in-up" data-readiness-card>
       <div v-if="readinessLoading" class="readiness-skeleton">
@@ -81,8 +89,8 @@
       </template>
     </section>
 
-    <!-- 统计摘要 -->
-    <section class="stat-grid fade-in-up">
+    <!-- 统计摘要（P2-19：加载失败时不渲染 0 值） -->
+    <section v-if="!loadError" class="stat-grid fade-in-up">
       <div class="stat-card">
         <div class="stat-label">已完成面试</div>
         <div class="stat-value num-display">{{ stats.count }}</div>
@@ -122,8 +130,8 @@
       </div>
     </section>
 
-    <!-- 折线图 -->
-    <section class="chart-card fade-in-up">
+    <!-- 折线图（P2-19：加载失败时不渲染「暂无记录」空态） -->
+    <section v-if="!loadError" class="chart-card fade-in-up">
       <div class="section-head chart-head">
         <div>
           <h2>得分走势</h2>
@@ -178,8 +186,8 @@
       </div>
     </section>
 
-    <!-- 维度分析 -->
-    <section class="dim-card fade-in-up">
+    <!-- 维度分析（P2-19：加载失败时不渲染「暂无答题数据」空态） -->
+    <section v-if="!loadError" class="dim-card fade-in-up">
       <div class="section-head">
         <h2>维度掌握度</h2>
         <span class="section-note">按题目分类统计平均得分</span>
@@ -219,7 +227,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
-import { BaseButton } from '../components'
+import { BaseButton, LoadErrorState } from '../components'
 import type { TrendPoint } from '../utils/scoreTrend'
 import { buildLineChart, computeTrendStats } from '../utils/scoreTrend'
 import { pickTickIndices } from '../utils/chartTicks'
@@ -266,6 +274,11 @@ const padY = 24
 const rawPoints = ref<TrendPoint[]>([])
 const categoryStats = ref<CategoryStat[]>([])
 const loading = ref(true)
+/**
+ * 主数据（趋势 + 维度）是否加载失败（P2-19）。
+ * 失败时**不能**渲染「0 次练习 / 暂无记录」——那是把「未知」当成「没有」。
+ */
+const loadError = ref(false)
 const dimension = ref('DAY')
 
 const dimensionLabel = computed(() => DIMENSIONS.find((d) => d.value === dimension.value)?.label || '按次')
@@ -357,11 +370,13 @@ async function loadTrend(dim: string) {
   const prev = rawPoints.value
   rawPoints.value = []
   loading.value = true
+  loadError.value = false
   try {
     rawPoints.value = asArray<TrendPoint>(await api.get(`/api/stats/trend?dimension=${encodeURIComponent(dim)}`))
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载成长数据失败'))
     rawPoints.value = prev
+    loadError.value = true
   } finally {
     loading.value = false
   }
@@ -452,7 +467,8 @@ async function loadReadiness(categories: CategoryStat[]) {
   }
 }
 
-onMounted(async () => {
+async function loadMain() {
+  loadError.value = false
   try {
     const [trend, summary] = await Promise.all([
       api.get('/api/stats/trend?dimension=DAY') as unknown as TrendPoint[],
@@ -471,12 +487,15 @@ onMounted(async () => {
     void loadReadiness(categoryStats.value)
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载成长数据失败'))
+    loadError.value = true
     // 主数据失败也要让准备度卡落到确定状态（用空分类，仍尝试其余数据源）
     void loadReadiness([])
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadMain)
 </script>
 
 <style scoped>

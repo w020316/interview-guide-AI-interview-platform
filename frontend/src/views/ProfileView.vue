@@ -13,6 +13,13 @@
       </div>
     </div>
 
+    <!-- P2-19：加载失败时给出明确错误块与重试，不渲染「0 份简历」 -->
+    <LoadErrorState
+      v-else-if="statsError"
+      description="统计数据没能取到，这不代表你还没有简历或面试。请检查网络后重试。"
+      @retry="loadStats"
+    />
+
     <!-- 数据卡片 -->
     <div v-else class="stats-grid">
       <div class="stat-card fade-in-up">
@@ -259,11 +266,13 @@ import {
   type ImportDryRunResult,
   type ImportMode,
 } from '../utils/backup'
-import { BaseButton, BaseInput } from '../components'
+import { BaseButton, BaseInput, LoadErrorState } from '../components'
 
 const router = useRouter()
 const stats = ref<any>(null)
 const loading = ref(true)
+/** P2-19：加载失败不能把卡片渲染成 0（「0 份简历」是假事实） */
+const statsError = ref(false)
 
 interface RecentActivity {
   type: string
@@ -417,11 +426,13 @@ async function clearAiKey() {
 
 async function loadStats() {
   loading.value = true
+  statsError.value = false
   try {
     const data = await api.get('/api/stats/dashboard') as unknown as any
     stats.value = data
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载统计数据失败'))
+    statsError.value = true
   } finally {
     loading.value = false
   }

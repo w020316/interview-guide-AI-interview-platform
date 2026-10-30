@@ -151,6 +151,13 @@
 
       <div v-if="wrongLoading" class="loading-hint">正在查询错题…</div>
 
+      <!-- P2-19：拉取失败 ≠ 没有错题 -->
+      <LoadErrorState
+        v-else-if="wrongError"
+        description="错题数据没能取到，这不代表你没有错题。请检查网络后重试。"
+        @retry="loadWrong"
+      />
+
       <template v-else-if="wrongList.length">
         <div class="result-summary">
           共 <strong>{{ wrongList.length }}</strong> 道错题（评分低于 {{ threshold }} 分）
@@ -300,7 +307,7 @@ import {
   scoreFill,
   type ScoreSample,
 } from '../utils/scoreDisplay'
-import { BaseButton, BaseInput, BaseTextarea } from '../components'
+import { BaseButton, BaseInput, BaseTextarea, LoadErrorState } from '../components'
 import { parseSearchHits, formatSimilarity, type SearchHit } from '../utils/knowledgeSearch'
 import { asArray } from '../utils/safeData'
 
@@ -363,6 +370,8 @@ interface WrongQuestion {
 const threshold = ref(60)
 const wrongList = ref<WrongQuestion[]>([])
 const wrongLoading = ref(false)
+/** P2-19：拉取失败必须显式提示，不能落进「暂无错题」空态（那等于告诉用户没答错过题） */
+const wrongError = ref(false)
 
 // ── 题目汇总 ──
 interface GroupStat {
@@ -510,6 +519,7 @@ function switchTab(t: Tab) {
 
 async function loadWrong() {
   wrongLoading.value = true
+  wrongError.value = false
   try {
     const data = await api.get('/api/knowledge/wrong-questions',
       { params: { threshold: threshold.value } }) as unknown as { total: number; questions: WrongQuestion[] }
@@ -517,6 +527,7 @@ async function loadWrong() {
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '加载错题失败'))
     wrongList.value = []
+    wrongError.value = true
   } finally {
     wrongLoading.value = false
   }

@@ -10,7 +10,9 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { initTheme } from './theme'
 import { prewarmBackend, installWakeRecovery } from './utils/backendWake'
 import { installSessionGuard } from './utils/sessionGuard'
+import { clearChunkReloadFlag, shouldAutoReloadForChunkError } from './utils/chunkReload'
 import { setupPwa } from './utils/pwa'
+import { ElMessage } from 'element-plus'
 import { autoAnimatePlugin } from '@formkit/auto-animate/vue'
 
 // 在任何渲染前应用主题，避免首屏闪烁
@@ -47,11 +49,20 @@ app.config.errorHandler = (err) => {
   console.error('[app-error]', err)
 }
 
-// 路由错误处理：chunk 加载失败时自动刷新（CDN 故障/缓存问题兜底）
+// 路由错误处理：chunk 加载失败时自动刷新（CDN 故障/缓存问题兜底）。
+// P2-18：每个会话只自动刷新一次 —— 原实现无条件 reload，CDN 持续故障/离线时
+// 页面会陷入「刷新 → 仍失败 → 再刷新」的死循环，用户连提示都看不到。
 router.onError((error) => {
-  if (error.message.includes('Failed to fetch dynamically imported module')) {
+  if (!error.message.includes('Failed to fetch dynamically imported module')) return
+  if (shouldAutoReloadForChunkError()) {
     window.location.reload()
+    return
   }
+  ElMessage.error('版本文件加载失败，页面可能不是最新版本。请检查网络后手动刷新。')
+})
+// 成功导航后清除「已自动刷新」标记：下一次网络抖动仍可自动恢复一次
+router.afterEach(() => {
+  clearChunkReloadFlag()
 })
 
 // 全局未处理 Promise rejection 捕获（SSE/fetch/async 中的未 catch 异常）

@@ -1,5 +1,6 @@
 import { clearAuth, isTokenValid } from '../auth'
 import { ElMessage } from 'element-plus'
+import { isProtectedRoute } from './publicRoutes'
 import {
   LOGIN_PATH,
   SESSION_EXPIRED_FLAG,
@@ -56,8 +57,14 @@ import {
 // 这里原样再导出，保持本模块既有的公开接口不变。
 export { LOGIN_PATH, SESSION_EXPIRED_FLAG, SESSION_EXPIRED_MESSAGE, buildSessionExpiredLoginUrl }
 
-/** 会话恢复评估结果 */
-export type SessionRecoveryAction = 'none' | 'redirect-login'
+/**
+ * 会话恢复评估结果。
+ *
+ * <p>P1-02（2026-10-30 质量循环）新增 {@code clear-and-stay}：公开页上带着**失效的**
+ * 脏 token 时，只静默清掉，不跳转也不提示 —— 否则匿名访客在首页切一次标签页
+ * 就会被弹到登录页并被告知「登录已过期」。
+ */
+export type SessionRecoveryAction = 'none' | 'clear-and-stay' | 'redirect-login'
 
 export interface SessionRecoveryDecision {
   /** 需要执行的动作 */
@@ -65,7 +72,7 @@ export interface SessionRecoveryDecision {
   /** action === 'redirect-login' 时的回跳地址（含 redirect 查询串） */
   redirectTo?: string
   /** 判定原因，便于日志与测试断言 */
-  reason: 'valid' | 'on-login-page' | 'expired'
+  reason: 'valid' | 'on-login-page' | 'expired' | 'public-route'
 }
 
 /**
@@ -74,14 +81,17 @@ export interface SessionRecoveryDecision {
  * 纯函数：只依赖传入的 token 与当前路径，不读 localStorage、不碰 window，
  * 因此可在 node 环境直接单测。
  *
- * @param token    当前持有的 token（可为空串 / null）
- * @param pathname 当前路径（如 `/resume`）
- * @param redirect 过期时要在 redirect 参数里带回的相对地址，默认取 pathname
+ * @param token         当前持有的 token（可为空串 / null）
+ * @param pathname      当前路径（如 `/resume`）
+ * @param redirect      过期时要在 redirect 参数里带回的相对地址，默认取 pathname
+ * @param isPublicPath  该路径是否公开（默认按 `publicRoutes.isProtectedRoute` 取反判断）。
+ *                      由调用方注入是为了让纯函数不依赖 vue-router 的路由表
  */
 export function evaluateSessionRecovery(
   token: string | null | undefined,
   pathname: string,
   redirect?: string,
+  isPublicPath?: (pathname: string) => boolean,
 ): SessionRecoveryDecision {
   // 已在登录页：无论 token 状态如何都不再跳转（防循环）
   if (pathname === LOGIN_PATH) {
@@ -91,7 +101,18 @@ export function evaluateSessionRecovery(
   if (token && isTokenValid(token)) {
     return { action: 'none', reason: 'valid' }
   }
-  // token 缺失 / 格式非法 / 已过期 → 清会话并带 redirect 跳登录。
+  const isPublic = isPublicPath ? isPublicPath(pathname) : !isProtectedRoute(pathname)
+
+  // P1-02：公开页 + 本来就没有 token（匿名访客打开首页/404）→ 什么都不做。
+  // 原实现会直接判 expired 并跳登录，这是访客流失的直接原因。
+  if (!token && isPublic) {
+    return { action: 'none', reason: 'public-route' }
+  }
+  // 公开页 + 失效的脏 token → 静默清掉，不跳转、不提示（公开页没有「会话」可言）
+  if (token && isPublic) {
+    return { action: 'clear-and-stay', reason: 'public-route' }
+  }
+  // 受保护路径（无论 token 缺失还是失效）→ 清会话并带 redirect 跳登录。
   // 跳转地址统一由 `sessionExpiry.buildSessionExpiredLoginUrl` 构造（带 `expired=1`），
   // 与 api 拦截器的 401 兜底共用同一约定，避免两处各写一遍、改一处漏一处。
   const target = redirect && redirect.length > 0 ? redirect : pathname
@@ -116,6 +137,8 @@ export interface SessionGuardHooks {
   onRedirect?: (href: string) => void
   /** 提示用户 */
   onNotify?: (message: string) => void
+  /** 该路径是否公开（默认按 publicRoutes 判定；测试可注入） */
+  isPublicPath?: (pathname: string) => boolean
   /** 最小化 DOM 依赖，便于测试注入假实现 */
   doc?: Pick<Document, 'addEventListener' | 'removeEventListener' | 'visibilityState'> | null
   win?: Pick<Window, 'addEventListener' | 'removeEventListener'> | null
@@ -142,7 +165,13 @@ export function handleSessionRecovery(hooks: SessionGuardHooks = {}): SessionRec
   const onNotify = hooks.onNotify ?? ((message: string) => { ElMessage.warning(message) })
 
   const pathname = getPathname()
-  const decision = evaluateSessionRecovery(getToken(), pathname, getRedirectTarget())
+  const decision = evaluateSessionRecovery(getToken(), pathname, getRedirectTarget(), hooks.isPublicPath)
+
+  // P1-02：公开页上的脏 token 只静默清理，不提示「登录已过期」、不跳转
+  if (decision.action === 'clear-and-stay') {
+    onClear()
+    return decision
+  }
 
   if (decision.action === 'redirect-login' && decision.redirectTo) {
     onClear()

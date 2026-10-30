@@ -85,6 +85,44 @@ describe('utils/sessionGuard · evaluateSessionRecovery（纯函数）', () => {
     expect(d.action).toBe('none')
     expect(d.redirectTo).toBeUndefined()
   })
+
+  /**
+   * P1-02（2026-10-30）：守卫必须看「当前路由是否需要登录」。
+   * 原实现只判 token 有效性 → 匿名访客打开首页/404 页后切回标签页就被踢到登录页，
+   * 还提示「登录已过期」（错误归因）。
+   */
+  describe('公开路由（P1-02）', () => {
+    it('匿名访客在首页 → 什么都不做', () => {
+      const d = evaluateSessionRecovery('', '/')
+      expect(d.action).toBe('none')
+      expect(d.reason).toBe('public-route')
+      expect(d.redirectTo).toBeUndefined()
+    })
+
+    it('匿名访客在 404 页 → 什么都不做', () => {
+      const d = evaluateSessionRecovery('', '/no-such-page')
+      expect(d.action).toBe('none')
+      expect(d.reason).toBe('public-route')
+    })
+
+    it('公开页上带着失效 token → 只静默清理，不跳转（不提示「过期」）', () => {
+      const d = evaluateSessionRecovery(expiredToken(), '/')
+      expect(d.action).toBe('clear-and-stay')
+      expect(d.redirectTo).toBeUndefined()
+    })
+
+    it('受保护页没有 token → 仍然跳登录', () => {
+      const d = evaluateSessionRecovery('', '/resume')
+      expect(d.action).toBe('redirect-login')
+      expect(d.redirectTo).toContain('redirect=')
+    })
+
+    it('调用方可注入自定义公开性判定（保持纯函数不依赖路由表）', () => {
+      const d = evaluateSessionRecovery('', '/whatever', undefined, () => true)
+      expect(d.action).toBe('none')
+      expect(d.reason).toBe('public-route')
+    })
+  })
 })
 
 describe('utils/sessionGuard · handleSessionRecovery（副作用）', () => {
@@ -125,6 +163,39 @@ describe('utils/sessionGuard · handleSessionRecovery（副作用）', () => {
       getToken: () => expiredToken(),
       getPathname: () => LOGIN_PATH,
       getRedirectTarget: () => LOGIN_PATH,
+      onClear,
+      onRedirect,
+    })
+    expect(d.action).toBe('none')
+    expect(onClear).not.toHaveBeenCalled()
+    expect(onRedirect).not.toHaveBeenCalled()
+  })
+
+  it('公开页脏 token → 只清 auth，不跳转、不提示（P1-02）', () => {
+    const onClear = vi.fn()
+    const onRedirect = vi.fn()
+    const onNotify = vi.fn()
+    const d = handleSessionRecovery({
+      getToken: () => expiredToken(),
+      getPathname: () => '/',
+      getRedirectTarget: () => '/',
+      onClear,
+      onRedirect,
+      onNotify,
+    })
+    expect(d.action).toBe('clear-and-stay')
+    expect(onClear).toHaveBeenCalledTimes(1)
+    expect(onRedirect).not.toHaveBeenCalled()
+    expect(onNotify).not.toHaveBeenCalled()
+  })
+
+  it('匿名访客在首页 → 不产生任何副作用', () => {
+    const onClear = vi.fn()
+    const onRedirect = vi.fn()
+    const d = handleSessionRecovery({
+      getToken: () => '',
+      getPathname: () => '/',
+      getRedirectTarget: () => '/',
       onClear,
       onRedirect,
     })

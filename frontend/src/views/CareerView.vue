@@ -220,7 +220,13 @@
         <h2 style="margin-bottom: 0">我的故事库（{{ stories.length }} 条）</h2>
         <button class="link-btn" @click="loadStories">刷新</button>
       </div>
-      <div v-if="!stories.length" class="hint">还没有存入故事。先在上面的输入框提炼故事候选，再点「存入故事库」。</div>
+      <!-- P2-19：拉取失败时不得显示「还没有存入故事」——那会把未知说成事实 -->
+      <LoadErrorState
+        v-if="storiesError"
+        description="故事库没能取到，这不代表你的故事丢了。请检查网络后重试。"
+        @retry="loadStories"
+      />
+      <div v-else-if="!stories.length" class="hint">还没有存入故事。先在上面的输入框提炼故事候选，再点「存入故事库」。</div>
       <div v-for="s in stories" :key="s.id" class="story-card">
         <div class="story-head">
           <div class="story-title">{{ s.title }}</div>
@@ -313,9 +319,9 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
-import { BaseButton, BaseTag } from '../components'
+import { BaseButton, BaseTag, LoadErrorState } from '../components'
 import { asArray } from '../utils/safeData'
 
 interface Asset {
@@ -390,6 +396,8 @@ const storyTrack = ref('')
 const extracting = ref(false)
 const candidates = ref<StoryCandidate[]>([])
 const stories = ref<StoryItem[]>([])
+/** P2-19：故事库加载失败标记（与「确实没有故事」区分） */
+const storiesError = ref(false)
 const practicingId = ref<number | null>(null)
 const practiceAnswer = ref('')
 const checking = ref(false)
@@ -522,11 +530,13 @@ async function saveEdit(id: number) {
   }
 }
 
-/** 加载我的故事库 */
-async function loadStories() {  try {
+/** 加载我的故事库（P2-19：失败要显式标出，不能静默渲染成空态） */
+async function loadStories() {
+  storiesError.value = false
+  try {
     stories.value = asArray<StoryItem>(await api.get('/api/story-bank'))
   } catch {
-    // 静默：故事库加载失败不打断页面
+    storiesError.value = true
   }
 }
 
@@ -575,8 +585,18 @@ async function saveStory(c: StoryCandidate) {
   }
 }
 
-/** 删除故事 */
+/** 删除故事（P2-20：二次确认，避免误点即永久删除） */
 async function removeStory(id: number) {
+  const story = stories.value.find((s) => s.id === id)
+  try {
+    await ElMessageBox.confirm(
+      `确定删除故事「${story?.title || '未命名'}」吗？删除后不可恢复。`,
+      '删除故事',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return // 用户取消
+  }
   try {
     await api.delete(`/api/story-bank/${id}`)
     ElMessage.success('已删除')

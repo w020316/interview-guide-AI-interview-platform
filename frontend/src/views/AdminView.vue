@@ -159,7 +159,12 @@
         </span>
         <button class="ghost-btn" @click="fetchSources">刷新</button>
       </div>
-      <div class="table-wrap">
+      <LoadErrorState
+        v-if="sourcesError"
+        description="数据源列表没能取到，这不代表没有配置来源。请检查后端状态后重试。"
+        @retry="fetchSources"
+      />
+      <div v-else class="table-wrap">
         <table class="data-table" v-loading="sourcesLoading">
           <thead>
             <tr>
@@ -322,7 +327,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { authState } from '../auth'
 import { recruitTypeLabel, RECRUIT_TYPE_CODES, RECRUIT_TYPE_LABELS } from '../utils/recruitType'
-import { EmptyChart } from '../components'
+import { EmptyChart, LoadErrorState } from '../components'
 import { asArray, asObject, asFiniteNumber } from '../utils/safeData'
 
 /**
@@ -450,6 +455,8 @@ const refreshResult = ref<RefreshResult | null>(null)
 
 const sources = ref<SourceRow[]>([])
 const sourcesLoading = ref(false)
+/** P2-19：获取失败时不能显示「共 0 个来源」——那是把未知当成事实 */
+const sourcesError = ref(false)
 
 const jobs = ref<JobRow[]>([])
 const jobsTotal = ref(0)
@@ -663,11 +670,13 @@ async function fetchOverview() {
 
 async function fetchSources() {
   sourcesLoading.value = true
+  sourcesError.value = false
   try {
     const res = (await api.get('/api/admin/sources')) as unknown as { items?: SourceRow[] }
     sources.value = asArray<SourceRow>(res?.items)
   } catch (e) {
     ElMessage.error(getErrMessage(e, '获取数据源失败'))
+    sourcesError.value = true
   } finally {
     sourcesLoading.value = false
   }

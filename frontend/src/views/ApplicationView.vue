@@ -179,8 +179,15 @@
       </div>
     </section>
 
-    <!-- 空状态 -->
-    <div v-if="!loading && total === 0" class="empty-state">
+    <!-- P2-19：加载失败 ≠ 没有投递记录 -->
+    <LoadErrorState
+      v-if="!loading && loadError"
+      description="投递台账没能取到，这不代表你的记录丢了。请检查网络后重试。"
+      @retry="load"
+    />
+
+    <!-- 空状态（仅在「确实没有数据」时出现） -->
+    <div v-if="!loading && !loadError && total === 0" class="empty-state">
       <div class="empty-icon-wrap" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <path d="M22 12h-6l-2 3h-4l-2-3H2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -513,9 +520,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { getErrMessage } from '../api'
-import { BaseButton, BaseTag, MapOpenLink } from '../components'
+import { BaseButton, BaseTag, LoadErrorState, MapOpenLink } from '../components'
 import ApplicationInsightsCard from '../components/ApplicationInsightsCard.vue'
 import { normalizeInsights, type ApplicationInsights } from '../utils/applicationInsights'
 import { EMPTY } from '../utils/format'
@@ -597,6 +604,8 @@ const statusOrder = [
 ]
 
 const loading = ref(true)
+/** P2-19：加载失败必须与「确实没有记录」区分，否则用户会以为数据丢了 */
+const loadError = ref(false)
 const items = ref<Application[]>([])
 const counts = ref<Record<string, number>>({})
 const funnel = ref<Record<string, number>>({})
@@ -646,6 +655,7 @@ const loadGuard = createLatestGuard()
 async function load() {
   const ticket = loadGuard.begin()
   loading.value = true
+  loadError.value = false
   try {
     const listData = (await api.get('/api/application/list')) as unknown as { items?: Application[] }
     if (!loadGuard.isLatest(ticket)) return
@@ -665,6 +675,7 @@ async function load() {
   } catch (e: unknown) {
     if (!loadGuard.isLatest(ticket)) return
     ElMessage.error(getErrMessage(e, '加载投递台账失败'))
+    loadError.value = true
   } finally {
     if (loadGuard.isLatest(ticket)) loading.value = false
   }
@@ -736,6 +747,16 @@ async function advanceToInterview(it: StatusLaggingItem) {
 }
 
 async function remove(a: Application) {
+  // P2-20：误点即永久删除（且无撤销）——必须二次确认
+  try {
+    await ElMessageBox.confirm(
+      `确定移除「${a.companyName} · ${a.title}」这条投递记录吗？移除后不可恢复。`,
+      '移除投递记录',
+      { type: 'warning', confirmButtonText: '移除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return // 用户取消
+  }
   busyId.value = a.id
   try {
     await api.delete(`/api/application/${a.id}`)
