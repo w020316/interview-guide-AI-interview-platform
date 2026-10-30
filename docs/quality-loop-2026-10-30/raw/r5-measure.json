@@ -9,8 +9,8 @@
   "overflowX": false,
   "small": [],
   "low": [],
-  "cls": 0.316,
-  "lcp": 700
+  "cls": 0,
+  "lcp": 740
  },
  {
   "path": "/jobs",
@@ -22,8 +22,8 @@
   "overflowX": false,
   "small": [],
   "low": [],
-  "cls": 0.087,
-  "lcp": 876
+  "cls": 0,
+  "lcp": 840
  },
  {
   "path": "/jobs",
@@ -78,8 +78,8 @@
    }
   ],
   "low": [],
-  "cls": 0.144,
-  "lcp": 676
+  "cls": 0,
+  "lcp": 712
  },
  {
   "path": "/jobs",
@@ -140,21 +140,21 @@
    }
   ],
   "low": [],
-  "cls": 0.066,
-  "lcp": 704
+  "cls": 0,
+  "lcp": 720
  },
  {
   "path": "/login",
   "w": 375,
   "h": 667,
   "theme": "light",
-  "url": "/",
+  "url": "/login",
   "vw": 375,
   "overflowX": false,
   "small": [],
   "low": [],
-  "cls": 0.316,
-  "lcp": 356
+  "cls": 0,
+  "lcp": 0
  },
  {
   "path": "/admin",
@@ -215,8 +215,8 @@
    }
   ],
   "low": [],
-  "cls": 0.046,
-  "lcp": 640
+  "cls": 0.035,
+  "lcp": 656
  },
  {
   "path": "/admin",
@@ -277,8 +277,8 @@
    }
   ],
   "low": [],
-  "cls": 0.046,
-  "lcp": 556
+  "cls": 0.035,
+  "lcp": 736
  },
  {
   "path": "/admin",
@@ -290,7 +290,7 @@
   "overflowX": false,
   "small": [],
   "low": [],
-  "cls": 0.316,
-  "lcp": 384
+  "cls": 0,
+  "lcp": 688
  }
 ]
