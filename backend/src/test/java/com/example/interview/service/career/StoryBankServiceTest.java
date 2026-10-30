@@ -136,21 +136,27 @@ class StoryBankServiceTest {
     // ---------- CRUD 与归属校验 ----------
 
     @Test
-    @DisplayName("save：标题为空抛业务异常")
-    void save_blankTitle_throws() {
+    @DisplayName("save：标题为空 → 400（P2-09：参数错误，不再是 503）")
+    void save_blankTitle_throws400() {
         StoryBankEntity s = StoryBankEntity.builder().title(" ").build();
 
         assertThatThrownBy(() -> service.save("user-1", s))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("标题不能为空")
+                .extracting(e -> ((BusinessException) e).getStatus())
+                .isEqualTo(400);
     }
 
     @Test
-    @DisplayName("save：超过容量上限抛业务异常")
-    void save_capacityLimit_throws() {
+    @DisplayName("save：超过容量上限 → 409（P2-09：资源冲突，不再是 503）")
+    void save_capacityLimit_throws409() {
         when(repository.countByUserId("user-1")).thenReturn(50L);
 
         assertThatThrownBy(() -> service.save("user-1", story()))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("故事库已满")
+                .extracting(e -> ((BusinessException) e).getStatus())
+                .isEqualTo(409);
     }
 
     @Test

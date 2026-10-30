@@ -87,12 +87,16 @@ public class StoryBankService {
      */
     public StoryBankEntity save(String userId, StoryBankEntity story) {
         if (repository.countByUserId(userId) >= MAX_STORIES_PER_USER) {
-            throw new BusinessException("故事库已满（上限 " + MAX_STORIES_PER_USER + " 条），请先删除不再需要的故事");
+            // P2-09：容量上限是用户正常操作触发的资源冲突，应为 409；
+            // 此前抛默认 503「服务暂不可用」，把用户自己的配额问题归因成平台故障。
+            throw new BusinessException(409,
+                    "故事库已满（上限 " + MAX_STORIES_PER_USER + " 条），请先删除不再需要的故事");
         }
         story.setId(null);
         story.setUserId(userId);
         if (story.getTitle() == null || story.getTitle().isBlank()) {
-            throw new BusinessException("故事标题不能为空");
+            // P2-09：空标题是请求参数问题，应为 400。
+            throw new BusinessException(400, "故事标题不能为空");
         }
         return repository.save(story);
     }

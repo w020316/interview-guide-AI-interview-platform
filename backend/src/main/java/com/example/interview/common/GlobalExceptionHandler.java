@@ -3,6 +3,7 @@ package com.example.interview.common;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
@@ -192,12 +193,23 @@ public class GlobalExceptionHandler {
      * （v1.31.4 B-11：与内部 IllegalStateException 区分，避免泄露内部细节）
      * v1.33.0（U1）：业务故障语义改为 503（服务暂不可用），替代 500"内部错误"——
      * 用户可据此理解"是 AI 服务暂时不可用"而非"平台坏了"。
+     *
+     * <p>2026-10-30（P2-09）：状态码不再写死 503，改由 {@link BusinessException#getStatus()}
+     * 决定——「故事库已满」是资源冲突（409）、「标题不能为空」是参数错误（400），
+     * 报成 503 会把用户自己的操作问题归因成平台故障。未显式声明状态码的抛出方
+     * （AI 全链失败等）仍保持 503，历史契约不变。
+     *
+     * <p>返回值改用 {@link ResponseEntity} 承载动态状态码；body 结构与
+     * {@code code} 字段同步取同一状态码，避免「状态码与 body 不一致」。
      */
     @ExceptionHandler(BusinessException.class)
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    public Result<Void> handleBusiness(BusinessException ex) {
-        log.warn("业务异常：{}", ex.getMessage());
-        return Result.error(503, ex.getMessage());
+    public ResponseEntity<Result<Void>> handleBusiness(BusinessException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatus());
+        if (status == null || !status.isError()) {
+            status = HttpStatus.SERVICE_UNAVAILABLE;
+        }
+        log.warn("业务异常（{}）：{}", status.value(), ex.getMessage());
+        return ResponseEntity.status(status).body(Result.error(status.value(), ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

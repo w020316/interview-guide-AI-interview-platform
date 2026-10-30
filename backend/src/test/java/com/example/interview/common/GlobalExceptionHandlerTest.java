@@ -162,12 +162,34 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("BusinessException → 503 message 原样透出")
+    @DisplayName("BusinessException（未声明状态码）→ 503 message 原样透出")
     void businessException_returns503() {
-        Result<Void> result = handler.handleBusiness(
+        // 契约有意变更（P2-09）：返回值由 Result 改为 ResponseEntity，以便携带动态状态码。
+        // 未声明状态码的抛出方（AI 全链失败等）保持 503，历史契约不变。
+        var response = handler.handleBusiness(
                 new BusinessException("AI 服务暂时不可用，请稍后重试"));
-        assertThat(result.code()).isEqualTo(503);
-        assertThat(result.message()).isEqualTo("AI 服务暂时不可用，请稍后重试");
+        assertThat(response.getStatusCode().value()).isEqualTo(503);
+        assertThat(response.getBody().code()).isEqualTo(503);
+        assertThat(response.getBody().message()).isEqualTo("AI 服务暂时不可用，请稍后重试");
+    }
+
+    @Test
+    @DisplayName("BusinessException(409) → 409 资源冲突（P2-09：故事库配额）")
+    void businessException_conflict_returns409() {
+        var response = handler.handleBusiness(
+                new BusinessException(409, "故事库已满（上限 50 条），请先删除不再需要的故事"));
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().code()).isEqualTo(409);
+        assertThat(response.getBody().message()).contains("故事库已满");
+    }
+
+    @Test
+    @DisplayName("BusinessException(400) → 400 参数错误（P2-09：空标题）")
+    void businessException_badRequest_returns400() {
+        var response = handler.handleBusiness(new BusinessException(400, "故事标题不能为空"));
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().code()).isEqualTo(400);
+        assertThat(response.getBody().message()).isEqualTo("故事标题不能为空");
     }
 
     @Test

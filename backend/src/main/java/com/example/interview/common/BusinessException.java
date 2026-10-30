@@ -12,11 +12,38 @@ package com.example.interview.common;
  */
 public class BusinessException extends IllegalStateException {
 
+    /** 默认 HTTP 状态码：503「服务暂不可用」（AI 全链失败、并发闸门超时等可重试故障） */
+    public static final int DEFAULT_STATUS = 503;
+
+    /**
+     * 该异常应映射到的 HTTP 状态码（P2-09，2026-10-30）。
+     *
+     * <p>此前所有 {@code BusinessException} 一律映射 503，导致「故事库已满」（用户正常操作
+     * 触发的资源冲突）、「标题不能为空」（参数错误）也被报成「服务暂不可用」，把用户错误
+     * 归因成平台故障。现在由抛出方显式声明语义：资源冲突 409、参数错误 400，
+     * 未声明时保持历史契约 503。
+     */
+    private final int status;
+
     public BusinessException(String message) {
-        super(message);
+        this(DEFAULT_STATUS, message);
     }
 
     public BusinessException(String message, Throwable cause) {
+        this(DEFAULT_STATUS, message, cause);
+    }
+
+    public BusinessException(int status, String message) {
+        super(message);
+        this.status = status;
+    }
+
+    public BusinessException(int status, String message, Throwable cause) {
         super(message, cause);
+        this.status = status;
+    }
+
+    public int getStatus() {
+        return status;
     }
 }
