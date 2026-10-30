@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isResumableSession, isAnswered, firstUnansweredIndex } from './interviewResume'
+import { isResumableSession, isAnswered, firstUnansweredIndex, resumeStartIndex } from './interviewResume'
 
 describe('isResumableSession（N1 断点续面）', () => {
   it('后端实际的「进行中」状态可继续', () => {
@@ -63,5 +63,25 @@ describe('firstUnansweredIndex：断点定位', () => {
 
   it('0 分算已作答，不会把断点误判回该题', () => {
     expect(firstUnansweredIndex([{ evaluationScore: 0 }, {}])).toBe(1)
+  })
+})
+
+describe('resumeStartIndex：续做落点（E-02）', () => {
+  it('部分作答 → 仍落在第一道未作答的题', () => {
+    expect(resumeStartIndex([{ evaluationScore: 80 }, { evaluationScore: 75 }, {}, {}])).toBe(2)
+  })
+
+  it('全部未作答 → 第 1 题', () => {
+    expect(resumeStartIndex([{}, {}, {}])).toBe(0)
+  })
+
+  it('全部已作答 → 最后一题（那里才有「结束面试」入口）', () => {
+    // 实测回归：此前落回第 1 题，用户须逐题跳过才能收尾
+    expect(resumeStartIndex([{ evaluationScore: 80 }, { evaluationScore: 0 }, { evaluationScore: 60 }])).toBe(2)
+  })
+
+  it('空数组 / 非数组 → 0，不越界', () => {
+    expect(resumeStartIndex([])).toBe(0)
+    expect(resumeStartIndex(undefined as unknown as [])).toBe(0)
   })
 })

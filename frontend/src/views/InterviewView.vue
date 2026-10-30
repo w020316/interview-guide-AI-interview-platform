@@ -138,6 +138,10 @@
         <!-- 答题区 -->
         <div class="answer-section">
           <label>你的回答</label>
+          <!-- E-02：续做时告知「本题已作答」，避免答案框空白让用户以为记录丢失 -->
+          <p v-if="currentAnsweredScore != null" class="answered-hint" role="status">
+            本题此前已作答，得分 {{ currentAnsweredScore }} 分；如需重答，请输入新回答后再次提交。
+          </p>
           <!-- 语音作答入口 -->
           <div v-if="speechSupported" class="speech-bar">
             <BaseButton variant="ghost" size="sm" :class="{ 'is-recording': speechRecording }"
@@ -286,7 +290,7 @@ import { createSpeechRecorder, isSpeechSupported } from '../utils/speech'
 import { compareWithHistory, suggestNextTarget } from '../utils/reportCompare'
 import { nextGenProgress } from '../utils/genProgress'
 import { EMPTY } from '../utils/format'
-import { firstUnansweredIndex, isResumableSession } from '../utils/interviewResume'
+import { isAnswered, isResumableSession, resumeStartIndex } from '../utils/interviewResume'
 import { buildReportView, buildScopeText, findDim, type ReportCompareView, type ReportEvalInput } from '../utils/reportView'
 import { BaseButton, BaseInput, BaseTextarea } from '../components'
 import ReportPanel from '../components/ReportPanel.vue'
@@ -330,6 +334,8 @@ interface Question {
    */
   userAnswer?: string | null
   evaluationScore?: number | null
+  /** 服务端已落库的维度明细（JSON 字符串）；E-03 用于续做后恢复复盘报告 */
+  evalDetail?: string | null
 }
 
 interface EvalResult {
@@ -561,21 +567,31 @@ async function resumeSession(targetId: string) {
     }
     sessionId.value = targetId
     questions.value = qs
-    // N1 断点续面：从「第一道未作答的题」继续，而不是永远从第 1 题重来。
+    // E-02：落点 = 首个未作答的题；若全部已作答，落到最后一题（那里才有「结束面试」入口）。
     // 边界（跳题 / 全部答完 / 0 分算已答）由 utils/interviewResume 的单测锁定。
-    qIndex.value = firstUnansweredIndex(qs)
+    qIndex.value = resumeStartIndex(qs)
     if (meta?.jobDescription) {
       jobDesc.value = meta.jobDescription
     }
-    // P2-26：记录该会话「此前已作答」的题数。复盘报告的 sessionEvals 是页面级状态，
-    // 只统计本次新作答，若不把会话累计数一并展示，报告会显得「丢了题」
-    //（实测：服务端 4 题、其中 2 题早有得分，报告却写「基于本次 1 道作答」）。
-    const answered = qs.filter((q) => typeof q.evaluationScore === 'number').length
+    // E-03：把服务端已落库的评分与维度明细恢复成页面级 sessionEvals。
+    // 此前 sessionEvals 只统计本次页面作答，从历史续做后「结束面试」判定 hasReport=false，
+    // 复盘报告（本场核心产出）被隐藏，只剩一句「结果已保存」。
+    sessionEvals.value = qs.filter((q) => isAnswered(q)).map((q) => ({
+      question: q.question,
+      category: q.category,
+      difficulty: q.difficulty,
+      overallScore: q.evaluationScore as number,
+      evalDetail: q.evalDetail ?? null,
+    }))
+    // P2-26：记录该会话「此前已作答」的题数，供复盘报告抬头说明覆盖范围
+    const answered = sessionEvals.value.length
     historyAnsweredCount.value = answered
     ElMessage.success(
-      answered > 0 && answered < qs.length
-        ? `已载入 ${qs.length} 道题，从第 ${qIndex.value + 1} 题继续（前 ${answered} 题已作答）`
-        : `已载入 ${qs.length} 道题，开始面试！`,
+      answered >= qs.length
+        ? `已载入 ${qs.length} 道题，本场已全部作答，可直接「结束面试」查看复盘`
+        : answered > 0
+          ? `已载入 ${qs.length} 道题，从第 ${qIndex.value + 1} 题继续（前 ${answered} 题已作答）`
+          : `已载入 ${qs.length} 道题，开始面试！`,
     )
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '载入面试失败'))
@@ -661,6 +677,11 @@ let abortController: AbortController | null = null
 let hintColdRetryCount = 0
 
 const currentQ = computed(() => questions.value[qIndex.value])
+/** 当前题在服务端已作答时的得分（续做回填用；null 表示未作答） */
+const currentAnsweredScore = computed(() => {
+  const q = currentQ.value as Question | undefined
+  return q && typeof q.evaluationScore === 'number' ? q.evaluationScore : null
+})
 // 修复进度条：第一题不为 0%，最后一题能到 100%
 const progress = computed(() =>
   Math.round(((qIndex.value + 1) / Math.max(questions.value.length, 1)) * 100)
@@ -1065,13 +1086,18 @@ async function submitAnswer() {
     // 收集本次回答的评估结果，供面试结束后的综合复盘报告使用
     if (evalResult.value && typeof evalResult.value.overallScore === 'number') {
       // 只用快照：切题后 currentQ 已指向下一题，读它会污染复盘数据
-      sessionEvals.value.push({
+      const entry: ReportEvalInput = {
         question: answered.question,
         category: answered.category,
         difficulty: answered.difficulty,
         overallScore: evalResult.value.overallScore,
         evalDetail,
-      })
+      }
+      // E-03：续做时 sessionEvals 已由服务端回填，同一题重答要替换而不是追加，
+      // 否则复盘报告会把同一道题算两次
+      const exist = sessionEvals.value.findIndex((e) => e.question === answered.question)
+      if (exist >= 0) sessionEvals.value[exist] = entry
+      else sessionEvals.value.push(entry)
     }
 
     // 2. 持久化用户答案 + 评估分 + 维度明细到后端（关联 questionId）
@@ -1921,6 +1947,17 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 500;
   color: var(--c-text);
+}
+
+.answered-hint {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--radius-md);
+  background: var(--c-bg-alt);
+  color: var(--c-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .answer-section textarea {

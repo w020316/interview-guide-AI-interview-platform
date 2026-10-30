@@ -39,3 +39,20 @@ export function firstUnansweredIndex(questions: Array<{ evaluationScore?: number
   const i = questions.findIndex((q) => !isAnswered(q))
   return i >= 0 ? i : 0
 }
+
+/**
+ * 恢复会话时的**落点下标**（E-02，2026-10-30 阶段四实测）。
+ *
+ * <p>与 {@link firstUnansweredIndex} 的唯一区别是「全部已作答」：此时没有断点，
+ * 若仍回到第 1 题，用户看到的是**空白答题框**（历史答案不填充），既以为答案丢了，
+ * 又要连点 N-1 次才能到最后一题点「结束面试」。实测一场 3 题全答完的会话，
+ * 续做落地在第 1 题，用户必须逐题跳过才能收尾。
+ *
+ * <p>因此全部已作答时落点为**最后一题**：那里有「结束面试」入口，且此前答案/评分
+ * 已在该题的「本题已作答」提示中可见。部分作答 / 全部未作答的语义保持不变。
+ */
+export function resumeStartIndex(questions: Array<{ evaluationScore?: number | null }>): number {
+  if (!Array.isArray(questions) || questions.length === 0) return 0
+  const i = questions.findIndex((q) => !isAnswered(q))
+  return i >= 0 ? i : questions.length - 1
+}
