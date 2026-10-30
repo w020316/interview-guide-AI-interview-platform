@@ -2,6 +2,7 @@ package com.example.interview.service;
 
 import com.example.interview.ai.AiConcurrencyGuard;
 import com.example.interview.util.HashUtil;
+import com.example.interview.util.PiiMasker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -115,7 +116,10 @@ public class AutoKnowledgeService {
         if (question == null) {
             return;
         }
-        String q = question.trim();
+        // P2-07：入库的是**共享**知识（META_SHARED=true，所有用户可检索）。
+        // 提问里常夹带手机号/邮箱/身份证号，必须先掩码再送去生成「通用知识」。
+        // ⚠️ 正则只能拦住格式化的联系方式，姓名/公司等自由文本仍依赖 prompt 约束。
+        String q = PiiMasker.mask(question.trim());
         if (q.length() < MIN_QUESTION_LEN || q.length() > MAX_QUESTION_LEN) {
             return;
         }

@@ -120,7 +120,7 @@ class BackupServiceTest {
         ResumeEntity r = ResumeEntity.builder().id(5L).userId("1").content("简历").build();
         when(resumeRepository.findByUserIdOrderByCreatedAtDesc("1")).thenReturn(List.of(r));
 
-        Map<String, Object> result = service.export("1", false);
+        Map<String, Object> result = service.export("1");
 
         assertThat(result.get("schemaVersion")).isEqualTo("3");
         assertThat(result.get("dataFingerprint")).isNotNull();
@@ -139,9 +139,9 @@ class BackupServiceTest {
     @Test
     @DisplayName("指纹：空数据下稳定可复现（导出与导入重算一致）")
     void fingerprint_deterministicForEmpty() {
-        Map<String, Object> export = service.export("1", false);
+        Map<String, Object> export = service.export("1");
         String fp1 = (String) export.get("dataFingerprint");
-        String fp2 = (String) service.export("1", false).get("dataFingerprint");
+        String fp2 = (String) service.export("1").get("dataFingerprint");
         assertThat(fp1).isEqualTo(fp2).hasSize(16);
     }
 
@@ -421,11 +421,11 @@ class BackupServiceTest {
     @Test
     @DisplayName("指纹：随数据量变化而变化")
     void fingerprint_changesWithData() {
-        String empty = (String) service.export("1", false).get("dataFingerprint");
+        String empty = (String) service.export("1").get("dataFingerprint");
         ResumeEntity r = ResumeEntity.builder().id(1L).userId("1").content("x")
                 .createdAt(LocalDateTime.now()).build();
         when(resumeRepository.findByUserIdOrderByCreatedAtDesc("1")).thenReturn(List.of(r));
-        String withData = (String) service.export("1", false).get("dataFingerprint");
+        String withData = (String) service.export("1").get("dataFingerprint");
         assertThat(withData).isNotEqualTo(empty);
     }
 }

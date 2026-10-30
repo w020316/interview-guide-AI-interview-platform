@@ -19,6 +19,10 @@ CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 -- DEFAULT 1 让存量行获得与「无 ver claim 的旧 token」一致的基准值，升级瞬间不踢人。
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 1;
 
+-- P2-14（2026-10-30）：封禁态落库。此前只存进程内 + Redis，而 prod 排除了 Redis，
+-- Render 每次重启/部署即全部解禁。现在 users.banned 是持久化事实，内存/Redis 只是缓存。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- 简历表
 CREATE TABLE IF NOT EXISTS resume (
     id              BIGSERIAL PRIMARY KEY,

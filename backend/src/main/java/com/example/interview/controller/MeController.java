@@ -51,13 +51,15 @@ public class MeController {
 
     /**
      * 导出个人数据
-     * GET /api/me/export?includeConversations=false
+     * GET /api/me/export
+     *
+     * <p>P2-11：移除了 {@code includeConversations} 参数 —— 它此前只被回显、从未实现，
+     * 是典型的「假开关」。对话备份如要做，应连同导入一起作为独立能力。
      */
     @Operation(summary = "导出个人数据（单 JSON）")
     @GetMapping("/export")
-    public Result<Map<String, Object>> export(
-            @RequestParam(required = false, defaultValue = "false") boolean includeConversations) {
-        return Result.success(backupService.export(currentUserId(), includeConversations));
+    public Result<Map<String, Object>> export() {
+        return Result.success(backupService.export(currentUserId()));
     }
 
     /**

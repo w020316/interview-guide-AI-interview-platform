@@ -34,7 +34,8 @@ export interface BackupCounts {
 export interface BackupPayload {
   schemaVersion?: string
   exportedAt?: string
-  includeConversations?: boolean
+  /** 被导出上限截断的集合名（空/缺省 = 全量）。P2-10 */
+  truncated?: string[]
   dataFingerprint?: string
   counts?: Partial<BackupCounts>
   data?: Record<string, unknown>

@@ -54,6 +54,21 @@ public class UserEntity {
     @Builder.Default
     private Integer tokenVersion = 1;
 
+    /**
+     * 是否被封禁（P2-14，2026-10-30 质量循环）。
+     *
+     * <p>封禁态此前只存在进程内存 + Redis，而生产 profile **显式排除了 Redis**
+     * （「登录/鉴权不依赖 Redis」），于是 Render 每次自动部署重启 = 全部解禁。
+     * 落到 users 表后，封禁成为持久化事实；Redis/内存退化为加速缓存。
+     *
+     * <p>{@code @Builder.Default} 同样不能省（原因见 tokenVersion 注释）。
+     */
+    // columnDefinition 必须显式带 default：本地 H2 由 Hibernate 建表，不加默认值时
+    // 任何「不写 banned 列」的历史 SQL / 探针脚本都会撞 NOT NULL（生产 DDL 已有 DEFAULT FALSE）
+    @Column(name = "banned", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean banned = false;
+
     @PrePersist
     public void prePersist() {
         if (createdAt == null) {

@@ -108,21 +108,44 @@ public class BackupService {
     // ─────────────────────────────── 导出 ───────────────────────────────
 
     /**
-     * 导出用户全部个人数据。
+     * 导出边界（P2-10，2026-10-30 质量循环）。
      *
-     * @param userId               当前用户 ID
-     * @param includeConversations 是否包含智能体会话（默认 false）
-     * @return {@code {schemaVersion, exportedAt, dataFingerprint, counts, data}}
+     * <p>导出原本无上限，而同文件导回受 {@code JsonBodySizeLimitFilter} 的 1MB 限制 ——
+     * 备份功能「只能出不能进」。这里按集合设上限，并在结果里如实标出被截断的集合
+     * （{@code truncated}），让用户知道这份备份不是全量，而不是导回去才发现少了数据。
      */
-    public Map<String, Object> export(String userId, boolean includeConversations) {
+    private static final int MAX_EXPORT_SESSIONS = 200;
+    private static final int MAX_EXPORT_QUESTIONS_PER_SESSION = 50;
+    private static final int MAX_EXPORT_ITEMS = 2000;
+
+    /**
+     * 导出用户个人数据（不含智能体会话）。
+     *
+     * <p>P2-11：原先的 {@code includeConversations} 参数只是被原样回显，没有任何实现 ——
+     * 「看起来生效了」比没有这个功能更糟。本版**移除该参数**（前端也不再传），
+     * 如果要支持对话备份，应作为独立能力连同导入一起做，而不是留一个假开关。
+     *
+     * @return {@code {schemaVersion, exportedAt, dataFingerprint, counts, truncated, data}}
+     */
+    public Map<String, Object> export(String userId) {
         Bundle bundle = loadBundle(userId);
 
         long questionCount = 0;
         List<Map<String, Object>> sessionViews = new ArrayList<>();
-        for (InterviewSessionEntity s : bundle.sessions) {
+        List<String> truncated = new ArrayList<>();
+        List<InterviewSessionEntity> sessions = bundle.sessions;
+        if (sessions.size() > MAX_EXPORT_SESSIONS) {
+            truncated.add("sessions");
+            sessions = sessions.subList(0, MAX_EXPORT_SESSIONS);
+        }
+        for (InterviewSessionEntity s : sessions) {
             List<InterviewQuestionEntity> questions =
                     questionRepository.findBySessionIdOrderByIdAsc(s.getSessionId());
             questionCount += questions.size();
+            if (questions.size() > MAX_EXPORT_QUESTIONS_PER_SESSION) {
+                if (!truncated.contains("questions")) truncated.add("questions");
+                questions = questions.subList(0, MAX_EXPORT_QUESTIONS_PER_SESSION);
+            }
             Map<String, Object> sv = new LinkedHashMap<>();
             sv.put("id", s.getId());
             sv.put("sessionId", s.getSessionId());
@@ -137,32 +160,49 @@ public class BackupService {
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("profile", profilePublic(userId));
-        data.put("resumes", bundle.resumes);
+        data.put("resumes", limited(bundle.resumes, "resumes", truncated));
         data.put("sessions", sessionViews);
-        data.put("applications", bundle.applications);
-        data.put("events", bundle.events);
-        data.put("favoriteQuestions", bundle.favoriteQuestions);
-        data.put("storyBank", bundle.storyBank);
-        data.put("jobFavorites", bundle.jobFavorites);
+        data.put("applications", limited(bundle.applications, "applications", truncated));
+        data.put("events", limited(bundle.events, "events", truncated));
+        data.put("favoriteQuestions", limited(bundle.favoriteQuestions, "favoriteQuestions", truncated));
+        data.put("storyBank", limited(bundle.storyBank, "storyBank", truncated));
+        data.put("jobFavorites", limited(bundle.jobFavorites, "jobFavorites", truncated));
 
         Map<String, Object> counts = new LinkedHashMap<>();
-        counts.put("resumes", bundle.resumes.size());
-        counts.put("sessions", bundle.sessions.size());
+        counts.put("resumes", sizeOf(data.get("resumes")));
+        counts.put("sessions", sessionViews.size());
         counts.put("questions", questionCount);
-        counts.put("applications", bundle.applications.size());
-        counts.put("events", bundle.events.size());
-        counts.put("favoriteQuestions", bundle.favoriteQuestions.size());
-        counts.put("storyBank", bundle.storyBank.size());
-        counts.put("jobFavorites", bundle.jobFavorites.size());
+        counts.put("applications", sizeOf(data.get("applications")));
+        counts.put("events", sizeOf(data.get("events")));
+        counts.put("favoriteQuestions", sizeOf(data.get("favoriteQuestions")));
+        counts.put("storyBank", sizeOf(data.get("storyBank")));
+        counts.put("jobFavorites", sizeOf(data.get("jobFavorites")));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("schemaVersion", SCHEMA_VERSION);
         result.put("exportedAt", LocalDateTime.now().toString());
-        result.put("includeConversations", includeConversations);
         result.put("dataFingerprint", fingerprintOf(bundle));
         result.put("counts", counts);
+        // 被截断的集合清单：空列表 = 全量导出（前端可据此提示「部分数据未包含」）
+        result.put("truncated", truncated);
         result.put("data", data);
         return result;
+    }
+
+    /** 按上限裁剪集合，并在超限时记录集合名 */
+    private static <T> List<T> limited(List<T> items, String name, List<String> truncated) {
+        if (items == null) {
+            return List.of();
+        }
+        if (items.size() > MAX_EXPORT_ITEMS) {
+            truncated.add(name);
+            return items.subList(0, MAX_EXPORT_ITEMS);
+        }
+        return items;
+    }
+
+    private static int sizeOf(Object value) {
+        return value instanceof List<?> list ? list.size() : 0;
     }
 
     /** 仅导出可公开的 profile 字段，杜绝 password/salt/token/role/banned 泄漏。 */

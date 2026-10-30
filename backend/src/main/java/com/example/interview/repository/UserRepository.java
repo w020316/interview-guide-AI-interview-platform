@@ -65,4 +65,24 @@ public interface UserRepository extends JpaRepository<UserEntity, Long>,
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE UserEntity u SET u.tokenVersion = u.tokenVersion + 1 WHERE u.id = :id")
     int incrementTokenVersion(@Param("id") Long id);
+
+    /**
+     * 当前被封禁的用户 id 集合（P2-14）。
+     *
+     * <p>只投影 id，避免把用户实体整表拉进内存；启动时用它回填内存名单。
+     * 若历史库还没有 banned 列（首次部署、DDL 尚未执行），调用方会收到异常并按空集合降级。
+     */
+    @Query("SELECT u.id FROM UserEntity u WHERE u.banned = true")
+    List<Long> findBannedIds();
+
+    /**
+     * 写入封禁态（P2-14）。用原子 UPDATE 而不是「读实体 → set → save」：
+     * 并发 ban/unban 时后者可能互相覆盖。
+     *
+     * @return 受影响行数（0 表示用户不存在）
+     */
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE UserEntity u SET u.banned = :banned WHERE u.id = :id")
+    int updateBanned(@Param("id") Long id, @Param("banned") boolean banned);
 }

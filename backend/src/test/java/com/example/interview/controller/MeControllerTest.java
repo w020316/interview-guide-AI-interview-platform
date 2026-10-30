@@ -65,7 +65,7 @@ class MeControllerTest {
     @Test
     @DisplayName("GET /api/me/export 返回导出结构（code=200）")
     void export_returns200() throws Exception {
-        when(backupService.export(any(), anyBoolean())).thenReturn(Map.of(
+        when(backupService.export(any())).thenReturn(Map.of(
                 "schemaVersion", "3",
                 "dataFingerprint", "abcdef0123456789",
                 "counts", Map.of("resumes", 0),

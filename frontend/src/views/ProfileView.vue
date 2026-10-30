@@ -478,13 +478,20 @@ function downloadJson(obj: unknown, filename: string) {
 }
 
 async function fetchExport(): Promise<Record<string, unknown>> {
-  return (await api.get(EXPORT_PATH, { params: { includeConversations: false } })) as unknown as Record<string, unknown>
+  // P2-11：后端已移除 includeConversations（此前是只回显、不实现的假开关）
+  return (await api.get(EXPORT_PATH)) as unknown as Record<string, unknown>
 }
 
 async function exportData() {
   exporting.value = true
   try {
-    downloadJson(await fetchExport(), exportFileName())
+    const payload = await fetchExport()
+    // P2-10：如实告知备份不是全量（超出单次导出上限的集合会被截断）
+    const truncatedNames = Array.isArray(payload.truncated) ? payload.truncated as string[] : []
+    if (truncatedNames.length) {
+      ElMessage.warning(`部分数据超出单次导出上限（${truncatedNames.join('、')}），本次备份不是全量`)
+    }
+    downloadJson(payload, exportFileName())
     ElMessage.success('数据已导出')
   } catch (e: unknown) {
     ElMessage.error(getErrMessage(e, '导出失败'))

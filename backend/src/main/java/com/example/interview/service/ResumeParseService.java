@@ -22,6 +22,12 @@ import java.io.IOException;
 @Service
 public class ResumeParseService {
 
+    /** PDF 最大页数（P2-13）：正常简历 1-5 页，20 页已远超合理范围 */
+    static final int MAX_PDF_PAGES = 20;
+
+    /** 解析后文本最大字符数（P2-13）：防止极小字号 PDF / 巨型 HTML 把内存与 AI 调用拖垮 */
+    static final int MAX_TEXT_CHARS = 100_000;
+
     @Autowired
     private ResumeAnalysisService resumeAnalysisService;
 
@@ -57,8 +63,14 @@ public class ResumeParseService {
         String resumeText;
 
         if (lower.endsWith(".pdf")) {
-            // PDFBox 解析 PDF
+            // P2-13（2026-10-30 质量循环）：PDF 解析必须有上限。
+            // 此前直接 Loader.loadPDF(bytes) + PDFTextStripper 全文抽取：
+            // 几千页的 PDF 会在解析线程里长时间占 CPU/内存（生产实例只有 512MB）。
             try (PDDocument document = Loader.loadPDF(file.getBytes())) {
+                if (document.getNumberOfPages() > MAX_PDF_PAGES) {
+                    throw new IllegalArgumentException(
+                            "PDF 页数过多（最多 " + MAX_PDF_PAGES + " 页），请精简后再上传");
+                }
                 PDFTextStripper stripper = new PDFTextStripper();
                 resumeText = stripper.getText(document);
             }
@@ -80,6 +92,11 @@ public class ResumeParseService {
 
         if (resumeText == null || resumeText.isBlank()) {
             throw new IllegalArgumentException("简历文件内容为空，请检查文件是否损坏");
+        }
+        // P2-13：字符数上限兜底（PDF 可能用极小字号塞进海量文字，行数限制拦不住）
+        if (resumeText.length() > MAX_TEXT_CHARS) {
+            throw new IllegalArgumentException(
+                    "简历文本过长（超过 " + MAX_TEXT_CHARS + " 字符），请精简后再上传");
         }
 
         return resumeText;
