@@ -242,10 +242,14 @@ app:
         rpm: ${AI_ZHIPU_RPM:0}
         # 智谱默认开思考模式 → content 为空 → 兜底节点被静默跳过（P1-02）
         thinking-disabled: true
+      # ⚠️ E-08（2026-10-30 阶段四实测）：末位模型原为 `glm-4-flash`，该模型已下线，
+      #    实际返回 400 `1211 模型不存在` —— 等于最后一层兜底根本不存在，故障时白丢一次机会。
+      #    改用仍在售的 `glm-4-flash-250414`（2026-09-20 横评中实测 155 分 / 6-6 稳定）。
+      #    换模型时如再遇 1211，说明该模型已下线，需同步更新此处与文档，不要只改环境变量。
       - name: zhipu-lastresort
         base-url: ${AI_ZHIPU_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
         api-key: ${AI_ZHIPU_API_KEY:}
-        model: ${AI_ZHIPU_FALLBACK_MODEL:glm-4-flash}
+        model: ${AI_ZHIPU_FALLBACK_MODEL:glm-4-flash-250414}
         temperature: ${AI_TEMPERATURE:0.7}
         rpm: ${AI_ZHIPU_RPM:0}
         thinking-disabled: true
