@@ -42,6 +42,10 @@ public class AiTaskService {
     static final int MAX_ATTEMPT_LIMIT = 5;
     /** 结果正文长度上限（M3）：出题 5–20 题的 JSON 实测 4–8KB，20K 留足余量且不让任务表膨胀 */
     static final int MAX_RESULT_TEXT_LEN = 20_000;
+    /** 成功 / 取消任务的保留天数（M4）：只用于「完成通知」，7 天足够回溯 */
+    static final int KEEP_SUCCEEDED_DAYS = 7;
+    /** 失败任务的保留天数（M4）：失败要留够排障窗口，比成功多留 3 周 */
+    static final int KEEP_FAILED_DAYS = 30;
 
     private final AiTaskRepository repository;
 
@@ -98,9 +102,9 @@ public class AiTaskService {
     }
 
     /**
-     * 领取一个 QUEUED 任务并置为 RUNNING。
+     * 领取一个任务并置为 RUNNING：优先 QUEUED，其次「租约已过期」的 RUNNING。
      *
-     * @param leaseSeconds 租约时长；进程崩溃后租约到期，任务可被重新领取
+     * @param leaseSeconds 租约时长；进程崩溃后租约过期，任务在下一轮可被重新领取
      * @return 抢到的任务；队列为空或竞争失败时为空
      */
     @Transactional
@@ -110,10 +114,41 @@ public class AiTaskService {
         }
         Optional<AiTaskEntity> candidate =
                 repository.findFirstByStatusOrderByCreatedAtAsc(AiTaskStatus.QUEUED.name());
-        if (candidate.isEmpty()) {
+        if (candidate.isPresent()) {
+            return tryClaim(candidate.get(), now, leaseSeconds);
+        }
+        // M4：队列空时再看「进程崩溃遗留的 RUNNING」。M1 注释承诺了租约可重领，
+        // 但那时 claim 只认 QUEUED —— 崩过一次的任务会永远停在「执行中」。
+        Optional<AiTaskEntity> stale = repository.findFirstByStatusAndLeaseUntilBeforeOrderByCreatedAtAsc(
+                AiTaskStatus.RUNNING.name(), now);
+        if (stale.isEmpty()) {
             return Optional.empty();
         }
-        Long id = candidate.get().getId();
+        AiTaskEntity task = stale.get();
+        int attempt = task.getAttempt() == null ? 0 : task.getAttempt();
+        int maxAttempt = task.getMaxAttempt() == null ? 1 : task.getMaxAttempt();
+        if (attempt >= maxAttempt) {
+            // 已用完重试次数仍停在 RUNNING：直接判终态，否则它会一直占着「执行中」不能结束
+            task.setStatus(AiTaskStatus.FAILED.name());
+            task.setErrorCode("LEASE_EXPIRED");
+            task.setErrorMessage("执行中断且已达重试上限，请重新发起");
+            task.setFinishedAt(now);
+            task.setLeaseUntil(null);
+            repository.save(task);
+            log.warn("租约过期的任务已达重试上限，转 FAILED taskId={} attempt={}", task.getId(), attempt);
+            return Optional.empty();
+        }
+        int won = repository.reclaim(task.getId(), now.plusSeconds(leaseSeconds), now);
+        if (won != 1) {
+            log.debug("过期任务重领竞争失败 id={} won={}", task.getId(), won);
+            return Optional.empty();
+        }
+        log.warn("重领租约过期的任务（上次执行可能已崩溃） taskId={} attempt={}", task.getId(), attempt + 1);
+        return repository.findById(task.getId());
+    }
+
+    private Optional<AiTaskEntity> tryClaim(AiTaskEntity candidate, LocalDateTime now, int leaseSeconds) {
+        Long id = candidate.getId();
         int won = repository.claim(id, now.plusSeconds(leaseSeconds), now);
         if (won != 1) {
             // 竞争失败：已被其它执行器领取或用户取消，交给下一轮调度
@@ -121,6 +156,30 @@ public class AiTaskService {
             return Optional.empty();
         }
         return repository.findById(id);
+    }
+
+    // ── 清理（M4）────────────────────────────────────────────────────────
+
+    /**
+     * 清理已结束且超过保留期的任务。
+     *
+     * <p>保留期：成功 / 取消 7 天，失败 30 天（失败要留够排障窗口，成功只是通知用）。
+     * 未结束的任务（QUEUED / RUNNING）{@code finishedAt} 为空，天然不会被删。
+     *
+     * @return 删除行数（用于日志与测试判据）
+     */
+    @Transactional
+    public int purgeFinished(LocalDateTime now) {
+        LocalDateTime successBefore = now.minusDays(KEEP_SUCCEEDED_DAYS);
+        LocalDateTime failedBefore = now.minusDays(KEEP_FAILED_DAYS);
+        int removed = repository.deleteFinishedBefore(AiTaskStatus.SUCCEEDED.name(), successBefore)
+                + repository.deleteFinishedBefore(AiTaskStatus.CANCELLED.name(), successBefore)
+                + repository.deleteFinishedBefore(AiTaskStatus.FAILED.name(), failedBefore);
+        if (removed > 0) {
+            log.info("任务清理完成 removed={}（成功/取消保留 {} 天，失败保留 {} 天）",
+                    removed, KEEP_SUCCEEDED_DAYS, KEEP_FAILED_DAYS);
+        }
+        return removed;
     }
 
     // ── 结束 ────────────────────────────────────────────────────────────

@@ -147,6 +147,74 @@ class AiTaskServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    @DisplayName("M4：队列为空但有租约过期的 RUNNING → 重领（进程崩溃遗留不会永远停在执行中）")
+    void claim_reclaimsExpiredRunning() {
+        when(repository.findFirstByStatusOrderByCreatedAtAsc(AiTaskStatus.QUEUED.name()))
+                .thenReturn(Optional.empty());
+        AiTaskEntity stale = task(AiTaskStatus.RUNNING.name(), 1, 2);
+        when(repository.findFirstByStatusAndLeaseUntilBeforeOrderByCreatedAtAsc(
+                AiTaskStatus.RUNNING.name(), NOW)).thenReturn(Optional.of(stale));
+        when(repository.reclaim(eq(1L), eq(NOW.plusSeconds(120)), eq(NOW))).thenReturn(1);
+        when(repository.findById(1L)).thenReturn(Optional.of(stale));
+
+        assertThat(service.claimNext(NOW, 120)).containsSame(stale);
+    }
+
+    @Test
+    @DisplayName("M4：过期任务已达重试上限 → 转 FAILED，不再占着执行中")
+    void claim_expiredAtAttemptLimit_fails() {
+        when(repository.findFirstByStatusOrderByCreatedAtAsc(AiTaskStatus.QUEUED.name()))
+                .thenReturn(Optional.empty());
+        AiTaskEntity stale = task(AiTaskStatus.RUNNING.name(), 2, 2);
+        when(repository.findFirstByStatusAndLeaseUntilBeforeOrderByCreatedAtAsc(
+                AiTaskStatus.RUNNING.name(), NOW)).thenReturn(Optional.of(stale));
+        when(repository.save(any(AiTaskEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(service.claimNext(NOW, 120)).isEmpty();
+        assertThat(stale.getStatus()).isEqualTo(AiTaskStatus.FAILED.name());
+        assertThat(stale.getErrorCode()).isEqualTo("LEASE_EXPIRED");
+        assertThat(stale.getFinishedAt()).isEqualTo(NOW);
+        verify(repository, never()).reclaim(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("M4：过期任务重领竞争失败 → 返回空（另一次调度已抢到）")
+    void claim_reclaimLostRace() {
+        when(repository.findFirstByStatusOrderByCreatedAtAsc(AiTaskStatus.QUEUED.name()))
+                .thenReturn(Optional.empty());
+        when(repository.findFirstByStatusAndLeaseUntilBeforeOrderByCreatedAtAsc(
+                AiTaskStatus.RUNNING.name(), NOW))
+                .thenReturn(Optional.of(task(AiTaskStatus.RUNNING.name(), 1, 2)));
+        when(repository.reclaim(any(), any(), any())).thenReturn(0);
+
+        assertThat(service.claimNext(NOW, 120)).isEmpty();
+    }
+
+    // ── 清理（M4）────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("M4：清理按状态使用不同保留期（成功/取消 7 天、失败 30 天）")
+    void purge_usesPerStatusRetention() {
+        when(repository.deleteFinishedBefore(eq(AiTaskStatus.SUCCEEDED.name()),
+                eq(NOW.minusDays(AiTaskService.KEEP_SUCCEEDED_DAYS)))).thenReturn(3);
+        when(repository.deleteFinishedBefore(eq(AiTaskStatus.CANCELLED.name()),
+                eq(NOW.minusDays(AiTaskService.KEEP_SUCCEEDED_DAYS)))).thenReturn(1);
+        when(repository.deleteFinishedBefore(eq(AiTaskStatus.FAILED.name()),
+                eq(NOW.minusDays(AiTaskService.KEEP_FAILED_DAYS)))).thenReturn(2);
+
+        assertThat(service.purgeFinished(NOW)).isEqualTo(6);
+        // 未结束的任务不可删：QUEUED / RUNNING 一次都没有传给仓储
+        verify(repository, never()).deleteFinishedBefore(eq(AiTaskStatus.QUEUED.name()), any());
+        verify(repository, never()).deleteFinishedBefore(eq(AiTaskStatus.RUNNING.name()), any());
+    }
+
+    @Test
+    @DisplayName("M4：没有可清理数据 → 返回 0")
+    void purge_nothingToDo() {
+        assertThat(service.purgeFinished(NOW)).isZero();
+    }
+
     // ── 结束 ────────────────────────────────────────────────────────────
 
     @Test
