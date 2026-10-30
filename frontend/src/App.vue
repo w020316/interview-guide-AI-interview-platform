@@ -66,6 +66,12 @@
                   stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
               <span>{{ item.label }}</span>
+              <!-- M4 角标：未完成的 AI 任务数（口径见 utils/taskBadge.ts，只表达「还有事在跑」） -->
+              <span
+                v-if="item.to === '/interview' && taskBadgeCount > 0"
+                class="nav-badge"
+                :aria-label="`有 ${taskBadgeCount} 个 AI 任务正在进行`"
+              >{{ taskBadgeCount }}</span>
             </router-link>
 
             <span v-if="authState.token" class="nav-divider" aria-hidden="true" />
@@ -245,6 +251,11 @@
                       stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                   <span>{{ it.label }}</span>
+                  <span
+                    v-if="it.to === '/interview' && taskBadgeCount > 0"
+                    class="nav-badge"
+                    :aria-label="`有 ${taskBadgeCount} 个 AI 任务正在进行`"
+                  >{{ taskBadgeCount }}</span>
                 </router-link>
               </div>
             </template>
@@ -333,6 +344,7 @@ import { theme, toggleTheme as toggle } from './theme'
 import { ICONS, primaryNav, toolNav, buildMobileGroups } from './navigation'
 import type { NavItem } from './navigation'
 import { needRefresh, isOnline, applyUpdate, dismissUpdate } from './utils/pwa'
+import { startTaskBadgeWatcher, taskBadgeCount } from './utils/taskBadge'
 
 const router = useRouter()
 const route = useRoute()
@@ -478,7 +490,26 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   window.removeEventListener('scroll', onScroll)
   if (hoverTimer) clearTimeout(hoverTimer)
+  stopTaskBadge?.()
 })
+
+/**
+ * M4 导航角标：只在登录后轮询 `/api/tasks/summary`。
+ * 未登录不发起请求（省流量、也避免 401 噪音）；登出时同步停表。
+ */
+let stopTaskBadge: (() => void) | null = null
+watch(
+  () => authState.token,
+  (token) => {
+    if (token) {
+      stopTaskBadge = startTaskBadgeWatcher()
+    } else {
+      stopTaskBadge?.()
+      stopTaskBadge = null
+    }
+  },
+  { immediate: true },
+)
 
 /** 手动打开版本更新：用户主动查看，视为已读 */
 function openChangelog() {
@@ -654,6 +685,24 @@ function logout() {
 .nav-link svg {
   opacity: 0.7;
   transition: opacity var(--transition-fast);
+}
+
+/* M4 角标：未完成 AI 任务数。用品牌实底 + --c-on-primary，暗色下随主题翻转 */
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--brand-primary);
+  color: var(--c-on-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 /* hover：浅灰背景 */
