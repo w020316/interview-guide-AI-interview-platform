@@ -1,15 +1,23 @@
 <template>
   <div v-if="running.length || done.length" class="ai-task-center" role="status" aria-live="polite">
-    <!-- 进行中：可离开本页，完成后会在这里通知 -->
+    <!-- 进行中：可离开本页，完成后会在这里通知；服务端任务可主动取消 -->
     <div v-for="t in running" :key="t.id" class="ai-task ai-task-running">
       <span class="ai-task-spinner" aria-hidden="true"></span>
       <div class="ai-task-body">
         <div class="ai-task-label">{{ t.label }}中…</div>
         <div class="ai-task-sub">
           <span class="ai-task-elapsed">{{ elapsed(t) }}s</span>
-          <span class="ai-task-hint">可离开本页，完成后通知你</span>
+          <span class="ai-task-hint">{{ t.serverTaskId ? '已转为后台任务，可离开本页' : '可离开本页，完成后通知你' }}</span>
         </div>
       </div>
+      <button
+        v-if="t.serverTaskId"
+        class="ai-task-cancel"
+        aria-label="取消该任务"
+        @click="cancel(t)"
+      >
+        取消
+      </button>
     </div>
 
     <!-- 完成通知 -->
@@ -40,6 +48,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { AiTask } from '../utils/aiTasks'
 import { dismissAiTask, doneTasks, elapsedSeconds, pruneDoneTasks, runningTasks } from '../utils/aiTasks'
+import { cancelServerTask } from '../utils/serverTask'
 
 /**
  * 全局 AI 任务中心（N3）
@@ -73,6 +82,12 @@ function elapsed(t: AiTask): number {
 
 function dismiss(id: string): void {
   dismissAiTask(id)
+}
+
+/** 取消服务端任务：只发请求，进度条与通知由轮询侧收口，避免这里与轮询各改一份状态 */
+function cancel(t: AiTask): void {
+  if (!t.serverTaskId) return
+  void cancelServerTask(t.serverTaskId)
 }
 
 function open(route?: string): void {
@@ -195,6 +210,38 @@ function open(route?: string): void {
 
 .ai-task-close:hover {
   color: var(--c-text);
+}
+
+.ai-task-cancel {
+  flex: none;
+  align-self: center;
+  min-height: 26px;
+  padding: 2px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  cursor: pointer;
+}
+
+.ai-task-cancel:hover {
+  color: var(--c-danger);
+  border-color: var(--c-danger);
+}
+
+/* 移动端：可点目标不小于 48px（阶段五 R1 的触控约定） */
+@media (max-width: 768px) {
+  .ai-task-cancel {
+    min-height: 48px;
+    padding: 2px 14px;
+  }
+
+  .ai-task-close {
+    width: 48px;
+    height: 48px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

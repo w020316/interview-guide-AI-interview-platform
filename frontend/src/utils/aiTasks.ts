@@ -29,6 +29,13 @@ export interface AiTask {
   ok?: boolean
   /** 失败时的简短原因（仅失败态有值） */
   error?: string
+  /**
+   * 服务端任务 id（阶段六 M3 · 异步任务中心链路）。
+   *
+   * <p>有值表示这个任务由 `/api/tasks` 托管：用户可以在任务中心里取消它，
+   * 也可以离开页面后再回来查看结果。为空则是 N3 的「请求级」托管（拦截器登记）。
+   */
+  serverTaskId?: number
 }
 
 /** 长耗时 AI 任务：路径特征 → 友好标签 + 完成后跳回的页面 */
@@ -78,6 +85,13 @@ export function startAiTask(url?: string): string | null {
   } catch {
     return null
   }
+}
+
+/** 登记一个服务端任务（阶段六 M3）：与 {@link startAiTask} 同构，额外携带任务 id 以便取消 */
+export function startServerAiTask(label: string, route: string | undefined, serverTaskId: number): string {
+  const id = `srv-${++seq}`
+  running.value.push({ id, label, route, startedAt: nowMs(), serverTaskId })
+  return id
 }
 
 /** 收口任务：成功 → 完成通知；失败 → 失败通知。幂等，未知 id 直接忽略。 */

@@ -9,6 +9,7 @@ import {
   pruneDoneTasks,
   runningTasks,
   startAiTask,
+  startServerAiTask,
   taskMetaForUrl,
 } from './aiTasks'
 
@@ -99,5 +100,20 @@ describe('aiTasks —— 全局 AI 任务注册表（N3）', () => {
     expect(elapsedSeconds(1000, 1000)).toBe(0)
     expect(elapsedSeconds(1000, 3999)).toBe(2)
     expect(elapsedSeconds(1000, 999)).toBe(0)
+  })
+
+  it('startServerAiTask：登记服务端任务并携带任务 id（用于取消）', () => {
+    const id = startServerAiTask('AI 出题', '/interview', 7)
+    expect(runningTasks.value).toHaveLength(1)
+    expect(runningTasks.value[0]).toMatchObject({
+      id,
+      label: 'AI 出题',
+      route: '/interview',
+      serverTaskId: 7,
+    })
+
+    finishAiTask(id, true)
+    expect(runningTasks.value).toHaveLength(0)
+    expect(doneTasks.value[0].serverTaskId).toBe(7)
   })
 })

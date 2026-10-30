@@ -303,6 +303,7 @@ import ReportPanel from '../components/ReportPanel.vue'
 // P2-17：复用已有的增量 SSE 解析器（状态在实例上，天然支持跨 chunk 的事件）
 import { AgentSseParser } from '../utils/agentSse'
 import { buildEvaluateBody, buildSessionAnswerBody, snapshotQuestion } from '../utils/interviewAnswer'
+import { runServerTask } from '../utils/serverTask'
 
 const router = useRouter()
 const route = useRoute()
@@ -898,9 +899,16 @@ async function startInterview() {
     genStep.value = 2
     const { difficulty, focusCategories } = await resolveAdaptiveTarget()
     genStep.value = 3
-    const qs = await api.post('/api/interview/questions',
-      { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value, difficulty, focusCategories },
-      { timeout: AI_TIMEOUT }) as unknown as string
+    // M3：优先走异步任务中心（可离开页面）；任务中心关闭时 runServerTask 自动回退同步接口
+    const qs = await runServerTask({
+      createPath: '/api/tasks/interview/questions',
+      body: { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value, difficulty, focusCategories },
+      label: 'AI 出题',
+      route: '/interview',
+      fallback: () => api.post('/api/interview/questions',
+        { resumeText: resumeText.value || jobDesc.value, jobDescription: jobDesc.value, count: count.value, difficulty, focusCategories },
+        { timeout: AI_TIMEOUT }) as unknown as Promise<string>,
+    })
     genStep.value = 4
 
     // 2. 解析题目
@@ -1080,8 +1088,18 @@ async function submitAnswer() {
   startEvalTimer()
   try {
     // 1. 评估回答（AI 返回评分 + 改进建议；可选携带附图 imageUrl 做多模态评估 v1.30.0）
-    const data = await api.post('/api/interview/evaluate',
-      buildEvaluateBody(answered, answeredText, answeredImageUrl)) as unknown as string
+    //    M3：纯文本评分优先走异步任务中心；带附图必须走同步——异步队列等待会让
+    //    服务端 10 分钟短时效签名 URL 过期，AI 抓不到图（见后端 InterviewTaskController）
+    const evalBody = buildEvaluateBody(answered, answeredText, answeredImageUrl)
+    const data = answeredImageUrl
+      ? (await api.post('/api/interview/evaluate', evalBody) as unknown as string)
+      : await runServerTask({
+          createPath: '/api/tasks/interview/evaluate',
+          body: evalBody,
+          label: '作答评分',
+          route: '/interview',
+          fallback: () => api.post('/api/interview/evaluate', evalBody) as unknown as Promise<string>,
+        })
     evalResult.value = safeParse<EvalResult>(data, {})
 
     // 维度明细（第三批 A）：以原始对象承载，**不在此处 `?? 0` 兜底**——
