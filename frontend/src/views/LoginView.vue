@@ -842,6 +842,8 @@ async function handleRegister() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* 阶段三实测：整行点击区仅 21px 高；标签本身可点，抬到 48px 触控标准 */
+  min-height: 48px;
   cursor: pointer;
   font-size: 13px;
   color: var(--c-text-secondary);

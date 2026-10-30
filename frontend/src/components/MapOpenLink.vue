@@ -101,5 +101,18 @@ const shownLinks = computed<MapLink[]>(() =>
   outline-offset: 2px;
   border-radius: var(--radius-xs);
 }
+
+/* 触控目标（阶段三实测 375/414/768）：内联文本链接仅 24×20。
+ * 用 padding 撑开点击区、再用负 margin 抵消视觉位移，避免把元信息行撑高。 */
+@media (max-width: 1180px) {
+  .map-open-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    /* 水平 padding 让「地图」两字也达到 48px 宽（实测 24×20 → 48×48） */
+    padding: 0 12px;
+    margin: -14px -12px;
+  }
+}
 </style>
 

@@ -1185,6 +1185,39 @@ onMounted(() => {
   cursor: pointer;
 }
 
+/* 触控目标（阶段三实测 375/414/768）：开关 21px、申请按钮 37px，均低于 48px 口径。
+ * 只在窄屏/触控场景补偿，桌面保持紧凑密度。 */
+@media (max-width: 1180px) {
+  .hide-expired-toggle {
+    min-height: 48px;
+  }
+  .apply-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+  }
+  .refresh-btn,
+  .source-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+  }
+  /* 平板档筛选 chips 实测 37px、筛选项 36–38px，一并抬到 48px */
+  .filter-chips button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+  }
+  .filter-input {
+    min-height: 48px;
+  }
+  /* 卡片收藏按钮实测 30×30（仅 1024 平板档暴露，移动端布局不渲染该按钮） */
+  .fav-btn {
+    width: 48px;
+    height: 48px;
+  }
+}
+
 .location-row {
   justify-content: space-between;
 }

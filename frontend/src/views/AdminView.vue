@@ -1076,7 +1076,8 @@ onMounted(() => {
   margin-top: 1px;
   font-size: 14px;
   font-weight: 700;
-  color: #fff;
+  /* 实色危险底的文字必须随主题翻转（暗色下 --c-danger 提亮成 #f87171，白字仅 2.77:1） */
+  color: var(--c-on-danger);
   background: var(--c-danger);
   border-radius: 50%;
 }
@@ -1123,7 +1124,8 @@ onMounted(() => {
 
 .alert-times {
   font-size: 12px;
-  color: var(--c-text-tertiary);
+  /* 阶段三实测：tertiary 压在 danger-light 底上只有 4.39:1（< 4.5），降一档到 secondary */
+  color: var(--c-text-secondary);
 }
 
 .alert-hint {

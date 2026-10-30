@@ -1412,6 +1412,24 @@ function logout() {
   }
 }
 
+/* ── 平板及以下（≤1180）：导航与图标控件统一 48px ──
+ * 阶段三实测 1024×768：导航项 44px、主题/菜单按钮 44px，而平板是典型触控场景。
+ * 只用一个登记过的断点（1180）表达，避免引入 961 这类未登记档位（designGuards 会拦）。
+ * 桌面 ≥1181 保留 44px：64px 导航栏里塞 48px 会挤压品牌区，且鼠标精度更高。 */
+@media (max-width: 1180px) {
+  .nav-link,
+  .user-chip,
+  .nav-more,
+  .btn-login {
+    min-height: 48px;
+  }
+  .theme-toggle,
+  .menu-toggle {
+    width: 48px;
+    height: 48px;
+  }
+}
+
 /* ── 移动/平板：头部控件统一 48px（v1.76.0）──
  * 放在文件末尾，故意压过上面的 44px 基础档（同优先级、后写者胜）。
  * 桌面保留 44px：64px 高的导航栏里塞 48px 图标按钮会挤压品牌区，

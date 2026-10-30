@@ -204,7 +204,9 @@ function handleClick(ev: MouseEvent) {
  * 这一版把 sm 也一并纳入：此前"密集行内不动 sm"的裁决在 375 宽实测中
  * 反而出现了 31~35px 的标签按钮（首页求职工具条、知识库 tab），
  * 手指点不中比"版式略松"代价更高。 */
-@media (max-width: 768px) {
+/* 阶段三实测：1024×768 平板档的 md 按钮只有 44px。触控场景统一抬到 48px，
+ * 桌面（≥1181）保留 44px 的紧凑档。 */
+@media (max-width: 1180px) {
   .base-btn--sm,
   .base-btn--md,
   .base-btn--lg {

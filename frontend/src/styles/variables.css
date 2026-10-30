@@ -27,6 +27,10 @@
    * 既不过 WCAG AA 正文 4.5 也不过大字 3.0。暗色下必须改用深色字。
    * 凡 background 为 var(--brand-primary[-hover|-active]) 的规则，文字一律用它。 */
   --c-on-primary: #ffffff;
+  /* 压在「语义危险色实底」上的内容色（如管理后台告警图标）。
+   * 暗色下 --c-danger 提亮为 #f87171，白字只有 2.77:1（阶段三实测）；
+   * 与 --c-on-primary 同因：实色底翻转时字色必须一起翻转。 */
+  --c-on-danger: #ffffff;
   /* 与主题无关的「品牌墨绿墨迹」：只用于**背景固定为浅色**的场景
    * （如白底反色 CTA 按钮）。暗色下品牌色会提亮，若用 --brand-primary
    * 就会在固定白底上退化成 2.49:1，故此处刻意不翻转。 */
@@ -555,6 +559,8 @@ p {
   /* 暗色下品牌色提亮为 #14b8a6，压在上面的内容必须转为深色：
    * #062e29 on #14b8a6 = 5.90:1（对比白字的 2.49:1）。 */
   --c-on-primary: #062e29;
+  /* #341210 on #f87171 = 5.9:1（白字仅 2.77:1） */
+  --c-on-danger: #341210;
   --brand-gradient: linear-gradient(135deg, #0f766e 0%, #0b2321 100%);
   --brand-gradient-soft: linear-gradient(135deg, #12322e 0%, #211d1a 100%);
   --brand-glow: 0 4px 14px rgba(20, 184, 166, 0.18);
