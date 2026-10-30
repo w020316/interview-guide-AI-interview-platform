@@ -11,6 +11,9 @@ const routes = [
   { path: '/resume/studio', component: () => import('../views/ResumeStudioView.vue'), meta: { requiresAuth: true } },
   { path: '/job',       component: () => import('../views/JobAnalysisView.vue'), meta: { requiresAuth: true  } },
   { path: '/jobs',      component: () => import('../views/JobsView.vue'),        meta: { requiresAuth: true  } },
+  // G-02：岗位详情页（可分享 URL、完整 JD）。后端 GET /api/jobs/{id} 需登录，
+  // 因此这里也要求登录；若未来开放匿名访问，需同步调整 SecurityConfig 白名单。
+  { path: '/jobs/:id',  component: () => import('../views/JobDetailView.vue'),   meta: { requiresAuth: true  } },
   { path: '/agent',     component: () => import('../views/AgentView.vue'),       meta: { requiresAuth: true  } },
   // v1.35.0：求职 Skill（职业资产挖掘 + 30 天节奏计划）与投递看板
   { path: '/career',       component: () => import('../views/CareerView.vue'),      meta: { requiresAuth: true  } },

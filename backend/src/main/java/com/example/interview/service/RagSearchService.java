@@ -291,6 +291,10 @@ public class RagSearchService {
                 item.put("distance", distance); // 余弦距离：越小越相似
                 item.put("similarity", distance == null ? null
                         : Math.max(0.0, 1.0 - distance)); // 归一化相似度：越大越相似
+                // G-01：标出「这条是我自己导入的」——前端据此提供删除入口。
+                // 共享知识（无 userId 元数据）不显示删除按钮，避免用户误删系统预置内容。
+                item.put("owned", userId != null
+                        && userId.equals(String.valueOf(doc.getMetadata().get(META_USER_ID))));
                 result.add(item);
             }
             String json = objectMapper.writeValueAsString(result);

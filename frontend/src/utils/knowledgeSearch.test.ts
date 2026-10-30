@@ -9,7 +9,7 @@ describe('parseSearchHits', () => {
   it('解析后端原样返回的 JSON 字符串', () => {
     const raw = '[{"id":"a1","content":"HashMap 底层是数组+链表","distance":0.2,"similarity":0.8}]'
     expect(parseSearchHits(raw)).toEqual([
-      { id: 'a1', content: 'HashMap 底层是数组+链表', similarity: 0.8 },
+      { id: 'a1', content: 'HashMap 底层是数组+链表', similarity: 0.8, owned: false },
     ])
   })
 
@@ -29,7 +29,9 @@ describe('parseSearchHits', () => {
 
   it('已经是数组时直接归一（上层可能先 parse 过）', () => {
     const arr = [{ id: 1, content: '  Spring 事务  ', similarity: 0.5 }]
-    expect(parseSearchHits(arr)).toEqual([{ id: '1', content: '  Spring 事务  ', similarity: 0.5 }])
+    expect(parseSearchHits(arr)).toEqual([
+      { id: '1', content: '  Spring 事务  ', similarity: 0.5, owned: false },
+    ])
   })
 
   it('只有 distance 时按 1-d 兜底（distance 越小越相似）', () => {
@@ -50,6 +52,12 @@ describe('parseSearchHits', () => {
   it('优先用后端给的 similarity，不被 score 误导（score 语义是 distance）', () => {
     const raw = '[{"id":"x","content":"A","distance":0.9,"similarity":0.1,"score":0.9}]'
     expect(parseSearchHits(raw)[0].similarity).toBe(0.1)
+  })
+
+  it('owned 只在后端明确给 true 时为 true（G-01 删除入口判据）', () => {
+    expect(parseSearchHits('[{"id":"a","content":"A","owned":true}]')[0].owned).toBe(true)
+    expect(parseSearchHits('[{"id":"b","content":"B","owned":"true"}]')[0].owned).toBe(false)
+    expect(parseSearchHits('[{"id":"c","content":"C"}]')[0].owned).toBe(false)
   })
 
   it('过滤空内容条目（脏数据不渲染空卡片）', () => {

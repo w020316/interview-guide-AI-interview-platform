@@ -20,9 +20,13 @@ describe('publicRoutes（P1-02 路由公开性判定）', () => {
     expect(isProtectedRoute('/resume/')).toBe(true)
   })
 
-  it('岗位详情 /jobs/:id 公开（分享链接可直接打开，投递/收藏时再要求登录）', () => {
-    expect(isPublicRoute('/jobs/123')).toBe(true)
-    // 但列表页本身仍需登录
+  /**
+   * G-02 说明：详情页最初计划公开，但后端详情接口需要登录（匿名会 401）。
+   * 前端单方面公开只会让访客看到报错页，因此 `/jobs/:id` 暂时仍算受保护。
+   * 待后端 SecurityConfig 开放匿名读取后再改这里（届时本用例同步反转）。
+   */
+  it('岗位详情 /jobs/:id 当前仍需登录（与后端接口口径一致）', () => {
+    expect(isProtectedRoute('/jobs/123')).toBe(true)
     expect(isProtectedRoute('/jobs')).toBe(true)
   })
 

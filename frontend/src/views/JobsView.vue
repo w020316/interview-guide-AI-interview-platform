@@ -413,6 +413,10 @@
           >
             查看投递看板 →
           </button>
+          <!-- G-02：抽屉只放摘要，完整 JD 与可分享 URL 在独立详情页 -->
+          <RouterLink class="apply-btn ghost" :to="`/jobs/${detail.id}`">
+            查看完整详情页 →
+          </RouterLink>
         </div>
       </div>
     </div>
@@ -421,7 +425,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { getErrMessage } from '../api'
 import { BaseButton, MapOpenLink, SkeletonBlock } from '../components'

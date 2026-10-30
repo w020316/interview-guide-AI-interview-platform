@@ -19,6 +19,8 @@ export interface SearchHit {
   content: string
   /** 归一化相似度 0~1；后端没给 distance 时为 null（**不是 0**） */
   similarity: number | null
+  /** 是否本人导入（G-01：仅自己的条目才显示删除入口，共享知识不可删） */
+  owned: boolean
 }
 
 function toNumberOrNull(v: unknown): number | null {
@@ -67,6 +69,7 @@ export function parseSearchHits(raw: unknown): SearchHit[] {
         similarity: similarity != null
           ? clamp01(similarity)
           : (distance == null ? null : clamp01(1 - distance)),
+        owned: it.owned === true,
       }
     })
     // 空内容是脏数据（不该出现在向量库），留着只会渲染出一个空卡片

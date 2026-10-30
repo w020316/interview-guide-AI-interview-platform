@@ -79,6 +79,13 @@
           <div class="search-item-head">
             <span class="search-rank">#{{ i + 1 }}</span>
             <span class="search-sim">相似度 {{ formatSimilarity(h.similarity) }}</span>
+            <!-- G-01：只有本人导入的条目才可删除（共享知识不可删） -->
+            <button
+              v-if="h.owned && h.id"
+              class="link-btn"
+              type="button"
+              @click="removeDoc(h.id)"
+            >删除</button>
           </div>
           <div class="search-content">{{ h.content }}</div>
         </div>
@@ -296,7 +303,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import renderMarkdown from '../utils/markdown'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import { getScoreColor } from '../utils/score'
@@ -514,6 +521,34 @@ function switchTab(t: Tab) {
     loadWrong()
   } else if (t === 'summary' && !summary.value && !summaryLoading.value) {
     loadSummary()
+  }
+}
+
+/**
+ * 删除本人导入的知识条目（G-01）。
+ *
+ * <p>此前后端已有 `DELETE /api/knowledge/{docId}`（含归属校验），但前端没有任何入口 ——
+ * 用户传错文件（别人的简历、含隐私的合同）后无法撤回，只能看着它出现在每次检索结果里。
+ * 这里只对 `owned === true` 的条目显示删除按钮，避免误删系统预置共享知识。
+ */
+async function removeDoc(docId: string) {
+  try {
+    await ElMessageBox.confirm(
+      '确定删除这条知识吗？删除后它将不再出现在检索结果中，且不可恢复。',
+      '删除知识条目',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return // 用户取消
+  }
+  try {
+    await api.delete(`/api/knowledge/${encodeURIComponent(docId)}`)
+    ElMessage.success('已删除')
+    // 局部移除 + 重新检索，保证列表与后端一致
+    searchHits.value = searchHits.value.filter((h) => h.id !== docId)
+    void loadRagStatus()
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '删除失败'))
   }
 }
 
@@ -1216,6 +1251,22 @@ function formatTime(t?: string) {
   align-items: center;
   gap: 10px;
   margin-bottom: 6px;
+}
+
+/* G-01：检索结果里的「删除」入口（仅本人导入的条目出现） */
+.link-btn {
+  margin-left: auto;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--c-danger);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+.link-btn:hover {
+  background: var(--c-danger-bg, rgba(239, 68, 68, 0.08));
 }
 
 .search-rank {

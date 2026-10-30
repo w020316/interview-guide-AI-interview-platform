@@ -37,8 +37,14 @@ const PROTECTED_BASES: readonly string[] = [
   '/admin',
 ]
 
-/** 公开的业务子路径（形如 `/jobs/123` 的岗位详情，分享链接要能直接被打开） */
-const PUBLIC_PREFIXES: readonly string[] = ['/jobs/']
+/**
+ * 公开的业务子路径。
+ *
+ * <p>G-02 原计划把 `/jobs/:id` 做成公开页，但后端 `GET /api/jobs/{id}` 位于
+ * `anyRequest().authenticated()` 之下，匿名访问会 401 —— 前端单方面「公开」只会
+ * 让访客看到一个报错页。因此这里**暂不登记该前缀**；待后端开放匿名读取时再加。
+ */
+const PUBLIC_PREFIXES: readonly string[] = []
 
 /** 去掉末尾斜杠（`/resume/` 与 `/resume` 等价） */
 function normalize(pathname: string): string {
