@@ -176,6 +176,8 @@ export interface ResumeImportPlatform {
   scheme?: string
   webUrl: string
   exportHint: string
+  /** 唤起后留在页面上的取件向导：用户在对应 App 内导出的 3 步 */
+  steps: string[]
 }
 
 /**
@@ -194,6 +196,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     scheme: 'bosszp://',
     webUrl: 'https://www.zhipin.com/',
     exportHint: '打开「我的简历」，有导出入口就导出 PDF；没有导出入口时直接截图，回来用「选择相册截图」。',
+    steps: [
+      '在 App 里打开「我的」→「我的简历」',
+      '有「导出 / 下载附件简历」就存成 PDF；没有导出入口就截图',
+      '切回浏览器，在下面选择 PDF 的位置',
+    ],
   },
   {
     key: 'liepin',
@@ -202,6 +209,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     scheme: 'liepin://',
     webUrl: 'https://www.liepin.com/',
     exportHint: '在「我的简历」里找附件简历或导出；找不到时截图，回来用「选择相册截图」。',
+    steps: [
+      '在 App 里打开「我的简历」→「附件简历」',
+      '点「下载 / 导出」，把 PDF 存到手机',
+      '切回浏览器，在下面选择 PDF 的位置',
+    ],
   },
   {
     key: 'zhaopin',
@@ -210,6 +222,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     scheme: 'zhaopin://',
     webUrl: 'https://www.zhaopin.com/',
     exportHint: '在「简历中心」下载附件简历为 PDF；没有下载入口时截图。',
+    steps: [
+      '在 App 里打开「简历中心」',
+      '在「附件简历」里点下载，存成 PDF',
+      '切回浏览器，在下面选择 PDF 的位置',
+    ],
   },
   {
     key: '51job',
@@ -218,6 +235,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     scheme: '51job://',
     webUrl: 'https://www.51job.com/',
     exportHint: '在「我的简历」导出附件简历为 PDF；没有导出入口时截图。',
+    steps: [
+      '在 App 里打开「我的」→「我的简历」',
+      '在「附件简历」里导出为 PDF',
+      '切回浏览器，在下面选择 PDF 的位置',
+    ],
   },
   {
     key: 'wechat',
@@ -226,6 +248,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     scheme: 'weixin://',
     webUrl: 'https://weixin.qq.com/',
     exportHint: '文件传输助手里的简历：手机上直接截图；或到电脑浏览器打开 filehelper.weixin.qq.com 下载后上传。',
+    steps: [
+      '在微信里打开「文件传输助手」，找到简历 PDF',
+      '点右上角「…」→「用其他应用打开」或「存储到文件」',
+      '切回浏览器，在下面选择 PDF 的位置',
+    ],
   },
   {
     key: 'wps',
@@ -234,8 +261,83 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     scheme: 'wps://',
     webUrl: 'https://www.wps.cn/',
     exportHint: '打开文档 → 分享 → 导出为 PDF，保存到手机后再回来上传。',
+    steps: [
+      '在 WPS 里打开简历文档',
+      '点「分享」→「导出为 PDF」，保存到手机',
+      '切回浏览器，在下面选择 PDF 的位置',
+    ],
   },
 ]
+
+/* ─────────────────────────────────────────────────────────────
+   取件向导（v1.90.1）
+
+   真机问题：点「在 App 中打开」后跳进了对应 App，回到浏览器却没有任何后续，
+   用户不知道要做什么、也不知道刚才的导出文件在哪。
+   这里把「App 内导出 3 步」和「回来后选哪个位置」固定下来：
+   - 面板在唤起的同时打开，切回来时仍在；
+   - 位置列表点击后统一打开系统文件选择器（网页无法直接读取其他 App 的文件），
+     不同位置只影响提示文案，不假装能直连微信 / WPS。
+   ───────────────────────────────────────────────────────────── */
+
+export type IntakeSheetPhase = 'launching' | 'ready'
+
+export interface ResumePickSource {
+  key: string
+  /** 列表左侧角标（沿用平台卡片的文字角标风格） */
+  badge: string
+  label: string
+  /** 系统选择器里该去哪找 */
+  where: string
+}
+
+export const RESUME_PICK_SOURCES: ResumePickSource[] = [
+  {
+    key: 'wechat',
+    badge: '微',
+    label: '微信 · 文件传输助手',
+    where: '发到「文件传输助手」后，在选择器里点「微信」或在「最近」里找；iOS 需先「存储到文件」',
+  },
+  {
+    key: 'files',
+    badge: '文',
+    label: '手机文件 · 下载',
+    where: '在「下载」「我的文件」或「浏览」里找刚保存的 PDF',
+  },
+  {
+    key: 'wps',
+    badge: 'WPS',
+    label: 'WPS · 云文档',
+    where: '先在 WPS 里导出到手机；在选择器里点「WPS」或对应网盘',
+  },
+  {
+    key: 'other',
+    badge: '⋯',
+    label: '其他位置',
+    where: '直接打开系统文件选择器，自己找 PDF',
+  },
+]
+
+export const INTAKE_SHEET_NOTE =
+  '点任意位置都会打开系统文件选择器：网页无法直接读取其他 App 的文件，需要你在选择器里选中 PDF。'
+
+export function intakeSheetTitle(phase: IntakeSheetPhase, name: string): string {
+  return phase === 'launching' ? `正在尝试打开「${name}」` : `从「${name}」导出 PDF`
+}
+
+/**
+ * 面板引导文案。
+ * 交棒信号只能说明「页面被切走过」，不能断言用户已经完成导出，
+ * 因此 handedOff 时用问句，不做「你已导出」的承诺。
+ */
+export function intakeSheetLead(phase: IntakeSheetPhase, handedOff: boolean): string {
+  if (phase === 'launching') {
+    return '按下面 3 步导出后切回本页；这个面板会保留，回来直接选择 PDF。'
+  }
+  return handedOff
+    ? '已经切回来了？选一个 PDF 所在的位置，打开系统选择器继续。'
+    : '没有跳转成功也不影响：可以重试或打开网页版；也可以先在 App 里导出，再回来选择。'
+}
 
 export type LaunchMode = 'app' | 'web' | 'blocked'
 

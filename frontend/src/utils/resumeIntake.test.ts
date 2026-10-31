@@ -12,7 +12,11 @@ import {
   uploadPercent,
   validateResumeFile,
   validateResumeFileDeep,
+  INTAKE_SHEET_NOTE,
   RESUME_IMPORT_PLATFORMS,
+  RESUME_PICK_SOURCES,
+  intakeSheetLead,
+  intakeSheetTitle,
 } from './resumeIntake'
 
 describe('utils/resumeIntake · 文件识别与校验', () => {
@@ -135,6 +139,46 @@ describe('utils/resumeIntake · 平台清单', () => {
     expect(RESUME_IMPORT_PLATFORMS.find((p) => p.key === 'wechat')?.scheme).toBe('weixin://')
     for (const platform of RESUME_IMPORT_PLATFORMS) {
       if (platform.scheme) expect(platform.scheme).toMatch(/^[a-z0-9]+:\/\/$/i)
+    }
+  })
+})
+
+describe('utils/resumeIntake · 取件向导（v1.90.1）', () => {
+  it('每个平台都带 3 步可执行的导出指引', () => {
+    for (const platform of RESUME_IMPORT_PLATFORMS) {
+      expect(platform.steps).toHaveLength(3)
+      for (const step of platform.steps) {
+        expect(step.trim().length).toBeGreaterThan(6)
+      }
+      expect(platform.steps[2]).toContain('切回浏览器')
+    }
+  })
+
+  it('位置清单覆盖微信 / 本机 / WPS / 其他，且都说明该去哪找', () => {
+    expect(RESUME_PICK_SOURCES.map((s) => s.key)).toEqual(['wechat', 'files', 'wps', 'other'])
+    for (const source of RESUME_PICK_SOURCES) {
+      expect(source.label.length).toBeGreaterThan(0)
+      expect(source.badge.length).toBeGreaterThan(0)
+      expect(source.where.length).toBeGreaterThan(8)
+    }
+    expect(INTAKE_SHEET_NOTE).toContain('系统文件选择器')
+    expect(INTAKE_SHEET_NOTE).toContain('无法直接读取其他 App 的文件')
+  })
+
+  it('面板文案：唤起中用进行时，交棒用问句，不断言已导出或未安装', () => {
+    expect(intakeSheetTitle('launching', 'BOSS直聘')).toBe('正在尝试打开「BOSS直聘」')
+    expect(intakeSheetTitle('ready', 'BOSS直聘')).toBe('从「BOSS直聘」导出 PDF')
+    expect(intakeSheetLead('ready', true)).toContain('已经切回来了')
+    expect(intakeSheetLead('ready', false)).toContain('没有跳转成功也不影响')
+
+    for (const text of [
+      intakeSheetLead('launching', false),
+      intakeSheetLead('ready', true),
+      intakeSheetLead('ready', false),
+    ]) {
+      expect(text).not.toContain('未安装')
+      expect(text).not.toContain('未检测到')
+      expect(text).not.toContain('已导出')
     }
   })
 })

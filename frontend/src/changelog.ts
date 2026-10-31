@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.90.0'
+export const CURRENT_VERSION = '1.90.1'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.90.1',
+    date: '2026-10-31',
+    title: '版本 1.90.1 · 唤起 App 后有取件向导',
+    items: [
+      { text: '手机端点「在 App 中打开」后会立即出现取件向导：列出在对应 App 里导出简历 PDF 的 3 个步骤；切回浏览器时面板仍在，不会再出现「跳进了 App、回来就没反应」', level: 'user' },
+      { text: '导出后可以按「微信文件传输助手 / 手机文件·下载 / WPS 云文档 / 其他位置」选择 PDF 在哪，再打开系统文件选择器；没有 PDF 导出入口时，向导里也能一键改用截图识别', level: 'user' },
+      { text: '前端：新增 ResumeIntakeSheet 取件向导与 RESUME_PICK_SOURCES、各平台 steps 数据；唤起时同步打开面板，交棒完成或 visibility 恢复后切到就绪态；位置列表只影响选择器里的寻找提示，不宣称网页能直连第三方 App 取文件', level: 'tech' },
+      { text: '测试：新增 ResumeIntakeSheet 用例 5 例；扩展 resumeIntake（平台步骤、位置清单、文案边界）与 ResumePlatformImport（面板出现、交棒后就绪、位置选择、截图兜底）用例', level: 'tech' },
+    ],
+  },
   {
     version: '1.90.0',
     date: '2026-10-31',

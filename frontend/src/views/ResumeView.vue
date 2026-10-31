@@ -40,6 +40,7 @@
           :target-job="targetJob"
           :disabled="uploadState.phase !== 'idle' || importLoading"
           @pick-file="triggerThirdPartyPicker"
+          @pick-image="triggerAlbumPicker"
           @imported="onThirdPartyImported"
         />
 

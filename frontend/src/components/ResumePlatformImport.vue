@@ -46,6 +46,14 @@
       <button v-if="showContinue" type="button" class="pi-inline-link" @click="$emit('pick-file')">
         选择刚导出的 PDF
       </button>
+      <button
+        v-if="sheetPlatform && !sheetOpen"
+        type="button"
+        class="pi-inline-link"
+        @click="reopenSheet"
+      >
+        查看取件步骤
+      </button>
     </p>
 
     <div class="pi-link">
@@ -85,6 +93,21 @@
       <p v-if="linkError" class="pi-error" role="alert">{{ linkError }}</p>
       <p class="pi-note">{{ boundaryNote }}</p>
     </div>
+
+    <!-- v1.90.1：唤起 App 后不再把用户丢在 App 里。面板在唤起的同时打开，
+         切回来时给出「PDF 在哪」的位置选择；位置只是提示，真正取文件仍走系统选择器。 -->
+    <ResumeIntakeSheet
+      :open="sheetOpen"
+      :phase="sheetPhase"
+      :platform="sheetPlatform"
+      :handed-off="sheetHandedOff"
+      :busy="!!launchingKey"
+      @close="closeSheet"
+      @pick-file="onSheetPickFile"
+      @pick-image="onSheetPickImage"
+      @retry="onSheetRetry"
+      @open-web="onSheetOpenWeb"
+    />
   </section>
 </template>
 
@@ -93,6 +116,7 @@ import { computed, onUnmounted, ref, shallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
 import BaseInput from './BaseInput.vue'
+import ResumeIntakeSheet from './ResumeIntakeSheet.vue'
 import {
   HANDOFF_WINDOW_MS,
   createHandoffWatcher,
@@ -110,6 +134,7 @@ import {
   decideLaunchMode,
   isHttpUrl,
   returnFromAppHint,
+  type IntakeSheetPhase,
   type ResumeImportPlatform,
 } from '../utils/resumeIntake'
 
@@ -126,6 +151,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'pick-file'): void
+  (e: 'pick-image'): void
   (e: 'imported', payload: ImportedPayload): void
 }>()
 
@@ -141,6 +167,13 @@ const launchingKey = ref('')
 const launchNotice = ref('')
 const launchNoticeWarn = ref(false)
 const showContinue = ref(false)
+
+/* 取件向导：唤起即打开，交棒/返回后切到「选 PDF 位置」 */
+const sheetOpen = ref(false)
+const sheetPhase = ref<IntakeSheetPhase>('launching')
+const sheetPlatform = ref<ResumeImportPlatform | null>(null)
+const sheetHandedOff = ref(false)
+let returnHandler: (() => void) | null = null
 
 const linkUrl = ref('')
 const authorized = ref(false)
@@ -177,6 +210,63 @@ function setNotice(text: string, warn: boolean) {
   launchNoticeWarn.value = warn
 }
 
+function openSheet(platform: ResumeImportPlatform) {
+  sheetPlatform.value = platform
+  sheetPhase.value = 'launching'
+  sheetHandedOff.value = false
+  sheetOpen.value = true
+}
+
+function closeSheet() {
+  sheetOpen.value = false
+}
+
+/** 关掉面板后仍可从提示里找回步骤，不必再触发一次 App 唤起 */
+function reopenSheet() {
+  if (!sheetPlatform.value) return
+  sheetPhase.value = 'ready'
+  sheetOpen.value = true
+}
+
+/**
+ * 从 App 切回页面时立刻把面板切到就绪态。
+ * 2.5s 的判定定时器在后台标签页会被节流，单靠它会让用户回来后仍看到「正在打开」。
+ */
+function watchAppReturn() {
+  stopWatchingAppReturn()
+  returnHandler = () => {
+    if (document.visibilityState !== 'visible') return
+    if (!watcher.value?.handedOff) return
+    sheetHandedOff.value = true
+    sheetPhase.value = 'ready'
+  }
+  document.addEventListener('visibilitychange', returnHandler)
+}
+
+function stopWatchingAppReturn() {
+  if (returnHandler) document.removeEventListener('visibilitychange', returnHandler)
+  returnHandler = null
+}
+
+function onSheetPickFile() {
+  sheetOpen.value = false
+  emit('pick-file')
+}
+
+function onSheetPickImage() {
+  sheetOpen.value = false
+  emit('pick-image')
+}
+
+function onSheetRetry() {
+  if (sheetPlatform.value && !launchingKey.value) launch(sheetPlatform.value)
+}
+
+function onSheetOpenWeb() {
+  sheetOpen.value = false
+  if (sheetPlatform.value) openWeb(sheetPlatform.value)
+}
+
 function openWeb(platform: ResumeImportPlatform) {
   const win = window.open(platform.webUrl, '_blank', 'noopener,noreferrer')
   if (!win) {
@@ -205,9 +295,11 @@ function launch(platform: ResumeImportPlatform) {
   launchingKey.value = platform.key
   showContinue.value = true
   setNotice(`正在尝试打开「${platform.name}」…`, false)
+  openSheet(platform)
 
   const current = createHandoffWatcher()
   watcher.value = current
+  watchAppReturn()
   try {
     window.location.href = platform.scheme
   } catch {
@@ -221,6 +313,9 @@ function launch(platform: ResumeImportPlatform) {
     } else {
       setNotice(launchFallbackHint(platform.name), true)
     }
+    sheetHandedOff.value = current.handedOff
+    sheetPhase.value = 'ready'
+    stopWatchingAppReturn()
     current.dispose()
     if (watcher.value === current) watcher.value = null
     launchingKey.value = ''
@@ -278,6 +373,8 @@ async function submitLink() {
 
 onUnmounted(() => {
   clearTimers()
+  stopWatchingAppReturn()
+  sheetOpen.value = false
   watcher.value?.dispose()
   watcher.value = null
 })

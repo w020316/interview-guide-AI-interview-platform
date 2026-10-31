@@ -13,8 +13,10 @@ vi.mock('element-plus', () => ({
 }))
 
 import ResumePlatformImport from './ResumePlatformImport.vue'
+import { HANDOFF_WINDOW_MS } from '../utils/appLaunch'
 import {
   RESUME_IMPORT_PLATFORMS,
+  RESUME_PICK_SOURCES,
   THIRD_PARTY_BOUNDARY_NOTE,
   THIRD_PARTY_CONSENT_TEXT,
 } from '../utils/resumeIntake'
@@ -55,6 +57,9 @@ beforeEach(() => {
 
 afterEach(() => {
   setUa(DESKTOP_UA)
+  vi.useRealTimers()
+  document.body.innerHTML = ''
+  document.body.style.overflow = ''
   vi.restoreAllMocks()
 })
 
@@ -171,5 +176,83 @@ describe('ResumePlatformImport · 移动端唤起', () => {
     expect(open).toHaveBeenCalledWith(RESUME_IMPORT_PLATFORMS[0].webUrl, '_blank', 'noopener,noreferrer')
     expect(wrapper.find('.pi-notice').text()).toContain('内置浏览器')
     expect(wrapper.find('.pi-notice').text()).toContain('已为你打开网页版入口')
+  })
+})
+
+describe('ResumePlatformImport · 取件向导（v1.90.1）', () => {
+  function launchButton(wrapper: ReturnType<typeof mountComponent>) {
+    return wrapper.findAll('button').find((b) => b.text().includes('在 App 中打开'))!
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  it('手机端点「在 App 中打开」立即出现向导：平台步骤 + 位置选择', async () => {
+    setUa(MOBILE_UA)
+    const wrapper = mountComponent()
+    await launchButton(wrapper).trigger('click')
+
+    const sheet = document.querySelector('.ri-sheet')
+    expect(sheet).not.toBeNull()
+    expect(sheet!.textContent).toContain('正在尝试打开「BOSS直聘」')
+    expect(sheet!.querySelectorAll('.ri-step')).toHaveLength(3)
+    expect(sheet!.querySelectorAll('.ri-source')).toHaveLength(RESUME_PICK_SOURCES.length)
+    expect(sheet!.textContent).toContain('文件传输助手')
+    wrapper.unmount()
+  })
+
+  it('交棒后切到就绪态并提示已切回；选位置后关闭向导并请求选择文件', async () => {
+    setUa(MOBILE_UA)
+    const wrapper = mountComponent()
+    await launchButton(wrapper).trigger('click')
+
+    window.dispatchEvent(new Event('blur'))
+    vi.advanceTimersByTime(HANDOFF_WINDOW_MS)
+    await flushPromises()
+
+    expect(document.querySelector('.ri-title')!.textContent).toBe('从「BOSS直聘」导出 PDF')
+    expect(document.querySelector('.ri-lead')!.textContent).toContain('已经切回来了')
+
+    ;(document.querySelectorAll('.ri-source')[0] as HTMLButtonElement).click()
+    await flushPromises()
+    expect(wrapper.emitted('pick-file')).toHaveLength(1)
+    expect(document.querySelector('.ri-sheet')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('关闭向导后可从提示里的「查看取件步骤」重新打开，不再次唤起', async () => {
+    setUa(MOBILE_UA)
+    const wrapper = mountComponent()
+    await launchButton(wrapper).trigger('click')
+    vi.advanceTimersByTime(HANDOFF_WINDOW_MS)
+    await flushPromises()
+
+    ;(document.querySelector('.ri-close') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(document.querySelector('.ri-sheet')).toBeNull()
+
+    const reopen = wrapper.findAll('button').find((b) => b.text().includes('查看取件步骤'))
+    expect(reopen).toBeTruthy()
+    await reopen!.trigger('click')
+    expect(document.querySelector('.ri-sheet')).not.toBeNull()
+    expect(document.querySelector('.ri-title')!.textContent).toBe('从「BOSS直聘」导出 PDF')
+    wrapper.unmount()
+  })
+
+  it('没交棒时给出兜底；向导里「用截图识别」转发 pick-image', async () => {
+    setUa(MOBILE_UA)
+    const wrapper = mountComponent()
+    await launchButton(wrapper).trigger('click')
+
+    vi.advanceTimersByTime(HANDOFF_WINDOW_MS)
+    await flushPromises()
+    expect(document.querySelector('.ri-lead')!.textContent).toContain('没有跳转成功也不影响')
+
+    ;(document.querySelectorAll('.ri-foot-btn')[0] as HTMLButtonElement).click()
+    await flushPromises()
+    expect(wrapper.emitted('pick-image')).toHaveLength(1)
+    expect(document.querySelector('.ri-sheet')).toBeNull()
+    wrapper.unmount()
   })
 })
