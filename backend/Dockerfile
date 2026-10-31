@@ -44,4 +44,9 @@ ENV JAVA_OPTS="-Xmx220m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+UseConta
 ENV SPRING_PROFILES_ACTIVE=prod
 
 # 启动命令（显式指定 prod profile，避免环境变量未生效）
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar --spring.profiles.active=prod --server.port=${PORT:-8080}"]
+#
+# ⚠️⚠️ M5 演练临时改动（2026-10-31 第二轮）：任务中心开关。Render 服务上的
+#    APP_TASK_CENTER_ENABLED=false 优先级高于 application.yml，改 yml 默认值或字面量 true
+#    都会被它覆盖；JVM 系统属性优先级高于环境变量，故用 -D 真正打开。
+#    **演练结束必须删除 -Dapp.task-center.enabled=true 并再次部署。**
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dapp.task-center.enabled=true -jar app.jar --spring.profiles.active=prod --server.port=${PORT:-8080}"]
