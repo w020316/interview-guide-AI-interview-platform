@@ -141,6 +141,21 @@ class InterviewServiceTest {
         }
 
         @Test
+        @DisplayName("P1-3：regenerate=true 跳过缓存读取，强制调用 AI 并把新结果写回缓存")
+        void generateQuestions_regenerate_skipsCacheRead() {
+            when(valueOperations.get(anyString())).thenReturn("[{\"question\":\"old\"}]");
+
+            String result = service.generateQuestions(USER_ID, RESUME, JOB, COUNT, "", "", true);
+
+            assertThat(result).isEqualTo(AI_RAW_RESPONSE);
+            // 关键：连读都不读缓存，否则「重新生成」会被 1 小时缓存原样顶回来
+            verify(valueOperations, never()).get(anyString());
+            verify(chatClient).prompt();
+            // 新结果仍写回同一缓存键，后续普通请求拿到最新一批
+            verify(valueOperations).set(anyString(), eq(AI_RAW_RESPONSE), eq(1L), any());
+        }
+
+        @Test
         @DisplayName("缓存未命中时调用 AI 并写入缓存")
         void generateQuestions_cacheMiss_callsAiAndWritesCache() {
             when(valueOperations.get(anyString())).thenReturn(null);

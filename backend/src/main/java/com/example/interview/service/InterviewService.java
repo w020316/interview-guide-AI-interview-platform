@@ -95,27 +95,41 @@ public class InterviewService {
      */
     public String generateQuestions(String userId, String resumeText, String jobDescription, int count,
                                     String difficulty, String focusCategories) {
+        return generateQuestions(userId, resumeText, jobDescription, count, difficulty, focusCategories, false);
+    }
+
+    /**
+     * 生成面试题（P1-3：支持显式「重新生成」）。
+     *
+     * @param regenerate 为 true 时跳过缓存读取、强制重新调用 AI。只为幂等键掺随机量还不够：
+     *                   缓存 key 只由内容派生，不复用旧缓存用户仍会拿到同一批题。
+     *                   新结果照常写回缓存，让后续同内容请求拿到最新一批。
+     */
+    public String generateQuestions(String userId, String resumeText, String jobDescription, int count,
+                                    String difficulty, String focusCategories, boolean regenerate) {
         long start = System.nanoTime();
         boolean cacheHit = false;
         try {
             // 1. 缓存命中（key 包含 userId 防跨用户串扰；难度/聚焦项纳入 key，保证不同自适应产出不同题目）
             String cacheKey = QUESTION_CACHE + userId + ":" + HashUtil.sha256Short(
                     resumeText + jobDescription + count + "|d=" + difficulty + "|f=" + focusCategories);
-            try {
-                Object cached = redisTemplate.opsForValue().get(cacheKey);
-                if (cached != null) {
-                    cacheHit = true;
-                    return cached.toString();
-                }
-            } catch (Exception e) {
-                log.warn("Redis 缓存读取失败，降级进程内缓存/直连 AI：{}", e.getMessage());
-                // v1.34.1（P2-5）：Redis 不可用时改用进程内兜底缓存。
-                // 仅在「读取抛异常」时启用（而非 Redis 返回 null 的正常未命中），
-                // 确保 Redis 正常时行为与改造前完全一致，不引入双写不一致。
-                String fallback = redisFallbackCache.get(cacheKey);
-                if (fallback != null) {
-                    cacheHit = true;
-                    return fallback;
+            if (!regenerate) {
+                try {
+                    Object cached = redisTemplate.opsForValue().get(cacheKey);
+                    if (cached != null) {
+                        cacheHit = true;
+                        return cached.toString();
+                    }
+                } catch (Exception e) {
+                    log.warn("Redis 缓存读取失败，降级进程内缓存/直连 AI：{}", e.getMessage());
+                    // v1.34.1（P2-5）：Redis 不可用时改用进程内兜底缓存。
+                    // 仅在「读取抛异常」时启用（而非 Redis 返回 null 的正常未命中），
+                    // 确保 Redis 正常时行为与改造前完全一致，不引入双写不一致。
+                    String fallback = redisFallbackCache.get(cacheKey);
+                    if (fallback != null) {
+                        cacheHit = true;
+                        return fallback;
+                    }
                 }
             }
 

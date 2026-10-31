@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -55,7 +56,7 @@ class InterviewQuestionTaskHandlerTest {
     @Test
     @DisplayName("合法 payload → 透传全部参数给 AI 链路，并返回结果正文")
     void execute_ok() {
-        when(interviewService.generateQuestions(eq("u1"), eq("resume"), eq("jd"), eq(5), eq("HARD"), eq("技术基础")))
+        when(interviewService.generateQuestions(eq("u1"), eq("resume"), eq("jd"), eq(5), eq("HARD"), eq("技术基础"), eq(false)))
                 .thenReturn("[{\"question\":\"q\"}]");
 
         AiTaskOutcome outcome = handler.execute(task(payload("resume", "jd", 5, "HARD", "技术基础")));
@@ -65,16 +66,27 @@ class InterviewQuestionTaskHandlerTest {
     }
 
     @Test
+    @DisplayName("P1-3：payload 里 regenerate=true → 透传给 AI 链路，不能命中旧缓存")
+    void execute_regenerate_forwarded() {
+        when(interviewService.generateQuestions(eq("u1"), eq("r"), eq("j"), eq(5), eq(""), eq(""), eq(true)))
+                .thenReturn("[]");
+
+        handler.execute(task("{\"resumeText\":\"r\",\"jobDescription\":\"j\",\"count\":5,\"regenerate\":true}"));
+
+        verify(interviewService).generateQuestions(eq("u1"), eq("r"), eq("j"), eq(5), eq(""), eq(""), eq(true));
+    }
+
+    @Test
     @DisplayName("数量越界 → 夹到 1–20（与同步接口一致，而不是直接拒绝）")
     void execute_clampsCount() {
         when(interviewService.generateQuestions(anyString(), anyString(), anyString(), anyInt(),
-                anyString(), anyString())).thenReturn("[]");
+                anyString(), anyString(), anyBoolean())).thenReturn("[]");
 
         handler.execute(task(payload("r", "j", 0, "", "")));
-        verify(interviewService).generateQuestions(eq("u1"), eq("r"), eq("j"), eq(1), eq(""), eq(""));
+        verify(interviewService).generateQuestions(eq("u1"), eq("r"), eq("j"), eq(1), eq(""), eq(""), eq(false));
 
         handler.execute(task(payload("r", "j", 99, "", "")));
-        verify(interviewService).generateQuestions(eq("u1"), eq("r"), eq("j"), eq(20), eq(""), eq(""));
+        verify(interviewService).generateQuestions(eq("u1"), eq("r"), eq("j"), eq(20), eq(""), eq(""), eq(false));
     }
 
     @Test
@@ -87,7 +99,7 @@ class InterviewQuestionTaskHandlerTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("格式错误");
         verify(interviewService, never()).generateQuestions(anyString(), anyString(), anyString(),
-                anyInt(), anyString(), anyString());
+                anyInt(), anyString(), anyString(), anyBoolean());
     }
 
     @Test
@@ -97,7 +109,7 @@ class InterviewQuestionTaskHandlerTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("不能为空");
         verify(interviewService, never()).generateQuestions(anyString(), anyString(), anyString(),
-                anyInt(), anyString(), anyString());
+                anyInt(), anyString(), anyString(), anyBoolean());
     }
 
     @Test
@@ -113,7 +125,7 @@ class InterviewQuestionTaskHandlerTest {
     @DisplayName("AI 返回空白 → 503（可重试；空串不能算成功）")
     void execute_blankResponse() {
         when(interviewService.generateQuestions(anyString(), anyString(), anyString(), anyInt(),
-                anyString(), anyString())).thenReturn("   ");
+                anyString(), anyString(), anyBoolean())).thenReturn("   ");
 
         assertThatThrownBy(() -> handler.execute(task(payload("r", "j", 5, "", ""))))
                 .isInstanceOf(BusinessException.class)

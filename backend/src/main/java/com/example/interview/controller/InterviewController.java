@@ -146,8 +146,10 @@ public class InterviewController {
         String focusCategories = request.get("focusCategories") == null ? "" : request.get("focusCategories").toString();
 
         String userId = currentUserId();
+        // P1-3：显式「重新生成」必须跳过 InterviewService 的内容缓存，否则同步链路照样返回旧题
         String result = interviewService.generateQuestions(
-                userId, resumeText, jobDescription, count, difficulty, focusCategories);
+                userId, resumeText, jobDescription, count, difficulty, focusCategories,
+                RequestFieldUtil.isTrue(request, "regenerate"));
         return Result.success(result);
     }
 

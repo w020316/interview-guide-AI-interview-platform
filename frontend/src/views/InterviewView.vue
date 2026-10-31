@@ -285,7 +285,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage, apiBaseUrl } from '../api'
@@ -490,22 +490,38 @@ function removeImage() {
   imageSignedUrl.value = ''
 }
 
-// 通过 ?sessionId= 载入指定会话（从收藏题库发起面试等入口进入时直接答题）
-onMounted(() => {
+/**
+ * 处理 ?taskId=（含 regenerate=1）入口，返回是否接管了本次路由。
+ *
+ * <p>任务中心是浮层抽屉：在 /interview 页内点「去看看 / 重新生成」只会改变 query，
+ * 组件不会重新挂载。只在 onMounted 处理会让「重新生成」静默无效
+ * （2026-10-31 演练实测：任务确实新建了，但页面没有任何反应），故同时挂 watch。
+ */
+function handleTaskQuery(): boolean {
   // P1-2：从任务中心「去看看」回来时带 ?taskId=，直接取回结果并重建会话
   const rawTaskId = typeof route.query.taskId === 'string' ? route.query.taskId : ''
   const taskId = Number(rawTaskId)
-  if (rawTaskId && Number.isInteger(taskId) && taskId > 0) {
-    // P1-3：抽屉里的「重新生成」会带上 regenerate=1，用原任务入参快照重跑一次
-    const regenerate = route.query.regenerate === '1'
-    void recoverFromTask(taskId, regenerate)
-    // 与 sessionId 同口径：清掉 query，避免刷新重复触发（重复恢复会多建出空会话）
-    const q = { ...route.query }
-    delete q.taskId
-    delete q.regenerate
-    router.replace({ path: '/interview', query: q }).catch(() => {})
-    return
-  }
+  if (!rawTaskId || !Number.isInteger(taskId) || taskId <= 0) return false
+  // P1-3：抽屉里的「重新生成」会带上 regenerate=1，用原任务入参快照重跑一次
+  const regenerate = route.query.regenerate === '1'
+  void recoverFromTask(taskId, regenerate)
+  // 与 sessionId 同口径：清掉 query，避免刷新重复触发（重复恢复会多建出空会话）
+  const q = { ...route.query }
+  delete q.taskId
+  delete q.regenerate
+  router.replace({ path: '/interview', query: q }).catch(() => {})
+  return true
+}
+
+// 同页任务入口：query 变化不会重新挂载组件，必须靠 watch 触发
+watch(
+  () => [route.query.taskId, route.query.regenerate],
+  () => { handleTaskQuery() },
+)
+
+// 通过 ?sessionId= 载入指定会话（从收藏题库发起面试等入口进入时直接答题）
+onMounted(() => {
+  if (handleTaskQuery()) return
   const sid = typeof route.query.sessionId === 'string' ? route.query.sessionId : ''
   if (sid) {
     resumeSession(sid)
@@ -975,7 +991,7 @@ async function recoverFromTask(taskId: number, regenerate = false) {
         body: { ...body, regenerate: true },
         label: 'AI 出题',
         route: '/interview',
-        fallback: () => api.post('/api/interview/questions', body,
+        fallback: () => api.post('/api/interview/questions', { ...body, regenerate: true },
           { timeout: AI_TIMEOUT }) as unknown as Promise<string>,
       })
     } else {

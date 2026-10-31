@@ -127,7 +127,8 @@ class InterviewControllerRateLimitTest {
 
         // 超限请求绝不能进入业务链路：恰好 1 次 AI 生成调用（第 2 次没有多烧一次）
         verify(interviewService, org.mockito.Mockito.times(1)).generateQuestions(
-                any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), any(), any());
+                any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), any(), any(),
+                org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     private static Map<String, Object> questionsBody() {

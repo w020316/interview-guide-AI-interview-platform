@@ -201,8 +201,9 @@ class InterviewTaskControllerTest {
         }
 
         org.mockito.ArgumentCaptor<String> keys = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.ArgumentCaptor<String> payloads = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(taskService, org.mockito.Mockito.times(4))
-                .create(eq(USER), eq(AiTaskTypes.INTERVIEW_QUESTIONS), keys.capture(), anyString(), eq(2));
+                .create(eq(USER), eq(AiTaskTypes.INTERVIEW_QUESTIONS), keys.capture(), payloads.capture(), eq(2));
         java.util.List<String> captured = keys.getAllValues();
 
         org.assertj.core.api.Assertions.assertThat(captured.get(0))
@@ -214,5 +215,13 @@ class InterviewTaskControllerTest {
         org.assertj.core.api.Assertions.assertThat(captured.get(2))
                 .as("regenerate 的键不能与普通请求相同")
                 .isNotEqualTo(captured.get(0));
+
+        // 只绕开幂等键还不够：执行器必须知道要跳过内容缓存，否则新任务仍会原样复制旧题（P1-3 复盘）
+        org.assertj.core.api.Assertions.assertThat(payloads.getAllValues().get(0))
+                .as("普通请求的 payload 不应要求重新生成")
+                .contains("\"regenerate\":false");
+        org.assertj.core.api.Assertions.assertThat(payloads.getAllValues().get(2))
+                .as("regenerate=true 必须写进 payload，供执行器跳过缓存")
+                .contains("\"regenerate\":true");
     }
 }

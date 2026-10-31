@@ -57,7 +57,7 @@ public class InterviewQuestionTaskHandler implements AiTaskHandler {
         Payload payload = parse(task.getPayload());
         String text = interviewService.generateQuestions(
                 task.getUserId(), payload.resumeText(), payload.jobDescription(),
-                payload.count(), payload.difficulty(), payload.focusCategories());
+                payload.count(), payload.difficulty(), payload.focusCategories(), payload.regenerate());
         if (text == null || text.isBlank()) {
             // 空响应不能算成功：前端拿到空串只会显示「生成失败」，且任务会被标成已完成
             throw new BusinessException(503, "AI 返回内容为空，请稍后重试");
@@ -91,7 +91,7 @@ public class InterviewQuestionTaskHandler implements AiTaskHandler {
 
     /** payload 快照（字段与 {@code InterviewService#generateQuestions} 入参一一对应） */
     public record Payload(String resumeText, String jobDescription, int count,
-                          String difficulty, String focusCategories) {
+                          String difficulty, String focusCategories, boolean regenerate) {
         public Payload {
             // 数量越界一律夹到合法区间：与同步接口的夹取行为保持一致，而不是拒绝请求
             count = Math.max(MIN_COUNT, Math.min(MAX_COUNT, count));

@@ -162,7 +162,7 @@ class InterviewControllerTest {
         @Test
         @DisplayName("合法入参返回 200 + 面试题结果")
         void questions_validInput_returns200() throws Exception {
-            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5, "", ""))
+            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5, "", "", false))
                     .thenReturn("{\"questions\":[]}");
 
             String body = objectMapper.writeValueAsString(Map.of(
@@ -177,9 +177,27 @@ class InterviewControllerTest {
         }
 
         @Test
+        @DisplayName("P1-3：regenerate=true 必须透传给 service（同步链路也要绕过内容缓存）")
+        void questions_regenerate_forwardedToService() throws Exception {
+            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5, "", "", true))
+                    .thenReturn("[]");
+
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "resumeText", "我的简历", "jobDescription", "Java 后端", "regenerate", true));
+
+            mockMvc.perform(post("/api/interview/questions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+
+            verify(interviewService).generateQuestions(USER_ID, "我的简历", "Java 后端", 5, "", "", true);
+        }
+
+        @Test
         @DisplayName("count 为负数时夹紧为 1 仍返回 200")
         void questions_negativeCount_clampedTo1() throws Exception {
-            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 1, "", ""))
+            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 1, "", "", false))
                     .thenReturn("[]");
 
             String body = objectMapper.writeValueAsString(Map.of(
@@ -195,7 +213,7 @@ class InterviewControllerTest {
         @Test
         @DisplayName("count 超过 20 时夹紧为 20 仍返回 200")
         void questions_countOver20_clampedTo20() throws Exception {
-            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 20, "", ""))
+            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 20, "", "", false))
                     .thenReturn("[]");
 
             String body = objectMapper.writeValueAsString(Map.of(
@@ -211,7 +229,7 @@ class InterviewControllerTest {
         @Test
         @DisplayName("count 缺失时默认 5 仍返回 200")
         void questions_missingCount_defaultsTo5() throws Exception {
-            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5, "", ""))
+            when(interviewService.generateQuestions(USER_ID, "我的简历", "Java 后端", 5, "", "", false))
                     .thenReturn("[]");
 
             String body = objectMapper.writeValueAsString(Map.of(

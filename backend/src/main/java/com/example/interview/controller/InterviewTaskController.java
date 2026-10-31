@@ -122,9 +122,12 @@ public class InterviewTaskController {
         // P1-3（2026-10-31）：显式「重新生成」时掺一个随机量，绕过最长 7 天的复用窗口 ——
         // 否则用户拿着同一份简历永远只能拿到同一批题，且界面没有任何提示。
         // 不传 regenerate 时语义完全不变。
+        boolean regenerate = RequestFieldUtil.isTrue(request, "regenerate");
+        // 执行器据此跳过 InterviewService 的内容缓存，否则新任务只会原样复制旧题
+        payload.put("regenerate", regenerate);
         String key = "q:" + HashUtil.sha256Short(resumeText + "|" + jobDescription + "|" + count
                 + "|d=" + difficulty.trim().toUpperCase() + "|f=" + focusCategories.trim()
-                + (isRegenerate(request) ? "|r=" + java.util.UUID.randomUUID() : ""));
+                + (regenerate ? "|r=" + java.util.UUID.randomUUID() : ""));
         return createTask(userId, AiTaskTypes.INTERVIEW_QUESTIONS, key, payload);
     }
 
@@ -180,20 +183,6 @@ public class InterviewTaskController {
         data.put("taskId", task.getId());
         data.put("status", task.getStatus());
         return Result.success(data);
-    }
-
-    /**
-     * 是否显式要求「重新生成」（P1-3）。
-     *
-     * <p>只认布尔 {@code true} 或字符串 {@code "true"}：前端偶尔会把表单值原样带上来，
-     * 若把 {@code "false"} 也当真值，幂等就彻底失效了 —— 每次点击都新建任务、重复计费。
-     */
-    private static boolean isRegenerate(Map<String, Object> request) {
-        Object raw = request.get("regenerate");
-        if (raw == null) {
-            return false;
-        }
-        return Boolean.TRUE.equals(raw) || "true".equalsIgnoreCase(String.valueOf(raw).trim());
     }
 
     private void requireRateLimit(String userId) {

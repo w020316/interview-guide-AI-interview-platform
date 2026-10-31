@@ -107,4 +107,18 @@ public final class RequestFieldUtil {
     public static String numberTypeError(String key) {
         return key + " 类型错误，期望数字";
     }
+
+    /**
+     * 读取布尔开关字段，只认布尔 {@code true} 或字符串 {@code "true"}。
+     *
+     * <p>前端偶尔会把表单值原样带上来，若把字符串 {@code "false"} 也当真值，
+     * 依赖该开关的语义（如 regenerate 绕过幂等）会彻底失效。其余类型一律视为 false。
+     */
+    public static boolean isTrue(Map<String, ?> src, String key) {
+        Object v = src.get(key);
+        if (v == null) {
+            return false;
+        }
+        return Boolean.TRUE.equals(v) || "true".equalsIgnoreCase(String.valueOf(v).trim());
+    }
 }
