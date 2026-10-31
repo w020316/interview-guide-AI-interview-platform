@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   MAX_RESUME_BYTES,
+  MAX_SCREENSHOT_COUNT,
   decideLaunchMode,
   detectMobileOS,
   extensionOf,
@@ -12,7 +13,10 @@ import {
   uploadPercent,
   validateResumeFile,
   validateResumeFileDeep,
+  validateScreenshotBatch,
   INTAKE_SHEET_NOTE,
+  INTAKE_SHOT_CTA,
+  INTAKE_SHOT_TITLE,
   RESUME_IMPORT_PLATFORMS,
   RESUME_PICK_SOURCES,
   intakeSheetLead,
@@ -117,7 +121,7 @@ describe('utils/resumeIntake · 移动端识别与唤起决策', () => {
   it('从 App 返回文案不断言「未安装 / 未检测到」', () => {
     const hint = returnFromAppHint('BOSS直聘')
     expect(hint).toContain('BOSS直聘')
-    expect(hint).toContain('选择已导出的 PDF')
+    expect(hint).toContain('选择截图，AI 直接提取')
     expect(hint).not.toContain('未安装')
     expect(hint).not.toContain('未检测到')
   })
@@ -143,14 +147,15 @@ describe('utils/resumeIntake · 平台清单', () => {
   })
 })
 
-describe('utils/resumeIntake · 取件向导（v1.90.1）', () => {
-  it('每个平台都带 3 步可执行的导出指引', () => {
+describe('utils/resumeIntake · 取件向导（v1.90.1 / v1.90.2）', () => {
+  it('每个平台都带 3 步可执行指引，主路径为截图（不用下载保存）', () => {
     for (const platform of RESUME_IMPORT_PLATFORMS) {
       expect(platform.steps).toHaveLength(3)
       for (const step of platform.steps) {
         expect(step.trim().length).toBeGreaterThan(6)
       }
-      expect(platform.steps[2]).toContain('切回浏览器')
+      expect(platform.steps[1]).toContain('截图')
+      expect(platform.steps[2]).toContain('切回本页')
     }
   })
 
@@ -167,8 +172,8 @@ describe('utils/resumeIntake · 取件向导（v1.90.1）', () => {
 
   it('面板文案：唤起中用进行时，交棒用问句，不断言已导出或未安装', () => {
     expect(intakeSheetTitle('launching', 'BOSS直聘')).toBe('正在尝试打开「BOSS直聘」')
-    expect(intakeSheetTitle('ready', 'BOSS直聘')).toBe('从「BOSS直聘」导出 PDF')
-    expect(intakeSheetLead('ready', true)).toContain('已经切回来了')
+    expect(intakeSheetTitle('ready', 'BOSS直聘')).toBe('从「BOSS直聘」提取简历')
+    expect(intakeSheetLead('ready', true)).toContain('切回来了')
     expect(intakeSheetLead('ready', false)).toContain('没有跳转成功也不影响')
 
     for (const text of [
@@ -180,5 +185,34 @@ describe('utils/resumeIntake · 取件向导（v1.90.1）', () => {
       expect(text).not.toContain('未检测到')
       expect(text).not.toContain('已导出')
     }
+  })
+
+  it('截图主路径文案强调「不用下载保存」，PDF 仅作次路径', () => {
+    expect(INTAKE_SHOT_TITLE).toContain('不用下载')
+    expect(INTAKE_SHOT_CTA).toContain('截图')
+    expect(INTAKE_SHEET_NOTE).toContain('不用下载或保存')
+  })
+})
+
+describe('utils/resumeIntake · 多张截图合并（v1.90.2）', () => {
+  const shot = (name: string, size = 200 * 1024) => ({ name, size, type: 'image/png' })
+
+  it('1–5 张截图通过校验', () => {
+    expect(validateScreenshotBatch([shot('1.png')]).ok).toBe(true)
+    const five = Array.from({ length: MAX_SCREENSHOT_COUNT }, (_, i) => shot(`${i}.png`))
+    expect(validateScreenshotBatch(five).ok).toBe(true)
+  })
+
+  it('空批次与超过 5 张被拒绝，并说明原因', () => {
+    expect(validateScreenshotBatch([]).error).toContain('至少选择一张')
+    const six = Array.from({ length: MAX_SCREENSHOT_COUNT + 1 }, (_, i) => shot(`${i}.png`))
+    expect(validateScreenshotBatch(six).error).toContain(`最多合并 ${MAX_SCREENSHOT_COUNT} 张`)
+  })
+
+  it('混入非图片或合计超过 10MB 时拒绝', () => {
+    expect(validateScreenshotBatch([shot('1.png'), { name: 'resume.pdf', size: 100 }]).error)
+      .toContain('不是截图')
+    const heavy = [shot('1.png', 6 * 1024 * 1024), shot('2.png', 6 * 1024 * 1024)]
+    expect(validateScreenshotBatch(heavy).error).toContain('合计不能超过 10MB')
   })
 })

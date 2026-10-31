@@ -27,15 +27,32 @@
         </header>
 
         <div class="ri-scroll">
-          <ol class="ri-steps" aria-label="在 App 里的导出步骤">
+          <ol class="ri-steps" aria-label="在 App 里的取件步骤">
             <li v-for="(step, i) in platform.steps" :key="i" class="ri-step">
               <span class="ri-step-no" aria-hidden="true">{{ i + 1 }}</span>
               <span class="ri-step-text">{{ step }}</span>
             </li>
           </ol>
 
+          <div class="ri-shot">
+            <div class="ri-shot-head">
+              <p class="ri-shot-title">{{ shotTitle }}</p>
+              <span class="ri-shot-badge">{{ shotBadge }}</span>
+            </div>
+            <p class="ri-shot-desc">{{ shotDesc }}</p>
+            <button type="button" class="ri-shot-btn" @click="emit('pick-image')">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2" />
+                <circle cx="9" cy="10" r="1.6" stroke="currentColor" stroke-width="2" />
+                <path d="M4 17l5-5 4 4 3-3 4 4" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              {{ shotCta }}
+            </button>
+          </div>
+
           <div class="ri-pick">
-            <p class="ri-pick-title">PDF 现在在哪？选一个位置继续</p>
+            <p class="ri-pick-title">已有 PDF？选它现在的位置</p>
             <div class="ri-sources">
               <button
                 v-for="source in sources"
@@ -57,9 +74,6 @@
         </div>
 
         <div class="ri-foot">
-          <button type="button" class="ri-foot-btn ri-foot-wide" @click="emit('pick-image')">
-            没有 PDF？用截图识别
-          </button>
           <button type="button" class="ri-foot-btn" :disabled="busy" @click="emit('retry')">
             {{ busy ? '正在唤起…' : '重新打开 App' }}
           </button>
@@ -74,6 +88,9 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import {
   INTAKE_SHEET_NOTE,
+  INTAKE_SHOT_CTA,
+  INTAKE_SHOT_DESC,
+  INTAKE_SHOT_TITLE,
   RESUME_PICK_SOURCES,
   intakeSheetLead,
   intakeSheetTitle,
@@ -106,6 +123,10 @@ const leadId = `${idBase}-lead`
 
 const sources = RESUME_PICK_SOURCES
 const pickNote = INTAKE_SHEET_NOTE
+const shotTitle = INTAKE_SHOT_TITLE
+const shotDesc = INTAKE_SHOT_DESC
+const shotCta = INTAKE_SHOT_CTA
+const shotBadge = '推荐 · 不用下载'
 const sheetEl = ref<HTMLElement | null>(null)
 
 const title = computed(() => (
@@ -287,6 +308,65 @@ onUnmounted(release)
   min-width: 0;
 }
 
+.ri-shot {
+  margin-top: 14px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--brand-primary);
+  border-radius: var(--radius-lg);
+  background: var(--brand-primary-light);
+}
+
+.ri-shot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ri-shot-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-primary-active);
+}
+
+.ri-shot-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--c-surface);
+  color: var(--brand-primary-active);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ri-shot-desc {
+  margin: 6px 0 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
+}
+
+.ri-shot-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 46px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--brand-primary);
+  color: var(--c-on-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ri-shot-btn:hover {
+  background: var(--brand-primary-hover);
+}
+
 .ri-pick {
   margin-top: 16px;
   padding-top: 14px;
@@ -402,13 +482,6 @@ onUnmounted(release)
 .ri-foot-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-
-.ri-foot-wide {
-  grid-column: 1 / -1;
-  border-color: var(--brand-primary);
-  color: var(--brand-primary-active);
-  font-weight: 600;
 }
 
 @keyframes ri-fade {

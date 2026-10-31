@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -485,6 +486,108 @@ class ResumeControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(500))
                     .andExpect(jsonPath("$.message").value("简历解析失败，请检查文件是否损坏或重试"));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/resume/upload-images 多图合并识别（v1.90.2）")
+    class UploadImages {
+
+        private static final byte[] PNG_BYTES =
+                new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0};
+
+        private MockMultipartFile shot(String name) {
+            return new MockMultipartFile("files", name, "image/png", PNG_BYTES);
+        }
+
+        @Test
+        @DisplayName("多张截图按顺序合并文本，只分析一次、只入库一次")
+        void multiImage_mergesTextsAndAnalyzesOnce() throws Exception {
+            when(resumeImageOcrService.extractText(any()))
+                    .thenReturn(new com.example.interview.service.ResumeImageOcrService.OcrResult("第一页：教育背景", false))
+                    .thenReturn(new com.example.interview.service.ResumeImageOcrService.OcrResult("第二页：工作经历", false));
+            when(resumeAnalysisService.analyze(any(), any(), any())).thenReturn("{\"score\":86}");
+
+            mockMvc.perform(multipart("/api/resume/upload-images")
+                            .file(shot("p1.png")).file(shot("p2.png")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.resumeText").value("第一页：教育背景\n\n第二页：工作经历"))
+                    .andExpect(jsonPath("$.data.fromImage").value("true"))
+                    .andExpect(jsonPath("$.data.imageCount").value("2"))
+                    .andExpect(jsonPath("$.data.imageTruncated").doesNotExist());
+
+            verify(resumeAnalysisService, times(1)).analyze(any(), any(), any());
+            verify(resumeService, times(1))
+                    .saveResume(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("超过 5 张返回 400，不调用识别")
+        void multiImage_moreThanFive_returns400() throws Exception {
+            var request = multipart("/api/resume/upload-images");
+            for (int i = 1; i <= 6; i++) request.file(shot("p" + i + ".png"));
+
+            mockMvc.perform(request)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("一次最多合并 5 张截图"));
+
+            verify(resumeImageOcrService, never()).extractText(any());
+        }
+
+        @Test
+        @DisplayName("非图片文件返回 400（该入口只收截图）")
+        void multiImage_nonImage_returns400() throws Exception {
+            MockMultipartFile pdf = new MockMultipartFile(
+                    "files", "resume.pdf", "application/pdf", "%PDF-1.4".getBytes());
+
+            mockMvc.perform(multipart("/api/resume/upload-images").file(pdf))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("这里只接受简历截图（PNG / JPG / WEBP / GIF）"));
+        }
+
+        @Test
+        @DisplayName("某张识别失败返回 502 + 真实原因，不静默丢弃该页")
+        void multiImage_ocrFailure_returns502() throws Exception {
+            when(resumeImageOcrService.extractText(any()))
+                    .thenThrow(new IllegalStateException("图片识别未配置（app.ai.vision.api-key 为空）"));
+
+            mockMvc.perform(multipart("/api/resume/upload-images").file(shot("p1.png")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(502))
+                    .andExpect(jsonPath("$.message").value("图片识别未配置（app.ai.vision.api-key 为空）"));
+
+            verify(resumeAnalysisService, never()).analyze(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("截图里没有文字时返回 400，不产生空简历")
+        void multiImage_blankText_returns400() throws Exception {
+            when(resumeImageOcrService.extractText(any()))
+                    .thenReturn(new com.example.interview.service.ResumeImageOcrService.OcrResult("   ", false));
+
+            mockMvc.perform(multipart("/api/resume/upload-images").file(shot("p1.png")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("截图里没有识别到文字，请重新截取清晰、完整的简历页面"));
+
+            verify(resumeAnalysisService, never()).analyze(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("任一张被输出上限截断时标记 imageTruncated")
+        void multiImage_truncatedFlag() throws Exception {
+            when(resumeImageOcrService.extractText(any()))
+                    .thenReturn(new com.example.interview.service.ResumeImageOcrService.OcrResult("第一页", false))
+                    .thenReturn(new com.example.interview.service.ResumeImageOcrService.OcrResult("第二页", true));
+            when(resumeAnalysisService.analyze(any(), any(), any())).thenReturn("{\"score\":70}");
+
+            mockMvc.perform(multipart("/api/resume/upload-images")
+                            .file(shot("p1.png")).file(shot("p2.png")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.imageTruncated").value("true"));
         }
     }
 

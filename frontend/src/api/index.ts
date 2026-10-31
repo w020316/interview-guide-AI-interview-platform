@@ -48,6 +48,8 @@ const api = axios.create({
 const AI_PATH_FRAGMENTS: readonly string[] = [
   '/api/resume/analyze',
   '/api/resume/upload',
+  // v1.90.2：多张截图合并识别（OCR 多图 + 一次分析，耗时不亚于单图）
+  '/api/resume/upload-images',
   '/api/resume/optimize',
   '/api/resume/import-url',
   // v1.90.0：第三方平台分享链接 → 抓取 PDF → 解析 → AI 分析

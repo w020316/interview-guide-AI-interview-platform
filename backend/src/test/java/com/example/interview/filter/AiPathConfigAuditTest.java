@@ -77,6 +77,8 @@ class AiPathConfigAuditTest {
         // ResumeController:88 / :112 / :252 / :297 / :447
         table.put("/api/resume/analyze", "/api/resume/analyze");
         table.put("/api/resume/upload", "/api/resume/upload");
+        // ResumeController POST /upload-images（v1.90.2：多张截图合并识别）
+        table.put("/api/resume/upload-images", "/api/resume/upload-images");
         table.put("/api/resume/optimize", "/api/resume/optimize");
         table.put("/api/resume/import-url", "/api/resume/import-url");
         // ResumeController:447 POST /import-pdf-url（v1.90.0：抓取第三方分享的 PDF + AI 分析）

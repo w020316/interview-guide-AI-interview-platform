@@ -4,6 +4,8 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ResumeIntakeSheet from './ResumeIntakeSheet.vue'
 import {
   INTAKE_SHEET_NOTE,
+  INTAKE_SHOT_CTA,
+  INTAKE_SHOT_TITLE,
   RESUME_IMPORT_PLATFORMS,
   RESUME_PICK_SOURCES,
 } from '../utils/resumeIntake'
@@ -51,9 +53,22 @@ describe('ResumeIntakeSheet · 取件向导', () => {
     expect(dialog!.textContent).toContain('BOSS直聘')
     expect(dialog!.querySelectorAll('.ri-step')).toHaveLength(3)
     expect(dialog!.querySelectorAll('.ri-source')).toHaveLength(RESUME_PICK_SOURCES.length)
-    expect(dialog!.textContent).toContain('文件传输助手')
+    expect(dialog!.textContent).toContain('手机文件 · 下载')
     expect(dialog!.textContent).toContain(INTAKE_SHEET_NOTE)
     expect(document.body.style.overflow).toBe('hidden')
+  })
+
+  it('截图提取是主路径：主按钮标注「不用下载保存」并抛出 pick-image', async () => {
+    const wrapperRef = mountSheet()
+    await flushPromises()
+    const primary = document.querySelector('.ri-shot-btn') as HTMLButtonElement
+    expect(primary).not.toBeNull()
+    expect(primary.textContent).toContain(INTAKE_SHOT_CTA)
+    expect(document.querySelector('.ri-shot')!.textContent).toContain(INTAKE_SHOT_TITLE)
+
+    primary.click()
+    await wrapperRef.vm.$nextTick()
+    expect(wrapperRef.emitted('pick-image')).toHaveLength(1)
   })
 
   it('唤起中显示「正在尝试打开」，就绪且已交棒时提示切回', async () => {
@@ -61,8 +76,8 @@ describe('ResumeIntakeSheet · 取件向导', () => {
     expect(document.querySelector('.ri-title')!.textContent).toContain('正在尝试打开「BOSS直聘」')
 
     await wrapperRef.setProps({ phase: 'ready', handedOff: true })
-    expect(document.querySelector('.ri-title')!.textContent).toBe('从「BOSS直聘」导出 PDF')
-    expect(document.querySelector('.ri-lead')!.textContent).toContain('已经切回来了')
+    expect(document.querySelector('.ri-title')!.textContent).toBe('从「BOSS直聘」提取简历')
+    expect(document.querySelector('.ri-lead')!.textContent).toContain('切回来了')
   })
 
   it('点位置行抛出 pick-file（带所选位置）', async () => {
@@ -77,12 +92,13 @@ describe('ResumeIntakeSheet · 取件向导', () => {
 
   it('截图 / 重试 / 网页版 / 关闭各自抛出事件', async () => {
     const wrapperRef = mountSheet()
+    ;(document.querySelector('.ri-shot-btn') as HTMLButtonElement).click()
     const footButtons = Array.from(
       document.querySelectorAll('.ri-foot-btn'),
     ) as HTMLButtonElement[]
+    expect(footButtons).toHaveLength(2)
     footButtons[0].click()
     footButtons[1].click()
-    footButtons[2].click()
     ;(document.querySelector('.ri-close') as HTMLButtonElement).click()
     await wrapperRef.vm.$nextTick()
 

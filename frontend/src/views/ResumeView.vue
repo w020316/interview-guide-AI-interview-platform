@@ -98,13 +98,15 @@
               accept=".pdf,.txt,.html,.htm,.md,.markdown,image/png,image/jpeg,image/webp,image/gif"
               @change="onNativeFile"
             />
-            <!-- 相册专用入口：accept="image/*" 在手机上会直接打开相册 -->
+            <!-- 相册专用入口：accept="image/*" 在手机上会直接打开相册；
+                 multiple 支持一次选 1–5 张截图（多页简历合并识别） -->
             <input
               ref="albumFileInput"
               class="hidden-file"
               type="file"
               accept="image/*"
-              @change="onNativeFile"
+              multiple
+              @change="onAlbumFiles"
             />
             <!-- 第三方平台导出后的 PDF：由 ResumePlatformImport 的「选择已导出的 PDF」触发 -->
             <input
@@ -425,6 +427,7 @@ import {
   formatFileSize,
   uploadPercent,
   validateResumeFileDeep,
+  validateScreenshotBatch,
 } from '../utils/resumeIntake'
 import renderMarkdown from '../utils/markdown'
 import { BaseInput, BaseTextarea } from '../components'
@@ -545,6 +548,19 @@ function onNativeFile(e: Event) {
 /** 触发相册选择：手机上直接打开相册，桌面端退化为普通文件选择器 */
 function triggerAlbumPicker() {
   albumFileInput.value?.click()
+}
+
+/** 相册多选（v1.90.2）：1 张复用单图通道，多张走合并识别 */
+function onAlbumFiles(e: Event) {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (!files.length) return
+  if (files.length > 1) {
+    void handleMultiUpload(files)
+    return
+  }
+  void handleUpload(files[0], { allowImages: true })
 }
 
 /** 第三方平台「选择已导出的 PDF」入口 */
@@ -725,7 +741,10 @@ async function handleUpload(file: File, options: { allowImages?: boolean } = {})
         if (uploadState.percent >= 100) uploadState.phase = 'parsing'
       },
     }) as unknown as string
-    if (handleResult(data)) ElMessage.success('分析完成')
+    if (handleResult(data)) {
+      ElMessage.success('分析完成')
+      warnIfImageTruncated(data)
+    }
   } catch (e: unknown) {
     uploadError.value = getErrMessage(e, '上传失败')
   } finally {
@@ -733,6 +752,70 @@ async function handleUpload(file: File, options: { allowImages?: boolean } = {})
     uploadState.phase = 'idle'
   }
   return false
+}
+
+/**
+ * 多张截图合并识别（v1.90.2）。
+ *
+ * 截屏由系统自动写入相册，用户不需要导出或下载保存；BOSS 等在线简历常跨 2–3 屏，
+ * 这里允许一次选 1–5 张，后端按顺序识别并合并文本后只分析一次。
+ */
+async function handleMultiUpload(files: File[]) {
+  if (uploadState.phase !== 'idle' || loading.value) {
+    ElMessage.warning('正在处理上一个文件，请稍候')
+    return false
+  }
+
+  const batch = validateScreenshotBatch(files)
+  if (!batch.ok) {
+    uploadError.value = batch.error || '截图校验未通过，请重新选择'
+    return false
+  }
+
+  uploadError.value = ''
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+  uploadState.fileName = `${files.length} 张截图`
+  uploadState.percent = 0
+  uploadState.loaded = 0
+  uploadState.total = totalSize
+  uploadState.phase = 'validating'
+
+  loading.value = true
+  result.value = ''
+  uploadState.phase = 'uploading'
+  const form = new FormData()
+  for (const file of files) form.append('files', file)
+  form.append('targetJob', targetJob.value)
+  try {
+    const data = await api.post('/api/resume/upload-images', form, {
+      timeout: AI_TIMEOUT,
+      onUploadProgress: (event) => {
+        const total = event.total && event.total > 0 ? event.total : totalSize
+        uploadState.loaded = event.loaded
+        uploadState.total = total
+        uploadState.percent = uploadPercent(event.loaded, total)
+        if (uploadState.percent >= 100) uploadState.phase = 'parsing'
+      },
+    })
+    if (handleResult(data)) {
+      ElMessage.success('截图识别完成')
+      warnIfImageTruncated(data)
+    }
+  } catch (e: unknown) {
+    uploadError.value = getErrMessage(e, '截图识别失败')
+  } finally {
+    loading.value = false
+    uploadState.phase = 'idle'
+  }
+  return false
+}
+
+/** 识别被模型输出上限截断时如实提示，不静默丢弃内容 */
+function warnIfImageTruncated(data: unknown) {
+  if (data && typeof data === 'object'
+    && (data as Record<string, unknown>).imageTruncated === 'true') {
+    ElMessage.warning('截图内容较长，识别结果已截断；可减少张数或改用 PDF 后重试')
+  }
 }
 
 async function analyzeText() {

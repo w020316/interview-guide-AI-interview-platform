@@ -135,6 +135,50 @@ export async function validateResumeFileDeep(
   }
 }
 
+/* ─────────────────────────────────────────────────────────────
+   多张截图合并识别（v1.90.2）
+   手机截屏由系统自动进相册，用户不需要导出/下载；BOSS 等在线简历常跨 2–3 屏，
+   允许一次选多张。后端单请求上限 10MB（spring.multipart.max-request-size）。
+   ───────────────────────────────────────────────────────────── */
+
+export const MAX_SCREENSHOT_COUNT = 5
+export const MAX_SCREENSHOT_TOTAL_BYTES = 10 * 1024 * 1024
+
+export interface ScreenshotBatchCheck {
+  ok: boolean
+  error?: string
+}
+
+export function validateScreenshotBatch(files: ResumeFileLike[]): ScreenshotBatchCheck {
+  if (!files.length) {
+    return { ok: false, error: '请至少选择一张简历截图' }
+  }
+  if (files.length > MAX_SCREENSHOT_COUNT) {
+    return { ok: false, error: `一次最多合并 ${MAX_SCREENSHOT_COUNT} 张截图` }
+  }
+  let total = 0
+  for (const file of files) {
+    const check = validateResumeFile(file, { allowImages: true })
+    if (!check.ok) {
+      return { ok: false, error: check.error }
+    }
+    if (check.kind !== 'image') {
+      return {
+        ok: false,
+        error: `「${file.name}」不是截图。这个入口只收 PNG / JPG / WEBP / GIF`,
+      }
+    }
+    total += file.size
+  }
+  if (total > MAX_SCREENSHOT_TOTAL_BYTES) {
+    return {
+      ok: false,
+      error: `多张截图合计不能超过 10MB（当前 ${formatFileSize(total)}），请减少张数或压缩后再试`,
+    }
+  }
+  return { ok: true }
+}
+
 /** 真实上传百分比：0–100；total 未知时返回 0（视图用不确定态） */
 export function uploadPercent(loaded: number, total: number): number {
   if (!Number.isFinite(total) || total <= 0) return 0
@@ -176,7 +220,7 @@ export interface ResumeImportPlatform {
   scheme?: string
   webUrl: string
   exportHint: string
-  /** 唤起后留在页面上的取件向导：用户在对应 App 内导出的 3 步 */
+  /** 唤起后留在页面上的取件向导：在对应 App 内 3 步取到简历（截图优先） */
   steps: string[]
 }
 
@@ -184,9 +228,9 @@ export interface ResumeImportPlatform {
  * 平台清单。
  *
  * 说明：BOSS / 猎聘 / 智联 / 前程无忧都没有公开的简历导出 API，
- * 这里只做「唤起 App + 告诉用户在哪导出」与「打开网页版」，
- * 不承诺自动登录、不保存第三方登录态（DESIGN.md §7）。
- * scheme 有效性由 App 方维护，所有入口都保留网页版与本机文件兜底。
+ * 也没有任何 Web 标准能读取其他 App 的私有文件。手机截屏由系统自动写入相册，
+ * 是唯一「不用导出、不用下载保存」的通用取件动作，因此步骤默认教截图，
+ * 能导出 PDF 时再走文件选择器。不承诺自动登录、不保存第三方登录态（DESIGN.md §7）。
  */
 export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
   {
@@ -195,11 +239,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     badge: 'BOSS',
     scheme: 'bosszp://',
     webUrl: 'https://www.zhipin.com/',
-    exportHint: '打开「我的简历」，有导出入口就导出 PDF；没有导出入口时直接截图，回来用「选择相册截图」。',
+    exportHint: '「我的简历」通常不提供导出：直接分屏截图（自动进相册），回来选截图；有导出入口时选 PDF 更准。',
     steps: [
       '在 App 里打开「我的」→「我的简历」',
-      '有「导出 / 下载附件简历」就存成 PDF；没有导出入口就截图',
-      '切回浏览器，在下面选择 PDF 的位置',
+      '分屏截图 1–3 张（截屏自动进相册，不用导出下载）',
+      '切回本页，点「选择截图，AI 直接提取」',
     ],
   },
   {
@@ -208,11 +252,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     badge: '猎',
     scheme: 'liepin://',
     webUrl: 'https://www.liepin.com/',
-    exportHint: '在「我的简历」里找附件简历或导出；找不到时截图，回来用「选择相册截图」。',
+    exportHint: '「我的简历」多数只支持在线查看：直接分屏截图，回来选截图；能导出附件简历时选 PDF 更准。',
     steps: [
-      '在 App 里打开「我的简历」→「附件简历」',
-      '点「下载 / 导出」，把 PDF 存到手机',
-      '切回浏览器，在下面选择 PDF 的位置',
+      '在 App 里打开「我的简历」',
+      '分屏截图 1–3 张（自动进相册，不用下载）',
+      '切回本页，点「选择截图，AI 直接提取」',
     ],
   },
   {
@@ -221,11 +265,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     badge: '智',
     scheme: 'zhaopin://',
     webUrl: 'https://www.zhaopin.com/',
-    exportHint: '在「简历中心」下载附件简历为 PDF；没有下载入口时截图。',
+    exportHint: '「简历中心」可在线上查看：直接分屏截图，回来选截图；能下载附件简历时选 PDF 更准。',
     steps: [
       '在 App 里打开「简历中心」',
-      '在「附件简历」里点下载，存成 PDF',
-      '切回浏览器，在下面选择 PDF 的位置',
+      '分屏截图 1–3 张（自动进相册，不用下载）',
+      '切回本页，点「选择截图，AI 直接提取」',
     ],
   },
   {
@@ -234,11 +278,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     badge: '51',
     scheme: '51job://',
     webUrl: 'https://www.51job.com/',
-    exportHint: '在「我的简历」导出附件简历为 PDF；没有导出入口时截图。',
+    exportHint: '「我的简历」多数只支持在线查看：直接分屏截图，回来选截图；能导出附件简历时选 PDF 更准。',
     steps: [
       '在 App 里打开「我的」→「我的简历」',
-      '在「附件简历」里导出为 PDF',
-      '切回浏览器，在下面选择 PDF 的位置',
+      '分屏截图 1–3 张（自动进相册，不用下载）',
+      '切回本页，点「选择截图，AI 直接提取」',
     ],
   },
   {
@@ -247,11 +291,11 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     badge: '微',
     scheme: 'weixin://',
     webUrl: 'https://weixin.qq.com/',
-    exportHint: '文件传输助手里的简历：手机上直接截图；或到电脑浏览器打开 filehelper.weixin.qq.com 下载后上传。',
+    exportHint: '文件传输助手里的简历：逐页截图最省事；也可以「存储到文件」后选 PDF，或到电脑版 filehelper.weixin.qq.com 取件。',
     steps: [
-      '在微信里打开「文件传输助手」，找到简历 PDF',
-      '点右上角「…」→「用其他应用打开」或「存储到文件」',
-      '切回浏览器，在下面选择 PDF 的位置',
+      '在微信里打开「文件传输助手」里的简历',
+      '逐页截图（自动进相册，不用「保存到文件」）',
+      '切回本页选截图；已有 PDF 文件也可直接选',
     ],
   },
   {
@@ -260,21 +304,23 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     badge: 'WPS',
     scheme: 'wps://',
     webUrl: 'https://www.wps.cn/',
-    exportHint: '打开文档 → 分享 → 导出为 PDF，保存到手机后再回来上传。',
+    exportHint: '文档已在 WPS 里：逐页截图最省事；也可以「分享」→「导出为 PDF」后回来选择文件。',
     steps: [
       '在 WPS 里打开简历文档',
-      '点「分享」→「导出为 PDF」，保存到手机',
-      '切回浏览器，在下面选择 PDF 的位置',
+      '逐页截图（自动进相册），或「分享」→「导出为 PDF」',
+      '切回本页选截图；已有 PDF 也可直接选',
     ],
   },
 ]
 
 /* ─────────────────────────────────────────────────────────────
-   取件向导（v1.90.1）
+   取件向导（v1.90.1 / v1.90.2）
 
-   真机问题：点「在 App 中打开」后跳进了对应 App，回到浏览器却没有任何后续，
-   用户不知道要做什么、也不知道刚才的导出文件在哪。
-   这里把「App 内导出 3 步」和「回来后选哪个位置」固定下来：
+   真机问题：点「在 App 中打开」后跳进了对应 App，回到浏览器却没有任何后续；
+   即使有后续，原来的主路径也要求用户先导出、再下载保存，手机端多一道门槛。
+
+   现在的主路径改成**截图提取**：截屏由系统自动写入相册，不需要导出或下载，
+   回到本页选中 1–5 张截图即可识别。PDF 选择保留为次路径：
    - 面板在唤起的同时打开，切回来时仍在；
    - 位置列表点击后统一打开系统文件选择器（网页无法直接读取其他 App 的文件），
      不同位置只影响提示文案，不假装能直连微信 / WPS。
@@ -295,8 +341,8 @@ export const RESUME_PICK_SOURCES: ResumePickSource[] = [
   {
     key: 'wechat',
     badge: '微',
-    label: '微信 · 文件传输助手',
-    where: '发到「文件传输助手」后，在选择器里点「微信」或在「最近」里找；iOS 需先「存储到文件」',
+    label: '微信 · 已保存的 PDF',
+    where: '微信里的 PDF 需先「保存到手机 / 存储到文件」，再在「下载」或「最近」里找',
   },
   {
     key: 'files',
@@ -308,35 +354,41 @@ export const RESUME_PICK_SOURCES: ResumePickSource[] = [
     key: 'wps',
     badge: 'WPS',
     label: 'WPS · 云文档',
-    where: '先在 WPS 里导出到手机；在选择器里点「WPS」或对应网盘',
+    where: '先在 WPS 里导出到手机；在选择器里点 WPS 或对应网盘',
   },
   {
     key: 'other',
     badge: '⋯',
     label: '其他位置',
-    where: '直接打开系统文件选择器，自己找 PDF',
+    where: '打开系统文件选择器，自己找 PDF',
   },
 ]
 
+/** 截图主路径文案（面板第一视觉层，强调「不用下载保存」） */
+export const INTAKE_SHOT_TITLE = '最快：截图提取，不用下载保存'
+export const INTAKE_SHOT_DESC =
+  '在 App 里分屏截图（1–5 张，截屏自动进相册）；回来选中截图，AI 直接提取文字并分析。'
+export const INTAKE_SHOT_CTA = '选择截图，AI 直接提取'
+
 export const INTAKE_SHEET_NOTE =
-  '点任意位置都会打开系统文件选择器：网页无法直接读取其他 App 的文件，需要你在选择器里选中 PDF。'
+  '截图提取不用下载或保存：截屏由系统自动存进相册。选 PDF 时会打开系统文件选择器——网页无法直接读取其他 App 的文件。'
 
 export function intakeSheetTitle(phase: IntakeSheetPhase, name: string): string {
-  return phase === 'launching' ? `正在尝试打开「${name}」` : `从「${name}」导出 PDF`
+  return phase === 'launching' ? `正在尝试打开「${name}」` : `从「${name}」提取简历`
 }
 
 /**
  * 面板引导文案。
- * 交棒信号只能说明「页面被切走过」，不能断言用户已经完成导出，
- * 因此 handedOff 时用问句，不做「你已导出」的承诺。
+ * 交棒信号只能说明「页面被切走过」，不能断言用户已经完成截图/导出，
+ * 因此 handedOff 时用问句，不做「你已截图」的承诺。
  */
 export function intakeSheetLead(phase: IntakeSheetPhase, handedOff: boolean): string {
   if (phase === 'launching') {
-    return '按下面 3 步导出后切回本页；这个面板会保留，回来直接选择 PDF。'
+    return '面板会保留：在 App 里截图后切回来，直接选截图，AI 提取文字。'
   }
   return handedOff
-    ? '已经切回来了？选一个 PDF 所在的位置，打开系统选择器继续。'
-    : '没有跳转成功也不影响：可以重试或打开网页版；也可以先在 App 里导出，再回来选择。'
+    ? '切回来了？直接选刚截的图（1–5 张可一起选），AI 会提取文字并分析。'
+    : '没有跳转成功也不影响：可以重试或打开网页版；也可以先截图，再回来选择。'
 }
 
 export type LaunchMode = 'app' | 'web' | 'blocked'
@@ -361,7 +413,7 @@ export function decideLaunchMode(input: LaunchDecisionInput): LaunchMode {
 
 /** 从 App 返回后的继续入口文案（不断言 App 是否安装） */
 export function returnFromAppHint(name: string): string {
-  return `已尝试打开「${name}」。导出 PDF 后切回这里，点「选择已导出的 PDF」继续`
+  return `已尝试打开「${name}」。截图后切回这里，点「选择截图，AI 直接提取」继续`
 }
 
 /** 分享链接授权说明（所有入口统一口径） */

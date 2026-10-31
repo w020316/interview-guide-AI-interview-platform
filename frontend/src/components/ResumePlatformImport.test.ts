@@ -78,9 +78,9 @@ describe('ResumePlatformImport · 平台卡片', () => {
     expect(wrapper.text()).not.toContain('在 App 中打开')
   })
 
-  it('点击「选择已导出的 PDF」抛出 pick-file（由页面打开文件选择器）', async () => {
+  it('点击「选择 PDF 文件」抛出 pick-file（由页面打开文件选择器）', async () => {
     const wrapper = mountComponent()
-    const pick = wrapper.findAll('button').find((b) => b.text().includes('选择已导出的 PDF'))
+    const pick = wrapper.findAll('button').find((b) => b.text().includes('选择 PDF 文件'))
     expect(pick).toBeTruthy()
     await pick!.trigger('click')
     expect(wrapper.emitted('pick-file')).toHaveLength(1)
@@ -198,7 +198,9 @@ describe('ResumePlatformImport · 取件向导（v1.90.1）', () => {
     expect(sheet!.textContent).toContain('正在尝试打开「BOSS直聘」')
     expect(sheet!.querySelectorAll('.ri-step')).toHaveLength(3)
     expect(sheet!.querySelectorAll('.ri-source')).toHaveLength(RESUME_PICK_SOURCES.length)
-    expect(sheet!.textContent).toContain('文件传输助手')
+    expect(sheet!.textContent).toContain('手机文件 · 下载')
+    // v1.90.2：截图提取是主路径（不用下载保存）
+    expect(sheet!.querySelector('.ri-shot-btn')!.textContent).toContain('选择截图，AI 直接提取')
     wrapper.unmount()
   })
 
@@ -211,8 +213,8 @@ describe('ResumePlatformImport · 取件向导（v1.90.1）', () => {
     vi.advanceTimersByTime(HANDOFF_WINDOW_MS)
     await flushPromises()
 
-    expect(document.querySelector('.ri-title')!.textContent).toBe('从「BOSS直聘」导出 PDF')
-    expect(document.querySelector('.ri-lead')!.textContent).toContain('已经切回来了')
+    expect(document.querySelector('.ri-title')!.textContent).toBe('从「BOSS直聘」提取简历')
+    expect(document.querySelector('.ri-lead')!.textContent).toContain('切回来了')
 
     ;(document.querySelectorAll('.ri-source')[0] as HTMLButtonElement).click()
     await flushPromises()
@@ -236,11 +238,11 @@ describe('ResumePlatformImport · 取件向导（v1.90.1）', () => {
     expect(reopen).toBeTruthy()
     await reopen!.trigger('click')
     expect(document.querySelector('.ri-sheet')).not.toBeNull()
-    expect(document.querySelector('.ri-title')!.textContent).toBe('从「BOSS直聘」导出 PDF')
+    expect(document.querySelector('.ri-title')!.textContent).toBe('从「BOSS直聘」提取简历')
     wrapper.unmount()
   })
 
-  it('没交棒时给出兜底；向导里「用截图识别」转发 pick-image', async () => {
+  it('没交棒时给出兜底；向导主按钮「选择截图」转发 pick-image', async () => {
     setUa(MOBILE_UA)
     const wrapper = mountComponent()
     await launchButton(wrapper).trigger('click')
@@ -249,7 +251,7 @@ describe('ResumePlatformImport · 取件向导（v1.90.1）', () => {
     await flushPromises()
     expect(document.querySelector('.ri-lead')!.textContent).toContain('没有跳转成功也不影响')
 
-    ;(document.querySelectorAll('.ri-foot-btn')[0] as HTMLButtonElement).click()
+    ;(document.querySelector('.ri-shot-btn') as HTMLButtonElement).click()
     await flushPromises()
     expect(wrapper.emitted('pick-image')).toHaveLength(1)
     expect(document.querySelector('.ri-sheet')).toBeNull()

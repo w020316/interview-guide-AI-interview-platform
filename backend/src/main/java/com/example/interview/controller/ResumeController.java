@@ -54,6 +54,20 @@ public class ResumeController {
     private static final Set<String> ALLOWED_IMAGE_EXTS =
             Set.of(".png", ".jpg", ".jpeg", ".webp", ".gif");
 
+    /**
+     * 多图合并识别（v1.90.2）：一次最多 5 张、合计 ≤10MB。
+     *
+     * <p>手机截屏由系统自动写入相册，不需要用户导出/下载；BOSS 等在线简历常跨 2–3 屏，
+     * 单张识别会被模型输出上限截断，所以允许一次选多张、合并文本后只做一次分析。
+     */
+    private static final int MAX_UPLOAD_IMAGES = 5;
+
+    /** 合并后的文本上限（与单张识别一致，约 3 页简历） */
+    private static final int MAX_COMBINED_TEXT_LEN = 8000;
+
+    /** 多图合计大小上限，与 spring.multipart.max-request-size 保持一致 */
+    private static final long MAX_TOTAL_IMAGE_BYTES = 10L * 1024 * 1024;
+
     /** 允许的 Content-Type */
     private static final Set<String> ALLOWED_CT = Set.of(
             "application/pdf",
@@ -228,6 +242,97 @@ public class ResumeController {
         } catch (Exception e) {
             log.error("简历解析失败 filename={}", originalFilename, e);
             return Result.error("简历解析失败，请检查文件是否损坏或重试");
+        }
+    }
+
+    /**
+     * 多张截图合并识别（v1.90.2）
+     * POST /api/resume/upload-images
+     * Form-data: files=&lt;截图 1–5 张&gt;, targetJob=&lt;岗位&gt;
+     *
+     * <p>对应手机端「不用下载保存」的取件路径：用户在任意 App 里分屏截图，
+     * 截屏自动进相册；回到本页一次选中，按顺序识别并合并文本，只调用一次分析与入库。
+     * 每张截图先走 {@link com.example.interview.service.ResumeImageOcrService}，
+     * 任一识别失败即整体失败并给出真实原因，不静默丢弃某一页。
+     */
+    @PostMapping("/upload-images")
+    public Result<Map<String, String>> uploadImages(
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam(value = "targetJob", defaultValue = "通用岗位") String targetJob) {
+
+        if (files == null || files.isEmpty()) {
+            return Result.error(400, "请至少选择一张简历截图");
+        }
+        if (files.size() > MAX_UPLOAD_IMAGES) {
+            return Result.error(400, "一次最多合并 " + MAX_UPLOAD_IMAGES + " 张截图");
+        }
+
+        long totalBytes = 0;
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                return Result.error(400, "截图不能为空");
+            }
+            totalBytes += file.getSize();
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename == null || originalFilename.isBlank()) {
+                return Result.error(400, "文件名不能为空");
+            }
+            String lower = originalFilename.toLowerCase();
+            if (ALLOWED_IMAGE_EXTS.stream().noneMatch(lower::endsWith)) {
+                return Result.error(400, "这里只接受简历截图（PNG / JPG / WEBP / GIF）");
+            }
+            String contentType = file.getContentType();
+            if (contentType != null && !contentType.toLowerCase().startsWith("image/")) {
+                return Result.error(400, "文件类型不受支持");
+            }
+        }
+        if (totalBytes > MAX_TOTAL_IMAGE_BYTES) {
+            return Result.error(400, "多张截图合计不能超过 10MB，请减少张数或压缩后再试");
+        }
+
+        try {
+            StringBuilder merged = new StringBuilder();
+            boolean ocrTruncated = false;
+            for (MultipartFile file : files) {
+                var ocr = resumeImageOcrService.extractText(file);
+                if (ocr.text() != null && !ocr.text().isBlank()) {
+                    if (merged.length() > 0) merged.append("\n\n");
+                    merged.append(ocr.text().trim());
+                }
+                ocrTruncated = ocrTruncated || ocr.truncated();
+            }
+            String resumeText = merged.toString().trim();
+            if (resumeText.isEmpty()) {
+                return Result.error(400, "截图里没有识别到文字，请重新截取清晰、完整的简历页面");
+            }
+            if (resumeText.length() > MAX_COMBINED_TEXT_LEN) {
+                resumeText = resumeText.substring(0, MAX_COMBINED_TEXT_LEN);
+                ocrTruncated = true;
+            }
+
+            String analysisJson = resumeAnalysisService.analyze(currentUserId(), resumeText, targetJob);
+            try {
+                resumeService.saveResume(currentUserId(), resumeText, targetJob, analysisJson);
+            } catch (Exception e) {
+                log.warn("多图简历识别结果持久化失败：{}", e.getMessage());
+            }
+
+            Map<String, String> payload = new HashMap<>();
+            payload.put("analysis", analysisJson);
+            payload.put("resumeText", resumeText);
+            payload.put("fromImage", "true");
+            payload.put("imageCount", String.valueOf(files.size()));
+            if (ocrTruncated) {
+                payload.put("imageTruncated", "true");
+            }
+            return Result.success(payload);
+        } catch (IllegalStateException e) {
+            return Result.error(502, e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        } catch (Exception e) {
+            log.error("多图简历识别失败", e);
+            return Result.error("简历识别失败，请检查截图是否清晰后重试");
         }
     }
 

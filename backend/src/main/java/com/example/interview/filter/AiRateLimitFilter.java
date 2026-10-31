@@ -172,6 +172,7 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
             + ",/api/knowledge/search"
             + ",/api/resume/analyze"
             + ",/api/resume/upload"
+            + ",/api/resume/upload-images"
             + ",/api/resume/optimize"
             + ",/api/resume/import-url"
             + ",/api/resume/import-pdf-url"

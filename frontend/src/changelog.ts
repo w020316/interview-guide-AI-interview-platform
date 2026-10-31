@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.90.1'
+export const CURRENT_VERSION = '1.90.2'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.90.2',
+    date: '2026-10-31',
+    title: '版本 1.90.2 · 截图直接提取，不用下载保存',
+    items: [
+      { text: '手机端从招聘 App 取简历不再要求先导出、再下载保存：在 App 里分屏截图（截屏自动进相册），回到本页点「选择截图，AI 直接提取」，一次可选 1–5 张，多页简历合并识别后再分析', level: 'user' },
+      { text: '取件向导把「截图提取」提为主路径，PDF 选择降为次路径；界面上直接说明截图不用下载保存，并如实标注「网页无法直接读取其他 App 的文件」的边界', level: 'user' },
+      { text: '后端：新增 POST /api/resume/upload-images，1–5 张截图依次 OCR 合并（合计 ≤10MB），只做一次分析与入库；任一截图识别失败整体失败，不静默丢页；限流清单三处同步', level: 'tech' },
+      { text: '前端：相册入口支持多选，新增 validateScreenshotBatch（张数/格式/合计大小校验）与多图上传进度；识别结果被模型上限截断时如实提示；补充前后端用例', level: 'tech' },
+    ],
+  },
   {
     version: '1.90.1',
     date: '2026-10-31',

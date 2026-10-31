@@ -3,8 +3,8 @@
     <div class="pi-head">
       <h4 id="pi-title" class="pi-title">从第三方平台导入</h4>
       <p class="pi-sub">
-        在招聘 App 里导出简历 PDF，再回来上传。手机端可直接唤起对应 App；没有导出入口时，
-        截图也能识别。
+        在招聘 App 里截图或导出简历，再回来上传。手机端可直接唤起对应 App；
+        截屏自动进相册，不用下载保存，回来选中就能识别。
       </p>
     </div>
 
@@ -35,7 +35,7 @@
             打开网页版
           </button>
           <button type="button" class="pi-btn pi-btn-quiet" :disabled="disabled" @click="$emit('pick-file')">
-            选择已导出的 PDF
+            选择 PDF 文件
           </button>
         </div>
       </article>
@@ -43,8 +43,8 @@
 
     <p v-if="launchNotice" class="pi-notice" :class="{ 'is-warn': launchNoticeWarn }" role="status">
       {{ launchNotice }}
-      <button v-if="showContinue" type="button" class="pi-inline-link" @click="$emit('pick-file')">
-        选择刚导出的 PDF
+      <button v-if="showContinue" type="button" class="pi-inline-link" @click="$emit('pick-image')">
+        选择截图提取
       </button>
       <button
         v-if="sheetPlatform && !sheetOpen"
@@ -95,7 +95,8 @@
     </div>
 
     <!-- v1.90.1：唤起 App 后不再把用户丢在 App 里。面板在唤起的同时打开，
-         切回来时给出「PDF 在哪」的位置选择；位置只是提示，真正取文件仍走系统选择器。 -->
+         切回来时给出继续入口；v1.90.2 起主路径为截图提取（不用下载保存），
+         PDF 选择保留为次路径；位置只是提示，真正取文件仍走系统选择器。 -->
     <ResumeIntakeSheet
       :open="sheetOpen"
       :phase="sheetPhase"
