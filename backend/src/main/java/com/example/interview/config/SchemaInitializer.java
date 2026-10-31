@@ -217,8 +217,35 @@ public class SchemaInitializer implements CommandLineRunner {
                     + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
                     + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
             "CREATE INDEX IF NOT EXISTS idx_resume_document_user ON resume_document(user_id)",
+            // ── 阶段六 M1（2026-10-30）：AI 异步任务表 ──
+            // ⚠️ 2026-10-31 补建表：此前 `CREATE TABLE ai_task` **只写进了 schema.sql**，
+            //    而 prod 是 `sql.init.mode=never` + `ddl-auto=none` —— 这张表在生产**从未建过**。
+            //    开关默认关闭把问题盖住了：线上实测 `GET /api/tasks` 返回
+            //    「数据库操作失败，请联系管理员」（500）。开关一开，所有任务接口都会这样。
+            //    两处清单的同步现已由 SchemaDdlCoverageTest 守住（扫实体自动发现，不靠人工枚举）。
+            "CREATE TABLE IF NOT EXISTS ai_task ("
+                    + "id BIGSERIAL PRIMARY KEY, "
+                    + "user_id VARCHAR(64) NOT NULL, "
+                    + "type VARCHAR(32) NOT NULL, "
+                    + "idempotency_key VARCHAR(96) NOT NULL, "
+                    + "status VARCHAR(16) NOT NULL, "
+                    + "progress SMALLINT NOT NULL DEFAULT 0, "
+                    + "attempt SMALLINT NOT NULL DEFAULT 0, "
+                    + "max_attempt SMALLINT NOT NULL DEFAULT 1, "
+                    + "payload TEXT, "
+                    + "result_ref VARCHAR(64), "
+                    + "result_text TEXT, "
+                    + "error_code VARCHAR(32), "
+                    + "error_message VARCHAR(200), "
+                    + "lease_until TIMESTAMP, "
+                    + "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "started_at TIMESTAMP, "
+                    + "finished_at TIMESTAMP)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_task_user ON ai_task(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_task_status ON ai_task(status)",
             // ── 阶段六 M3（2026-10-30）：任务结果正文 ──
             // 出题/评分的结果不落业务表，异步化后必须能取回；上限由 AiTaskService#saveResultText 控制。
+            // 保留这条 ALTER：老环境若已建表但缺列，靠它补齐。
             "ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS result_text TEXT"
     };
 
@@ -253,7 +280,10 @@ public class SchemaInitializer implements CommandLineRunner {
             "data_import_log",
             // v1.67.0：简历工作台依赖此表；缺表时模板编辑器的保存会 500，
             // 加进自检让「表没建成」在启动日志里直接暴露
-            "resume_document"
+            "resume_document",
+            // 2026-10-31：任务中心。建表语句一度只写在 schema.sql，prod 从未建过这张表，
+            // 表现为所有 /api/tasks 接口 500 —— 必须让「表没建成」在启动日志里立刻可见
+            "ai_task"
     };
 
     @Override
