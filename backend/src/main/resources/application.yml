@@ -83,10 +83,12 @@ app:
   # M1 只落库 ai_task 表与状态机，**不接入任何业务链路**，上线零行为变化。
   # M2 起由本开关启用调度器与接口；M3 起出题/评分走异步（关闭时完全回到同步路径）。
   task-center:
-    # ⚠️⚠️ M5 演练临时默认值（2026-10-31 12:50）：因为没有 Render API 凭据、无法在面板翻环境变量，
-    #      改用「改默认值 + 自动部署」达成同样的运行时状态。**演练结束必须改回 false**。
+    # ⚠️⚠️ M5 演练临时硬编码（2026-10-31 13:02）：改默认值无效（创建接口仍 503，说明服务上
+    #      存在 APP_TASK_CENTER_ENABLED=false 这个环境变量，覆盖了 yml 默认值），而我没有
+    #      Render 凭据无法在面板改它 —— 故临时去掉占位符、硬编码 true 绕过环境变量。
+    #      **演练结束必须改回 `${APP_TASK_CENTER_ENABLED:false}`**。
     #      演练卡：docs/quality-loop-2026-10-30/09-M5灰度演练卡.md
-    enabled: ${APP_TASK_CENTER_ENABLED:true}
+    enabled: true
     # 轮询间隔：单实例每 5s 领一个任务；任务量级很小，无需更密
     poll-interval-ms: ${APP_TASK_CENTER_POLL_MS:5000}
     # 清理时间（M4）：每日 03:00。成功/取消保留 7 天、失败 30 天（周期见 AiTaskService）
