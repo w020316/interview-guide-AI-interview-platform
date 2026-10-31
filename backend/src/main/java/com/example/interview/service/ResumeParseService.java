@@ -63,17 +63,7 @@ public class ResumeParseService {
         String resumeText;
 
         if (lower.endsWith(".pdf")) {
-            // P2-13（2026-10-30 质量循环）：PDF 解析必须有上限。
-            // 此前直接 Loader.loadPDF(bytes) + PDFTextStripper 全文抽取：
-            // 几千页的 PDF 会在解析线程里长时间占 CPU/内存（生产实例只有 512MB）。
-            try (PDDocument document = Loader.loadPDF(file.getBytes())) {
-                if (document.getNumberOfPages() > MAX_PDF_PAGES) {
-                    throw new IllegalArgumentException(
-                            "PDF 页数过多（最多 " + MAX_PDF_PAGES + " 页），请精简后再上传");
-                }
-                PDFTextStripper stripper = new PDFTextStripper();
-                resumeText = stripper.getText(document);
-            }
+            resumeText = parsePdfToText(file.getBytes());
         } else if (lower.endsWith(".html") || lower.endsWith(".htm")) {
             // jsoup 解析 HTML，提取纯文本
             String html = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
@@ -90,6 +80,44 @@ public class ResumeParseService {
                     "暂不支持该格式，请将简历转换为 PDF / HTML / MD / TXT 后重试（当前支持 .pdf / .html / .htm / .md / .markdown / .txt）");
         }
 
+        requireUsableText(resumeText);
+        return resumeText;
+    }
+
+    /**
+     * 解析 PDF 字节流为纯文本。
+     *
+     * <p>供本地上传与「分享链接直接导入 PDF」共用同一套解析与限额，
+     * 避免两条链路对页数 / 字符数 / 合法性做出不同承诺。
+     *
+     * @param bytes PDF 原始字节
+     * @return 简历纯文本
+     */
+    public String parsePdfToText(byte[] bytes) throws IOException {
+        if (bytes == null || bytes.length < 5 || !hasPdfMagic(bytes)) {
+            throw new IllegalArgumentException("文件内容不是合法的 PDF");
+        }
+        String resumeText;
+        // P2-13（2026-10-30 质量循环）：PDF 解析必须有上限。
+        // 几千页的 PDF 会在解析线程里长时间占 CPU/内存（生产实例只有 512MB）。
+        try (PDDocument document = Loader.loadPDF(bytes)) {
+            if (document.getNumberOfPages() > MAX_PDF_PAGES) {
+                throw new IllegalArgumentException(
+                        "PDF 页数过多（最多 " + MAX_PDF_PAGES + " 页），请精简后再上传");
+            }
+            PDFTextStripper stripper = new PDFTextStripper();
+            resumeText = stripper.getText(document);
+        }
+        requireUsableText(resumeText);
+        return resumeText;
+    }
+
+    /** PDF 文件头（%PDF-），与上传接口的校验口径保持一致 */
+    private static boolean hasPdfMagic(byte[] bytes) {
+        return bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D' && bytes[3] == 'F' && bytes[4] == '-';
+    }
+
+    private static void requireUsableText(String resumeText) {
         if (resumeText == null || resumeText.isBlank()) {
             throw new IllegalArgumentException("简历文件内容为空，请检查文件是否损坏");
         }
@@ -98,8 +126,6 @@ public class ResumeParseService {
             throw new IllegalArgumentException(
                     "简历文本过长（超过 " + MAX_TEXT_CHARS + " 字符），请精简后再上传");
         }
-
-        return resumeText;
     }
 
     /**

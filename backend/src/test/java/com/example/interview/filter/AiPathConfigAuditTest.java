@@ -74,11 +74,13 @@ class AiPathConfigAuditTest {
         table.put("/api/knowledge/import", "/api/knowledge/import");
         // KnowledgeController:55 GET /search
         table.put("/api/knowledge/search", "/api/knowledge/search");
-        // ResumeController:88 / :112 / :252 / :297
+        // ResumeController:88 / :112 / :252 / :297 / :447
         table.put("/api/resume/analyze", "/api/resume/analyze");
         table.put("/api/resume/upload", "/api/resume/upload");
         table.put("/api/resume/optimize", "/api/resume/optimize");
         table.put("/api/resume/import-url", "/api/resume/import-url");
+        // ResumeController:447 POST /import-pdf-url（v1.90.0：抓取第三方分享的 PDF + AI 分析）
+        table.put("/api/resume/import-pdf-url", "/api/resume/import-pdf-url");
         // ResumeDocumentController:165 POST /documents/{id}/autofill
         table.put("/api/resume/documents/*/autofill", "/api/resume/documents/5/autofill");
         // CareerController:81 / :103 / :128 POST /salary（v1.85.0）

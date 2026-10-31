@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -76,6 +77,14 @@ class ResumeControllerTest {
     @MockBean
     private ResumeExportCheckService resumeExportCheckService;
 
+    /** v1.90.0：分享链接 PDF 下载 */
+    @MockBean
+    private com.example.interview.service.RemotePdfFetcher remotePdfFetcher;
+
+    /** v1.90.0：SSRF 校验单一入口（切片测试中可构造合法 URL） */
+    @MockBean
+    private com.example.interview.util.SsrfGuard ssrfGuard;
+
     @MockBean
     private JwtUtil jwtUtil;
 
@@ -90,6 +99,10 @@ class ResumeControllerTest {
                 new UsernamePasswordAuthenticationToken(USER_ID, null, List.of()));
         // 24 个用例超出 10 次/分钟限流阈值，mock preHandle 绕过
         when(rateLimitInterceptor.preHandle(any(), any(), any())).thenReturn(true);
+        // 默认委托真实校验器：import-url 的协议 / 内网用例仍走真实判定；
+        // 需要合法公网 URL 的用例再单独 stub，避免测试依赖 DNS。
+        when(ssrfGuard.validate(anyString())).thenAnswer(inv ->
+                com.example.interview.util.SsrUrlValidator.validate(inv.getArgument(0)));
     }
 
     @AfterEach
@@ -622,6 +635,112 @@ class ResumeControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(400))
                     .andExpect(jsonPath("$.message").value("文件类型不受支持"));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/resume/import-pdf-url 分享链接导入 PDF（v1.90.0）")
+    class ImportPdfUrl {
+
+        private static final String PDF_URL = "https://example.com/files/resume.pdf";
+
+        private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder postJson(
+                Map<String, Object> body) throws Exception {
+            return post("/api/resume/import-pdf-url")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(body));
+        }
+
+        @Test
+        @DisplayName("URL 为空返回 400")
+        void importPdf_emptyUrl_returns400() throws Exception {
+            mockMvc.perform(postJson(Map.of("url", "", "authorized", true)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("URL 不能为空"));
+        }
+
+        @Test
+        @DisplayName("未确认授权返回 400，且不发起下载")
+        void importPdf_withoutConsent_returns400() throws Exception {
+            mockMvc.perform(postJson(Map.of("url", PDF_URL)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("请先确认你已获得该简历的分享授权"));
+
+            verify(remotePdfFetcher, never()).fetch(anyString());
+        }
+
+        @Test
+        @DisplayName("内网地址被 SSRF 校验拦截，不发起下载")
+        void importPdf_localhost_returns400() throws Exception {
+            mockMvc.perform(postJson(Map.of(
+                            "url", "http://127.0.0.1/private.pdf", "authorized", true)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("不支持访问内网地址"));
+
+            verify(remotePdfFetcher, never()).fetch(anyString());
+        }
+
+        @Test
+        @DisplayName("链接是网页时返回 400 + 明确原因")
+        void importPdf_htmlLink_returns400() throws Exception {
+            when(ssrfGuard.validate(PDF_URL))
+                    .thenReturn(com.example.interview.util.SsrUrlValidator.Result.pass(PDF_URL));
+            when(remotePdfFetcher.fetch(PDF_URL)).thenThrow(new IllegalArgumentException(
+                    "链接返回的是网页，不是 PDF 文件。请打开该页面下载 PDF 后从本地上传"));
+
+            mockMvc.perform(postJson(Map.of(
+                            "url", PDF_URL, "authorized", true, "targetJob", "Java 后端")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value(
+                            "链接返回的是网页，不是 PDF 文件。请打开该页面下载 PDF 后从本地上传"));
+        }
+
+        @Test
+        @DisplayName("合法 PDF：返回 analysis / resumeText / 文件名，并走同一套 PDF 解析")
+        void importPdf_ok_returnsAnalysis() throws Exception {
+            byte[] pdf = "%PDF-1.4\n简历".getBytes();
+            when(ssrfGuard.validate(PDF_URL))
+                    .thenReturn(com.example.interview.util.SsrUrlValidator.Result.pass(PDF_URL));
+            when(remotePdfFetcher.fetch(PDF_URL))
+                    .thenReturn(new com.example.interview.service.RemotePdfFetcher.FetchedPdf(
+                            pdf, "吴宇威-Java后端.pdf"));
+            when(resumeParseService.parsePdfToText(pdf)).thenReturn("吴宇威\nJava 后端工程师");
+            when(resumeAnalysisService.analyze(USER_ID, "吴宇威\nJava 后端工程师", "Java 后端"))
+                    .thenReturn("{\"overallScore\":88}");
+
+            mockMvc.perform(postJson(Map.of(
+                            "url", PDF_URL, "authorized", true, "targetJob", "Java 后端")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.analysis").value("{\"overallScore\":88}"))
+                    .andExpect(jsonPath("$.data.resumeText").value("吴宇威\nJava 后端工程师"))
+                    .andExpect(jsonPath("$.data.fileName").value("吴宇威-Java后端.pdf"))
+                    .andExpect(jsonPath("$.data.source").value("third-party-pdf"));
+
+            verify(resumeParseService).parsePdfToText(pdf);
+            verify(resumeService).saveResume(USER_ID, "吴宇威\nJava 后端工程师",
+                    "Java 后端", "{\"overallScore\":88}");
+        }
+
+        @Test
+        @DisplayName("PDF 解析失败返回 400 + 真实原因")
+        void importPdf_parseFailure_returns400() throws Exception {
+            byte[] pdf = "%PDF-1.4\n坏文件".getBytes();
+            when(ssrfGuard.validate(PDF_URL))
+                    .thenReturn(com.example.interview.util.SsrUrlValidator.Result.pass(PDF_URL));
+            when(remotePdfFetcher.fetch(PDF_URL))
+                    .thenReturn(new com.example.interview.service.RemotePdfFetcher.FetchedPdf(pdf, "resume.pdf"));
+            when(resumeParseService.parsePdfToText(pdf))
+                    .thenThrow(new IllegalArgumentException("文件内容不是合法的 PDF"));
+
+            mockMvc.perform(postJson(Map.of("url", PDF_URL, "authorized", true)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("文件内容不是合法的 PDF"));
         }
     }
 }

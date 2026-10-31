@@ -85,9 +85,23 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.89.0'
+export const CURRENT_VERSION = '1.90.0'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.90.0',
+    date: '2026-10-31',
+    title: '版本 1.90.0 · 简历可从第三方平台导入',
+    items: [
+      { text: '简历页新增「从第三方平台导入」：BOSS直聘、猎聘、智联招聘、前程无忧、微信文件、WPS 六个入口；手机上可直接唤起对应 App，导出 PDF 后回来上传，电脑上则打开网页版', level: 'user' },
+      { text: '已拿到平台分享链接时可直接导入 PDF：勾选授权确认后，由后台抓取公开链接并解析分析；需要登录才能打开的分享页会明确提示改用导出后上传', level: 'user' },
+      { text: '上传时显示真实进度：先校验文件，再显示已上传的字节数，最后进入 AI 解析；无法确定的阶段用进度条表示「进行中」，不编造百分比', level: 'user' },
+      { text: '非 PDF 或「改了后缀的假 PDF」会在上传前被拦下，并指出具体文件名与原因；改后缀的文件不再等到后端解析失败才发现', level: 'user' },
+      { text: '后端：新增 POST /api/resume/import-pdf-url。SSRF 校验复用 SsrUrlValidator 并禁止跟随重定向；10MB 限额同时按 Content-Length 与流式读取执行；校验 %PDF- 文件头后交给 PDFBox，与本地上传共用 20 页 / 10 万字上限；接口同时登记到 AiRateLimitFilter 常量与 application.yml 两处 AI 限流清单', level: 'tech' },
+      { text: '前端：新增 utils/resumeIntake（文件分类、PDF 深校验、进度换算、平台清单、唤起决策）与 ResumePlatformImport 组件；主上传区用 onUploadProgress 显示真实字节进度，校验与解析阶段使用不确定态；App 唤起沿用三信号交棒监听，不断言「未安装」，应用内浏览器直接走网页版', level: 'tech' },
+      { text: '测试：RemotePdfFetcherTest 7 例（含重定向 / 403 / HTML 分享页 / 假 PDF / 超限）、ResumeParseService PDF 解析 5 例、ResumeController 导入链路 6 例；前端 resumeIntake 14 例 + ResumePlatformImport 10 例', level: 'tech' },
+    ],
+  },
   {
     version: '1.89.0',
     date: '2026-10-29',

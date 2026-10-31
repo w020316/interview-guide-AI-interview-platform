@@ -71,6 +71,12 @@ class ResumeExportCheckRateLimitTest {
     private ResumeExportCheckService resumeExportCheckService;
 
     @MockBean
+    private com.example.interview.service.RemotePdfFetcher remotePdfFetcher;
+
+    @MockBean
+    private com.example.interview.util.SsrfGuard ssrfGuard;
+
+    @MockBean
     private JwtUtil jwtUtil;
 
     @MockBean

@@ -5,9 +5,11 @@ import com.example.interview.common.Result;
 import com.example.interview.entity.ResumeEntity;
 import com.example.interview.service.ResumeAnalysisService;
 import com.example.interview.service.ResumeExportCheckService;
+import com.example.interview.service.RemotePdfFetcher;
 import com.example.interview.service.ResumeParseService;
 import com.example.interview.service.ResumeService;
 import com.example.interview.util.PerUserRateLimiter;
+import com.example.interview.util.SsrfGuard;
 import com.example.interview.util.SsrUrlValidator;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
@@ -73,6 +75,14 @@ public class ResumeController {
 
     @Autowired
     private ResumeService resumeService;
+
+    /** 第三方平台分享链接 → PDF 直链下载（v1.90.0） */
+    @Autowired
+    private RemotePdfFetcher remotePdfFetcher;
+
+    /** SSRF 校验单一入口（可注入，便于切片测试） */
+    @Autowired
+    private SsrfGuard ssrfGuard;
 
     /** 导出体检（纯本地 PDFBox 解析，不调用 AI） */
     @Autowired
@@ -372,7 +382,7 @@ public class ResumeController {
         }
 
         // URL 安全校验（防 SSRF）：协议/主机端口/内网与元数据网段统一校验（v1.31.4 抽出共享校验器）
-        SsrUrlValidator.Result valid = SsrUrlValidator.validate(url);
+        SsrUrlValidator.Result valid = ssrfGuard.validate(url);
         if (!valid.ok) {
             return Result.error(400, valid.message);
         }
@@ -418,6 +428,66 @@ public class ResumeController {
         } catch (Exception e) {
             log.error("URL 导入简历失败 url={}", url, e);
             return Result.error(400, "导入失败，请确认 URL 可公开访问后重试");
+        }
+    }
+
+    /**
+     * 从第三方平台的**分享链接**直接导入 PDF（v1.90.0）
+     * POST /api/resume/import-pdf-url
+     * Body: {"url": "https://.../resume.pdf", "targetJob": "...", "authorized": true}
+     *
+     * <p>能力边界：BOSS / 猎聘 / 智联等平台均未开放简历导出 API，也没有可对接的
+     * OAuth 授权；本接口不保存任何第三方登录态。用户需要先在平台内导出/分享 PDF，
+     * 再把**可公开访问的 PDF 直链**交给我们导入；链接是分享页（HTML）时会明确提示，
+     * 不会伪装成导入成功。
+     *
+     * <p>{@code authorized} 是用户「确认有权导入该简历」的显式同意，后端同样校验，
+     * 避免绕过前端直接调用。
+     */
+    @PostMapping("/import-pdf-url")
+    public Result<Map<String, String>> importPdfFromUrl(@RequestBody Map<String, Object> request) {
+        Object rawUrl = request.get("url");
+        String url = rawUrl == null ? null : String.valueOf(rawUrl).trim();
+        if (url == null || url.isEmpty()) {
+            return Result.error(400, "URL 不能为空");
+        }
+        Object rawAuthorized = request.get("authorized");
+        boolean authorized = Boolean.TRUE.equals(rawAuthorized)
+                || "true".equalsIgnoreCase(String.valueOf(rawAuthorized));
+        if (!authorized) {
+            return Result.error(400, "请先确认你已获得该简历的分享授权");
+        }
+        Object rawJob = request.get("targetJob");
+        String targetJob = rawJob == null || String.valueOf(rawJob).isBlank()
+                ? "通用岗位" : String.valueOf(rawJob);
+
+        SsrUrlValidator.Result valid = ssrfGuard.validate(url);
+        if (!valid.ok) {
+            return Result.error(400, valid.message);
+        }
+
+        String userId = currentUserId();
+        try {
+            RemotePdfFetcher.FetchedPdf pdf = remotePdfFetcher.fetch(valid.normalizedUrl);
+            String resumeText = resumeParseService.parsePdfToText(pdf.content());
+            String analysisJson = resumeAnalysisService.analyze(userId, resumeText, targetJob);
+            try {
+                resumeService.saveResume(userId, resumeText, targetJob, analysisJson);
+            } catch (Exception e) {
+                log.warn("分享链接导入简历持久化失败：{}", e.getMessage());
+            }
+
+            Map<String, String> payload = new HashMap<>();
+            payload.put("analysis", analysisJson);
+            payload.put("resumeText", resumeText);
+            payload.put("fileName", pdf.fileName());
+            payload.put("source", "third-party-pdf");
+            return Result.success(payload);
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        } catch (Exception e) {
+            log.error("分享链接导入 PDF 失败 url={}", valid.normalizedUrl, e);
+            return Result.error(502, "导入失败，请确认链接指向可公开访问的 PDF 后重试");
         }
     }
 }

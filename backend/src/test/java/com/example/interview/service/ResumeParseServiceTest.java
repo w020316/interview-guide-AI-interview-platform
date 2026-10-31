@@ -12,6 +12,13 @@ import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -220,16 +227,109 @@ class ResumeParseServiceTest {
         }
 
         @Test
-        @DisplayName("大写扩展名 .PDF 走 PDF 分支（非 PDF 内容会抛异常）")
+        @DisplayName("大写扩展名 .PDF 走 PDF 分支（非 PDF 内容被 magic bytes 拦下）")
         void parseToText_upperCasePdfExtension_entersPdfBranch() {
-            // 非 PDF 二进制内容传入 PDFBox 会抛异常
             MultipartFile file = new MockMultipartFile(
                     "file", "resume.PDF", "application/pdf",
                     "not a real pdf".getBytes());
 
-            // PDFBox 解析非 PDF 内容会抛 IOException
             assertThatThrownBy(() -> service.parseToText(file))
-                    .isInstanceOf(IOException.class);
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("文件内容不是合法的 PDF");
+        }
+    }
+
+    @Nested
+    @DisplayName("parsePdfToText: PDF 文本抽取（解析准确率基线）")
+    class ParsePdf {
+
+        /** 生成真实 PDF（Helvetica 标准字体，仅 ASCII 文本） */
+        private static byte[] pdfWithPages(String[]... pages) throws IOException {
+            try (PDDocument doc = new PDDocument()) {
+                for (String[] lines : pages) {
+                    PDPage page = new PDPage();
+                    doc.addPage(page);
+                    try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                        cs.beginText();
+                        cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                        cs.newLineAtOffset(72, 720);
+                        cs.setLeading(18);
+                        for (String line : lines) {
+                            cs.showText(line);
+                            cs.newLine();
+                        }
+                        cs.endText();
+                    }
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                doc.save(out);
+                return out.toByteArray();
+            }
+        }
+
+        @Test
+        @DisplayName("单页 PDF：所有关键行都能完整抽出")
+        void parsePdf_singlePage_extractsAllLines() throws IOException {
+            byte[] pdf = pdfWithPages(new String[]{
+                    "Wu Yuwei",
+                    "Java Backend Engineer",
+                    "Spring Boot / PostgreSQL / Redis",
+                    "5 years of experience"
+            });
+
+            String text = service.parsePdfToText(pdf);
+
+            assertThat(text).contains("Wu Yuwei");
+            assertThat(text).contains("Java Backend Engineer");
+            assertThat(text).contains("Spring Boot / PostgreSQL / Redis");
+            assertThat(text).contains("5 years of experience");
+        }
+
+        @Test
+        @DisplayName("多页 PDF：跨页文本不丢失")
+        void parsePdf_multiPage_extractsAllPages() throws IOException {
+            byte[] pdf = pdfWithPages(
+                    new String[]{"PAGE ONE", "Education"},
+                    new String[]{"PAGE TWO", "Work Experience"});
+
+            String text = service.parsePdfToText(pdf);
+
+            assertThat(text).contains("PAGE ONE");
+            assertThat(text).contains("PAGE TWO");
+            assertThat(text).contains("Education");
+            assertThat(text).contains("Work Experience");
+        }
+
+        @Test
+        @DisplayName("经 parseToText 分发时与 parsePdfToText 结果一致")
+        void parseToText_pdf_usesSamePipeline() throws IOException {
+            byte[] pdf = pdfWithPages(new String[]{"Resume", "Backend"});
+            MultipartFile file = new MockMultipartFile(
+                    "file", "resume.pdf", "application/pdf", pdf);
+
+            String viaFile = service.parseToText(file);
+            String viaBytes = service.parsePdfToText(pdf);
+
+            assertThat(viaFile).isEqualTo(viaBytes);
+            assertThat(viaFile).contains("Resume");
+        }
+
+        @Test
+        @DisplayName("没有 magic bytes 的字节流被拒绝")
+        void parsePdf_badMagic_rejected() {
+            assertThatThrownBy(() -> service.parsePdfToText("PK\u0003\u0004 not pdf".getBytes()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("文件内容不是合法的 PDF");
+        }
+
+        @Test
+        @DisplayName("空 PDF（无文字层）：给出「内容为空」而不是返回空串")
+        void parsePdf_noTextLayer_throws() throws IOException {
+            byte[] pdf = pdfWithPages(new String[]{});
+
+            assertThatThrownBy(() -> service.parsePdfToText(pdf))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("简历文件内容为空");
         }
     }
 

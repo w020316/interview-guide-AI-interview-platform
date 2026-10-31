@@ -15,13 +15,15 @@
 
       <div v-if="tab === 'upload'" class="upload-area">
         <el-upload drag accept=".pdf,.txt,.html,.htm,.md,.markdown,application/pdf,text/plain,text/html,text/markdown"
-          :before-upload="handleUpload" :show-file-list="false" :http-request="() => {}">
+          :before-upload="handleUpload" :show-file-list="false" :http-request="() => {}"
+          :disabled="uploadState.phase !== 'idle' || loading">
           <div class="upload-inner">
             <div class="upload-icon"></div>
             <div class="upload-text">拖拽文件到此处或 <span class="upload-action">点击上传</span></div>
-            <div class="upload-hint">支持 PDF / HTML / MD / TXT 格式，文件 ≤ 10MB</div>
+            <div class="upload-hint">支持 PDF / HTML / MD / TXT 格式，文件 ≤ 10MB；PDF 会校验文件头，改后缀会被拦下</div>
           </div>
         </el-upload>
+
         <div class="field-row">
           <label>目标岗位</label>
           <BaseInput v-model="targetJob" block list="job-suggestions" placeholder="如：Java 后端、产品经理、教师、医生、销售经理…" />
@@ -32,6 +34,15 @@
       </div>
 
       <div v-else-if="tab === 'import'" class="import-area">
+        <!-- v1.90.0：第三方平台导入（App 唤起 + 分享链接授权导入）。
+             不维护第三方登录态，也不宣称「已检测到 App 安装」——具体边界见组件内注释。 -->
+        <ResumePlatformImport
+          :target-job="targetJob"
+          :disabled="uploadState.phase !== 'idle' || importLoading"
+          @pick-file="triggerThirdPartyPicker"
+          @imported="onThirdPartyImported"
+        />
+
         <!-- v1.37.0 新增：从其他软件提取简历。
              场景：简历常常不在本地，而是躺在微信「文件传输助手」、网盘、WPS 云文档
              或招聘 App 的在线简历里。此前只能靠用户自己找到并导出，取件成本高。
@@ -94,6 +105,14 @@
               accept="image/*"
               @change="onNativeFile"
             />
+            <!-- 第三方平台导出后的 PDF：由 ResumePlatformImport 的「选择已导出的 PDF」触发 -->
+            <input
+              ref="thirdPartyFileInput"
+              class="hidden-file"
+              type="file"
+              accept=".pdf,application/pdf"
+              @change="onThirdPartyFile"
+            />
           </div>
 
           <details class="extract-guide">
@@ -134,7 +153,7 @@
           </p>
         </div>
 
-        <div class="import-divider"><span>或从链接导入</span></div>
+        <div class="import-divider"><span>或从公开网页导入</span></div>
 
         <div class="field-row">
           <label>简历页面 URL</label>
@@ -166,11 +185,32 @@
           {{ loading ? '分析中...' : '开始分析' }}
         </button>
       </div>
+
+      <!-- 上传状态放在三个 Tab 之外：第三方平台「选择已导出的 PDF」是在导入 Tab 触发的，
+           进度与错误若只渲染在上传 Tab 里，用户在导入 Tab 就看不到任何反馈。 -->
+      <p v-if="uploadError" class="upload-error" role="alert">{{ uploadError }}</p>
+
+      <div v-if="uploadState.phase !== 'idle'" class="upload-progress" role="status" aria-live="polite">
+        <div class="upload-progress-head">
+          <span class="upload-progress-name">{{ uploadState.fileName }}</span>
+          <span class="upload-progress-phase">{{ uploadPhaseLabel }}</span>
+        </div>
+        <div class="upload-bar" :class="{ 'is-indeterminate': uploadState.phase !== 'uploading' }">
+          <div
+            v-if="uploadState.phase === 'uploading'"
+            class="upload-bar-fill"
+            :style="{ width: uploadState.percent + '%' }"
+          ></div>
+          <div v-else class="upload-bar-indeterminate"></div>
+        </div>
+        <p class="upload-progress-hint">{{ uploadProgressHint }}</p>
+      </div>
     </div>
 
     <!-- 加载状态：骨架屏（v1.23.2 优化②，按结果布局占位，降低等待焦虑）。
-         顺序与结果区一致：维度卡在前、参考总分为小徽标在后。 -->
-    <div v-if="loading" class="loading-state" role="status" aria-live="polite">
+         顺序与结果区一致：维度卡在前、参考总分为小徽标在后。
+         上传链路已由 .upload-progress 承担等待反馈，此处不再叠加骨架屏。 -->
+    <div v-if="loading && uploadState.phase === 'idle'" class="loading-state" role="status" aria-live="polite">
       <div class="skeleton-grid">
         <div v-for="i in 4" :key="i" class="skeleton-card">
           <div class="skeleton skeleton-line" style="width: 42%"></div>
@@ -366,7 +406,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
@@ -379,10 +419,15 @@ import {
   COPY_LINK_LABEL,
   copyResultHint,
   copyText,
-  detectMobile,
 } from '../utils/appLaunch'
+import {
+  formatFileSize,
+  uploadPercent,
+  validateResumeFileDeep,
+} from '../utils/resumeIntake'
 import renderMarkdown from '../utils/markdown'
 import { BaseInput, BaseTextarea } from '../components'
+import ResumePlatformImport from '../components/ResumePlatformImport.vue'
 
 interface AnalysisResult {
   overallScore: number
@@ -416,6 +461,43 @@ const loading = ref(false)
 const result = ref('')
 const parseError = ref('')
 
+/* ─────────────────────────────────────────────────────────────
+   上传进度（v1.90.0）
+
+   `loading` 仍表示「AI 正在分析」；`uploadState.phase` 把一次上传拆成
+   校验 → 传输 → 解析三段。传输阶段用真实字节进度，校验/解析阶段用不确定态：
+   后端收到完整文件后才开始 AI 推理，这两段没有可信百分比，不伪造。
+   ───────────────────────────────────────────────────────────── */
+type UploadPhase = 'idle' | 'validating' | 'uploading' | 'parsing'
+
+const uploadState = reactive({
+  phase: 'idle' as UploadPhase,
+  percent: 0,
+  fileName: '',
+  loaded: 0,
+  total: 0,
+})
+const uploadError = ref('')
+
+const uploadPhaseLabel = computed(() => {
+  if (uploadState.phase === 'validating') return '正在校验文件…'
+  if (uploadState.phase === 'uploading') return `${uploadState.percent}% · 正在上传`
+  if (uploadState.phase === 'parsing') return '上传完成 · AI 正在解析'
+  return ''
+})
+
+const uploadProgressHint = computed(() => {
+  if (uploadState.phase === 'validating') return '检查文件格式、大小与 PDF 文件头'
+  if (uploadState.phase === 'uploading') {
+    const total = uploadState.total > 0 ? ` / ${formatFileSize(uploadState.total)}` : ''
+    return `已上传 ${formatFileSize(uploadState.loaded)}${total}`
+  }
+  if (uploadState.phase === 'parsing') {
+    return 'AI 正在评分并生成建议；首次调用可能需 1-2 分钟，请勿关闭页面'
+  }
+  return ''
+})
+
 // 从其他平台导入相关状态
 const importUrl = ref('')
 const importLoading = ref(false)
@@ -435,12 +517,8 @@ const importLoading = ref(false)
 const nativeFileInput = ref<HTMLInputElement | null>(null)
 /** 相册专用入口：`accept="image/*"` 在手机上会直接打开相册 */
 const albumFileInput = ref<HTMLInputElement | null>(null)
-
-/**
- * 环境判定（v1.44.1）：在 ref 初始化时求值，避免首帧按桌面分支渲染。
- * 目前只用于按端调整提示文案。
- */
-const isMobile = ref(detectMobile())
+/** 第三方平台导出后回传的 PDF 选择器 */
+const thirdPartyFileInput = ref<HTMLInputElement | null>(null)
 
 /**
  * 「文件传输助手」地址复制失败（v1.44.1）。
@@ -457,7 +535,8 @@ function triggerFilePicker() {
 function onNativeFile(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
-  if (file) void handleUpload(file)
+  // 这两条通道接受截图（v1.45.0 / v1.46.0），主上传入口仍只收文档
+  if (file) void handleUpload(file, { allowImages: true })
   // 重置 value，允许连续选择同一个文件
   input.value = ''
 }
@@ -465,6 +544,30 @@ function onNativeFile(e: Event) {
 /** 触发相册选择：手机上直接打开相册，桌面端退化为普通文件选择器 */
 function triggerAlbumPicker() {
   albumFileInput.value?.click()
+}
+
+/** 第三方平台「选择已导出的 PDF」入口 */
+function triggerThirdPartyPicker() {
+  thirdPartyFileInput.value?.click()
+}
+
+function onThirdPartyFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) void handleUpload(file)
+  input.value = ''
+}
+
+interface ThirdPartyImportedPayload {
+  analysis: string
+  resumeText: string
+  fileName?: string
+}
+
+/** 分享链接导入成功后，复用主结果区渲染 */
+function onThirdPartyImported(payload: ThirdPartyImportedPayload) {
+  uploadError.value = ''
+  if (handleResult(payload)) ElMessage.success('第三方简历导入完成')
 }
 
 /**
@@ -479,9 +582,6 @@ async function copyFilehelper() {
   if (ok) ElMessage.success(copyResultHint(true))
   else ElMessage.warning(copyResultHint(false))
 }
-
-// 环境判定（isMobile）已在 ref 初始化时求值（v1.44.1），不再放 onMounted：
-// 那会让首帧按桌面分支渲染，手机上先画出桌面端才有的提示。
 
 // 优化简历相关状态
 const optimizing = ref(false)
@@ -578,31 +678,59 @@ function handleResult(data: unknown) {
   return true
 }
 
-async function handleUpload(file: File) {
-  // 文件大小校验
-  if (file.size > 10 * 1024 * 1024) {
-    ElMessage.error('文件大小不能超过 10MB')
+/**
+ * 上传并分析简历。
+ *
+ * @param options.allowImages 取件通道（本机文件 / 相册 / 第三方导出）允许截图；
+ *   主上传拖拽区保持文档-only，图片会被引导到相册通道。
+ */
+async function handleUpload(file: File, options: { allowImages?: boolean } = {}) {
+  if (uploadState.phase !== 'idle' || loading.value) {
+    ElMessage.warning('正在处理上一个文件，请稍候')
     return false
   }
-  // 文件类型校验（与后端 ALLOWED_EXTS + 模板 accept 对齐）
-  const allowed = ['.pdf', '.txt', '.html', '.htm', '.md', '.markdown']
-  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] || ''
-  if (!allowed.includes(ext)) {
-    ElMessage.error('仅支持 PDF / HTML / MD / TXT 格式（Word 请转换为 PDF）')
+
+  uploadError.value = ''
+  uploadState.fileName = file.name
+  uploadState.percent = 0
+  uploadState.loaded = 0
+  uploadState.total = file.size
+  uploadState.phase = 'validating'
+
+  // 深校验：扩展名/大小之外，PDF 再验 %PDF- 文件头，改后缀的文件在这里被拦下
+  const check = await validateResumeFileDeep(file, { allowImages: options.allowImages })
+  if (!check.ok) {
+    uploadError.value = check.error || '文件校验未通过，请重新选择'
+    uploadState.phase = 'idle'
     return false
   }
 
   loading.value = true
   result.value = ''
+  uploadState.phase = 'uploading'
   const form = new FormData()
   form.append('file', file)
   form.append('targetJob', targetJob.value)
   try {
-    const data = await api.post('/api/resume/upload', form, { timeout: AI_TIMEOUT }) as unknown as string
+    const data = await api.post('/api/resume/upload', form, {
+      timeout: AI_TIMEOUT,
+      onUploadProgress: (event) => {
+        // 浏览器给出的是 multipart 请求体大小（略大于文件本身），按它算真实百分比
+        const total = event.total && event.total > 0 ? event.total : file.size
+        uploadState.loaded = event.loaded
+        uploadState.total = total
+        uploadState.percent = uploadPercent(event.loaded, total)
+        // 传输完成 ≠ 分析完成：后端收完文件才开始推理，切到不确定态
+        if (uploadState.percent >= 100) uploadState.phase = 'parsing'
+      },
+    }) as unknown as string
     if (handleResult(data)) ElMessage.success('分析完成')
   } catch (e: unknown) {
-    ElMessage.error(getErrMessage(e, '上传失败'))
-  } finally { loading.value = false }
+    uploadError.value = getErrMessage(e, '上传失败')
+  } finally {
+    loading.value = false
+    uploadState.phase = 'idle'
+  }
   return false
 }
 
@@ -883,6 +1011,89 @@ function formatDate() {
 
 .upload-hint {
   font-size: 13px;
+  color: var(--c-text-tertiary);
+}
+
+/* ── 上传错误与进度（v1.90.0）── */
+.upload-error {
+  margin: 16px 0 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--c-danger);
+  background: var(--c-danger-light);
+  border: 1px solid var(--c-danger-border);
+  border-radius: var(--radius-md);
+}
+
+.upload-progress {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.upload-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.upload-progress-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.upload-progress-phase {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-primary);
+}
+
+.upload-bar {
+  position: relative;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--c-bg-alt);
+  overflow: hidden;
+}
+
+.upload-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--brand-primary);
+  transition: width 0.2s ease;
+}
+
+.upload-bar-indeterminate {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--brand-primary);
+  animation: upload-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes upload-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+.upload-progress-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
   color: var(--c-text-tertiary);
 }
 

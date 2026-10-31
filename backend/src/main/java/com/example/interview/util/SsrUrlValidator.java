@@ -37,11 +37,11 @@ public final class SsrUrlValidator {
             this.normalizedUrl = normalizedUrl;
         }
 
-        static Result pass(String url) {
+        public static Result pass(String url) {
             return new Result(true, null, url);
         }
 
-        static Result fail(String reason) {
+        public static Result fail(String reason) {
             return new Result(false, reason, null);
         }
     }
