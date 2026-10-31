@@ -18,6 +18,7 @@ import {
   filterTasks,
   formatTaskTime,
   loadMyTasks,
+  canRegenerate,
   taskRoute,
   taskStatusLabel,
   taskStatusTone,
@@ -83,6 +84,16 @@ describe('状态映射', () => {
     expect(taskRoute('interview.questions', 42)).toBe('/interview?taskId=42')
     expect(taskRoute('interview.evaluate', 42)).toBe('/interview')
     expect(taskRoute('interview.questions', 0)).toBe('/interview')
+  })
+
+  // P1-3：没有这个标记，同简历同岗位最长 7 天只能拿回同一批题
+  it('重新生成：出题任务带 regenerate=1，且只有出题支持重新生成', () => {
+    expect(taskRoute('interview.questions', 42, true)).toBe('/interview?taskId=42&regenerate=1')
+    expect(taskRoute('interview.questions', 42, false)).toBe('/interview?taskId=42')
+    expect(taskRoute('interview.evaluate', 42, true)).toBe('/interview')
+    expect(canRegenerate('interview.questions')).toBe(true)
+    expect(canRegenerate('interview.evaluate')).toBe(false)
+    expect(canRegenerate(undefined)).toBe(false)
   })
 
   it('时间展示：T 换空格并截到分钟；缺失显示破折号', () => {

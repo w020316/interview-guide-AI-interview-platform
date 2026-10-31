@@ -496,10 +496,13 @@ onMounted(() => {
   const rawTaskId = typeof route.query.taskId === 'string' ? route.query.taskId : ''
   const taskId = Number(rawTaskId)
   if (rawTaskId && Number.isInteger(taskId) && taskId > 0) {
-    void recoverFromTask(taskId)
+    // P1-3：抽屉里的「重新生成」会带上 regenerate=1，用原任务入参快照重跑一次
+    const regenerate = route.query.regenerate === '1'
+    void recoverFromTask(taskId, regenerate)
     // 与 sessionId 同口径：清掉 query，避免刷新重复触发（重复恢复会多建出空会话）
     const q = { ...route.query }
     delete q.taskId
+    delete q.regenerate
     router.replace({ path: '/interview', query: q }).catch(() => {})
     return
   }
@@ -940,27 +943,60 @@ async function persistQuestions(parsed: Question[], jobDescription: string): Pro
  * <p>岗位描述从任务 payload 快照里取回：此刻用户表单可能已被清空，
  * 而建会话需要它（否则历史里的这次面试没有岗位信息）。
  */
-async function recoverFromTask(taskId: number) {
+async function recoverFromTask(taskId: number, regenerate = false) {
   if (loading.value) return
   loading.value = true
   startGenProgress()
   try {
     genStep.value = 3
     const task = await api.get(`/api/tasks/${taskId}`) as unknown as { payload?: string } | null
-    const result = await api.get(`/api/tasks/${taskId}/result`) as unknown as { resultText?: string } | null
-    const parsed = safeParse<Question[]>(result?.resultText ?? '', [])
+    // 入参快照：重新生成时用它重发一次，用户此刻的表单可能已清空
+    const snapshot = safeParse<{
+      resumeText?: string
+      jobDescription?: string
+      count?: number
+      difficulty?: string
+      focusCategories?: string
+    }>(task?.payload ?? '', {})
+    const jobDescription = snapshot.jobDescription ?? ''
+
+    let qs: string
+    if (regenerate) {
+      // P1-3：后端在幂等键里掺随机量，这里必须显式带 regenerate，否则会拿回同一批题
+      const body = {
+        resumeText: snapshot.resumeText ?? '',
+        jobDescription,
+        count: snapshot.count ?? 5,
+        difficulty: snapshot.difficulty ?? '',
+        focusCategories: snapshot.focusCategories ?? '',
+      }
+      qs = await runServerTask({
+        createPath: '/api/tasks/interview/questions',
+        body: { ...body, regenerate: true },
+        label: 'AI 出题',
+        route: '/interview',
+        fallback: () => api.post('/api/interview/questions', body,
+          { timeout: AI_TIMEOUT }) as unknown as Promise<string>,
+      })
+    } else {
+      const result = await api.get(`/api/tasks/${taskId}/result`) as unknown as { resultText?: string } | null
+      qs = result?.resultText ?? ''
+    }
+
+    const parsed = safeParse<Question[]>(qs, [])
     if (!parsed.length) {
-      ElMessage.error('任务已完成但题目内容为空，请重新生成')
+      ElMessage.error(regenerate ? '重新生成失败，请稍后再试' : '任务已完成但题目内容为空，请重新生成')
       return
     }
     genStep.value = 4
-    const jobDescription = safeParse<{ jobDescription?: string }>(task?.payload ?? '', {}).jobDescription ?? ''
     const createdSessionId = await persistQuestions(parsed, jobDescription)
     sessionId.value = createdSessionId
     questions.value = parsed
-    ElMessage.success(`已恢复 ${questions.value.length} 道题目，继续面试`)
+    ElMessage.success(regenerate
+      ? `已重新生成 ${questions.value.length} 道题目`
+      : `已恢复 ${questions.value.length} 道题目，继续面试`)
   } catch (e: unknown) {
-    ElMessage.error(getErrMessage(e, '恢复任务结果失败'))
+    ElMessage.error(getErrMessage(e, regenerate ? '重新生成失败' : '恢复任务结果失败'))
   } finally {
     loading.value = false
     stopGenProgress()

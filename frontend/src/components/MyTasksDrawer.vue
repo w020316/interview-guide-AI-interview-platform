@@ -72,6 +72,12 @@
               class="tk-btn primary"
               @click="go(t)"
             >去看看</button>
+            <button
+              v-if="t.status === 'SUCCEEDED' && canRegenerate(t.type)"
+              type="button"
+              class="tk-btn"
+              @click="regenerate(t)"
+            >重新生成</button>
           </div>
         </li>
       </ul>
@@ -85,6 +91,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   canCancel,
+  canRegenerate,
   canRetry,
   cancelMyTask,
   closeTaskDrawer,
@@ -161,6 +168,20 @@ async function cancel(t: MyTask): Promise<void> {
 
 function go(t: MyTask): void {
   const route = taskRoute(t.type, t.id)
+  if (!route) return
+  closeTaskDrawer()
+  router.push(route)
+}
+
+/**
+ * 用原任务的入参快照重新出一批题（P1-3）。
+ *
+ * <p>为什么不在抽屉里直接调接口：出题结果必须落到面试页的会话状态里
+ * （题目列表 + 会话 id），在抽屉里生成完再跳转反而多一次状态搬运。
+ * 这里只负责把「用这份快照重跑」的意图带到页面。
+ */
+function regenerate(t: MyTask): void {
+  const route = taskRoute(t.type, t.id, true)
   if (!route) return
   closeTaskDrawer()
   router.push(route)

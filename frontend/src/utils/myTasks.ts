@@ -88,14 +88,24 @@ export function canRetry(status?: string): boolean {
  * {@code ai_task.result_text}，面试页只有拿到 id 才能取回并重建会话。
  * 不带的后果是「回来落在空表单」，用户只能重新生成、再烧一次 AI 配额。
  *
- * <p>评分任务暂不带 id：评分结果依附「某道题 + 用户答案」的页内上下文，
+ * <p>P1-3：{@code regenerate} 为真时额外带 {@code &regenerate=1}，面试页据此
+ * 用原任务的入参快照重新发一次出题（后端会在幂等键里掺随机量）。
+ *
+ * <p>评分任务不带 id：评分结果依附「某道题 + 用户答案」的页内上下文，
  * 刷新后上下文已丢失，回填方式需产品决策（见 08-下一步交接.md），此处不做假装恢复。
  */
-export function taskRoute(type?: string, taskId?: number): string | undefined {
+export function taskRoute(type?: string, taskId?: number, regenerate = false): string | undefined {
   if (!type) return undefined
-  if (type === 'interview.questions' && taskId) return `/interview?taskId=${taskId}`
+  if (type === 'interview.questions' && taskId) {
+    return regenerate ? `/interview?taskId=${taskId}&regenerate=1` : `/interview?taskId=${taskId}`
+  }
   if (type.startsWith('interview.')) return '/interview'
   return undefined
+}
+
+/** 是否支持「重新生成」：目前只有出题有意义（评分重跑同一份答案只会得到同一个分数） */
+export function canRegenerate(type?: string): boolean {
+  return type === 'interview.questions'
 }
 
 /** 抽屉是否展开（模块级单例，导航角标、头像菜单都改这个） */

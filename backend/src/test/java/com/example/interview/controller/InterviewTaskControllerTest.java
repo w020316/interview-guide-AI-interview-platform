@@ -184,4 +184,35 @@ class InterviewTaskControllerTest {
 
         verifyNoInteractions(taskService);
     }
+
+    @Test
+    @DisplayName("P1-3：同入参不传 regenerate → 幂等键一致；传 regenerate=true → 每次不同")
+    void questions_regenerateBypassesIdempotency() throws Exception {
+        when(taskService.create(eq(USER), eq(AiTaskTypes.INTERVIEW_QUESTIONS), anyString(), anyString(), eq(2)))
+                .thenReturn(queued(AiTaskTypes.INTERVIEW_QUESTIONS));
+
+        String plain = "{\"resumeText\":\"r\",\"jobDescription\":\"j\"}";
+        String regen = "{\"resumeText\":\"r\",\"jobDescription\":\"j\",\"regenerate\":true}";
+        for (String body : new String[]{plain, plain, regen, regen}) {
+            mockMvc.perform(post("/api/tasks/interview/questions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(jsonPath("$.code").value(200));
+        }
+
+        org.mockito.ArgumentCaptor<String> keys = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(taskService, org.mockito.Mockito.times(4))
+                .create(eq(USER), eq(AiTaskTypes.INTERVIEW_QUESTIONS), keys.capture(), anyString(), eq(2));
+        java.util.List<String> captured = keys.getAllValues();
+
+        org.assertj.core.api.Assertions.assertThat(captured.get(0))
+                .as("不传 regenerate：同入参必须复用同一条任务（连点不重复计费）")
+                .isEqualTo(captured.get(1));
+        org.assertj.core.api.Assertions.assertThat(captured.get(2))
+                .as("regenerate=true：每次都要派生新键，否则用户永远拿到同一批题")
+                .isNotEqualTo(captured.get(3));
+        org.assertj.core.api.Assertions.assertThat(captured.get(2))
+                .as("regenerate 的键不能与普通请求相同")
+                .isNotEqualTo(captured.get(0));
+    }
 }
