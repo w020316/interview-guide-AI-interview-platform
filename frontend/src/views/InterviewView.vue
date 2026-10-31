@@ -492,6 +492,17 @@ function removeImage() {
 
 // 通过 ?sessionId= 载入指定会话（从收藏题库发起面试等入口进入时直接答题）
 onMounted(() => {
+  // P1-2：从任务中心「去看看」回来时带 ?taskId=，直接取回结果并重建会话
+  const rawTaskId = typeof route.query.taskId === 'string' ? route.query.taskId : ''
+  const taskId = Number(rawTaskId)
+  if (rawTaskId && Number.isInteger(taskId) && taskId > 0) {
+    void recoverFromTask(taskId)
+    // 与 sessionId 同口径：清掉 query，避免刷新重复触发（重复恢复会多建出空会话）
+    const q = { ...route.query }
+    delete q.taskId
+    router.replace({ path: '/interview', query: q }).catch(() => {})
+    return
+  }
   const sid = typeof route.query.sessionId === 'string' ? route.query.sessionId : ''
   if (sid) {
     resumeSession(sid)
@@ -889,6 +900,73 @@ function shareCard() {
     .finally(() => { sharing.value = false })
 }
 
+/**
+ * 建会话并把题目落库（出题主链路与「任务结果回填」共用）。
+ *
+ * <p>为什么必须共用同一段：题目只有落进 session / question 表，历史、错题本、
+ * 成长趋势才有数据。若回填只把题目塞进内存状态，这次面试就是「看得见、查不到」的孤岛，
+ * 而且用户毫不知情。
+ *
+ * @returns 新建的会话 id
+ */
+async function persistQuestions(parsed: Question[], jobDescription: string): Promise<string> {
+  const sess = await api.post('/api/session/create',
+    { jobDescription }, { timeout: AI_TIMEOUT }) as unknown as { sessionId: string }
+  const createdSessionId = sess.sessionId
+  try {
+    const saved = await api.post(`/api/session/${createdSessionId}/questions`,
+      parsed, { timeout: AI_TIMEOUT }) as unknown as Question[]
+    if (Array.isArray(saved) && saved.length === parsed.length) {
+      // 用后端返回的带 id 题目替换，后续 saveAnswer 需要 questionId
+      parsed.splice(0, parsed.length, ...saved)
+    }
+  } catch (persistErr) {
+    console.warn('题目持久化失败，历史回顾将不可用：', persistErr)
+    // P1-18：持久化失败此前只写 console.warn，用户拿到一份「看起来完整」的面试，
+    // 却没有任何数据落库（历史/错题本/趋势全空），且毫不知情。
+    // 这里显式提示，让失败可见——「不阻断流程」不等于「可以不告诉用户」。
+    ElMessage.warning('题目保存失败：本次作答将不会记入面试历史与错题本')
+  }
+  return createdSessionId
+}
+
+/**
+ * 从任务中心的任务取回出题结果并重建面试（P1-2）。
+ *
+ * <p>为什么需要：出题结果只存在 {@code ai_task.result_text}，页内轮询在用户离开页面后
+ * 就已经结束。没有这条路径，「可离开页面、回来看结果」就只兑现了「回来看通知」——
+ * 用户点「去看看」会落在空表单上，只能重新生成、再烧一次 AI 配额。
+ *
+ * <p>岗位描述从任务 payload 快照里取回：此刻用户表单可能已被清空，
+ * 而建会话需要它（否则历史里的这次面试没有岗位信息）。
+ */
+async function recoverFromTask(taskId: number) {
+  if (loading.value) return
+  loading.value = true
+  startGenProgress()
+  try {
+    genStep.value = 3
+    const task = await api.get(`/api/tasks/${taskId}`) as unknown as { payload?: string } | null
+    const result = await api.get(`/api/tasks/${taskId}/result`) as unknown as { resultText?: string } | null
+    const parsed = safeParse<Question[]>(result?.resultText ?? '', [])
+    if (!parsed.length) {
+      ElMessage.error('任务已完成但题目内容为空，请重新生成')
+      return
+    }
+    genStep.value = 4
+    const jobDescription = safeParse<{ jobDescription?: string }>(task?.payload ?? '', {}).jobDescription ?? ''
+    const createdSessionId = await persistQuestions(parsed, jobDescription)
+    sessionId.value = createdSessionId
+    questions.value = parsed
+    ElMessage.success(`已恢复 ${questions.value.length} 道题目，继续面试`)
+  } catch (e: unknown) {
+    ElMessage.error(getErrMessage(e, '恢复任务结果失败'))
+  } finally {
+    loading.value = false
+    stopGenProgress()
+  }
+}
+
 async function startInterview() {
   if (!jobDesc.value.trim()) return ElMessage.warning('请填写目标岗位')
   if (loading.value) return // 防止重复点击
@@ -918,25 +996,8 @@ async function startInterview() {
       return
     }
 
-    // 3. 出题成功后再创建会话并持久化题目
-    //    持久化失败不阻塞流程，仅记录日志（用户仍可在当前会话答题，仅历史回顾不可用）
-    const sess = await api.post('/api/session/create',
-      { jobDescription: jobDesc.value }, { timeout: AI_TIMEOUT }) as unknown as { sessionId: string }
-    const createdSessionId = sess.sessionId
-    try {
-      const saved = await api.post(`/api/session/${createdSessionId}/questions`,
-        parsed, { timeout: AI_TIMEOUT }) as unknown as Question[]
-      if (Array.isArray(saved) && saved.length === parsed.length) {
-        // 用后端返回的带 id 题目替换，后续 saveAnswer 需要 questionId
-        parsed.splice(0, parsed.length, ...saved)
-      }
-    } catch (persistErr) {
-      console.warn('题目持久化失败，历史回顾将不可用：', persistErr)
-      // P1-18：持久化失败此前只写 console.warn，用户拿到一份「看起来完整」的面试，
-      // 却没有任何数据落库（历史/错题本/趋势全空），且毫不知情。
-      // 这里显式提示，让失败可见——「不阻断流程」不等于「可以不告诉用户」。
-      ElMessage.warning('题目保存失败：本次作答将不会记入面试历史与错题本')
-    }
+    // 3. 出题成功后再创建会话并持久化题目（与「任务结果回填」共用同一段逻辑）
+    const createdSessionId = await persistQuestions(parsed, jobDesc.value)
 
     // 4. 题目成功后设置状态，切换到面试页
     sessionId.value = createdSessionId

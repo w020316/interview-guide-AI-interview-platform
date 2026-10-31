@@ -81,9 +81,19 @@ export function canRetry(status?: string): boolean {
   return status === 'FAILED' || status === 'CANCELLED'
 }
 
-/** 任务对应的业务页面（点「去看看」跳这里） */
-export function taskRoute(type?: string): string | undefined {
+/**
+ * 任务对应的业务页面（点「去看看」跳这里）。
+ *
+ * <p>P1-2（2026-10-31）：出题任务必须带上 {@code taskId} —— 结果正文只存在
+ * {@code ai_task.result_text}，面试页只有拿到 id 才能取回并重建会话。
+ * 不带的后果是「回来落在空表单」，用户只能重新生成、再烧一次 AI 配额。
+ *
+ * <p>评分任务暂不带 id：评分结果依附「某道题 + 用户答案」的页内上下文，
+ * 刷新后上下文已丢失，回填方式需产品决策（见 08-下一步交接.md），此处不做假装恢复。
+ */
+export function taskRoute(type?: string, taskId?: number): string | undefined {
   if (!type) return undefined
+  if (type === 'interview.questions' && taskId) return `/interview?taskId=${taskId}`
   if (type.startsWith('interview.')) return '/interview'
   return undefined
 }

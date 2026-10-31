@@ -78,6 +78,13 @@ describe('状态映射', () => {
     expect(taskRoute(undefined)).toBeUndefined()
   })
 
+  // P1-2：不带 taskId 的跳转会让用户落在空表单上（结果只存在 ai_task.result_text）
+  it('出题任务带上 taskId，评分任务不带（评分上下文刷新后已丢失，不做假装恢复）', () => {
+    expect(taskRoute('interview.questions', 42)).toBe('/interview?taskId=42')
+    expect(taskRoute('interview.evaluate', 42)).toBe('/interview')
+    expect(taskRoute('interview.questions', 0)).toBe('/interview')
+  })
+
   it('时间展示：T 换空格并截到分钟；缺失显示破折号', () => {
     expect(formatTaskTime('2026-10-30T23:02:47')).toBe('10-30 23:02')
     expect(formatTaskTime(undefined)).toBe('—')

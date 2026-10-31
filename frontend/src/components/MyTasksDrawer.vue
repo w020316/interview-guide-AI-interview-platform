@@ -160,7 +160,7 @@ async function cancel(t: MyTask): Promise<void> {
 }
 
 function go(t: MyTask): void {
-  const route = taskRoute(t.type)
+  const route = taskRoute(t.type, t.id)
   if (!route) return
   closeTaskDrawer()
   router.push(route)
