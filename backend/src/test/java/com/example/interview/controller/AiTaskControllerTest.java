@@ -230,4 +230,44 @@ class AiTaskControllerTest {
 
         verifyNoInteractions(taskService);
     }
+
+    // ── P1-1：开关只关「创建/汇总」，查询与取消不受影响 ──────────────────
+
+    @Test
+    @DisplayName("开关关闭时列表仍可用（回滚期间用户必须看得到自己的任务）")
+    void disabled_listStillWorks() throws Exception {
+        ReflectionTestUtils.setField(controller, "enabled", false);
+        when(taskService.listOwned(anyString(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get("/api/tasks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.total").value(0));
+    }
+
+    @Test
+    @DisplayName("开关关闭时仍可取消（否则被硬杀的任务无法收尾）")
+    void disabled_cancelStillWorks() throws Exception {
+        ReflectionTestUtils.setField(controller, "enabled", false);
+        when(taskService.cancel(eq(USER), eq(7L))).thenReturn(task(AiTaskStatus.CANCELLED.name()));
+
+        mockMvc.perform(post("/api/tasks/7/cancel"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    @Test
+    @DisplayName("开关关闭时仍可取结果（已成功的任务不能因回滚而不可读）")
+    void disabled_resultStillWorks() throws Exception {
+        ReflectionTestUtils.setField(controller, "enabled", false);
+        AiTaskEntity done = task(AiTaskStatus.SUCCEEDED.name());
+        done.setResultText("[{\"question\":\"q\"}]");
+        when(taskService.findOwned(anyString(), eq(7L))).thenReturn(done);
+
+        mockMvc.perform(get("/api/tasks/7/result"))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.resultText").value("[{\"question\":\"q\"}]"));
+    }
 }

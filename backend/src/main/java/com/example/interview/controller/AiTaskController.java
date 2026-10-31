@@ -28,8 +28,10 @@ import java.util.Map;
  * 创建 / 查询 / 列表 / 取消 / 汇总。所有接口的 {@code userId} 一律从 SecurityContext 取，
  * **不接受请求体传入**（防 IDOR）。
  *
- * <p>开关：{@code app.task-center.enabled} 默认 false。关闭时接口返回 503「任务中心未启用」，
- * 保证回滚时不是「静默返回空列表」而是明确告知——前者会让前端以为「你没有任务」。
+ * <p>开关：{@code app.task-center.enabled} 默认 false。**只有「创建」与「汇总」受它管辖**
+ * （前者是「能不能接新活」，后者是导航角标的数据源）；查询、取结果、列表、取消
+ * <b>一律不受开关影响</b> —— 2026-10-31 修正（P1-1）：回滚时恰恰最需要「看到并取消
+ * 那些被硬杀的任务」，若这几个接口也返 503，用户就只能干等。
  */
 @Tag(name = "AI 任务中心", description = "长耗时 AI 调用的异步任务查询与取消")
 @RestController
@@ -97,9 +99,6 @@ public class AiTaskController {
     @Operation(summary = "查询单个任务（仅本人）")
     @GetMapping("/{id}")
     public Result<AiTaskEntity> get(@PathVariable Long id) {
-        if (!enabled) {
-            return Result.error(503, DISABLED_MSG);
-        }
         return Result.success(taskService.findOwned(currentUserId(), id));
     }
 
@@ -114,9 +113,6 @@ public class AiTaskController {
     @Operation(summary = "取任务结果正文（仅成功的任务）")
     @GetMapping("/{id}/result")
     public Result<Map<String, Object>> result(@PathVariable Long id) {
-        if (!enabled) {
-            return Result.error(503, DISABLED_MSG);
-        }
         AiTaskEntity task = taskService.findOwned(currentUserId(), id);
         if (!AiTaskStatus.SUCCEEDED.name().equals(task.getStatus())) {
             return Result.error(409, "任务尚未成功完成（当前 " + task.getStatus() + "）");
@@ -133,9 +129,6 @@ public class AiTaskController {
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        if (!enabled) {
-            return Result.error(503, DISABLED_MSG);
-        }
         Page<AiTaskEntity> result = taskService.listOwned(currentUserId(), status, page,
                 Math.min(size, MAX_PAGE_SIZE));
         Map<String, Object> data = new LinkedHashMap<>();
@@ -149,9 +142,6 @@ public class AiTaskController {
     @Operation(summary = "取消任务（仅本人、仅未结束）")
     @PostMapping("/{id}/cancel")
     public Result<AiTaskEntity> cancel(@PathVariable Long id) {
-        if (!enabled) {
-            return Result.error(503, DISABLED_MSG);
-        }
         return Result.success(taskService.cancel(currentUserId(), id));
     }
 

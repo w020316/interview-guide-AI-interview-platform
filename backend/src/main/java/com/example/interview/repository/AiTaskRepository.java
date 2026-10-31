@@ -87,4 +87,45 @@ public interface AiTaskRepository extends JpaRepository<AiTaskEntity, Long> {
 
     /** 某状态下我的任务数（summary 角标用） */
     long countByUserIdAndStatus(String userId, String status);
+
+    // ── 启动收敛（P1-1，2026-10-31）──────────────────────────────────────
+    //
+    // 为什么需要：{@code @PreDestroy} 里的 {@code shutdownNow()} 会**硬杀**在途任务，
+    // 而关闭开关时 {@code AiTaskScheduler.poll()} 直接 return，{@code claimNext} 的
+    // 「租约过期重领」分支永远不会被调用 —— 这些行会永久停在 RUNNING，
+    // 用户既看不到进展也取消不了。启动时一次性收敛，比等租约自然过期更可靠。
+
+    /**
+     * 把「进程已死但仍挂在 RUNNING」且还有重试余量的任务退回队列。
+     *
+     * <p>退队列而不是直接判失败：这些任务只是被打断，重新执行即可拿到结果；
+     * 但**必须**用 {@code attempt < maxAttempt} 兜住，否则会与
+     * {@link #failExhaustedRunning} 抢同一批行，且可能无限重跑。
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("update AiTaskEntity t set t.status = 'QUEUED', t.progress = 0, t.leaseUntil = null "
+            + "where t.status = 'RUNNING' and t.attempt < t.maxAttempt")
+    int requeueOrphanRunning();
+
+    /** 重试次数已用尽的 RUNNING 直接判失败（与 {@code AiTaskService#claimNext} 的 stale 分支同口径） */
+    @Modifying(clearAutomatically = true)
+    @Query("update AiTaskEntity t set t.status = 'FAILED', t.errorCode = 'LEASE_EXPIRED', "
+            + "t.errorMessage = :message, t.finishedAt = :now, t.leaseUntil = null, t.progress = 0 "
+            + "where t.status = 'RUNNING' and t.attempt >= t.maxAttempt")
+    int failExhaustedRunning(@Param("message") String message, @Param("now") LocalDateTime now);
+
+    /**
+     * 开关关闭（回滚）时把**所有未结束**的任务判失败。
+     *
+     * <p>RUNNING 是被硬杀的中断任务；QUEUED 是「永远不会被执行」的排队任务。
+     * 两者若留在库里，前端会一直显示「进行中 / 排队中」—— 那是把结构性失效
+     * 说成暂时性问题。判失败后用户能拿到明确的「去重新发起」入口。
+     *
+     * <p>**只改状态不删行**：这些行是前端「去重新发起」的落点。
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("update AiTaskEntity t set t.status = 'FAILED', t.errorCode = 'ROLLBACK', "
+            + "t.errorMessage = :message, t.finishedAt = :now, t.leaseUntil = null, t.progress = 0 "
+            + "where t.status in ('RUNNING', 'QUEUED')")
+    int failUnfinishedForRollback(@Param("message") String message, @Param("now") LocalDateTime now);
 }

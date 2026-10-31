@@ -168,6 +168,44 @@ public class AiTaskService {
         return repository.findById(id);
     }
 
+    // ── 启动收敛（P1-1）──────────────────────────────────────────────────
+
+    /** 回滚收敛文案：与 M5 runbook 里的收尾 SQL 保持一致，前端直接展示给用户 */
+    public static final String ROLLBACK_MSG = "任务中心已回滚，请重新发起";
+    /** 重试次数耗尽的中断文案：与 {@link #claimNext} 的 stale 分支保持同一句话 */
+    public static final String LEASE_EXHAUSTED_MSG = "执行中断且已达重试上限，请重新发起";
+
+    /**
+     * 启动时收敛「进程死掉留下的在途任务」（P1-1）。
+     *
+     * <p>两种模式刻意不同：
+     * <ul>
+     *   <li><b>开关开</b>：RUNNING 说明上次进程被硬杀，任务本身没跑完 —— 还有重试余量的
+     *       退回队列（下一轮调度会重新执行），已用完次数的判失败；</li>
+     *   <li><b>开关关</b>：调度器根本不跑，留在库里的 RUNNING/QUEUED 永远不会前进。
+     *       此时一律判失败并给出「去重新发起」的终态 —— 让用户看到「失败可重发」，
+     *       而不是无限「进行中」。这是本项目「链路失效必须可见」的硬要求。</li>
+     * </ul>
+     *
+     * @return 被收敛的行数（用于日志与测试判据）
+     */
+    @Transactional
+    public int recoverOrphansOnStartup(boolean taskCenterEnabled, LocalDateTime now) {
+        if (!taskCenterEnabled) {
+            int rolledBack = repository.failUnfinishedForRollback(ROLLBACK_MSG, now);
+            if (rolledBack > 0) {
+                log.warn("任务中心未启用：已把 {} 条未结束任务收敛为 FAILED(ROLLBACK)", rolledBack);
+            }
+            return rolledBack;
+        }
+        int requeued = repository.requeueOrphanRunning();
+        int failed = repository.failExhaustedRunning(LEASE_EXHAUSTED_MSG, now);
+        if (requeued + failed > 0) {
+            log.warn("启动收敛完成：requeued={} failed={}（上次进程可能被硬杀）", requeued, failed);
+        }
+        return requeued + failed;
+    }
+
     // ── 清理（M4）────────────────────────────────────────────────────────
 
     /**

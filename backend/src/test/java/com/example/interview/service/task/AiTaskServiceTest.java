@@ -375,4 +375,32 @@ class AiTaskServiceTest {
         assertThat(AiTaskStatus.isTerminal("SUCCEEDED")).isTrue();
         assertThat(AiTaskStatus.isTerminal("QUEUED")).isFalse();
     }
+
+    // ── 启动收敛（P1-1）──────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("启动收敛（开关开）：有重试余量的退回队列，次数耗尽的判失败")
+    void recoverOrphans_enabled_requeuesAndFails() {
+        when(repository.requeueOrphanRunning()).thenReturn(2);
+        when(repository.failExhaustedRunning(anyString(), eq(NOW))).thenReturn(1);
+
+        int affected = service.recoverOrphansOnStartup(true, NOW);
+
+        assertThat(affected).isEqualTo(3);
+        verify(repository).requeueOrphanRunning();
+        verify(repository).failExhaustedRunning(AiTaskService.LEASE_EXHAUSTED_MSG, NOW);
+        verify(repository, never()).failUnfinishedForRollback(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("启动收敛（开关关）：未结束任务一律判失败，绝不留「进行中」")
+    void recoverOrphans_disabled_failsEverythingUnfinished() {
+        when(repository.failUnfinishedForRollback(AiTaskService.ROLLBACK_MSG, NOW)).thenReturn(4);
+
+        int affected = service.recoverOrphansOnStartup(false, NOW);
+
+        assertThat(affected).isEqualTo(4);
+        verify(repository, never()).requeueOrphanRunning();
+        verify(repository, never()).failExhaustedRunning(anyString(), any());
+    }
 }
