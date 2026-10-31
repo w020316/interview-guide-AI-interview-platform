@@ -28,13 +28,33 @@
 
         <div class="ri-scroll">
           <ol class="ri-steps" aria-label="在 App 里的取件步骤">
-            <li v-for="(step, i) in platform.steps" :key="i" class="ri-step">
+            <li v-for="(step, i) in steps" :key="i" class="ri-step">
               <span class="ri-step-no" aria-hidden="true">{{ i + 1 }}</span>
               <span class="ri-step-text">{{ step }}</span>
             </li>
           </ol>
 
-          <div class="ri-shot">
+          <!-- v1.90.3：微信平台的简历常在聊天里，用户要的是「选那个 PDF」。
+               网页拿不到聊天记录，所以这里把「存一次再选」做成主按钮，
+               截图退为「不想保存」的备选。 -->
+          <div v-if="chatSource" class="ri-chat">
+            <div class="ri-chat-head">
+              <p class="ri-chat-title">{{ chatSource.label }}</p>
+              <span class="ri-chat-badge">推荐</span>
+            </div>
+            <p class="ri-chat-desc">{{ chatSource.where }}</p>
+            <button type="button" class="ri-chat-btn" @click="emit('pick-file', chatSource)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"
+                  stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                <path d="M14 3v5h5" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+              </svg>
+              {{ chatPickCta }}
+            </button>
+            <p class="ri-chat-note">{{ chatPickNote }}</p>
+          </div>
+
+          <div class="ri-shot" :class="{ 'is-secondary': !!chatSource }">
             <div class="ri-shot-head">
               <p class="ri-shot-title">{{ shotTitle }}</p>
               <span class="ri-shot-badge">{{ shotBadge }}</span>
@@ -52,7 +72,7 @@
           </div>
 
           <div class="ri-pick">
-            <p class="ri-pick-title">已有 PDF？选它现在的位置</p>
+            <p class="ri-pick-title">{{ pickTitle }}</p>
             <div class="ri-sources">
               <button
                 v-for="source in sources"
@@ -87,14 +107,22 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import {
+  INTAKE_CHAT_PICK_CTA,
+  INTAKE_PICK_TITLE_OTHER,
   INTAKE_SHEET_NOTE,
   INTAKE_SHOT_CTA,
   INTAKE_SHOT_DESC,
   INTAKE_SHOT_TITLE,
+  INTAKE_SHOT_TITLE_NO_SAVE,
   RESUME_PICK_SOURCES,
+  WECHAT_FILE_PICK_NOTE,
   intakeSheetLead,
   intakeSheetTitle,
+  resolvePickWhere,
+  resolvePlatformSteps,
+  wechatIntakeLead,
   type IntakeSheetPhase,
+  type MobileOs,
   type ResumeImportPlatform,
   type ResumePickSource,
 } from '../utils/resumeIntake'
@@ -106,6 +134,8 @@ const props = defineProps<{
   handedOff: boolean
   /** 正在唤起时禁用重试，避免重复触发 scheme */
   busy?: boolean
+  /** iOS / Android 的存文件菜单名不同；缺省时用通用说法 */
+  os?: MobileOs
 }>()
 
 const emit = defineEmits<{
@@ -121,18 +151,48 @@ const idBase = `ri-${Date.now().toString(36)}-${++seq}`
 const titleId = `${idBase}-title`
 const leadId = `${idBase}-lead`
 
-const sources = RESUME_PICK_SOURCES
 const pickNote = INTAKE_SHEET_NOTE
-const shotTitle = INTAKE_SHOT_TITLE
 const shotDesc = INTAKE_SHOT_DESC
 const shotCta = INTAKE_SHOT_CTA
-const shotBadge = '推荐 · 不用下载'
+const chatPickCta = INTAKE_CHAT_PICK_CTA
+const chatPickNote = WECHAT_FILE_PICK_NOTE
 const sheetEl = ref<HTMLElement | null>(null)
+
+const osClass = computed<MobileOs>(() => props.os ?? 'other')
+const steps = computed(() => (
+  props.platform ? resolvePlatformSteps(props.platform, osClass.value) : []
+))
+
+/** 微信等「聊天里收文件」的平台：把该位置提为主按钮，并从下方列表里移除避免重复 */
+const chatSource = computed<ResumePickSource | null>(() => {
+  const key = props.platform?.chatPickSource
+  if (!key) return null
+  const source = RESUME_PICK_SOURCES.find((s) => s.key === key)
+  return source ? { ...source, where: resolvePickWhere(source, osClass.value) } : null
+})
+
+const sources = computed<ResumePickSource[]>(() => (
+  RESUME_PICK_SOURCES
+    .filter((source) => source.key !== props.platform?.chatPickSource)
+    .map((source) => ({ ...source, where: resolvePickWhere(source, osClass.value) }))
+))
+
+const shotTitle = computed(() => (
+  chatSource.value ? INTAKE_SHOT_TITLE_NO_SAVE : INTAKE_SHOT_TITLE
+))
+const shotBadge = computed(() => (chatSource.value ? '备用 · 不用保存' : '推荐 · 不用下载'))
+const pickTitle = computed(() => (
+  chatSource.value ? INTAKE_PICK_TITLE_OTHER : '已有 PDF？选它现在的位置'
+))
 
 const title = computed(() => (
   props.platform ? intakeSheetTitle(props.phase, props.platform.name) : ''
 ))
-const lead = computed(() => intakeSheetLead(props.phase, props.handedOff))
+const lead = computed(() => (
+  chatSource.value
+    ? wechatIntakeLead(props.phase, props.handedOff)
+    : intakeSheetLead(props.phase, props.handedOff)
+))
 
 let lastFocused: HTMLElement | null = null
 let prevOverflow = ''
@@ -306,6 +366,101 @@ onUnmounted(release)
 .ri-step-text {
   flex: 1;
   min-width: 0;
+}
+
+.ri-chat {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--brand-primary);
+  border-radius: var(--radius-lg);
+  background: var(--brand-primary-light);
+}
+
+.ri-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ri-chat-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--brand-primary-active);
+}
+
+.ri-chat-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--brand-primary);
+  color: var(--c-on-primary);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ri-chat-desc {
+  margin: 6px 0 10px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--c-text-secondary);
+  word-break: break-word;
+}
+
+.ri-chat-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--brand-primary);
+  color: var(--c-on-primary);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ri-chat-btn:hover {
+  background: var(--brand-primary-hover);
+}
+
+.ri-chat-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--c-text-tertiary);
+}
+
+.ri-chat + .ri-shot {
+  margin-top: 10px;
+}
+
+.ri-shot.is-secondary {
+  border-color: var(--c-border);
+  background: var(--c-bg-soft);
+}
+
+.ri-shot.is-secondary .ri-shot-title {
+  color: var(--c-text);
+}
+
+.ri-shot.is-secondary .ri-shot-badge {
+  background: var(--c-surface);
+  color: var(--c-text-tertiary);
+}
+
+.ri-shot.is-secondary .ri-shot-btn {
+  border: 1px solid var(--brand-primary);
+  background: var(--c-surface);
+  color: var(--brand-primary);
+}
+
+.ri-shot.is-secondary .ri-shot-btn:hover {
+  background: var(--brand-primary-light);
 }
 
 .ri-shot {

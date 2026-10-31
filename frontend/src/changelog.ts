@@ -85,9 +85,20 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.90.2'
+export const CURRENT_VERSION = '1.90.3'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.90.3',
+    date: '2026-10-31',
+    title: '版本 1.90.3 · 微信聊天里的简历，直接选 PDF',
+    items: [
+      { text: '从微信导入简历时，取件向导把「微信聊天里的 PDF」提为主按钮：聊天里点开 PDF → 右上角 ⋯ 存一次到手机 → 回来直接选，不用再翻下载目录', level: 'user' },
+      { text: '存文件的指引按系统给准确菜单名：iOS 是「存储到「文件」」+「浏览 → 我的 iPhone / iCloud」，安卓 / 鸿蒙是「保存到手机」+「下载 / 文件管理」；不想保存仍可用截图提取', level: 'user' },
+      { text: '在微信内置浏览器里打开本页时，顶部提示「选择文件通常只给相册」，引导从右上角 ⋯ 跳到系统浏览器；点微信卡片也不再打开没有意义的微信官网，留在本页给截图通道', level: 'user' },
+      { text: '前端：平台步骤与取件位置支持按 iOS / Android 分流（resolvePlatformSteps / resolvePickWhere），补对应用例', level: 'tech' },
+    ],
+  },
   {
     version: '1.90.2',
     date: '2026-10-31',

@@ -177,11 +177,31 @@ describe('ResumePlatformImport · 移动端唤起', () => {
     expect(wrapper.find('.pi-notice').text()).toContain('内置浏览器')
     expect(wrapper.find('.pi-notice').text()).toContain('已为你打开网页版入口')
   })
+
+  it('微信内置浏览器顶部给出「选择文件只给相册」的跳出提示', () => {
+    setUa(WECHAT_UA)
+    const wrapper = mountComponent()
+    const tip = wrapper.find('.pi-wechat-tip')
+    expect(tip.exists()).toBe(true)
+    expect(tip.text()).toContain('在浏览器打开')
+  })
+
+  it('非微信环境不出现微信内置浏览器提示', () => {
+    setUa(MOBILE_UA)
+    const wrapper = mountComponent()
+    expect(wrapper.find('.pi-wechat-tip').exists()).toBe(false)
+  })
 })
 
 describe('ResumePlatformImport · 取件向导（v1.90.1）', () => {
   function launchButton(wrapper: ReturnType<typeof mountComponent>) {
     return wrapper.findAll('button').find((b) => b.text().includes('在 App 中打开'))!
+  }
+
+  function cardLaunchButton(wrapper: ReturnType<typeof mountComponent>, key: string) {
+    const index = RESUME_IMPORT_PLATFORMS.findIndex((p) => p.key === key)
+    const card = wrapper.findAll('.pi-card')[index]
+    return card.findAll('button').find((b) => b.text().includes('在 App 中打开'))!
   }
 
   beforeEach(() => {
@@ -255,6 +275,34 @@ describe('ResumePlatformImport · 取件向导（v1.90.1）', () => {
     await flushPromises()
     expect(wrapper.emitted('pick-image')).toHaveLength(1)
     expect(document.querySelector('.ri-sheet')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('微信平台（iOS）：主按钮是「选择聊天里的 PDF」，步骤用 iOS 菜单名', async () => {
+    setUa(MOBILE_UA)
+    const wrapper = mountComponent()
+    await cardLaunchButton(wrapper, 'wechat').trigger('click')
+
+    const sheet = document.querySelector('.ri-sheet')!
+    expect(sheet.textContent).toContain('微信聊天里的 PDF')
+    expect(sheet.querySelector('.ri-chat-btn')!.textContent).toContain('选择聊天里的 PDF')
+    expect(sheet.querySelector('.ri-step:nth-child(2)')!.textContent).toContain('存储到「文件」')
+    expect(sheet.querySelector('.ri-shot')!.classList.contains('is-secondary')).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('微信内置浏览器点微信卡片：不跳外站，留在本页给截图与跳出提示', async () => {
+    setUa(WECHAT_UA)
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wrapper = mountComponent()
+    await cardLaunchButton(wrapper, 'wechat').trigger('click')
+
+    expect(open).not.toHaveBeenCalled()
+    expect(wrapper.find('.pi-notice').text()).toContain('在浏览器打开')
+    const sheet = document.querySelector('.ri-sheet')
+    expect(sheet).not.toBeNull()
+    expect(document.querySelector('.ri-title')!.textContent).toBe('从「微信文件」提取简历')
+    expect(sheet!.querySelector('.ri-chat-btn')).not.toBeNull()
     wrapper.unmount()
   })
 })

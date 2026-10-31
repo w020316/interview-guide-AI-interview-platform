@@ -17,10 +17,17 @@ import {
   INTAKE_SHEET_NOTE,
   INTAKE_SHOT_CTA,
   INTAKE_SHOT_TITLE,
+  INTAKE_SHOT_TITLE_NO_SAVE,
   RESUME_IMPORT_PLATFORMS,
   RESUME_PICK_SOURCES,
+  WECHAT_FILE_PICK_NOTE,
+  WECHAT_IN_APP_HINT,
   intakeSheetLead,
   intakeSheetTitle,
+  resolvePickWhere,
+  resolvePlatformSteps,
+  wechatIntakeLead,
+  wechatReturnFromAppHint,
 } from './resumeIntake'
 
 describe('utils/resumeIntake · 文件识别与校验', () => {
@@ -148,26 +155,63 @@ describe('utils/resumeIntake · 平台清单', () => {
 })
 
 describe('utils/resumeIntake · 取件向导（v1.90.1 / v1.90.2）', () => {
-  it('每个平台都带 3 步可执行指引，主路径为截图（不用下载保存）', () => {
+  it('每个平台在 iOS / Android 都带 3 步可执行指引', () => {
     for (const platform of RESUME_IMPORT_PLATFORMS) {
-      expect(platform.steps).toHaveLength(3)
-      for (const step of platform.steps) {
-        expect(step.trim().length).toBeGreaterThan(6)
+      for (const os of ['ios', 'android'] as const) {
+        const steps = resolvePlatformSteps(platform, os)
+        expect(steps).toHaveLength(3)
+        for (const step of steps) {
+          expect(step.trim().length).toBeGreaterThan(6)
+        }
+        expect(steps[2]).toContain('切回本页')
       }
-      expect(platform.steps[1]).toContain('截图')
-      expect(platform.steps[2]).toContain('切回本页')
     }
   })
 
-  it('位置清单覆盖微信 / 本机 / WPS / 其他，且都说明该去哪找', () => {
+  it('非聊天平台主路径仍是截图；微信按系统给「存到文件」的准确菜单名', () => {
+    const boss = RESUME_IMPORT_PLATFORMS.find((p) => p.key === 'boss')!
+    expect(resolvePlatformSteps(boss, 'ios')[1]).toContain('截图')
+
+    const wechat = RESUME_IMPORT_PLATFORMS.find((p) => p.key === 'wechat')!
+    const ios = resolvePlatformSteps(wechat, 'ios')
+    expect(ios[1]).toContain('存储到「文件」')
+    expect(ios[2]).toContain('我的 iPhone')
+    const android = resolvePlatformSteps(wechat, 'android')
+    expect(android[1]).toContain('保存到手机')
+    expect(android[2]).toContain('下载')
+    expect(resolvePlatformSteps(wechat, 'harmony')[1]).toContain('保存到手机')
+    expect(wechat.chatPickSource).toBe('wechat')
+  })
+
+  it('位置清单覆盖微信 / 本机 / WPS / 其他，微信位置按系统给准确路径', () => {
     expect(RESUME_PICK_SOURCES.map((s) => s.key)).toEqual(['wechat', 'files', 'wps', 'other'])
     for (const source of RESUME_PICK_SOURCES) {
       expect(source.label.length).toBeGreaterThan(0)
       expect(source.badge.length).toBeGreaterThan(0)
       expect(source.where.length).toBeGreaterThan(8)
     }
+    const wechat = RESUME_PICK_SOURCES[0]
+    expect(wechat.label).toContain('微信聊天')
+    expect(resolvePickWhere(wechat, 'ios')).toContain('存储到「文件」')
+    expect(resolvePickWhere(wechat, 'android')).toContain('保存到手机')
+    expect(resolvePickWhere(wechat, 'other')).toBe(wechat.where)
+    expect(resolvePickWhere(RESUME_PICK_SOURCES[1], 'ios')).toBe(RESUME_PICK_SOURCES[1].where)
     expect(INTAKE_SHEET_NOTE).toContain('系统文件选择器')
     expect(INTAKE_SHEET_NOTE).toContain('无法直接读取其他 App 的文件')
+  })
+
+  it('微信取件文案说清「网页拿不到聊天记录」，不宣称能直连', () => {
+    expect(WECHAT_FILE_PICK_NOTE).toContain('微信不向网页开放聊天记录')
+    expect(WECHAT_FILE_PICK_NOTE).toContain('存一次')
+    expect(wechatIntakeLead('launching', false)).toContain('右上角 ⋯')
+    expect(wechatIntakeLead('ready', true)).toContain('选择聊天里的 PDF')
+    expect(wechatIntakeLead('ready', false)).toContain('没跳转成功也不影响')
+    expect(wechatReturnFromAppHint()).toContain('选择聊天里的 PDF')
+    expect(WECHAT_IN_APP_HINT).toContain('在浏览器打开')
+    for (const text of [WECHAT_FILE_PICK_NOTE, wechatIntakeLead('ready', true), WECHAT_IN_APP_HINT]) {
+      expect(text).not.toContain('直接读取聊天记录')
+      expect(text).not.toContain('无需保存')
+    }
   })
 
   it('面板文案：唤起中用进行时，交棒用问句，不断言已导出或未安装', () => {
@@ -190,6 +234,7 @@ describe('utils/resumeIntake · 取件向导（v1.90.1 / v1.90.2）', () => {
   it('截图主路径文案强调「不用下载保存」，PDF 仅作次路径', () => {
     expect(INTAKE_SHOT_TITLE).toContain('不用下载')
     expect(INTAKE_SHOT_CTA).toContain('截图')
+    expect(INTAKE_SHOT_TITLE_NO_SAVE).toContain('不想保存')
     expect(INTAKE_SHEET_NOTE).toContain('不用下载或保存')
   })
 })

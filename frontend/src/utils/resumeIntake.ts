@@ -222,6 +222,14 @@ export interface ResumeImportPlatform {
   exportHint: string
   /** 唤起后留在页面上的取件向导：在对应 App 内 3 步取到简历（截图优先） */
   steps: string[]
+  /** 存到「文件」/「保存到手机」的菜单名在两端不同，分开写 */
+  stepsIos?: string[]
+  stepsAndroid?: string[]
+  /**
+   * 该平台的简历来自聊天记录时，取件面板把哪个位置提为主按钮。
+   * 只对确有「聊天里收文件」场景的平台声明（目前是微信）。
+   */
+  chatPickSource?: string
 }
 
 /**
@@ -291,12 +299,23 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
     badge: '微',
     scheme: 'weixin://',
     webUrl: 'https://weixin.qq.com/',
-    exportHint: '文件传输助手里的简历：逐页截图最省事；也可以「存储到文件」后选 PDF，或到电脑版 filehelper.weixin.qq.com 取件。',
+    exportHint: '聊天里收到的简历 PDF：点开 → 右上角 ⋯ → 存一次到手机，回来直接选；不想保存就截图提取。',
     steps: [
-      '在微信里打开「文件传输助手」里的简历',
-      '逐页截图（自动进相册，不用「保存到文件」）',
-      '切回本页选截图；已有 PDF 文件也可直接选',
+      '在微信聊天里点开对方发来的简历 PDF',
+      '右上角 ⋯ →「保存到手机」',
+      '切回本页，点「选择聊天里的 PDF」，在「下载」里选它',
     ],
+    stepsIos: [
+      '在微信聊天里点开对方发来的简历 PDF',
+      '右上角 ⋯ →「存储到「文件」」',
+      '切回本页，点「选择聊天里的 PDF」，在「浏览 → 我的 iPhone / iCloud 云盘」里选它',
+    ],
+    stepsAndroid: [
+      '在微信聊天里点开对方发来的简历 PDF',
+      '右上角 ⋯ →「保存到手机」',
+      '切回本页，点「选择聊天里的 PDF」，在「下载」或「文件管理」里选它',
+    ],
+    chatPickSource: 'wechat',
   },
   {
     key: 'wps',
@@ -328,6 +347,18 @@ export const RESUME_IMPORT_PLATFORMS: ResumeImportPlatform[] = [
 
 export type IntakeSheetPhase = 'launching' | 'ready'
 
+/**
+ * 取件步骤的系统差异只在「存到哪」这一步：
+ * iOS 的 WeChat 是「存储到「文件」」+「浏览 → 我的 iPhone / iCloud」，
+ * Android / HarmonyOS 是「保存到手机」+「下载 / 文件管理」。
+ * 没有单独文案的平台统一回落到 steps。
+ */
+export function resolvePlatformSteps(platform: ResumeImportPlatform, os: MobileOs): string[] {
+  if (os === 'ios' && platform.stepsIos) return platform.stepsIos
+  if ((os === 'android' || os === 'harmony') && platform.stepsAndroid) return platform.stepsAndroid
+  return platform.steps
+}
+
 export interface ResumePickSource {
   key: string
   /** 列表左侧角标（沿用平台卡片的文字角标风格） */
@@ -335,14 +366,18 @@ export interface ResumePickSource {
   label: string
   /** 系统选择器里该去哪找 */
   where: string
+  whereIos?: string
+  whereAndroid?: string
 }
 
 export const RESUME_PICK_SOURCES: ResumePickSource[] = [
   {
     key: 'wechat',
     badge: '微',
-    label: '微信 · 已保存的 PDF',
-    where: '微信里的 PDF 需先「保存到手机 / 存储到文件」，再在「下载」或「最近」里找',
+    label: '微信聊天里的 PDF',
+    where: '先点开 PDF 存到手机，再回到系统文件选择器里选它',
+    whereIos: '微信里点开 PDF → 右上角 ⋯ →「存储到「文件」」；回来在「浏览 → 我的 iPhone / iCloud 云盘」里找',
+    whereAndroid: '微信里点开 PDF → 右上角 ⋯ →「保存到手机」；回来在「下载」或「文件管理」里找',
   },
   {
     key: 'files',
@@ -364,11 +399,34 @@ export const RESUME_PICK_SOURCES: ResumePickSource[] = [
   },
 ]
 
-/** 截图主路径文案（面板第一视觉层，强调「不用下载保存」） */
+/** 按当前系统取「该去哪找」；两端菜单名不同，桌面/未知系统用通用说法 */
+export function resolvePickWhere(source: ResumePickSource, os: MobileOs): string {
+  if (os === 'ios' && source.whereIos) return source.whereIos
+  if ((os === 'android' || os === 'harmony') && source.whereAndroid) return source.whereAndroid
+  return source.where
+}
+
+/** 微信平台下的主按钮：直接打开系统文件选择器选聊天里存下的 PDF */
+export const INTAKE_CHAT_PICK_CTA = '选择聊天里的 PDF'
+
+/**
+ * 「为什么还要存一次」的说明。
+ * 网页拿不到微信聊天记录，`wx.chooseMessageFile` 只在小程序里可用；
+ * 不写清这一点，用户会以为是我们没做直连。这是平台边界，不是实现偷懒。
+ */
+export const WECHAT_FILE_PICK_NOTE =
+  '微信不向网页开放聊天记录，网页无法直接列出聊天里的文件；在微信里存一次到手机，回来就能选。不想保存可改用截图提取。'
+
+/** 截图主路径文案（非聊天取件平台的第一视觉层，强调「不用下载保存」） */
 export const INTAKE_SHOT_TITLE = '最快：截图提取，不用下载保存'
+/** 聊天取件平台里截图退为备选（PDF 才是用户本来要的东西） */
+export const INTAKE_SHOT_TITLE_NO_SAVE = '不想保存？直接截图提取'
 export const INTAKE_SHOT_DESC =
   '在 App 里分屏截图（1–5 张，截屏自动进相册）；回来选中截图，AI 直接提取文字并分析。'
 export const INTAKE_SHOT_CTA = '选择截图，AI 直接提取'
+
+/** 微信平台下位置列表已去掉微信行，标题相应改成「其他位置」 */
+export const INTAKE_PICK_TITLE_OTHER = '其他位置的 PDF'
 
 export const INTAKE_SHEET_NOTE =
   '截图提取不用下载或保存：截屏由系统自动存进相册。选 PDF 时会打开系统文件选择器——网页无法直接读取其他 App 的文件。'
@@ -390,6 +448,29 @@ export function intakeSheetLead(phase: IntakeSheetPhase, handedOff: boolean): st
     ? '切回来了？直接选刚截的图（1–5 张可一起选），AI 会提取文字并分析。'
     : '没有跳转成功也不影响：可以重试或打开网页版；也可以先截图，再回来选择。'
 }
+
+/** 微信取件面板的引导：主路径是聊天里的 PDF，截图是备选 */
+export function wechatIntakeLead(phase: IntakeSheetPhase, handedOff: boolean): string {
+  if (phase === 'launching') {
+    return '面板会保留：在聊天里点开 PDF → 右上角 ⋯ 存到手机，然后切回来选它。'
+  }
+  return handedOff
+    ? '切回来了？在聊天里点开 PDF → 右上角 ⋯ 存到手机，再点下方「选择聊天里的 PDF」。'
+    : '没跳转成功也不影响：手动打开微信，点开 PDF → 右上角 ⋯ 存到手机，再回来选。'
+}
+
+/** 微信平台交棒后的提示（与面板主按钮同名，避免两套说法） */
+export function wechatReturnFromAppHint(): string {
+  return '在微信里点开 PDF → 右上角 ⋯ 存到手机，回来点「选择聊天里的 PDF」'
+}
+
+/**
+ * 微信内置浏览器的选文件限制提示。
+ * 安卓微信的 `<input type="file">` 通常只给「拍照 / 相册」，iOS 也只给照片库和文件 App，
+ * 聊天里的 PDF 不在其中；跳出到系统浏览器后，选择器才会列出刚存下的文件。
+ */
+export const WECHAT_IN_APP_HINT =
+  '在微信内置浏览器里，选择文件通常只给相册，找不到聊天里的 PDF。点右上角 ⋯ →「在浏览器打开」，再回来选。'
 
 export type LaunchMode = 'app' | 'web' | 'blocked'
 

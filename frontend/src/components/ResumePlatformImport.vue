@@ -6,6 +6,9 @@
         在招聘 App 里截图或导出简历，再回来上传。手机端可直接唤起对应 App；
         截屏自动进相册，不用下载保存，回来选中就能识别。
       </p>
+      <p v-if="inAppBrowser === 'wechat'" class="pi-wechat-tip" role="note">
+        {{ wechatInAppHint }}
+      </p>
     </div>
 
     <div class="pi-grid">
@@ -103,6 +106,7 @@
       :platform="sheetPlatform"
       :handed-off="sheetHandedOff"
       :busy="!!launchingKey"
+      :os="mobileOS"
       @close="closeSheet"
       @pick-file="onSheetPickFile"
       @pick-image="onSheetPickImage"
@@ -132,9 +136,12 @@ import {
   RESUME_IMPORT_PLATFORMS,
   THIRD_PARTY_BOUNDARY_NOTE,
   THIRD_PARTY_CONSENT_TEXT,
+  WECHAT_IN_APP_HINT,
   decideLaunchMode,
+  detectMobileOS,
   isHttpUrl,
   returnFromAppHint,
+  wechatReturnFromAppHint,
   type IntakeSheetPhase,
   type ResumeImportPlatform,
 } from '../utils/resumeIntake'
@@ -163,6 +170,8 @@ const boundaryNote = THIRD_PARTY_BOUNDARY_NOTE
 /** 环境在 setup 时求值一次：首帧就按真实端渲染，避免手机先看到桌面分支 */
 const isMobile = detectMobile()
 const inAppBrowser = detectInAppBrowser()
+const mobileOS = detectMobileOS()
+const wechatInAppHint = WECHAT_IN_APP_HINT
 
 const launchingKey = ref('')
 const launchNotice = ref('')
@@ -287,8 +296,16 @@ function launch(platform: ResumeImportPlatform) {
     return
   }
   if (mode === 'blocked') {
-    setNotice(inAppBrowserHint(platform.name, inAppBrowser), true)
     showContinue.value = true
+    // 在微信里打开「微信」的网页版没有意义：不解自己的问题，还把用户丢到 weixin.qq.com。
+    // 直接留在本页：面板给截图通道，提示里给跳出到系统浏览器的办法。
+    if (platform.chatPickSource) {
+      setNotice(WECHAT_IN_APP_HINT, true)
+      openSheet(platform)
+      sheetPhase.value = 'ready'
+      return
+    }
+    setNotice(inAppBrowserHint(platform.name, inAppBrowser), true)
     openWeb(platform)
     return
   }
@@ -310,7 +327,10 @@ function launch(platform: ResumeImportPlatform) {
   const timer = window.setTimeout(() => {
     timers.delete(timer)
     if (current.handedOff) {
-      setNotice(returnFromAppHint(platform.name), false)
+      setNotice(
+        platform.chatPickSource ? wechatReturnFromAppHint() : returnFromAppHint(platform.name),
+        false,
+      )
     } else {
       setNotice(launchFallbackHint(platform.name), true)
     }
@@ -405,6 +425,17 @@ onUnmounted(() => {
   font-size: 13px;
   line-height: 1.6;
   color: var(--c-text-tertiary);
+}
+
+.pi-wechat-tip {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--brand-primary);
+  border-radius: var(--radius-sm);
+  background: var(--brand-primary-light);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c-text-secondary);
 }
 
 .pi-grid {

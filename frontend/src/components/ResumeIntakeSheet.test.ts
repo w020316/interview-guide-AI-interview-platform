@@ -18,6 +18,7 @@ import {
  */
 
 const BOSS = RESUME_IMPORT_PLATFORMS[0]
+const WECHAT = RESUME_IMPORT_PLATFORMS.find((p) => p.key === 'wechat')!
 
 let wrapper: VueWrapper | null = null
 
@@ -120,5 +121,53 @@ describe('ResumeIntakeSheet · 取件向导', () => {
 
     await wrapperRef.setProps({ open: false })
     expect(document.body.style.overflow).toBe('')
+  })
+})
+
+describe('ResumeIntakeSheet · 微信聊天取件（v1.90.3）', () => {
+  it('iOS：聊天 PDF 提为主按钮，截图退为备选，步骤用「存储到「文件」」', async () => {
+    const wrapperRef = mountSheet({ platform: WECHAT, os: 'ios' })
+    await flushPromises()
+
+    const chat = document.querySelector('.ri-chat')
+    expect(chat).not.toBeNull()
+    expect(chat!.textContent).toContain('微信聊天里的 PDF')
+    expect(chat!.textContent).toContain('存储到「文件」')
+    expect(document.querySelector('.ri-chat-btn')!.textContent).toContain('选择聊天里的 PDF')
+    expect(document.querySelector('.ri-step:nth-child(2)')!.textContent).toContain('存储到「文件」')
+
+    const shot = document.querySelector('.ri-shot')!
+    expect(shot.classList.contains('is-secondary')).toBe(true)
+    expect(shot.textContent).toContain('不想保存')
+    expect(shot.querySelector('.ri-shot-badge')!.textContent).toContain('备用')
+
+    // 微信行已提升为主按钮，位置列表不再重复它
+    expect(document.querySelectorAll('.ri-source')).toHaveLength(RESUME_PICK_SOURCES.length - 1)
+    expect(document.querySelector('.ri-pick')!.textContent).not.toContain('微信聊天里的 PDF')
+
+    ;(document.querySelector('.ri-chat-btn') as HTMLButtonElement).click()
+    await wrapperRef.vm.$nextTick()
+    const events = wrapperRef.emitted('pick-file')
+    expect(events).toHaveLength(1)
+    expect(events![0][0]).toMatchObject({ key: 'wechat' })
+    expect((events![0][0] as { where: string }).where).toContain('我的 iPhone')
+  })
+
+  it('Android：说明用「保存到手机」，并写明微信不向网页开放聊天记录', async () => {
+    mountSheet({ platform: WECHAT, os: 'android' })
+    await flushPromises()
+    expect(document.querySelector('.ri-chat-desc')!.textContent).toContain('保存到手机')
+    expect(document.querySelector('.ri-chat-note')!.textContent)
+      .toContain('微信不向网页开放聊天记录')
+    expect(document.querySelectorAll('.ri-step')[1].textContent).toContain('保存到手机')
+    expect(document.querySelector('.ri-lead')!.textContent).toContain('右上角 ⋯')
+  })
+
+  it('其他系统回落通用说明，不虚构「存储到「文件」」菜单', async () => {
+    mountSheet({ platform: WECHAT })
+    await flushPromises()
+    const desc = document.querySelector('.ri-chat-desc')!.textContent || ''
+    expect(desc).toContain('存到手机')
+    expect(desc).not.toContain('存储到「文件」')
   })
 })
