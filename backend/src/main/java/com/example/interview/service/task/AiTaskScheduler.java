@@ -67,7 +67,15 @@ public class AiTaskScheduler {
             t.setDaemon(true);
             return t;
         }));
+        this.heartbeat = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "ai-task-lease");
+            t.setDaemon(true);
+            return t;
+        });
     }
+
+    /** 续租线程；测试构造器下为 null（同步执行不需要续租） */
+    private java.util.concurrent.ScheduledExecutorService heartbeat;
 
     /** 测试用：注入直执行器（{@code Runnable::run}）即可恢复同步语义 */
     AiTaskScheduler(AiTaskService taskService, List<AiTaskHandler> handlers, Executor executor) {
@@ -114,6 +122,9 @@ public class AiTaskScheduler {
         if (ownedExecutor != null) {
             ownedExecutor.shutdownNow();
         }
+        if (heartbeat != null) {
+            heartbeat.shutdownNow();
+        }
     }
 
     /**
@@ -134,6 +145,8 @@ public class AiTaskScheduler {
 
     /** 真正的执行体；无论成败都必须释放 {@link #running} */
     private void doExecute(AiTaskEntity task) {
+        int attempt = task.getAttempt() == null ? 0 : task.getAttempt();
+        java.util.concurrent.ScheduledFuture<?> renewal = startRenewal(task.getId(), attempt);
         try {
             Optional<AiTaskHandler> handler = handlers.stream()
                     .filter(h -> h.type().equals(task.getType()))
@@ -149,7 +162,7 @@ public class AiTaskScheduler {
                 AiTaskOutcome outcome = handler.get().execute(task);
                 AiTaskOutcome safe = outcome == null ? AiTaskOutcome.EMPTY : outcome;
                 try {
-                    taskService.markSucceededWithResult(task.getId(), safe.resultRef(), safe.resultText());
+                    taskService.markSucceededWithResult(task.getId(), attempt, safe.resultRef(), safe.resultText());
                     log.info("任务执行成功 taskId={} type={} cost={}ms hasText={}",
                             task.getId(), task.getType(), System.currentTimeMillis() - start,
                             safe.resultText() != null);
@@ -173,8 +186,35 @@ public class AiTaskScheduler {
                 log.error("任务执行异常 taskId={}", task.getId(), e);
             }
         } finally {
+            if (renewal != null) {
+                renewal.cancel(false);
+            }
             running.set(false);
         }
+    }
+
+    /** 每 1/3 租约续一次；续不上（被取消/被重领）就停，终态写入会因 attempt 不符被拒 */
+    private java.util.concurrent.ScheduledFuture<?> startRenewal(Long id, int attempt) {
+        if (heartbeat == null) {
+            return null;
+        }
+        long period = LEASE_SECONDS / 3;
+        java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledFuture<?>> self =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        self.set(heartbeat.scheduleAtFixedRate(() -> {
+            try {
+                if (!taskService.renewLease(id, attempt, LEASE_SECONDS)) {
+                    log.info("续租失败，任务已不归本次执行 taskId={} attempt={}", id, attempt);
+                    java.util.concurrent.ScheduledFuture<?> f = self.get();
+                    if (f != null) {
+                        f.cancel(false);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("续租异常（下一周期重试） taskId={} err={}", id, e.getMessage());
+            }
+        }, period, period, java.util.concurrent.TimeUnit.SECONDS));
+        return self.get();
     }
 
     /**
@@ -187,7 +227,7 @@ public class AiTaskScheduler {
      */
     private void recordFailure(AiTaskEntity task, String code, String message, boolean retryable) {
         try {
-            taskService.markFailed(task.getId(), code, message, retryable);
+            taskService.markFailed(task.getId(), task.getAttempt() == null ? 0 : task.getAttempt(), code, message, retryable);
         } catch (Exception e) {
             log.debug("任务状态回写被忽略（多半是用户已取消） taskId={} err={}", task.getId(), e.getMessage());
         }

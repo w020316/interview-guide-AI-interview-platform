@@ -58,7 +58,7 @@ class AiTaskRepositoryRecoveryTest {
         AiTaskEntity queued = save("k3", "QUEUED", 0, 2);
         AiTaskEntity succeeded = save("k4", "SUCCEEDED", 1, 2);
 
-        assertThat(repository.requeueOrphanRunning()).isEqualTo(1);
+        assertThat(repository.requeueOrphanRunning(NOW)).isEqualTo(1);
 
         AiTaskEntity back = repository.findById(withBudget.getId()).orElseThrow();
         assertThat(back.getStatus()).isEqualTo("QUEUED");
@@ -116,5 +116,25 @@ class AiTaskRepositoryRecoveryTest {
                 .as("已成功的任务不能被回滚收敛改坏：用户还要取结果").isEqualTo("SUCCEEDED");
         assertThat(repository.findById(cancelled.getId()).orElseThrow().getStatus()).isEqualTo("CANCELLED");
         assertThat(repository.findById(failed.getId()).orElseThrow().getStatus()).isEqualTo("FAILED");
+    }
+
+    @Test
+    @DisplayName("启动收敛不碰租约未过期的 RUNNING（可能是其它实例正在执行）")
+    void requeue_skipsLiveLease() {
+        AiTaskEntity live = save("k-live", "RUNNING", 1, 2);
+        live.setLeaseUntil(NOW.plusMinutes(2));
+        repository.saveAndFlush(live);
+
+        assertThat(repository.requeueOrphanRunning(NOW)).isZero();
+        assertThat(repository.failExhaustedRunning("m", NOW)).isZero();
+        assertThat(repository.findById(live.getId()).orElseThrow().getStatus()).isEqualTo("RUNNING");
+    }
+
+    @Test
+    @DisplayName("续租只认当前 attempt：被重领后旧执行者续不上")
+    void renewLease_requiresCurrentAttempt() {
+        AiTaskEntity t = save("k-renew", "RUNNING", 2, 3);
+        assertThat(repository.renewLease(t.getId(), 1, NOW.plusMinutes(3))).isZero();
+        assertThat(repository.renewLease(t.getId(), 2, NOW.plusMinutes(3))).isEqualTo(1);
     }
 }

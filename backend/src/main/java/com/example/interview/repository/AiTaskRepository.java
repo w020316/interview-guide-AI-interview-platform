@@ -104,14 +104,16 @@ public interface AiTaskRepository extends JpaRepository<AiTaskEntity, Long> {
      */
     @Modifying(clearAutomatically = true)
     @Query("update AiTaskEntity t set t.version = t.version + 1, t.status = 'QUEUED', t.progress = 0, t.leaseUntil = null "
-            + "where t.status = 'RUNNING' and t.attempt < t.maxAttempt")
-    int requeueOrphanRunning();
+            + "where t.status = 'RUNNING' and t.attempt < t.maxAttempt "
+            + "and (t.leaseUntil is null or t.leaseUntil < :now)")
+    int requeueOrphanRunning(@Param("now") LocalDateTime now);
 
     /** 重试次数已用尽的 RUNNING 直接判失败（与 {@code AiTaskService#claimNext} 的 stale 分支同口径） */
     @Modifying(clearAutomatically = true)
     @Query("update AiTaskEntity t set t.version = t.version + 1, t.status = 'FAILED', t.errorCode = 'LEASE_EXPIRED', "
             + "t.errorMessage = :message, t.finishedAt = :now, t.leaseUntil = null, t.progress = 0 "
-            + "where t.status = 'RUNNING' and t.attempt >= t.maxAttempt")
+            + "where t.status = 'RUNNING' and t.attempt >= t.maxAttempt "
+            + "and (t.leaseUntil is null or t.leaseUntil < :now)")
     int failExhaustedRunning(@Param("message") String message, @Param("now") LocalDateTime now);
 
     /**
@@ -128,4 +130,11 @@ public interface AiTaskRepository extends JpaRepository<AiTaskEntity, Long> {
             + "t.errorMessage = :message, t.finishedAt = :now, t.leaseUntil = null, t.progress = 0 "
             + "where t.status in ('RUNNING', 'QUEUED')")
     int failUnfinishedForRollback(@Param("message") String message, @Param("now") LocalDateTime now);
+
+    /** 续租：只有仍持有该次领取（同 attempt、仍 RUNNING）的执行者能续上 */
+    @Modifying(clearAutomatically = true)
+    @Query("update AiTaskEntity t set t.version = t.version + 1, t.leaseUntil = :leaseUntil "
+            + "where t.id = :id and t.status = 'RUNNING' and t.attempt = :attempt")
+    int renewLease(@Param("id") Long id, @Param("attempt") int attempt,
+                   @Param("leaseUntil") LocalDateTime leaseUntil);
 }
