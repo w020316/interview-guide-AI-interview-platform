@@ -186,7 +186,8 @@ public class AiRateLimitFilter extends OncePerRequestFilter implements Ordered {
             + ",/api/application/*/tailor";
 
     /** 默认「成本最高」的路径前缀（可被 {@code app.ai.user-rate-limit.expensive-paths} 覆盖） */
-    public static final String DEFAULT_EXPENSIVE_PATH_PREFIXES = "/api/agent/";
+    /** 多图识别一次最多 5 次视觉 OCR + 1 次分析，与 Agent 同档计费 */
+    public static final String DEFAULT_EXPENSIVE_PATH_PREFIXES = "/api/agent/,/api/resume/upload-images";
 
     /** 默认每窗口配额：普通 AI 端点 60 次/分钟 */
     public static final int DEFAULT_AI_REQUESTS = 60;

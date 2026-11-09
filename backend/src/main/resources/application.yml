@@ -142,7 +142,7 @@ app:
       paths: ${AI_USER_RATE_LIMIT_PATHS:/api/agent/,/api/interview/,/api/job/,/api/jobs/refresh,/api/knowledge/ask,/api/knowledge/import,/api/knowledge/search,/api/resume/analyze,/api/resume/upload,/api/resume/upload-images,/api/resume/optimize,/api/resume/import-url,/api/resume/import-pdf-url,/api/resume/documents/*/autofill,/api/career/mine,/api/career/plan,/api/career/salary,/api/story-bank/extract,/api/story-bank/*/check,/api/story-bank/*/followup,/api/application/*/tailor}
       requests: ${AI_USER_RATE_LIMIT_REQUESTS:60}
       # 高成本前缀与其配额（覆盖上面的 requests，不会双重计数）
-      expensive-paths: ${AI_USER_RATE_LIMIT_EXPENSIVE_PATHS:/api/agent/}
+      expensive-paths: ${AI_USER_RATE_LIMIT_EXPENSIVE_PATHS:/api/agent/,/api/resume/upload-images}
       expensive-requests: ${AI_USER_RATE_LIMIT_EXPENSIVE_REQUESTS:20}
       # 滑动窗口长度（秒）
       window-seconds: ${AI_USER_RATE_LIMIT_WINDOW_SECONDS:60}

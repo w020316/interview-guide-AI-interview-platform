@@ -285,6 +285,19 @@ public class ResumeController {
             if (contentType != null && !contentType.toLowerCase().startsWith("image/")) {
                 return Result.error(400, "文件类型不受支持");
             }
+            // 整批先过格式与单张大小校验，避免前几张 OCR 已计费后才发现后面某张不合法
+            if (file.getSize() > com.example.interview.service.ResumeImageOcrService.MAX_IMAGE_BYTES) {
+                return Result.error(400, "图片过大（超过 6MB），请压缩后重试或改用原始文件上传");
+            }
+            byte[] head;
+            try {
+                head = file.getBytes();
+            } catch (Exception e) {
+                return Result.error(400, "截图读取失败，请重新选择");
+            }
+            if (com.example.interview.service.ResumeImageOcrService.detectImageMime(head) == null) {
+                return Result.error(400, "不是受支持的图片格式（支持 PNG / JPG / WEBP / GIF）");
+            }
         }
         if (totalBytes > MAX_TOTAL_IMAGE_BYTES) {
             return Result.error(400, "多张截图合计不能超过 10MB，请减少张数或压缩后再试");

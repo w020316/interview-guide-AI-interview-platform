@@ -523,6 +523,21 @@ class ResumeControllerTest {
         }
 
         @Test
+        @DisplayName("批内混入伪装图片 → 整批在 OCR 前拒绝，前面几张不产生识别费用")
+        void multiImage_fakeImageInBatch_rejectedBeforeOcr() throws Exception {
+            MockMultipartFile fake = new MockMultipartFile(
+                    "files", "p3.png", "image/png", "not an image".getBytes());
+
+            mockMvc.perform(multipart("/api/resume/upload-images")
+                            .file(shot("p1.png")).file(shot("p2.png")).file(fake))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("不是受支持的图片格式（支持 PNG / JPG / WEBP / GIF）"));
+
+            verify(resumeImageOcrService, never()).extractText(any());
+        }
+
+        @Test
         @DisplayName("超过 5 张返回 400，不调用识别")
         void multiImage_moreThanFive_returns400() throws Exception {
             var request = multipart("/api/resume/upload-images");
