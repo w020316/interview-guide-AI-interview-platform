@@ -91,6 +91,12 @@
             <version>1.18.3</version>
         </dependency>
 
+        <!-- OkHttp：支持自定义 Dns，用于把连接固定在已通过 SSRF 校验的 IP 上（版本由 Spring Boot BOM 管理） -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+        </dependency>
+
         <!-- PostgreSQL 驱动 -->
         <dependency>
             <groupId>org.postgresql</groupId>

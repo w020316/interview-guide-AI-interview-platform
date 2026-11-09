@@ -84,7 +84,7 @@ class RemotePdfFetcherTest {
     @Test
     @DisplayName("合法 PDF：返回字节与 UTF-8 文件名")
     void fetch_pdf_ok() {
-        RemotePdfFetcher.FetchedPdf result = new RemotePdfFetcher().fetch(baseUrl + "/files/resume.pdf");
+        RemotePdfFetcher.FetchedPdf result = RemotePdfFetcher.allowingLoopbackForTest().fetch(baseUrl + "/files/resume.pdf");
 
         assertThat(result.content()).isEqualTo(PDF);
         assertThat(result.fileName()).isEqualTo("吴宇威-Java.pdf");
@@ -93,7 +93,7 @@ class RemotePdfFetcherTest {
     @Test
     @DisplayName("没有 Content-Disposition 时用 URL 末段做文件名")
     void fetch_filenameFromUrl() {
-        RemotePdfFetcher.FetchedPdf result = new RemotePdfFetcher().fetch(baseUrl + "/files/fallback.pdf");
+        RemotePdfFetcher.FetchedPdf result = RemotePdfFetcher.allowingLoopbackForTest().fetch(baseUrl + "/files/fallback.pdf");
 
         assertThat(result.fileName()).isEqualTo("fallback.pdf");
     }
@@ -101,7 +101,7 @@ class RemotePdfFetcherTest {
     @Test
     @DisplayName("分享页返回 HTML：明确提示这不是 PDF")
     void fetch_htmlPage_hasClearMessage() {
-        assertThatThrownBy(() -> new RemotePdfFetcher().fetch(baseUrl + "/share/page.html"))
+        assertThatThrownBy(() -> RemotePdfFetcher.allowingLoopbackForTest().fetch(baseUrl + "/share/page.html"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("链接返回的是网页，不是 PDF 文件。请打开该页面下载 PDF 后从本地上传");
     }
@@ -109,7 +109,7 @@ class RemotePdfFetcherTest {
     @Test
     @DisplayName("重定向不跟随，提示使用最终直链（防绕过 SSRF 校验）")
     void fetch_redirect_rejected() {
-        assertThatThrownBy(() -> new RemotePdfFetcher().fetch(baseUrl + "/redirect"))
+        assertThatThrownBy(() -> RemotePdfFetcher.allowingLoopbackForTest().fetch(baseUrl + "/redirect"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("链接发生了跳转（HTTP 302），请使用最终的 PDF 直链");
     }
@@ -117,7 +117,7 @@ class RemotePdfFetcherTest {
     @Test
     @DisplayName("403：提示需要登录或链接失效")
     void fetch_forbidden_hasClearMessage() {
-        assertThatThrownBy(() -> new RemotePdfFetcher().fetch(baseUrl + "/private"))
+        assertThatThrownBy(() -> RemotePdfFetcher.allowingLoopbackForTest().fetch(baseUrl + "/private"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("链接需要登录或已失效，请在平台内重新获取公开分享链接");
     }
@@ -125,7 +125,7 @@ class RemotePdfFetcherTest {
     @Test
     @DisplayName("后缀是 pdf 但内容不是：按 magic bytes 拒绝")
     void fetch_fakePdf_rejected() {
-        assertThatThrownBy(() -> new RemotePdfFetcher().fetch(baseUrl + "/fake.pdf"))
+        assertThatThrownBy(() -> RemotePdfFetcher.allowingLoopbackForTest().fetch(baseUrl + "/fake.pdf"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("链接内容不是合法的 PDF 文件");
     }
@@ -138,5 +138,26 @@ class RemotePdfFetcherTest {
         assertThatThrownBy(() -> RemotePdfFetcher.readLimited(new ByteArrayInputStream(oversized)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("PDF 大小不能超过 10MB");
+    }
+
+    @Test
+    @DisplayName("连接阶段解析到回环地址即拦截（DNS 重绑定防护，默认构造器）")
+    void fetch_loopback_blockedAtConnect() {
+        assertThatThrownBy(() -> new RemotePdfFetcher().fetch(baseUrl + "/files/resume.pdf"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("不支持访问内网地址");
+    }
+
+    @Test
+    @DisplayName("PinnedPublicDns：解析结果含内网 IP 时拒绝，公网 IP 放行")
+    void pinnedDns_filtersByResolvedAddress() throws Exception {
+        RemotePdfFetcher.PinnedPublicDns dns =
+                new RemotePdfFetcher.PinnedPublicDns(com.example.interview.util.SsrUrlValidator::isBlocked);
+        assertThatThrownBy(() -> dns.lookup("127.0.0.1"))
+                .isInstanceOf(java.net.UnknownHostException.class);
+        assertThatThrownBy(() -> dns.lookup("169.254.169.254"))
+                .isInstanceOf(java.net.UnknownHostException.class);
+        assertThat(dns.lookup("192.0.2.1")).extracting(java.net.InetAddress::getHostAddress)
+                .containsExactly("192.0.2.1");
     }
 }

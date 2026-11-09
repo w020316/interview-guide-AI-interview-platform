@@ -132,7 +132,7 @@ public final class SsrUrlValidator {
      *   <li>IPv6 ULA fd00::/8：{@code isSiteLocalAddress} 仅识别 fec0::/10 旧站点本地段。</li>
      * </ul>
      */
-    private static boolean isBlocked(InetAddress addr) {
+    public static boolean isBlocked(InetAddress addr) {
         if (addr == null) return false;
         if (addr.isLoopbackAddress()
                 || addr.isSiteLocalAddress()
