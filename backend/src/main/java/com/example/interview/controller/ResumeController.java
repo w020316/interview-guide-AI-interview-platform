@@ -220,13 +220,17 @@ public class ResumeController {
             // 2. 调用 AI 分析
             String analysisJson = resumeAnalysisService.analyze(currentUserId(), resumeText, targetJob);
             // 3. 持久化（保存真实简历文本，便于后续优化与回看）
+            boolean saved = true;
             try {
                 resumeService.saveResume(currentUserId(), resumeText, targetJob, analysisJson);
             } catch (Exception e) {
                 log.warn("简历上传结果持久化失败：{}", e.getMessage());
+                saved = false;
             }
             // 4. 返回 analysis + resumeText（前端需要 resumeText 调用 /optimize 生成优化简历）
             Map<String, String> payload = new HashMap<>();
+            // 入库失败要让用户知道：否则「导入成功」后历史里却找不到这份简历
+            if (!saved) payload.put("saved", "false");
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
             if (isImage) {
@@ -324,13 +328,17 @@ public class ResumeController {
             }
 
             String analysisJson = resumeAnalysisService.analyze(currentUserId(), resumeText, targetJob);
+            boolean saved = true;
             try {
                 resumeService.saveResume(currentUserId(), resumeText, targetJob, analysisJson);
             } catch (Exception e) {
                 log.warn("多图简历识别结果持久化失败：{}", e.getMessage());
+                saved = false;
             }
 
             Map<String, String> payload = new HashMap<>();
+            // 入库失败要让用户知道：否则「导入成功」后历史里却找不到这份简历
+            if (!saved) payload.put("saved", "false");
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
             payload.put("fromImage", "true");
@@ -529,13 +537,17 @@ public class ResumeController {
             String analysisJson = resumeAnalysisService.analyze(userId, resumeText, targetJob);
 
             // 持久化
+            boolean saved = true;
             try {
                 resumeService.saveResume(userId, resumeText, targetJob, analysisJson);
             } catch (Exception e) {
                 log.warn("URL 导入简历持久化失败：{}", e.getMessage());
+                saved = false;
             }
 
             Map<String, String> payload = new HashMap<>();
+            // 入库失败要让用户知道：否则「导入成功」后历史里却找不到这份简历
+            if (!saved) payload.put("saved", "false");
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
             return Result.success(payload);
@@ -589,13 +601,17 @@ public class ResumeController {
             RemotePdfFetcher.FetchedPdf pdf = remotePdfFetcher.fetch(valid.normalizedUrl);
             String resumeText = resumeParseService.parsePdfToText(pdf.content());
             String analysisJson = resumeAnalysisService.analyze(userId, resumeText, targetJob);
+            boolean saved = true;
             try {
                 resumeService.saveResume(userId, resumeText, targetJob, analysisJson);
             } catch (Exception e) {
                 log.warn("分享链接导入简历持久化失败：{}", e.getMessage());
+                saved = false;
             }
 
             Map<String, String> payload = new HashMap<>();
+            // 入库失败要让用户知道：否则「导入成功」后历史里却找不到这份简历
+            if (!saved) payload.put("saved", "false");
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
             payload.put("fileName", pdf.fileName());

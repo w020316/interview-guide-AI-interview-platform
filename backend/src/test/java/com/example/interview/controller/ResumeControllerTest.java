@@ -538,6 +538,20 @@ class ResumeControllerTest {
         }
 
         @Test
+        @DisplayName("入库失败：仍返回分析结果，但带 saved=false 让前端如实提示")
+        void multiImage_saveFails_flagsNotSaved() throws Exception {
+            when(resumeImageOcrService.extractText(any()))
+                    .thenReturn(new com.example.interview.service.ResumeImageOcrService.OcrResult("教育背景", false));
+            when(resumeAnalysisService.analyze(any(), any(), any())).thenReturn("{\"score\":80}");
+            org.mockito.Mockito.doThrow(new RuntimeException("db down"))
+                    .when(resumeService).saveResume(any(), any(), any(), any());
+
+            mockMvc.perform(multipart("/api/resume/upload-images").file(shot("p1.png")))
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.saved").value("false"));
+        }
+
+        @Test
         @DisplayName("超过 5 张返回 400，不调用识别")
         void multiImage_moreThanFive_returns400() throws Exception {
             var request = multipart("/api/resume/upload-images");

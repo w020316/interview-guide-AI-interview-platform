@@ -677,7 +677,7 @@ function handleResult(data: unknown) {
   }
   // 新格式：上传文件时后端返回 { analysis, resumeText }
   if (data && typeof data === 'object' && 'analysis' in (data as Record<string, unknown>)) {
-    const payload = data as { analysis?: string; resumeText?: string }
+    const payload = data as { analysis?: string; resumeText?: string; saved?: string }
     const analysis = payload.analysis || ''
     if (!analysis.trim()) {
       ElMessage.error('AI 返回为空，请重试')
@@ -685,6 +685,9 @@ function handleResult(data: unknown) {
       return false
     }
     result.value = analysis
+    if (payload.saved === 'false') {
+      ElMessage.warning('分析已完成，但未能保存到简历历史，请复制结果或稍后重试')
+    }
     // 保存后端解析出的简历文本，供"生成优化简历"使用
     if (payload.resumeText) {
       resumeText.value = payload.resumeText
