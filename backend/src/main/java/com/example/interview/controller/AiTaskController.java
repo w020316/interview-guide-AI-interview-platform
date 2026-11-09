@@ -60,6 +60,12 @@ public class AiTaskController {
         return auth.getPrincipal().toString();
     }
 
+    private static boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
+
     private static final String DISABLED_MSG = "任务中心未启用";
 
     /**
@@ -74,6 +80,10 @@ public class AiTaskController {
     public Result<AiTaskEntity> create(@RequestBody Map<String, Object> req) {
         if (!enabled) {
             return Result.error(503, DISABLED_MSG);
+        }
+        // 普通用户走 InterviewTaskController（有字段校验与限流）；这里只留给管理员排障，否则可绕过限流刷 AI 配额
+        if (!isAdmin()) {
+            return Result.error(403, "请通过业务接口创建任务");
         }
         String userId = currentUserId();
         String type = str(req.get("type"));
