@@ -6,6 +6,7 @@ import com.example.interview.entity.AiTaskEntity;
 import com.example.interview.repository.AiTaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,7 +66,7 @@ public class AiTaskService {
      * @param maxAttempt 含首次的最大执行次数（1–5）
      * @return 新建任务，或同键下「未失败」的既有任务
      */
-    @Transactional
+    // 不加 @Transactional：唯一索引冲突在 PostgreSQL 会让当前事务失效，回读必须在新事务里做
     public AiTaskEntity create(String userId, String type, String idempotencyKey,
                                String payload, int maxAttempt, LocalDateTime now) {
         requireText(userId, "userId", 64);
@@ -92,7 +93,13 @@ public class AiTaskService {
                 .payload(payload)
                 .createdAt(now)
                 .build();
-        return repository.save(task);
+        try {
+            return repository.saveAndFlush(task);
+        } catch (DataIntegrityViolationException e) {
+            log.info("并发创建同键任务，复用已入库的那条 userId={} type={}", userId, type);
+            return repository.findFirstByUserIdAndIdempotencyKeyAndStatusIn(userId, idempotencyKey, AiTaskStatus.ACTIVE)
+                    .orElseThrow(() -> e);
+        }
     }
 
     // ── 领取 ────────────────────────────────────────────────────────────

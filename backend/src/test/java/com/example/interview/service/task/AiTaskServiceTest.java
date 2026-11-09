@@ -67,7 +67,21 @@ class AiTaskServiceTest {
         AiTaskEntity result = service.create(USER, "interview.questions", "key-1", "{}", 1, NOW);
 
         assertThat(result).isSameAs(exist);
-        verify(repository, never()).save(any(AiTaskEntity.class));
+        verify(repository, never()).saveAndFlush(any(AiTaskEntity.class));
+    }
+
+    @Test
+    @DisplayName("并发双击撞唯一索引 → 回读并复用先入库的那条，不抛错")
+    void create_uniqueConflict_returnsWinner() {
+        AiTaskEntity winner = task(AiTaskStatus.QUEUED.name(), 0, 1);
+        when(repository.findFirstByUserIdAndIdempotencyKeyAndStatusIn(eq(USER), eq("key-1"), anyCollection()))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(repository.saveAndFlush(any(AiTaskEntity.class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uq_ai_task_user_key_active"));
+
+        AiTaskEntity result = service.create(USER, "interview.questions", "key-1", "{}", 1, NOW);
+
+        assertThat(result).isSameAs(winner);
     }
 
     @Test
@@ -75,7 +89,7 @@ class AiTaskServiceTest {
     void create_allowsNewAfterFailure() {
         when(repository.findFirstByUserIdAndIdempotencyKeyAndStatusIn(eq(USER), eq("key-1"), anyCollection()))
                 .thenReturn(Optional.empty());
-        when(repository.save(any(AiTaskEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any(AiTaskEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AiTaskEntity result = service.create(USER, "interview.questions", "key-1", "{}", 2, NOW);
 

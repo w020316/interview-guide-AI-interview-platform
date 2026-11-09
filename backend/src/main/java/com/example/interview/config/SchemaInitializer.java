@@ -248,7 +248,10 @@ public class SchemaInitializer implements CommandLineRunner {
             // 保留这条 ALTER：老环境若已建表但缺列，靠它补齐。
             "ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS result_text TEXT",
             // 乐观锁：取消与 worker 写终态并发时，后提交的一方得到冲突而不是静默覆盖
-            "ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0"
+            "ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0",
+            // 并发双击防重：条件与 AiTaskStatus.ACTIVE 一致，FAILED/CANCELLED 后允许同键新建
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_task_user_key_active ON ai_task(user_id, idempotency_key) "
+                    + "WHERE status IN ('QUEUED','RUNNING','SUCCEEDED')"
     };
 
     /**

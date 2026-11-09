@@ -300,8 +300,10 @@ CREATE INDEX IF NOT EXISTS idx_ai_task_status ON ai_task(status);
 ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS result_text TEXT;
 -- 乐观锁：防止 worker 的终态写入覆盖并发取消
 ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
--- 幂等键不加唯一约束：FAILED 之后允许同键新建（见 AiTaskStatus.ACTIVE），
--- 唯一性由服务层按「未失败状态」判定；H2/PostgreSQL 的部分唯一索引语法不一致，故不落库约束。
+-- 幂等键部分唯一索引：只约束「未失败」状态（同 AiTaskStatus.ACTIVE），FAILED/CANCELLED 后允许同键新建。
+-- 并发双击时第二个 INSERT 撞约束，服务层捕获后读回已有任务。
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ai_task_user_key_active ON ai_task(user_id, idempotency_key)
+    WHERE status IN ('QUEUED', 'RUNNING', 'SUCCEEDED');
 
 -- 预置知识数据
 INSERT INTO knowledge_doc (category, title, content, source) VALUES
