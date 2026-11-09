@@ -246,7 +246,9 @@ public class SchemaInitializer implements CommandLineRunner {
             // ── 阶段六 M3（2026-10-30）：任务结果正文 ──
             // 出题/评分的结果不落业务表，异步化后必须能取回；上限由 AiTaskService#saveResultText 控制。
             // 保留这条 ALTER：老环境若已建表但缺列，靠它补齐。
-            "ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS result_text TEXT"
+            "ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS result_text TEXT",
+            // 乐观锁：取消与 worker 写终态并发时，后提交的一方得到冲突而不是静默覆盖
+            "ALTER TABLE ai_task ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0"
     };
 
     /**
@@ -272,7 +274,8 @@ public class SchemaInitializer implements CommandLineRunner {
             {"users", "banned"},
             // 阶段六 M3：缺列时异步出题/评分任务成功但「结果取不回」——
             // 前端只会一直显示「排队中/执行中」，与静默失效等价，纳入启动自检
-            {"ai_task", "result_text"}
+            {"ai_task", "result_text"},
+            {"ai_task", "version"}
     };
 
     /** 必须存在的新表 */
