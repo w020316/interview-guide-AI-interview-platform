@@ -20,8 +20,10 @@ import { finishAiTask, startServerAiTask } from './aiTasks'
 
 /** 默认最长等待：出题 77s + 队列等待，留一倍余量 */
 export const DEFAULT_TASK_TIMEOUT_MS = 240_000
-/** 默认轮询间隔：2s，对后端与免费层额度都很轻 */
+/** 首次轮询间隔；之后每轮乘 POLL_BACKOFF，封顶 MAX_POLL_MS */
 export const DEFAULT_POLL_MS = 2_000
+export const MAX_POLL_MS = 5_000
+const POLL_BACKOFF = 1.5
 /** 轮询连续失败上限：超过则认为网络已断，不再空转 */
 const MAX_POLL_FAILURES = 5
 
@@ -99,26 +101,38 @@ async function pollUntilDone(taskId: number, opts: ServerTaskOptions): Promise<s
   const sleep = opts.sleep ?? defaultSleep
   const now = opts.now ?? Date.now
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TASK_TIMEOUT_MS
-  const pollMs = opts.pollMs ?? DEFAULT_POLL_MS
+  let delay = opts.pollMs ?? DEFAULT_POLL_MS
   const deadline = now() + timeoutMs
   let failures = 0
+  let resultFailures = 0
+  const tooMany = (n: number): void => {
+    if (n >= MAX_POLL_FAILURES) {
+      throw new Error('任务状态查询失败，请稍后在任务中心重试')
+    }
+  }
 
   while (now() < deadline) {
-    await sleep(pollMs)
+    await sleep(delay)
+    delay = Math.min(delay * POLL_BACKOFF, MAX_POLL_MS)
     let task: TaskView | null | undefined
     try {
       task = (await api.get(`/api/tasks/${taskId}`)) as unknown as TaskView | null
       failures = 0
-    } catch (e) {
-      failures += 1
-      if (failures >= MAX_POLL_FAILURES) {
-        throw new Error('任务状态查询失败，请稍后在任务中心重试')
-      }
+    } catch {
+      tooMany(++failures)
       continue
     }
     const status = task?.status
     if (status === SUCCEEDED) {
-      return fetchResult(taskId)
+      let data: { resultText?: string } | null
+      try {
+        data = (await api.get(`/api/tasks/${taskId}/result`)) as unknown as { resultText?: string } | null
+      } catch {
+        // 任务已成功、结果还在服务端：取结果失败只重试，不能让用户重新生成再付一次费
+        tooMany(++resultFailures)
+        continue
+      }
+      return requireResultText(data)
     }
     if (status === FAILED) {
       throw new Error(task?.errorMessage || '任务执行失败，请重试')
@@ -130,9 +144,8 @@ async function pollUntilDone(taskId: number, opts: ServerTaskOptions): Promise<s
   throw new Error('任务等待超时，请稍后在任务中心查看结果')
 }
 
-/** 取结果正文；缺失时明确失败，而不是返回空串让调用方「解析成功但内容为空」 */
-async function fetchResult(taskId: number): Promise<string> {
-  const data = (await api.get(`/api/tasks/${taskId}/result`)) as unknown as { resultText?: string } | null
+/** 结果正文缺失时明确失败，而不是返回空串让调用方「解析成功但内容为空」 */
+function requireResultText(data: { resultText?: string } | null): string {
   const text = data?.resultText
   if (typeof text !== 'string' || text.trim() === '') {
     throw new Error('任务已完成但没有返回结果，请重试')
