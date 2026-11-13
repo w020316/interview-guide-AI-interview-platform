@@ -1,5 +1,7 @@
 package com.example.interview.service;
 
+import com.example.interview.util.PinnedHttp;
+import com.example.interview.util.PinnedHttp.BlockedAddressException;
 import com.example.interview.util.SsrUrlValidator;
 import okhttp3.Dns;
 import okhttp3.OkHttpClient;
@@ -17,10 +19,8 @@ import java.io.InterruptedIOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URLDecoder;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.List;
 import java.util.Locale;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -53,58 +53,19 @@ public class RemotePdfFetcher {
     }
 
     RemotePdfFetcher(Predicate<InetAddress> blocked) {
-        this.httpClient = new OkHttpClient.Builder()
+        this.httpClient = PinnedHttp.newBuilder(Dns.SYSTEM, blocked)
                 .connectTimeout(Duration.ofSeconds(10))
                 .callTimeout(Duration.ofSeconds(20))
-                // 禁止跟随重定向：重定向目标可能绕过已完成的 SSRF 校验
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .dns(new PinnedPublicDns(blocked))
-                // IP 字面量主机不经过 Dns 钩子，所以再校验实际连上的对端地址
-                .addNetworkInterceptor(chain -> {
-                    okhttp3.Connection conn = chain.connection();
-                    InetAddress peer = conn == null ? null : conn.socket().getInetAddress();
-                    if (peer == null || blocked.test(peer)) {
-                        throw new BlockedAddressException(chain.request().url().host());
-                    }
-                    return chain.proceed(chain.request());
-                })
                 .build();
     }
 
     /** 测试专用：允许连接本机测试服务器，其它地址仍按 SSRF 规则拦截 */
     static RemotePdfFetcher allowingLoopbackForTest() {
-        return new RemotePdfFetcher(addr -> !addr.isLoopbackAddress() && SsrUrlValidator.isBlocked(addr));
+        return new RemotePdfFetcher(PinnedHttp.blockedExceptLoopback());
     }
 
     /** 下载结果：PDF 字节与展示用文件名 */
     public record FetchedPdf(byte[] content, String fileName) {
-    }
-
-    /** 解析一次并只返回通过校验的地址，连接直接使用这些地址，不再二次解析 */
-    static final class PinnedPublicDns implements Dns {
-        private final Predicate<InetAddress> blocked;
-
-        PinnedPublicDns(Predicate<InetAddress> blocked) {
-            this.blocked = blocked;
-        }
-
-        @Override
-        public List<InetAddress> lookup(String hostname) throws UnknownHostException {
-            List<InetAddress> addresses = Dns.SYSTEM.lookup(hostname);
-            for (InetAddress addr : addresses) {
-                if (blocked.test(addr)) {
-                    throw new BlockedAddressException(hostname);
-                }
-            }
-            return addresses;
-        }
-    }
-
-    static final class BlockedAddressException extends UnknownHostException {
-        BlockedAddressException(String host) {
-            super("blocked address for host " + host);
-        }
     }
 
     public FetchedPdf fetch(String url) {

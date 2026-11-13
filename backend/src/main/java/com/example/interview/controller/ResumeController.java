@@ -9,8 +9,11 @@ import com.example.interview.service.RemotePdfFetcher;
 import com.example.interview.service.ResumeParseService;
 import com.example.interview.service.ResumeService;
 import com.example.interview.util.PerUserRateLimiter;
+import com.example.interview.util.PinnedHttp;
 import com.example.interview.util.SsrfGuard;
 import com.example.interview.util.SsrUrlValidator;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
 import org.slf4j.Logger;
@@ -93,6 +96,12 @@ public class ResumeController {
     /** 第三方平台分享链接 → PDF 直链下载（v1.90.0） */
     @Autowired
     private RemotePdfFetcher remotePdfFetcher;
+
+    private static final OkHttpClient URL_IMPORT_HTTP = PinnedHttp.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(10))
+            .readTimeout(java.time.Duration.ofSeconds(10))
+            .callTimeout(java.time.Duration.ofSeconds(20))
+            .build();
 
     /** SSRF 校验单一入口（可注入，便于切片测试） */
     @Autowired
@@ -516,13 +525,11 @@ public class ResumeController {
 
         String userId = currentUserId();
         try {
-            // 抓取 URL 页面（限制 10 秒超时，模拟浏览器 UA，禁止跟随重定向防 SSRF 绕过）
-            org.jsoup.nodes.Document doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .timeout(10_000)
-                    .maxBodySize(5 * 1024 * 1024) // 5MB 上限
-                    .followRedirects(false)
-                    .get();
+            // 不跟随重定向、连接时重新校验 IP（防 DNS 重绑定），正文 5MB 上限
+            Request pageRequest = new Request.Builder().url(url).get()
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .build();
+            org.jsoup.nodes.Document doc = PinnedHttp.getHtml(URL_IMPORT_HTTP, pageRequest, 5 * 1024 * 1024, false, false);
 
             // 提取纯文本
             String resumeText = Jsoup.clean(doc.html(), Safelist.none())
@@ -551,7 +558,10 @@ public class ResumeController {
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
             return Result.success(payload);
-        } catch (java.net.SocketTimeoutException e) {
+        } catch (PinnedHttp.BlockedAddressException e) {
+            log.warn("URL 导入在连接阶段解析到内网地址，已拦截 url={}", url);
+            return Result.error(400, "不支持访问内网地址");
+        } catch (java.io.InterruptedIOException e) {
             return Result.error(400, "网页访问超时，请检查 URL 是否可公开访问");
         } catch (org.jsoup.HttpStatusException e) {
             return Result.error(400, "网页返回错误状态码：" + e.getStatusCode());

@@ -1,7 +1,9 @@
 package com.example.interview.service.job;
 
+import com.example.interview.util.PinnedHttp;
 import com.example.interview.util.SsrUrlValidator;
-import org.jsoup.Jsoup;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -11,8 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.net.SocketTimeoutException;
+import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -66,8 +69,16 @@ public class WebJobSearcherService {
     private static final int MAX_PER_SOURCE = 8;
     /** 最大结果总数 */
     private static final int MAX_TOTAL = 12;
-    /** 读取超时（毫秒）；Jsoup.connect().timeout() 同时作用于连接与读取，连接超时无需单独常量 */
+    /** 连接与读取共用的超时（毫秒） */
     private static final int READ_TIMEOUT_MS = 8000;
+    /** 与 Jsoup.connect 默认上限一致，超出部分截断 */
+    private static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
+
+    private static final OkHttpClient HTTP = PinnedHttp.newBuilder()
+            .connectTimeout(Duration.ofMillis(READ_TIMEOUT_MS))
+            .readTimeout(Duration.ofMillis(READ_TIMEOUT_MS))
+            .callTimeout(Duration.ofMillis(READ_TIMEOUT_MS * 2L))
+            .build();
 
     private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             + "(KHTML, like Gecko) Chrome/120.0 Safari/537.36";
@@ -317,21 +328,22 @@ public class WebJobSearcherService {
 
     private Document fetch(String url) {
         // B-07：与 JobPageFetcher 对齐——先过 SSRF 校验（当前 URL 全为硬编码公开站点，
-        // 此校验为纵深防御：若将来支持用户自定义源，可直接拦住内网/元数据地址），
-        // 且 followRedirects(false) 防止「跟随 302 跳转到内网」绕过校验。
+        // 此校验为纵深防御：若将来支持用户自定义源，可直接拦住内网/元数据地址）；
+        // PinnedHttp 不跟随重定向，并在连接时重新校验解析出的 IP，防 302 与 DNS 重绑定绕过。
         if (!SsrUrlValidator.validate(url).ok) {
             log.warn("拒绝抓取未通过 SSRF 校验的地址：{}", url);
             return null;
         }
         try {
-            return Jsoup.connect(url)
-                    .userAgent(UA)
-                    .timeout(READ_TIMEOUT_MS)
+            Request request = new Request.Builder().url(url).get()
+                    .header("User-Agent", UA)
                     .header("Accept-Language", "zh-CN,zh;q=0.9")
-                    .followRedirects(false)
-                    .ignoreHttpErrors(true)
-                    .get();
-        } catch (SocketTimeoutException e) {
+                    .build();
+            return PinnedHttp.getHtml(HTTP, request, MAX_BODY_BYTES, true, false);
+        } catch (PinnedHttp.BlockedAddressException e) {
+            log.warn("联网抓取在连接阶段解析到内网地址，已拦截：{}", url);
+            return null;
+        } catch (InterruptedIOException e) {
             log.warn("联网抓取超时：{}", url);
             return null;
         } catch (IOException | IllegalArgumentException e) {

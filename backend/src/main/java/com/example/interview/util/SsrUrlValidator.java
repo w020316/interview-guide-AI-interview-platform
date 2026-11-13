@@ -16,9 +16,8 @@ import java.net.UnknownHostException;
  *   <li>显式拒绝常见的云元数据 / 容器宿主机等敏感网段</li>
  * </ol>
  *
- * <p>说明：DNS 重绑定（校验时公网 IP、连接时换内网 IP）依赖"解析与连接分离"的 TOCTOU 窗口，
- * 本工具为最佳努力校验；彻底阻断需把连接也绑定到已校验的 IP 并强制 Host 头（会影响 HTTPS/证书 SAN 校验），
- * 故作为已记录残余风险，不做破坏性改动。
+ * <p>本类只在校验时解析一次 DNS，挡不住 DNS 重绑定（校验时公网、连接时内网）。
+ * 后端自行抓取时必须用 {@link PinnedHttp} 的客户端，它在连接时重新校验并只连已校验的地址。
  */
 public final class SsrUrlValidator {
 

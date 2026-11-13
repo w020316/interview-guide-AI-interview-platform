@@ -151,8 +151,9 @@ class RemotePdfFetcherTest {
     @Test
     @DisplayName("PinnedPublicDns：解析结果含内网 IP 时拒绝，公网 IP 放行")
     void pinnedDns_filtersByResolvedAddress() throws Exception {
-        RemotePdfFetcher.PinnedPublicDns dns =
-                new RemotePdfFetcher.PinnedPublicDns(com.example.interview.util.SsrUrlValidator::isBlocked);
+        com.example.interview.util.PinnedHttp.PinnedPublicDns dns =
+                new com.example.interview.util.PinnedHttp.PinnedPublicDns(
+                        okhttp3.Dns.SYSTEM, com.example.interview.util.SsrUrlValidator::isBlocked);
         assertThatThrownBy(() -> dns.lookup("127.0.0.1"))
                 .isInstanceOf(java.net.UnknownHostException.class);
         assertThatThrownBy(() -> dns.lookup("169.254.169.254"))

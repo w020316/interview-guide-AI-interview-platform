@@ -1,13 +1,16 @@
 package com.example.interview.service.job;
 
+import com.example.interview.util.PinnedHttp;
 import com.example.interview.util.SsrUrlValidator;
-import org.jsoup.Jsoup;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.net.SocketTimeoutException;
+import java.io.InterruptedIOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,6 +64,12 @@ public class JobPageFetcher {
      * 宁可多放一点噪声给 AI，也不要因为阈值太高把有效的短 JD 判死。
      */
     private static final int MIN_MEANINGFUL_TEXT = 500;
+
+    private final OkHttpClient httpClient = PinnedHttp.newBuilder()
+            .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS))
+            .readTimeout(Duration.ofMillis(READ_TIMEOUT_MS))
+            .callTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS + READ_TIMEOUT_MS))
+            .build();
 
     /** 抓取结果：三态，调用方必须分别处理。 */
     public enum Outcome { OK, SPA_OR_EMPTY, FAILED }
@@ -120,19 +129,19 @@ public class JobPageFetcher {
         }
         String url = valid.normalizedUrl;
 
-        // 2) 抓取。followRedirects(false) 是安全要求而非偏好：
-        //    若能跟随 302，攻击者可用一个公网域名把我们重定向到内网地址，绕过第 1 步的全部校验。
+        // 2) 抓取。客户端不跟随重定向，并在连接时重新校验解析出的 IP（防 DNS 重绑定），
+        //    否则第 1 步的校验可以被 302 或「先公网后内网」的 DNS 应答绕过。
         final Document doc;
         try {
-            doc = Jsoup.connect(url)
-                    .userAgent(UA)
+            Request request = new Request.Builder().url(url).get()
+                    .header("User-Agent", UA)
                     .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                    .timeout(Math.max(CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS))
-                    .maxBodySize(MAX_BODY_BYTES)
-                    .followRedirects(false)
-                    .ignoreContentType(true)
-                    .get();
-        } catch (SocketTimeoutException e) {
+                    .build();
+            doc = PinnedHttp.getHtml(httpClient, request, MAX_BODY_BYTES, false, true);
+        } catch (PinnedHttp.BlockedAddressException e) {
+            log.warn("岗位链接在连接阶段解析到内网地址，已拦截 url={}", url);
+            return FetchedPage.failed(null, Reason.NOT_A_JOB_PAGE, "不支持访问内网地址");
+        } catch (InterruptedIOException e) {
             return FetchedPage.failed(url, Reason.NETWORK,
                     "访问该链接超时。请确认它能在浏览器里正常打开；若可以，说明该站点对程序访问较慢或被限速，请手动复制正文。");
         } catch (org.jsoup.HttpStatusException e) {
