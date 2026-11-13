@@ -4,12 +4,25 @@ import DOMPurify from 'dompurify'
 // html: false 禁止 HTML 标签通过，linkify 自动识别链接
 const md = new MarkdownIt({ html: false, linkify: true })
 
-// DOMPurify 消毒：阻止 javascript: 协议等 XSS 向量
+// 白名单，新增渲染能力时需同步这里。故意不放行 img（AI 文本可被注入外链图片做追踪）
+// 和 style（表格对齐统一由 markdown.css 控制）
+const ALLOWED_TAGS = [
+  'p', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'strong', 'em', 's', 'del', 'code', 'pre', 'blockquote',
+  'ul', 'ol', 'li', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+]
+const ALLOWED_ATTR = ['href', 'title', 'start']
+
+// AI 文本里的链接一律新标签页打开，并切断 window.opener，防止反向篡改本页
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A' && node.hasAttribute('href')) {
+    node.setAttribute('target', '_blank')
+    node.setAttribute('rel', 'noopener noreferrer')
+  }
+})
+
 function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
-    FORBID_TAGS: ['style', 'iframe'],
-    FORBID_ATTR: ['onerror', 'onload'],
-  })
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR, ADD_ATTR: ['target', 'rel'] })
 }
 
 /**
