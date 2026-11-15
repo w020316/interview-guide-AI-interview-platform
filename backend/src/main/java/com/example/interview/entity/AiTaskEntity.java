@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -133,6 +134,12 @@ public class AiTaskEntity {
 
     @Column(name = "finished_at")
     private LocalDateTime finishedAt;
+
+    /** 乐观锁：防止用户取消与 worker 写终态互相覆盖；批量 update 语句需手动 +1 */
+    @Version
+    @Column(name = "version", nullable = false)
+    @Builder.Default
+    private Long version = 0L;
 
     @PrePersist
     public void prePersist() {

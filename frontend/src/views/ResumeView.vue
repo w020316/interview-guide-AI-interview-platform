@@ -198,6 +198,7 @@
         <div class="upload-progress-head">
           <span class="upload-progress-name">{{ uploadState.fileName }}</span>
           <span class="upload-progress-phase">{{ uploadPhaseLabel }}</span>
+          <el-button size="small" text type="info" class="upload-cancel" @click="cancelUpload">取消</el-button>
         </div>
         <div class="upload-bar" :class="{ 'is-indeterminate': uploadState.phase !== 'uploading' }">
           <div
@@ -410,7 +411,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api, { AI_TIMEOUT, getErrMessage } from '../api'
@@ -474,6 +475,14 @@ const parseError = ref('')
    后端收到完整文件后才开始 AI 推理，这两段没有可信百分比，不伪造。
    ───────────────────────────────────────────────────────────── */
 type UploadPhase = 'idle' | 'validating' | 'uploading' | 'parsing'
+
+let uploadController: AbortController | null = null
+function cancelUpload() { uploadController?.abort() }
+onBeforeUnmount(cancelUpload)
+function isAborted(e: unknown) {
+  const name = (e as { name?: string; code?: string } | null)
+  return name?.name === 'CanceledError' || name?.code === 'ERR_CANCELED'
+}
 
 const uploadState = reactive({
   phase: 'idle' as UploadPhase,
@@ -677,7 +686,7 @@ function handleResult(data: unknown) {
   }
   // 新格式：上传文件时后端返回 { analysis, resumeText }
   if (data && typeof data === 'object' && 'analysis' in (data as Record<string, unknown>)) {
-    const payload = data as { analysis?: string; resumeText?: string }
+    const payload = data as { analysis?: string; resumeText?: string; saved?: string }
     const analysis = payload.analysis || ''
     if (!analysis.trim()) {
       ElMessage.error('AI 返回为空，请重试')
@@ -685,6 +694,9 @@ function handleResult(data: unknown) {
       return false
     }
     result.value = analysis
+    if (payload.saved === 'false') {
+      ElMessage.warning('分析已完成，但未能保存到简历历史，请复制结果或稍后重试')
+    }
     // 保存后端解析出的简历文本，供"生成优化简历"使用
     if (payload.resumeText) {
       resumeText.value = payload.resumeText
@@ -730,8 +742,10 @@ async function handleUpload(file: File, options: { allowImages?: boolean } = {})
   form.append('file', file)
   form.append('targetJob', targetJob.value)
   try {
+    uploadController = new AbortController()
     const data = await api.post('/api/resume/upload', form, {
       timeout: AI_TIMEOUT,
+      signal: uploadController.signal,
       onUploadProgress: (event) => {
         // 浏览器给出的是 multipart 请求体大小（略大于文件本身），按它算真实百分比
         const total = event.total && event.total > 0 ? event.total : file.size
@@ -747,8 +761,10 @@ async function handleUpload(file: File, options: { allowImages?: boolean } = {})
       warnIfImageTruncated(data)
     }
   } catch (e: unknown) {
-    uploadError.value = getErrMessage(e, '上传失败')
+    if (isAborted(e)) ElMessage.info('已取消上传')
+    else uploadError.value = getErrMessage(e, '上传失败')
   } finally {
+    uploadController = null
     loading.value = false
     uploadState.phase = 'idle'
   }
@@ -779,7 +795,6 @@ async function handleMultiUpload(files: File[]) {
   uploadState.percent = 0
   uploadState.loaded = 0
   uploadState.total = totalSize
-  uploadState.phase = 'validating'
 
   loading.value = true
   result.value = ''
@@ -788,8 +803,10 @@ async function handleMultiUpload(files: File[]) {
   for (const file of files) form.append('files', file)
   form.append('targetJob', targetJob.value)
   try {
+    uploadController = new AbortController()
     const data = await api.post('/api/resume/upload-images', form, {
       timeout: AI_TIMEOUT,
+      signal: uploadController.signal,
       onUploadProgress: (event) => {
         const total = event.total && event.total > 0 ? event.total : totalSize
         uploadState.loaded = event.loaded
@@ -803,8 +820,10 @@ async function handleMultiUpload(files: File[]) {
       warnIfImageTruncated(data)
     }
   } catch (e: unknown) {
-    uploadError.value = getErrMessage(e, '截图识别失败')
+    if (isAborted(e)) ElMessage.info('已取消上传')
+    else uploadError.value = getErrMessage(e, '截图识别失败')
   } finally {
+    uploadController = null
     loading.value = false
     uploadState.phase = 'idle'
   }

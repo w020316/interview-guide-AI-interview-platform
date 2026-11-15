@@ -43,7 +43,7 @@ public interface AiTaskRepository extends JpaRepository<AiTaskEntity, Long> {
      * @return 1=抢到，0=已被其它执行器领取/已被取消
      */
     @Modifying(clearAutomatically = true)
-    @Query("update AiTaskEntity t set t.status = 'RUNNING', t.attempt = t.attempt + 1, "
+    @Query("update AiTaskEntity t set t.version = t.version + 1, t.status = 'RUNNING', t.attempt = t.attempt + 1, "
             + "t.leaseUntil = :leaseUntil, t.startedAt = :startedAt "
             + "where t.id = :id and t.status = 'QUEUED'")
     int claim(@Param("id") Long id,
@@ -60,7 +60,7 @@ public interface AiTaskRepository extends JpaRepository<AiTaskEntity, Long> {
      * 避免把另一个执行器正在跑的任务抢走。attempt 同样 +1，受 max_attempt 约束。
      */
     @Modifying(clearAutomatically = true)
-    @Query("update AiTaskEntity t set t.leaseUntil = :leaseUntil, t.startedAt = :startedAt, "
+    @Query("update AiTaskEntity t set t.version = t.version + 1, t.leaseUntil = :leaseUntil, t.startedAt = :startedAt, "
             + "t.attempt = t.attempt + 1 "
             + "where t.id = :id and t.status = 'RUNNING' and t.leaseUntil < :startedAt")
     int reclaim(@Param("id") Long id,
@@ -103,15 +103,17 @@ public interface AiTaskRepository extends JpaRepository<AiTaskEntity, Long> {
      * {@link #failExhaustedRunning} 抢同一批行，且可能无限重跑。
      */
     @Modifying(clearAutomatically = true)
-    @Query("update AiTaskEntity t set t.status = 'QUEUED', t.progress = 0, t.leaseUntil = null "
-            + "where t.status = 'RUNNING' and t.attempt < t.maxAttempt")
-    int requeueOrphanRunning();
+    @Query("update AiTaskEntity t set t.version = t.version + 1, t.status = 'QUEUED', t.progress = 0, t.leaseUntil = null "
+            + "where t.status = 'RUNNING' and t.attempt < t.maxAttempt "
+            + "and (t.leaseUntil is null or t.leaseUntil < :now)")
+    int requeueOrphanRunning(@Param("now") LocalDateTime now);
 
     /** 重试次数已用尽的 RUNNING 直接判失败（与 {@code AiTaskService#claimNext} 的 stale 分支同口径） */
     @Modifying(clearAutomatically = true)
-    @Query("update AiTaskEntity t set t.status = 'FAILED', t.errorCode = 'LEASE_EXPIRED', "
+    @Query("update AiTaskEntity t set t.version = t.version + 1, t.status = 'FAILED', t.errorCode = 'LEASE_EXPIRED', "
             + "t.errorMessage = :message, t.finishedAt = :now, t.leaseUntil = null, t.progress = 0 "
-            + "where t.status = 'RUNNING' and t.attempt >= t.maxAttempt")
+            + "where t.status = 'RUNNING' and t.attempt >= t.maxAttempt "
+            + "and (t.leaseUntil is null or t.leaseUntil < :now)")
     int failExhaustedRunning(@Param("message") String message, @Param("now") LocalDateTime now);
 
     /**
@@ -124,8 +126,15 @@ public interface AiTaskRepository extends JpaRepository<AiTaskEntity, Long> {
      * <p>**只改状态不删行**：这些行是前端「去重新发起」的落点。
      */
     @Modifying(clearAutomatically = true)
-    @Query("update AiTaskEntity t set t.status = 'FAILED', t.errorCode = 'ROLLBACK', "
+    @Query("update AiTaskEntity t set t.version = t.version + 1, t.status = 'FAILED', t.errorCode = 'ROLLBACK', "
             + "t.errorMessage = :message, t.finishedAt = :now, t.leaseUntil = null, t.progress = 0 "
             + "where t.status in ('RUNNING', 'QUEUED')")
     int failUnfinishedForRollback(@Param("message") String message, @Param("now") LocalDateTime now);
+
+    /** 续租：只有仍持有该次领取（同 attempt、仍 RUNNING）的执行者能续上 */
+    @Modifying(clearAutomatically = true)
+    @Query("update AiTaskEntity t set t.version = t.version + 1, t.leaseUntil = :leaseUntil "
+            + "where t.id = :id and t.status = 'RUNNING' and t.attempt = :attempt")
+    int renewLease(@Param("id") Long id, @Param("attempt") int attempt,
+                   @Param("leaseUntil") LocalDateTime leaseUntil);
 }

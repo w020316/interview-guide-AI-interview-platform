@@ -46,7 +46,7 @@ public class ResumeImageOcrService {
     private static final Logger log = LoggerFactory.getLogger(ResumeImageOcrService.class);
 
     /** 单张图片大小上限（base64 后约 1.37 倍，留足上游请求体余量） */
-    private static final long MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+    public static final long MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 
     /** glm-4v-flash 的输出上限就是 1024，传更大会被上游 400 拒绝 */
     private static final int MAX_OUTPUT_TOKENS = 1024;
@@ -150,7 +150,7 @@ public class ResumeImageOcrService {
      *
      * @return image/jpeg、image/png、image/gif、image/webp；无法识别返回 null
      */
-    private static String detectImageMime(byte[] b) {
+    public static String detectImageMime(byte[] b) {
         if (b == null) return null;
         if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) {
             return "image/jpeg";

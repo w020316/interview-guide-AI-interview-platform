@@ -87,9 +87,26 @@ class AiTaskControllerTest {
 
     // ── 创建 ────────────────────────────────────────────────────────────
 
+    private void asAdmin() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                USER, null, List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))));
+    }
+
+    @Test
+    @DisplayName("创建：普通用户 → 403，且不触达 service（防绕过业务接口限流）")
+    void create_nonAdmin_forbidden() throws Exception {
+        mockMvc.perform(post("/api/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"interview.questions\",\"idempotencyKey\":\"k1\"}"))
+                .andExpect(jsonPath("$.code").value(403));
+
+        verifyNoInteractions(taskService);
+    }
+
     @Test
     @DisplayName("创建：合法入参 → 200，返回任务 id 与 QUEUED 状态")
     void create_ok() throws Exception {
+        asAdmin();
         when(taskService.create(eq(USER), eq("interview.questions"), eq("k1"), any(), anyInt()))
                 .thenReturn(task(AiTaskStatus.QUEUED.name()));
 
@@ -110,6 +127,7 @@ class AiTaskControllerTest {
     @Test
     @DisplayName("创建：缺少 type → 400，且不触达 service（避免无类型任务入队）")
     void create_missingType() throws Exception {
+        asAdmin();
         mockMvc.perform(post("/api/tasks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"idempotencyKey\":\"k1\"}"))
@@ -123,6 +141,7 @@ class AiTaskControllerTest {
     @Test
     @DisplayName("创建：缺少幂等键 → 400（没有键就无法防重复计费）")
     void create_missingKey() throws Exception {
+        asAdmin();
         mockMvc.perform(post("/api/tasks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"interview.questions\"}"))
@@ -135,6 +154,7 @@ class AiTaskControllerTest {
     @Test
     @DisplayName("创建：payload 超长 → 400（任务表不存大文本）")
     void create_payloadTooLong() throws Exception {
+        asAdmin();
         String payload = "x".repeat(2001);
         mockMvc.perform(post("/api/tasks")
                         .contentType(MediaType.APPLICATION_JSON)

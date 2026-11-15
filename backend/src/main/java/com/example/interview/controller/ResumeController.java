@@ -9,8 +9,11 @@ import com.example.interview.service.RemotePdfFetcher;
 import com.example.interview.service.ResumeParseService;
 import com.example.interview.service.ResumeService;
 import com.example.interview.util.PerUserRateLimiter;
+import com.example.interview.util.PinnedHttp;
 import com.example.interview.util.SsrfGuard;
 import com.example.interview.util.SsrUrlValidator;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
 import org.slf4j.Logger;
@@ -93,6 +96,12 @@ public class ResumeController {
     /** 第三方平台分享链接 → PDF 直链下载（v1.90.0） */
     @Autowired
     private RemotePdfFetcher remotePdfFetcher;
+
+    private static final OkHttpClient URL_IMPORT_HTTP = PinnedHttp.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(10))
+            .readTimeout(java.time.Duration.ofSeconds(10))
+            .callTimeout(java.time.Duration.ofSeconds(20))
+            .build();
 
     /** SSRF 校验单一入口（可注入，便于切片测试） */
     @Autowired
@@ -220,13 +229,17 @@ public class ResumeController {
             // 2. 调用 AI 分析
             String analysisJson = resumeAnalysisService.analyze(currentUserId(), resumeText, targetJob);
             // 3. 持久化（保存真实简历文本，便于后续优化与回看）
+            boolean saved = true;
             try {
                 resumeService.saveResume(currentUserId(), resumeText, targetJob, analysisJson);
             } catch (Exception e) {
                 log.warn("简历上传结果持久化失败：{}", e.getMessage());
+                saved = false;
             }
             // 4. 返回 analysis + resumeText（前端需要 resumeText 调用 /optimize 生成优化简历）
             Map<String, String> payload = new HashMap<>();
+            // 入库失败要让用户知道：否则「导入成功」后历史里却找不到这份简历
+            if (!saved) payload.put("saved", "false");
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
             if (isImage) {
@@ -285,6 +298,19 @@ public class ResumeController {
             if (contentType != null && !contentType.toLowerCase().startsWith("image/")) {
                 return Result.error(400, "文件类型不受支持");
             }
+            // 整批先过格式与单张大小校验，避免前几张 OCR 已计费后才发现后面某张不合法
+            if (file.getSize() > com.example.interview.service.ResumeImageOcrService.MAX_IMAGE_BYTES) {
+                return Result.error(400, "图片过大（超过 6MB），请压缩后重试或改用原始文件上传");
+            }
+            byte[] head;
+            try {
+                head = file.getBytes();
+            } catch (Exception e) {
+                return Result.error(400, "截图读取失败，请重新选择");
+            }
+            if (com.example.interview.service.ResumeImageOcrService.detectImageMime(head) == null) {
+                return Result.error(400, "不是受支持的图片格式（支持 PNG / JPG / WEBP / GIF）");
+            }
         }
         if (totalBytes > MAX_TOTAL_IMAGE_BYTES) {
             return Result.error(400, "多张截图合计不能超过 10MB，请减少张数或压缩后再试");
@@ -311,13 +337,17 @@ public class ResumeController {
             }
 
             String analysisJson = resumeAnalysisService.analyze(currentUserId(), resumeText, targetJob);
+            boolean saved = true;
             try {
                 resumeService.saveResume(currentUserId(), resumeText, targetJob, analysisJson);
             } catch (Exception e) {
                 log.warn("多图简历识别结果持久化失败：{}", e.getMessage());
+                saved = false;
             }
 
             Map<String, String> payload = new HashMap<>();
+            // 入库失败要让用户知道：否则「导入成功」后历史里却找不到这份简历
+            if (!saved) payload.put("saved", "false");
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
             payload.put("fromImage", "true");
@@ -495,13 +525,11 @@ public class ResumeController {
 
         String userId = currentUserId();
         try {
-            // 抓取 URL 页面（限制 10 秒超时，模拟浏览器 UA，禁止跟随重定向防 SSRF 绕过）
-            org.jsoup.nodes.Document doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .timeout(10_000)
-                    .maxBodySize(5 * 1024 * 1024) // 5MB 上限
-                    .followRedirects(false)
-                    .get();
+            // 不跟随重定向、连接时重新校验 IP（防 DNS 重绑定），正文 5MB 上限
+            Request pageRequest = new Request.Builder().url(url).get()
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .build();
+            org.jsoup.nodes.Document doc = PinnedHttp.getHtml(URL_IMPORT_HTTP, pageRequest, 5 * 1024 * 1024, false, false);
 
             // 提取纯文本
             String resumeText = Jsoup.clean(doc.html(), Safelist.none())
@@ -516,17 +544,24 @@ public class ResumeController {
             String analysisJson = resumeAnalysisService.analyze(userId, resumeText, targetJob);
 
             // 持久化
+            boolean saved = true;
             try {
                 resumeService.saveResume(userId, resumeText, targetJob, analysisJson);
             } catch (Exception e) {
                 log.warn("URL 导入简历持久化失败：{}", e.getMessage());
+                saved = false;
             }
 
             Map<String, String> payload = new HashMap<>();
+            // 入库失败要让用户知道：否则「导入成功」后历史里却找不到这份简历
+            if (!saved) payload.put("saved", "false");
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
             return Result.success(payload);
-        } catch (java.net.SocketTimeoutException e) {
+        } catch (PinnedHttp.BlockedAddressException e) {
+            log.warn("URL 导入在连接阶段解析到内网地址，已拦截 url={}", url);
+            return Result.error(400, "不支持访问内网地址");
+        } catch (java.io.InterruptedIOException e) {
             return Result.error(400, "网页访问超时，请检查 URL 是否可公开访问");
         } catch (org.jsoup.HttpStatusException e) {
             return Result.error(400, "网页返回错误状态码：" + e.getStatusCode());
@@ -576,13 +611,17 @@ public class ResumeController {
             RemotePdfFetcher.FetchedPdf pdf = remotePdfFetcher.fetch(valid.normalizedUrl);
             String resumeText = resumeParseService.parsePdfToText(pdf.content());
             String analysisJson = resumeAnalysisService.analyze(userId, resumeText, targetJob);
+            boolean saved = true;
             try {
                 resumeService.saveResume(userId, resumeText, targetJob, analysisJson);
             } catch (Exception e) {
                 log.warn("分享链接导入简历持久化失败：{}", e.getMessage());
+                saved = false;
             }
 
             Map<String, String> payload = new HashMap<>();
+            // 入库失败要让用户知道：否则「导入成功」后历史里却找不到这份简历
+            if (!saved) payload.put("saved", "false");
             payload.put("analysis", analysisJson);
             payload.put("resumeText", resumeText);
             payload.put("fileName", pdf.fileName());

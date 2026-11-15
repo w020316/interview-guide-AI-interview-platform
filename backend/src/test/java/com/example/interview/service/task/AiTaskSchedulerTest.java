@@ -72,12 +72,12 @@ class AiTaskSchedulerTest {
     void cancelledDuringRun_ignoresResult() {
         when(taskService.claimNext(anyInt())).thenReturn(Optional.of(task(AiTaskTypes.INTERVIEW_QUESTIONS)));
         org.mockito.Mockito.doThrow(new BusinessException(409, "任务状态不允许该操作（当前 CANCELLED → SUCCEEDED）"))
-                .when(taskService).markSucceededWithResult(any(), any(), any());
+                .when(taskService).markSucceededWithResult(any(), anyInt(), any(), any());
 
         scheduler(true, List.of(handler(AiTaskTypes.INTERVIEW_QUESTIONS,
                 () -> AiTaskOutcome.ofText("[]")))).poll();
 
-        verify(taskService, never()).markFailed(any(), anyString(), anyString(), eq(false));
+        verify(taskService, never()).markFailed(any(), anyInt(), anyString(), anyString(), eq(false));
     }
 
     @Test
@@ -102,7 +102,7 @@ class AiTaskSchedulerTest {
         scheduler(true, List.of(handler(AiTaskTypes.INTERVIEW_QUESTIONS,
                 () -> new AiTaskOutcome("session-9", "[]")))).poll();
 
-        verify(taskService).markSucceededWithResult(eq(7L), eq("session-9"), eq("[]"));
+        verify(taskService).markSucceededWithResult(eq(7L), eq(1), eq("session-9"), eq("[]"));
     }
 
     @Test
@@ -112,7 +112,7 @@ class AiTaskSchedulerTest {
 
         scheduler(true, List.of(handler(AiTaskTypes.INTERVIEW_QUESTIONS, () -> null))).poll();
 
-        verify(taskService).markSucceededWithResult(eq(7L), eq(null), eq(null));
+        verify(taskService).markSucceededWithResult(eq(7L), eq(1), eq(null), eq(null));
     }
 
     @Test
@@ -122,8 +122,8 @@ class AiTaskSchedulerTest {
 
         scheduler(true, List.of(handler("resume.analyze", () -> AiTaskOutcome.EMPTY))).poll();
 
-        verify(taskService).markFailed(eq(7L), eq("NO_HANDLER"), anyString(), eq(false));
-        verify(taskService, never()).markSucceededWithResult(any(), any(), any());
+        verify(taskService).markFailed(eq(7L), eq(1), eq("NO_HANDLER"), anyString(), eq(false));
+        verify(taskService, never()).markSucceededWithResult(any(), anyInt(), any(), any());
     }
 
     @Test
@@ -133,19 +133,19 @@ class AiTaskSchedulerTest {
         scheduler(true, List.of(handler(AiTaskTypes.INTERVIEW_EVALUATE, () -> {
             throw new BusinessException("AI 服务暂时不可用");
         }))).poll();
-        verify(taskService).markFailed(eq(7L), eq("AI_UPSTREAM"), anyString(), eq(true));
+        verify(taskService).markFailed(eq(7L), eq(1), eq("AI_UPSTREAM"), anyString(), eq(true));
 
         when(taskService.claimNext(anyInt())).thenReturn(Optional.of(task(AiTaskTypes.INTERVIEW_EVALUATE)));
         scheduler(true, List.of(handler(AiTaskTypes.INTERVIEW_EVALUATE, () -> {
             throw new BusinessException(400, "任务参数格式错误");
         }))).poll();
-        verify(taskService).markFailed(eq(7L), eq("AI_UPSTREAM"), anyString(), eq(false));
+        verify(taskService).markFailed(eq(7L), eq(1), eq("AI_UPSTREAM"), anyString(), eq(false));
 
         when(taskService.claimNext(anyInt())).thenReturn(Optional.of(task(AiTaskTypes.INTERVIEW_EVALUATE)));
         scheduler(true, List.of(handler(AiTaskTypes.INTERVIEW_EVALUATE, () -> {
             throw new IllegalStateException("boom");
         }))).poll();
-        verify(taskService).markFailed(eq(7L), eq("UNKNOWN"), anyString(), eq(false));
+        verify(taskService).markFailed(eq(7L), eq(1), eq("UNKNOWN"), anyString(), eq(false));
     }
 
     @Test
@@ -156,7 +156,7 @@ class AiTaskSchedulerTest {
             throw new AiGateTimeoutException("排队超时");
         }))).poll();
 
-        verify(taskService).markFailed(eq(7L), eq("AI_GATE_TIMEOUT"), anyString(), eq(true));
+        verify(taskService).markFailed(eq(7L), eq(1), eq("AI_GATE_TIMEOUT"), anyString(), eq(true));
     }
 
     @Test
@@ -166,8 +166,8 @@ class AiTaskSchedulerTest {
         scheduler(true, List.of(handler(AiTaskTypes.INTERVIEW_QUESTIONS,
                 () -> AiTaskOutcome.EMPTY))).poll();
 
-        verify(taskService, never()).markSucceededWithResult(any(), any(), any());
-        verify(taskService, never()).markFailed(any(), anyString(), anyString(), eq(true));
+        verify(taskService, never()).markSucceededWithResult(any(), anyInt(), any(), any());
+        verify(taskService, never()).markFailed(any(), anyInt(), anyString(), anyString(), eq(true));
     }
 
     @Test
@@ -187,7 +187,7 @@ class AiTaskSchedulerTest {
         assertThat(queued).hasSize(1);
 
         queued.get(0).run();
-        verify(taskService).markSucceededWithResult(eq(7L), eq(null), eq("[]"));
+        verify(taskService).markSucceededWithResult(eq(7L), eq(1), eq(null), eq("[]"));
 
         // 执行结束后闸门释放，下一轮可以继续领取
         s.poll();

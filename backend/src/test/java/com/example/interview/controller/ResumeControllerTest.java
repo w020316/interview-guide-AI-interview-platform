@@ -523,6 +523,35 @@ class ResumeControllerTest {
         }
 
         @Test
+        @DisplayName("批内混入伪装图片 → 整批在 OCR 前拒绝，前面几张不产生识别费用")
+        void multiImage_fakeImageInBatch_rejectedBeforeOcr() throws Exception {
+            MockMultipartFile fake = new MockMultipartFile(
+                    "files", "p3.png", "image/png", "not an image".getBytes());
+
+            mockMvc.perform(multipart("/api/resume/upload-images")
+                            .file(shot("p1.png")).file(shot("p2.png")).file(fake))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400))
+                    .andExpect(jsonPath("$.message").value("不是受支持的图片格式（支持 PNG / JPG / WEBP / GIF）"));
+
+            verify(resumeImageOcrService, never()).extractText(any());
+        }
+
+        @Test
+        @DisplayName("入库失败：仍返回分析结果，但带 saved=false 让前端如实提示")
+        void multiImage_saveFails_flagsNotSaved() throws Exception {
+            when(resumeImageOcrService.extractText(any()))
+                    .thenReturn(new com.example.interview.service.ResumeImageOcrService.OcrResult("教育背景", false));
+            when(resumeAnalysisService.analyze(any(), any(), any())).thenReturn("{\"score\":80}");
+            org.mockito.Mockito.doThrow(new RuntimeException("db down"))
+                    .when(resumeService).saveResume(any(), any(), any(), any());
+
+            mockMvc.perform(multipart("/api/resume/upload-images").file(shot("p1.png")))
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.saved").value("false"));
+        }
+
+        @Test
         @DisplayName("超过 5 张返回 400，不调用识别")
         void multiImage_moreThanFive_returns400() throws Exception {
             var request = multipart("/api/resume/upload-images");

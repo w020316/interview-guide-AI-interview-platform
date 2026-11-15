@@ -67,7 +67,21 @@ class AiTaskServiceTest {
         AiTaskEntity result = service.create(USER, "interview.questions", "key-1", "{}", 1, NOW);
 
         assertThat(result).isSameAs(exist);
-        verify(repository, never()).save(any(AiTaskEntity.class));
+        verify(repository, never()).saveAndFlush(any(AiTaskEntity.class));
+    }
+
+    @Test
+    @DisplayName("并发双击撞唯一索引 → 回读并复用先入库的那条，不抛错")
+    void create_uniqueConflict_returnsWinner() {
+        AiTaskEntity winner = task(AiTaskStatus.QUEUED.name(), 0, 1);
+        when(repository.findFirstByUserIdAndIdempotencyKeyAndStatusIn(eq(USER), eq("key-1"), anyCollection()))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(repository.saveAndFlush(any(AiTaskEntity.class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uq_ai_task_user_key_active"));
+
+        AiTaskEntity result = service.create(USER, "interview.questions", "key-1", "{}", 1, NOW);
+
+        assertThat(result).isSameAs(winner);
     }
 
     @Test
@@ -75,7 +89,7 @@ class AiTaskServiceTest {
     void create_allowsNewAfterFailure() {
         when(repository.findFirstByUserIdAndIdempotencyKeyAndStatusIn(eq(USER), eq("key-1"), anyCollection()))
                 .thenReturn(Optional.empty());
-        when(repository.save(any(AiTaskEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any(AiTaskEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         AiTaskEntity result = service.create(USER, "interview.questions", "key-1", "{}", 2, NOW);
 
@@ -381,13 +395,13 @@ class AiTaskServiceTest {
     @Test
     @DisplayName("启动收敛（开关开）：有重试余量的退回队列，次数耗尽的判失败")
     void recoverOrphans_enabled_requeuesAndFails() {
-        when(repository.requeueOrphanRunning()).thenReturn(2);
+        when(repository.requeueOrphanRunning(any())).thenReturn(2);
         when(repository.failExhaustedRunning(anyString(), eq(NOW))).thenReturn(1);
 
         int affected = service.recoverOrphansOnStartup(true, NOW);
 
         assertThat(affected).isEqualTo(3);
-        verify(repository).requeueOrphanRunning();
+        verify(repository).requeueOrphanRunning(NOW);
         verify(repository).failExhaustedRunning(AiTaskService.LEASE_EXHAUSTED_MSG, NOW);
         verify(repository, never()).failUnfinishedForRollback(anyString(), any());
     }
@@ -400,7 +414,40 @@ class AiTaskServiceTest {
         int affected = service.recoverOrphansOnStartup(false, NOW);
 
         assertThat(affected).isEqualTo(4);
-        verify(repository, never()).requeueOrphanRunning();
+        verify(repository, never()).requeueOrphanRunning(any());
         verify(repository, never()).failExhaustedRunning(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("续租：条件更新命中 0 行 → 返回 false，执行者应放弃结果")
+    void renewLease_lostClaim() {
+        when(repository.renewLease(eq(1L), eq(1), any())).thenReturn(0);
+        assertThat(service.renewLease(1L, 1, 180)).isFalse();
+    }
+
+    @Test
+    @DisplayName("续租：仍持有本次领取 → 返回 true")
+    void renewLease_ok() {
+        when(repository.renewLease(eq(1L), eq(2), any())).thenReturn(1);
+        assertThat(service.renewLease(1L, 2, 180)).isTrue();
+    }
+
+    @Test
+    @DisplayName("旧执行者（attempt 已被重领推进）写成功 → 409，不覆盖新一轮的结果")
+    void succeed_staleAttempt_rejected() {
+        when(repository.findById(1L)).thenReturn(Optional.of(task(AiTaskStatus.RUNNING.name(), 2, 3)));
+        assertThatThrownBy(() -> service.markSucceededWithResult(1L, 1, null, "[]"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(409));
+        verify(repository, never()).save(any(AiTaskEntity.class));
+    }
+
+    @Test
+    @DisplayName("旧执行者写失败 → 409，不把新一轮任务打回队列")
+    void fail_staleAttempt_rejected() {
+        when(repository.findById(1L)).thenReturn(Optional.of(task(AiTaskStatus.RUNNING.name(), 2, 3)));
+        assertThatThrownBy(() -> service.markFailed(1L, 1, "X", "m", true))
+                .isInstanceOf(BusinessException.class);
+        verify(repository, never()).save(any(AiTaskEntity.class));
     }
 }

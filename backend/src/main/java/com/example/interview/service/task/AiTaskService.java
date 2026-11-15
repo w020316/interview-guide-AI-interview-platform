@@ -6,6 +6,7 @@ import com.example.interview.entity.AiTaskEntity;
 import com.example.interview.repository.AiTaskRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,7 +66,7 @@ public class AiTaskService {
      * @param maxAttempt 含首次的最大执行次数（1–5）
      * @return 新建任务，或同键下「未失败」的既有任务
      */
-    @Transactional
+    // 不加 @Transactional：唯一索引冲突在 PostgreSQL 会让当前事务失效，回读必须在新事务里做
     public AiTaskEntity create(String userId, String type, String idempotencyKey,
                                String payload, int maxAttempt, LocalDateTime now) {
         requireText(userId, "userId", 64);
@@ -92,7 +93,13 @@ public class AiTaskService {
                 .payload(payload)
                 .createdAt(now)
                 .build();
-        return repository.save(task);
+        try {
+            return repository.saveAndFlush(task);
+        } catch (DataIntegrityViolationException e) {
+            log.info("并发创建同键任务，复用已入库的那条 userId={} type={}", userId, type);
+            return repository.findFirstByUserIdAndIdempotencyKeyAndStatusIn(userId, idempotencyKey, AiTaskStatus.ACTIVE)
+                    .orElseThrow(() -> e);
+        }
     }
 
     // ── 领取 ────────────────────────────────────────────────────────────
@@ -198,7 +205,7 @@ public class AiTaskService {
             }
             return rolledBack;
         }
-        int requeued = repository.requeueOrphanRunning();
+        int requeued = repository.requeueOrphanRunning(now);
         int failed = repository.failExhaustedRunning(LEASE_EXHAUSTED_MSG, now);
         if (requeued + failed > 0) {
             log.warn("启动收敛完成：requeued={} failed={}（上次进程可能被硬杀）", requeued, failed);
@@ -248,6 +255,31 @@ public class AiTaskService {
      *                   不静默截断——截断后的 JSON 在前端只会「解析失败」，
      *                   错误现场反而更难定位
      */
+    /** 续租；返回 false 表示这次领取已失效（被取消、被重领或已结束），执行者应放弃结果 */
+    @Transactional
+    public boolean renewLease(Long id, int attempt, int leaseSeconds) {
+        return repository.renewLease(id, attempt, LocalDateTime.now().plusSeconds(leaseSeconds)) == 1;
+    }
+
+    /** 带领取凭证的终态写入：attempt 不匹配说明任务已被其它执行者重领，旧执行者的结果作废 */
+    @Transactional
+    public AiTaskEntity markSucceededWithResult(Long id, int attempt, String resultRef, String resultText) {
+        requireAttempt(requireTask(id), attempt);
+        return markSucceededWithResult(id, resultRef, resultText);
+    }
+
+    @Transactional
+    public AiTaskEntity markFailed(Long id, int attempt, String errorCode, String errorMessage, boolean retryable) {
+        requireAttempt(requireTask(id), attempt);
+        return markFailed(id, errorCode, errorMessage, retryable, LocalDateTime.now());
+    }
+
+    private static void requireAttempt(AiTaskEntity task, int attempt) {
+        if (task.getAttempt() == null || task.getAttempt() != attempt) {
+            throw new BusinessException(409, "任务已被重新领取，本次执行结果作废");
+        }
+    }
+
     @Transactional
     public AiTaskEntity markSucceededWithResult(Long id, String resultRef, String resultText) {
         if (resultText != null && resultText.length() > MAX_RESULT_TEXT_LEN) {

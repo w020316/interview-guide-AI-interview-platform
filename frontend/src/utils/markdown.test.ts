@@ -55,4 +55,28 @@ describe('renderMarkdown 安全', () => {
     expect(html).toContain('<h1>主题</h1>')
     expect(html).toContain('<code>code</code>')
   })
+
+  it('链接新标签页打开并带 noopener noreferrer，切断 window.opener', () => {
+    const html = renderMarkdown('详见 https://example.com/jd')
+    expect(html).toContain('href="https://example.com/jd"')
+    expect(html).toContain('target="_blank"')
+    expect(html).toContain('rel="noopener noreferrer"')
+  })
+
+  it('javascript: 链接不保留可执行 href', () => {
+    expect(renderMarkdown('[点我](javascript:alert(1))')).not.toContain('href="javascript:')
+  })
+
+  it('白名单仍保留表格与粗体等常用结构', () => {
+    const html = renderMarkdown('**粗体**\n\n| a | b |\n|---|---|\n| 1 | 2 |')
+    for (const tag of ['<strong>', '<table>', '<th>', '<td>']) {
+      expect(html).toContain(tag)
+    }
+  })
+
+  it('不加载外链图片，也不保留内联 style', () => {
+    const html = renderMarkdown('![x](https://evil.example/t.png)\n\n| a |\n|--:|\n| 1 |')
+    expect(html).not.toContain('<img')
+    expect(html).not.toContain('style=')
+  })
 })

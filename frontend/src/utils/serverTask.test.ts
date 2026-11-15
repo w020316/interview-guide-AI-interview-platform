@@ -136,6 +136,46 @@ describe('runServerTask —— 异步优先、同步保底', () => {
 
     await expect(runServerTask(opts())).rejects.toThrow('任务已完成但没有返回结果')
   })
+
+  it('轮询间隔从 2s 起按 1.5 倍退避，封顶 5s', async () => {
+    post.mockResolvedValueOnce({ taskId: 7, status: 'QUEUED' })
+    get
+      .mockResolvedValueOnce({ status: 'RUNNING' })
+      .mockResolvedValueOnce({ status: 'RUNNING' })
+      .mockResolvedValueOnce({ status: 'RUNNING' })
+      .mockResolvedValueOnce({ status: 'RUNNING' })
+      .mockResolvedValueOnce({ status: 'SUCCEEDED' })
+      .mockResolvedValueOnce({ resultText: '[]' })
+    const sleep = vi.fn(async (_ms: number): Promise<void> => {})
+
+    await runServerTask(opts({ sleep }))
+
+    expect(sleep.mock.calls.map((c) => c[0])).toEqual([2_000, 3_000, 4_500, 5_000, 5_000])
+  })
+
+  it('任务已成功但取结果偶发失败 → 重试取结果，不判失败', async () => {
+    post.mockResolvedValueOnce({ taskId: 7, status: 'QUEUED' })
+    get
+      .mockResolvedValueOnce({ status: 'SUCCEEDED' })
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ status: 'SUCCEEDED' })
+      .mockResolvedValueOnce({ resultText: '[{"question":"q"}]' })
+
+    expect(await runServerTask(opts())).toBe('[{"question":"q"}]')
+    expect(doneTasks.value[0].ok).toBe(true)
+  })
+
+  it('取结果持续失败 → 达到上限后报错，不无限重试', async () => {
+    post.mockResolvedValueOnce({ taskId: 7, status: 'QUEUED' })
+    get.mockImplementation(async (url: string) => {
+      if (url.endsWith('/result')) throw new Error('network')
+      return { status: 'SUCCEEDED' }
+    })
+
+    await expect(runServerTask(opts({ timeoutMs: DEFAULT_TASK_TIMEOUT_MS })))
+      .rejects.toThrow('任务状态查询失败')
+    expect(get.mock.calls.filter((c) => String(c[0]).endsWith('/result'))).toHaveLength(5)
+  })
 })
 
 describe('cancelServerTask —— 尽力而为', () => {
