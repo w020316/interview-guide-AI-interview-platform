@@ -85,9 +85,19 @@ export function decideChangelogAction(seen: string | null): ChangelogDecision {
 /** 老用户遇到新版本时自动弹窗的延迟（毫秒）：让首屏先渲染完成 */
 export const CHANGELOG_AUTO_OPEN_DELAY_MS = 1500
 
-export const CURRENT_VERSION = '1.90.3'
+export const CURRENT_VERSION = '1.90.4'
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.90.4',
+    date: '2026-11-15',
+    title: '版本 1.90.4 · 简历处理与任务结果更可靠',
+    items: [
+      { text: '简历上传或截图识别过程中可以取消；离开页面时会自动中断浏览器请求', level: 'user' },
+      { text: '任务完成后若网络暂时不稳定，系统会自动重试读取结果，减少重复生成；等待期间查询间隔会逐步放宽', level: 'user' },
+      { text: '分析完成但未能保存到简历历史时，会明确提示并保留分析结果', level: 'user' },
+    ],
+  },
   {
     version: '1.90.3',
     date: '2026-10-31',
