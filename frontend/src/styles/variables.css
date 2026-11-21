@@ -476,11 +476,12 @@ button:focus:not(:focus-visible) {
   color: var(--c-text);
 }
 
-/* ── 触摸目标 ≥48px（v1.76.0）──────────────────────────────
- * 移动端可交互控件的最小命中区抬到 48px：
+/* ── 触摸目标 ≥48px（v1.76.0，v1.90.5 扩到平板）────────────
+ * 移动端与平板可交互控件的最小命中区抬到 48px：
  *   · WCAG 2.5.5（AAA）要求 44×44，本项目在触屏断点上再留 4px 余量；
- *   · 只在 ≤768px 生效：桌面 64px 导航栏与密集表格里塞 48px 会把行高撑坏，
- *     鼠标的指向精度远高于手指，44px 已满足桌面可达性。
+ *   · 2026-11-21 阶段三实测：1024×768 平板档落在原 768 补偿之外，
+ *     投递行内按钮仅 31–35px、日历翻页 32px、刷新 29px。平板是典型触控场景，
+ *     故与 App.vue 导航一致改用登记过的 1180 断点；≥1181 仍是桌面密度。
  * 用「宽度断点」而非 (pointer: coarse)：可折叠设备 / 触屏笔记本会在
  * fine 与 coarse 之间来回切换，而宽度断点在无头视口仿真下可稳定复现、可回归。
  * ⚠️ 组件内若把 height 写死，min-height 会赢过它 —— 需要固定高度的地方请改 min-height。 */
@@ -491,7 +492,7 @@ button:focus:not(:focus-visible) {
   min-height: 44px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1180px) {
   button,
   [role='button'],
   input:not([type='checkbox']):not([type='radio']):not([type='hidden']),

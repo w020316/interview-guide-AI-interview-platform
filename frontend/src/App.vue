@@ -1540,6 +1540,12 @@ function logout() {
     width: 48px;
     height: 48px;
   }
+  /* 页脚版本号是按钮，被 .version-link 的 24px 覆盖；平板档一并抬到 48 */
+  .version-link {
+    min-height: 48px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
 }
 
 /* ── 移动/平板：头部控件统一 48px（v1.76.0）──

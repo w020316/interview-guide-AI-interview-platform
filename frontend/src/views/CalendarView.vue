@@ -502,11 +502,11 @@ onMounted(load)
 }
 
 /* ── 触控目标 ≥44px（v1.63.2）──
- * 移动端没有 hover，28px 的图标按钮手指很容易点错。
+ * 移动端与 1024 平板档没有 hover，28px 的图标按钮手指很容易点错。
  * ⚠️ 这里**放大实际尺寸**，而不是用伪元素扩热区：`.icon-btn` 三个按钮（完成/编辑/删除）
  * 在同一事件行里是**相邻**的，用伪元素把热区扩到 44px 会让它们互相重叠、抢彼此的点击。
  * 放大实际尺寸会让布局自然重排，不会重叠。桌面端保持紧凑。 */
-@media (max-width: 768px) {
+@media (max-width: 1180px) {
   .icon-btn,
   .cal-nav { width: 48px; height: 48px; }
   .cal-today { min-height: 48px; padding: 12px 18px; }

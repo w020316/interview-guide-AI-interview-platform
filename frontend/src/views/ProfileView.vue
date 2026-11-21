@@ -829,8 +829,8 @@ function fmtRelative(iso: string): string {
   text-decoration: underline;
 }
 
-/* 移动端：scoped 类的 min-height:24 会压过全局 button 的 48，这里显式抬档 */
-@media (max-width: 768px) {
+/* 移动/平板：scoped 类的 min-height:24 会压过全局 button 的 48，这里显式抬档 */
+@media (max-width: 1180px) {
   .btn-link {
     min-height: 48px;
     display: inline-flex;

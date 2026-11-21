@@ -1054,6 +1054,16 @@ const steps = [
   }
 }
 
+/* 求职工具胶囊是 <a>，不吃全局 button 的触摸下限，单独抬到 48。
+ * 2026-11-21 阶段三：1024 平板档实测仅 44px，与 App.vue 导航同用 1180 断点。 */
+@media (max-width: 1180px) {
+  .tool-chip {
+    min-height: 48px;
+    padding: 4px 16px;
+    font-size: 14px;
+  }
+}
+
 @media (max-width: 768px) {
   .steps {
     grid-template-columns: 1fr;
@@ -1061,12 +1071,6 @@ const steps = [
   }
   .step {
     padding: 20px 0 0;
-  }
-  /* 求职工具胶囊是 <a>，不吃全局 button 的触摸下限，单独抬到 48 */
-  .tool-chip {
-    min-height: 48px;
-    padding: 4px 16px;
-    font-size: 14px;
   }
   /* 移动端隐藏浮动小标：卡片仅 260px，标签外挂会在 320px 视口溢出。
      （遮挡问题已由 .visual-stage 从结构上修掉，这里只是窄屏空间取舍） */

@@ -1326,10 +1326,10 @@ function actionVariant(action: string) {
 .mini-btn.danger:hover:not(:disabled) { border-color: var(--c-danger); color: var(--c-danger); }
 .mini-select { padding: 6px 8px; font-size: 13px; border: 1px solid var(--c-border-strong); border-radius: var(--radius-md); background: var(--c-surface); color: var(--c-text-secondary); cursor: pointer; }
 
-/* ── 触控目标 ≥48px（v1.63.2 立规 / v1.76.0 抬档）──
- * 移动端 `.mini-btn` / `.mini-select` 只有 ~29px 高，手指容易点错。
+/* ── 触控目标 ≥48px（v1.63.2 立规 / v1.76.0 抬档 / v1.90.5 扩到平板）──
+ * 移动端与 1024 平板档 `.mini-btn` / `.mini-select` 只有 ~31px 高，手指容易点错。
  * 与 CalendarView 同理：放大实际尺寸而非伪元素扩热区（这些控件在卡片操作行里是相邻的）。 */
-@media (max-width: 768px) {
+@media (max-width: 1180px) {
   .mini-btn,
   .mini-select { min-height: 48px; padding: 12px 16px; }
   /* N4：「复制跟进消息」同为窄屏下的关键操作，一并抬到 48px */

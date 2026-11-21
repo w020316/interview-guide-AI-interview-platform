@@ -690,8 +690,8 @@ async function doFollowUp(s: StoryItem) {
    鼠标都要瞄；补纵向内边距到 24px（WCAG 2.5.8 AA 指针目标下限）。 */
 .link-btn { background: transparent; border: none; color: var(--brand-primary); font-size: 13px; font-weight: 500; cursor: pointer; padding: 4px 2px; min-height: 24px; }
 .link-btn:hover { text-decoration: underline; }
-/* 移动端：scoped 类的 min-height:24 会压过全局 button 的 48，这里显式抬档 */
-@media (max-width: 768px) {
+/* 移动/平板：scoped 类的 min-height:24 会压过全局 button 的 48，这里显式抬档 */
+@media (max-width: 1180px) {
   .link-btn { min-height: 48px; }
 }
 
