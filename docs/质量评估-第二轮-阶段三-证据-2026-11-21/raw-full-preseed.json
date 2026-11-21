@@ -1,0 +1,9402 @@
+{
+ "mode": "full",
+ "base": "http://127.0.0.1:5173",
+ "started": "2026-11-21 16:07:17",
+ "records": [
+  {
+   "route": "/",
+   "name": "home",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 2883,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.router-link-active.router-link-exact-active | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 模拟面试",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/",
+   "name": "home",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 2883,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.router-link-active.router-link-exact-active | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 模拟面试",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/",
+   "name": "home",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 2883,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.router-link-active.router-link-exact-active | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 模拟面试",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/",
+   "name": "home",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 2938,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 投递看板",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 学习中心",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 历史记录",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 知识库",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/",
+   "name": "home",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 3850,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/",
+   "name": "home",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 4366,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/",
+   "name": "home",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 4435,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/login",
+   "name": "login",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 2883,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.router-link-active.router-link-exact-active | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 模拟面试",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/login",
+   "name": "login",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 2883,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.router-link-active.router-link-exact-active | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 模拟面试",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/login",
+   "name": "login",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 2883,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.router-link-active.router-link-exact-active | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 模拟面试",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/login",
+   "name": "login",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 2938,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 投递看板",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 学习中心",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 历史记录",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 知识库",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/login",
+   "name": "login",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 3850,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/login",
+   "name": "login",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 4366,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/login",
+   "name": "login",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 4435,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/resume",
+   "name": "resume",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "简历分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | 上传文件",
+     "w": 96,
+     "h": 35
+    },
+    {
+     "el": "button | 从其他平台导入",
+     "w": 138,
+     "h": 35
+    },
+    {
+     "el": "button | 粘贴文本",
+     "w": 96,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 900,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume"
+  },
+  {
+   "route": "/resume",
+   "name": "resume",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 900,
+   "hOverflow": false,
+   "h1": "简历分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | 上传文件",
+     "w": 96,
+     "h": 35
+    },
+    {
+     "el": "button | 从其他平台导入",
+     "w": 138,
+     "h": 35
+    },
+    {
+     "el": "button | 粘贴文本",
+     "w": 96,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 900,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume"
+  },
+  {
+   "route": "/resume",
+   "name": "resume",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "简历分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | 上传文件",
+     "w": 96,
+     "h": 35
+    },
+    {
+     "el": "button | 从其他平台导入",
+     "w": 138,
+     "h": 35
+    },
+    {
+     "el": "button | 粘贴文本",
+     "w": 96,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 900,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume"
+  },
+  {
+   "route": "/resume",
+   "name": "resume",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "简历分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.active | 上传文件",
+     "w": 96,
+     "h": 35
+    },
+    {
+     "el": "button | 从其他平台导入",
+     "w": 138,
+     "h": 35
+    },
+    {
+     "el": "button | 粘贴文本",
+     "w": 96,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 900,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume"
+  },
+  {
+   "route": "/resume",
+   "name": "resume",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "简历分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume"
+  },
+  {
+   "route": "/resume",
+   "name": "resume",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 896,
+   "hOverflow": false,
+   "h1": "简历分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume"
+  },
+  {
+   "route": "/resume",
+   "name": "resume",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 753,
+   "hOverflow": false,
+   "h1": "简历分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume"
+  },
+  {
+   "route": "/resume/history",
+   "name": "resume-history",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "简历历史",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往简历分析",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/history"
+  },
+  {
+   "route": "/resume/history",
+   "name": "resume-history",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 900,
+   "hOverflow": false,
+   "h1": "简历历史",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往简历分析",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/history"
+  },
+  {
+   "route": "/resume/history",
+   "name": "resume-history",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "简历历史",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往简历分析",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/history"
+  },
+  {
+   "route": "/resume/history",
+   "name": "resume-history",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "简历历史",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/history"
+  },
+  {
+   "route": "/resume/history",
+   "name": "resume-history",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "简历历史",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/history"
+  },
+  {
+   "route": "/resume/history",
+   "name": "resume-history",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 896,
+   "hOverflow": false,
+   "h1": "简历历史",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/history"
+  },
+  {
+   "route": "/resume/history",
+   "name": "resume-history",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 757,
+   "hOverflow": false,
+   "h1": "简历历史",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/history"
+  },
+  {
+   "route": "/resume/studio",
+   "name": "resume-studio",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/studio",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 2143,
+   "hOverflow": false,
+   "h1": "简历模板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link.active | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/studio"
+  },
+  {
+   "route": "/resume/studio",
+   "name": "resume-studio",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/studio",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 2143,
+   "hOverflow": false,
+   "h1": "简历模板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link.active | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/studio"
+  },
+  {
+   "route": "/resume/studio",
+   "name": "resume-studio",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/studio",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 2143,
+   "hOverflow": false,
+   "h1": "简历模板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link.active | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/studio"
+  },
+  {
+   "route": "/resume/studio",
+   "name": "resume-studio",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/studio",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 2143,
+   "hOverflow": false,
+   "h1": "简历模板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/studio"
+  },
+  {
+   "route": "/resume/studio",
+   "name": "resume-studio",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/studio",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 4463,
+   "hOverflow": false,
+   "h1": "简历模板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/studio"
+  },
+  {
+   "route": "/resume/studio",
+   "name": "resume-studio",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/studio",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 4489,
+   "hOverflow": false,
+   "h1": "简历模板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/studio"
+  },
+  {
+   "route": "/resume/studio",
+   "name": "resume-studio",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/resume/studio",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 4489,
+   "hOverflow": false,
+   "h1": "简历模板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/resume/studio"
+  },
+  {
+   "route": "/job",
+   "name": "job-analysis",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/job",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "岗位分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | JD 岗位分析",
+     "w": 113,
+     "h": 35
+    },
+    {
+     "el": "button | 差距诊断",
+     "w": 92,
+     "h": 35
+    },
+    {
+     "el": "button | 求职信生成",
+     "w": 106,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 726,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 从链接导入",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 开始分析",
+     "w": 94,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/job"
+  },
+  {
+   "route": "/job",
+   "name": "job-analysis",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/job",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 996,
+   "hOverflow": false,
+   "h1": "岗位分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | JD 岗位分析",
+     "w": 113,
+     "h": 35
+    },
+    {
+     "el": "button | 差距诊断",
+     "w": 92,
+     "h": 35
+    },
+    {
+     "el": "button | 求职信生成",
+     "w": 106,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 726,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 从链接导入",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 开始分析",
+     "w": 94,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/job"
+  },
+  {
+   "route": "/job",
+   "name": "job-analysis",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/job",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 996,
+   "hOverflow": false,
+   "h1": "岗位分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | JD 岗位分析",
+     "w": 113,
+     "h": 35
+    },
+    {
+     "el": "button | 差距诊断",
+     "w": 92,
+     "h": 35
+    },
+    {
+     "el": "button | 求职信生成",
+     "w": 106,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 726,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 从链接导入",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 开始分析",
+     "w": 94,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/job"
+  },
+  {
+   "route": "/job",
+   "name": "job-analysis",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/job",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 1004,
+   "hOverflow": false,
+   "h1": "岗位分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.active | JD 岗位分析",
+     "w": 113,
+     "h": 35
+    },
+    {
+     "el": "button | 差距诊断",
+     "w": 92,
+     "h": 35
+    },
+    {
+     "el": "button | 求职信生成",
+     "w": 106,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 726,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/job"
+  },
+  {
+   "route": "/job",
+   "name": "job-analysis",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/job",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1033,
+   "hOverflow": false,
+   "h1": "岗位分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/job"
+  },
+  {
+   "route": "/job",
+   "name": "job-analysis",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/job",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 1124,
+   "hOverflow": false,
+   "h1": "岗位分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/job"
+  },
+  {
+   "route": "/job",
+   "name": "job-analysis",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/job",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 1143,
+   "hOverflow": false,
+   "h1": "岗位分析",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/job"
+  },
+  {
+   "route": "/jobs",
+   "name": "jobs",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 4237,
+   "hOverflow": false,
+   "h1": "招聘信息广场",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | 秋招精选 162",
+     "w": 122,
+     "h": 37
+    },
+    {
+     "el": "button | 春招 11",
+     "w": 86,
+     "h": 37
+    },
+    {
+     "el": "button | 社招 413",
+     "w": 94,
+     "h": 37
+    },
+    {
+     "el": "button | 实习 42",
+     "w": 87,
+     "h": 37
+    },
+    {
+     "el": "button | 兼职 36",
+     "w": 87,
+     "h": 37
+    },
+    {
+     "el": "button | 定向专项 14",
+     "w": 115,
+     "h": 37
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs"
+  },
+  {
+   "route": "/jobs",
+   "name": "jobs",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 4237,
+   "hOverflow": false,
+   "h1": "招聘信息广场",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | 秋招精选 162",
+     "w": 122,
+     "h": 37
+    },
+    {
+     "el": "button | 春招 11",
+     "w": 86,
+     "h": 37
+    },
+    {
+     "el": "button | 社招 413",
+     "w": 94,
+     "h": 37
+    },
+    {
+     "el": "button | 实习 42",
+     "w": 87,
+     "h": 37
+    },
+    {
+     "el": "button | 兼职 36",
+     "w": 87,
+     "h": 37
+    },
+    {
+     "el": "button | 定向专项 14",
+     "w": 115,
+     "h": 37
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs"
+  },
+  {
+   "route": "/jobs",
+   "name": "jobs",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 4237,
+   "hOverflow": false,
+   "h1": "招聘信息广场",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | 秋招精选 162",
+     "w": 122,
+     "h": 37
+    },
+    {
+     "el": "button | 春招 11",
+     "w": 86,
+     "h": 37
+    },
+    {
+     "el": "button | 社招 413",
+     "w": 94,
+     "h": 37
+    },
+    {
+     "el": "button | 实习 42",
+     "w": 87,
+     "h": 37
+    },
+    {
+     "el": "button | 兼职 36",
+     "w": 87,
+     "h": 37
+    },
+    {
+     "el": "button | 定向专项 14",
+     "w": 115,
+     "h": 37
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs"
+  },
+  {
+   "route": "/jobs",
+   "name": "jobs",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 4687,
+   "hOverflow": false,
+   "h1": "招聘信息广场",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button | 首页",
+     "w": 65,
+     "h": 35
+    },
+    {
+     "el": "button | 上一页",
+     "w": 78,
+     "h": 35
+    },
+    {
+     "el": "button | 下一页",
+     "w": 78,
+     "h": 35
+    },
+    {
+     "el": "button | 末页",
+     "w": 65,
+     "h": 35
+    },
+    {
+     "el": "input",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button | 跳转",
+     "w": 65,
+     "h": 35
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs"
+  },
+  {
+   "route": "/jobs",
+   "name": "jobs",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 4768,
+   "hOverflow": false,
+   "h1": "招聘信息广场",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs"
+  },
+  {
+   "route": "/jobs",
+   "name": "jobs",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 7344,
+   "hOverflow": false,
+   "h1": "招聘信息广场",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs"
+  },
+  {
+   "route": "/jobs",
+   "name": "jobs",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 7838,
+   "hOverflow": false,
+   "h1": "招聘信息广场",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs"
+  },
+  {
+   "route": "/jobs/999999",
+   "name": "job-detail-404",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs/999999",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "岗位不存在或已下架",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link.active | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 返回招聘广场",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs/999999"
+  },
+  {
+   "route": "/jobs/999999",
+   "name": "job-detail-404",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs/999999",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 900,
+   "hOverflow": false,
+   "h1": "岗位不存在或已下架",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link.active | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 返回招聘广场",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs/999999"
+  },
+  {
+   "route": "/jobs/999999",
+   "name": "job-detail-404",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs/999999",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "岗位不存在或已下架",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link.active | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 返回招聘广场",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs/999999"
+  },
+  {
+   "route": "/jobs/999999",
+   "name": "job-detail-404",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs/999999",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "岗位不存在或已下架",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs/999999"
+  },
+  {
+   "route": "/jobs/999999",
+   "name": "job-detail-404",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs/999999",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "岗位不存在或已下架",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs/999999"
+  },
+  {
+   "route": "/jobs/999999",
+   "name": "job-detail-404",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs/999999",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 896,
+   "hOverflow": false,
+   "h1": "岗位不存在或已下架",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs/999999"
+  },
+  {
+   "route": "/jobs/999999",
+   "name": "job-detail-404",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/jobs/999999",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 667,
+   "hOverflow": false,
+   "h1": "岗位不存在或已下架",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/jobs/999999"
+  },
+  {
+   "route": "/agent",
+   "name": "agent",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/agent",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "Career Copilot 求职智能体",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | ＋ 新对话",
+     "w": 220,
+     "h": 44
+    },
+    {
+     "el": "button.suggest-btn | Redis 持久化面试怎么答？",
+     "w": 235,
+     "h": 39
+    },
+    {
+     "el": "button.suggest-btn | 我最近有哪些面试安排？",
+     "w": 235,
+     "h": 39
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 发送",
+     "w": 66,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/agent"
+  },
+  {
+   "route": "/agent",
+   "name": "agent",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/agent",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 1078,
+   "hOverflow": false,
+   "h1": "Career Copilot 求职智能体",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | ＋ 新对话",
+     "w": 220,
+     "h": 44
+    },
+    {
+     "el": "button.suggest-btn | Redis 持久化面试怎么答？",
+     "w": 235,
+     "h": 39
+    },
+    {
+     "el": "button.suggest-btn | 我最近有哪些面试安排？",
+     "w": 235,
+     "h": 39
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 发送",
+     "w": 66,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/agent"
+  },
+  {
+   "route": "/agent",
+   "name": "agent",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/agent",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 1078,
+   "hOverflow": false,
+   "h1": "Career Copilot 求职智能体",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | ＋ 新对话",
+     "w": 220,
+     "h": 44
+    },
+    {
+     "el": "button.suggest-btn | Redis 持久化面试怎么答？",
+     "w": 235,
+     "h": 39
+    },
+    {
+     "el": "button.suggest-btn | 我最近有哪些面试安排？",
+     "w": 235,
+     "h": 39
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 发送",
+     "w": 66,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/agent"
+  },
+  {
+   "route": "/agent",
+   "name": "agent",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/agent",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 1078,
+   "hOverflow": false,
+   "h1": "Career Copilot 求职智能体",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.suggest-btn | Redis 持久化面试怎么答？",
+     "w": 235,
+     "h": 39
+    },
+    {
+     "el": "button.suggest-btn | 我最近有哪些面试安排？",
+     "w": 235,
+     "h": 39
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/agent"
+  },
+  {
+   "route": "/agent",
+   "name": "agent",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/agent",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1237,
+   "hOverflow": false,
+   "h1": "Career Copilot 求职智能体",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/agent"
+  },
+  {
+   "route": "/agent",
+   "name": "agent",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/agent",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 1386,
+   "hOverflow": false,
+   "h1": "Career Copilot 求职智能体",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/agent"
+  },
+  {
+   "route": "/agent",
+   "name": "agent",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/agent",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 1397,
+   "hOverflow": false,
+   "h1": "Career Copilot 求职智能体",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/agent"
+  },
+  {
+   "route": "/career",
+   "name": "career",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/career",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1761,
+   "hOverflow": false,
+   "h1": "求职诊断",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "input.input",
+     "w": 692,
+     "h": 36
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 挖掘我的职业资产",
+     "w": 150,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 生成 30 天求职节奏计划",
+     "w": 187,
+     "h": 44
+    },
+    {
+     "el": "input.input",
+     "w": 680,
+     "h": 36
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 提炼 STAR 故事候选",
+     "w": 162,
+     "h": 44
+    },
+    {
+     "el": "button.link-btn | 刷新",
+     "w": 30,
+     "h": 25
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/career"
+  },
+  {
+   "route": "/career",
+   "name": "career",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/career",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 1761,
+   "hOverflow": false,
+   "h1": "求职诊断",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "input.input",
+     "w": 692,
+     "h": 36
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 挖掘我的职业资产",
+     "w": 150,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 生成 30 天求职节奏计划",
+     "w": 187,
+     "h": 44
+    },
+    {
+     "el": "input.input",
+     "w": 680,
+     "h": 36
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 提炼 STAR 故事候选",
+     "w": 162,
+     "h": 44
+    },
+    {
+     "el": "button.link-btn | 刷新",
+     "w": 30,
+     "h": 25
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/career"
+  },
+  {
+   "route": "/career",
+   "name": "career",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/career",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 1761,
+   "hOverflow": false,
+   "h1": "求职诊断",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "input.input",
+     "w": 692,
+     "h": 36
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 挖掘我的职业资产",
+     "w": 150,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 生成 30 天求职节奏计划",
+     "w": 187,
+     "h": 44
+    },
+    {
+     "el": "input.input",
+     "w": 680,
+     "h": 36
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 提炼 STAR 故事候选",
+     "w": 162,
+     "h": 44
+    },
+    {
+     "el": "button.link-btn | 刷新",
+     "w": 30,
+     "h": 25
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/career"
+  },
+  {
+   "route": "/career",
+   "name": "career",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/career",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 1773,
+   "hOverflow": false,
+   "h1": "求职诊断",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "input.input",
+     "w": 692,
+     "h": 36
+    },
+    {
+     "el": "input.input",
+     "w": 680,
+     "h": 36
+    },
+    {
+     "el": "button.link-btn | 刷新",
+     "w": 30,
+     "h": 25
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/career"
+  },
+  {
+   "route": "/career",
+   "name": "career",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/career",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1802,
+   "hOverflow": false,
+   "h1": "求职诊断",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/career"
+  },
+  {
+   "route": "/career",
+   "name": "career",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/career",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 1925,
+   "hOverflow": false,
+   "h1": "求职诊断",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/career"
+  },
+  {
+   "route": "/career",
+   "name": "career",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/career",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 1972,
+   "hOverflow": false,
+   "h1": "求职诊断",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/career"
+  },
+  {
+   "route": "/salary",
+   "name": "salary",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/salary",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "谈薪助手",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "input#salary-job.input",
+     "w": 854,
+     "h": 36
+    },
+    {
+     "el": "input#salary-city.input",
+     "w": 421,
+     "h": 36
+    },
+    {
+     "el": "input#salary-years.input",
+     "w": 421,
+     "h": 36
+    },
+    {
+     "el": "input#salary-current.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-expected.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-offer.input",
+     "w": 205,
+     "h": 36
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/salary"
+  },
+  {
+   "route": "/salary",
+   "name": "salary",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/salary",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 1079,
+   "hOverflow": false,
+   "h1": "谈薪助手",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "input#salary-job.input",
+     "w": 854,
+     "h": 36
+    },
+    {
+     "el": "input#salary-city.input",
+     "w": 421,
+     "h": 36
+    },
+    {
+     "el": "input#salary-years.input",
+     "w": 421,
+     "h": 36
+    },
+    {
+     "el": "input#salary-current.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-expected.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-offer.input",
+     "w": 205,
+     "h": 36
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/salary"
+  },
+  {
+   "route": "/salary",
+   "name": "salary",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/salary",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 1079,
+   "hOverflow": false,
+   "h1": "谈薪助手",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "input#salary-job.input",
+     "w": 854,
+     "h": 36
+    },
+    {
+     "el": "input#salary-city.input",
+     "w": 421,
+     "h": 36
+    },
+    {
+     "el": "input#salary-years.input",
+     "w": 421,
+     "h": 36
+    },
+    {
+     "el": "input#salary-current.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-expected.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-offer.input",
+     "w": 205,
+     "h": 36
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/salary"
+  },
+  {
+   "route": "/salary",
+   "name": "salary",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/salary",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 1083,
+   "hOverflow": false,
+   "h1": "谈薪助手",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "input#salary-job.input",
+     "w": 854,
+     "h": 36
+    },
+    {
+     "el": "input#salary-city.input",
+     "w": 421,
+     "h": 36
+    },
+    {
+     "el": "input#salary-years.input",
+     "w": 421,
+     "h": 36
+    },
+    {
+     "el": "input#salary-current.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-expected.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-offer.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-months.input",
+     "w": 205,
+     "h": 36
+    },
+    {
+     "el": "input#salary-competing.input",
+     "w": 854,
+     "h": 36
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/salary"
+  },
+  {
+   "route": "/salary",
+   "name": "salary",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/salary",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1399,
+   "hOverflow": false,
+   "h1": "谈薪助手",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/salary"
+  },
+  {
+   "route": "/salary",
+   "name": "salary",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/salary",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 1789,
+   "hOverflow": false,
+   "h1": "谈薪助手",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/salary"
+  },
+  {
+   "route": "/salary",
+   "name": "salary",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/salary",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 1789,
+   "hOverflow": false,
+   "h1": "谈薪助手",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/salary"
+  },
+  {
+   "route": "/applications",
+   "name": "applications",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/applications",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "投递看板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 粘贴通知识别",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 从表格导入",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往招聘广场",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/applications"
+  },
+  {
+   "route": "/applications",
+   "name": "applications",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/applications",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 900,
+   "hOverflow": false,
+   "h1": "投递看板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 粘贴通知识别",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 从表格导入",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往招聘广场",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/applications"
+  },
+  {
+   "route": "/applications",
+   "name": "applications",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/applications",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 773,
+   "hOverflow": false,
+   "h1": "投递看板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 粘贴通知识别",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 从表格导入",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往招聘广场",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/applications"
+  },
+  {
+   "route": "/applications",
+   "name": "applications",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/applications",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 781,
+   "hOverflow": false,
+   "h1": "投递看板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/applications"
+  },
+  {
+   "route": "/applications",
+   "name": "applications",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/applications",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "投递看板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/applications"
+  },
+  {
+   "route": "/applications",
+   "name": "applications",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/applications",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 896,
+   "hOverflow": false,
+   "h1": "投递看板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/applications"
+  },
+  {
+   "route": "/applications",
+   "name": "applications",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/applications",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 861,
+   "hOverflow": false,
+   "h1": "投递看板",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/applications"
+  },
+  {
+   "route": "/interview",
+   "name": "interview",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/interview",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "AI 模拟面试",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 834,
+     "h": 44
+    },
+    {
+     "el": "button | −",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "input.count-input",
+     "w": 48,
+     "h": 43
+    },
+    {
+     "el": "button | +",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.pref-btn.active | 自适应",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "el": "button.pref-btn | 打基础",
+     "w": 77,
+     "h": 35
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/interview"
+  },
+  {
+   "route": "/interview",
+   "name": "interview",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/interview",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 985,
+   "hOverflow": false,
+   "h1": "AI 模拟面试",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 834,
+     "h": 44
+    },
+    {
+     "el": "button | −",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "input.count-input",
+     "w": 48,
+     "h": 43
+    },
+    {
+     "el": "button | +",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.pref-btn.active | 自适应",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "el": "button.pref-btn | 打基础",
+     "w": 77,
+     "h": 35
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/interview"
+  },
+  {
+   "route": "/interview",
+   "name": "interview",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/interview",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 985,
+   "hOverflow": false,
+   "h1": "AI 模拟面试",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.router-link-active.router-link-exact-active | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 834,
+     "h": 44
+    },
+    {
+     "el": "button | −",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "input.count-input",
+     "w": 48,
+     "h": 43
+    },
+    {
+     "el": "button | +",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.pref-btn.active | 自适应",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "el": "button.pref-btn | 打基础",
+     "w": 77,
+     "h": 35
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/interview"
+  },
+  {
+   "route": "/interview",
+   "name": "interview",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/interview",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 989,
+   "hOverflow": false,
+   "h1": "AI 模拟面试",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 834,
+     "h": 44
+    },
+    {
+     "el": "button | −",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "input.count-input",
+     "w": 48,
+     "h": 43
+    },
+    {
+     "el": "button | +",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.pref-btn.active | 自适应",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "el": "button.pref-btn | 打基础",
+     "w": 77,
+     "h": 35
+    },
+    {
+     "el": "button.pref-btn | 稳中有升",
+     "w": 90,
+     "h": 35
+    },
+    {
+     "el": "button.pref-btn | 挑战自我",
+     "w": 90,
+     "h": 35
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/interview"
+  },
+  {
+   "route": "/interview",
+   "name": "interview",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/interview",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "AI 模拟面试",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/interview"
+  },
+  {
+   "route": "/interview",
+   "name": "interview",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/interview",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 1052,
+   "hOverflow": false,
+   "h1": "AI 模拟面试",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/interview"
+  },
+  {
+   "route": "/interview",
+   "name": "interview",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/interview",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 1075,
+   "hOverflow": false,
+   "h1": "AI 模拟面试",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/interview"
+  },
+  {
+   "route": "/history",
+   "name": "history",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "历史面试记录",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往面试",
+     "w": 94,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/history"
+  },
+  {
+   "route": "/history",
+   "name": "history",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 900,
+   "hOverflow": false,
+   "h1": "历史面试记录",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往面试",
+     "w": 94,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/history"
+  },
+  {
+   "route": "/history",
+   "name": "history",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "历史面试记录",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往面试",
+     "w": 94,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/history"
+  },
+  {
+   "route": "/history",
+   "name": "history",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "历史面试记录",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/history"
+  },
+  {
+   "route": "/history",
+   "name": "history",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "历史面试记录",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/history"
+  },
+  {
+   "route": "/history",
+   "name": "history",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 896,
+   "hOverflow": false,
+   "h1": "历史面试记录",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/history"
+  },
+  {
+   "route": "/history",
+   "name": "history",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/history",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 736,
+   "hOverflow": false,
+   "h1": "历史面试记录",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/history"
+  },
+  {
+   "route": "/learning",
+   "name": "learning",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/learning",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "学习中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 开始模拟面试",
+     "w": 140,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 规划下一场",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/learning"
+  },
+  {
+   "route": "/learning",
+   "name": "learning",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/learning",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 900,
+   "hOverflow": false,
+   "h1": "学习中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 开始模拟面试",
+     "w": 140,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 规划下一场",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/learning"
+  },
+  {
+   "route": "/learning",
+   "name": "learning",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/learning",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "学习中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 开始模拟面试",
+     "w": 140,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 规划下一场",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/learning"
+  },
+  {
+   "route": "/learning",
+   "name": "learning",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/learning",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "学习中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/learning"
+  },
+  {
+   "route": "/learning",
+   "name": "learning",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/learning",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "学习中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/learning"
+  },
+  {
+   "route": "/learning",
+   "name": "learning",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/learning",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 1054,
+   "hOverflow": false,
+   "h1": "学习中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/learning"
+  },
+  {
+   "route": "/learning",
+   "name": "learning",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/learning",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 1094,
+   "hOverflow": false,
+   "h1": "学习中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/learning"
+  },
+  {
+   "route": "/calendar",
+   "name": "calendar",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/calendar",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1331,
+   "hOverflow": false,
+   "h1": "面试日历",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 新增日程",
+     "w": 112,
+     "h": 44
+    },
+    {
+     "el": "button.cal-nav | ‹",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.cal-nav | ›",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.cal-today | 今天",
+     "w": 54,
+     "h": 30
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 安排一场面试",
+     "w": 104,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/calendar"
+  },
+  {
+   "route": "/calendar",
+   "name": "calendar",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/calendar",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 1331,
+   "hOverflow": false,
+   "h1": "面试日历",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 新增日程",
+     "w": 112,
+     "h": 44
+    },
+    {
+     "el": "button.cal-nav | ‹",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.cal-nav | ›",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.cal-today | 今天",
+     "w": 54,
+     "h": 30
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 安排一场面试",
+     "w": 104,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/calendar"
+  },
+  {
+   "route": "/calendar",
+   "name": "calendar",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/calendar",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 1331,
+   "hOverflow": false,
+   "h1": "面试日历",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 新增日程",
+     "w": 112,
+     "h": 44
+    },
+    {
+     "el": "button.cal-nav | ‹",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.cal-nav | ›",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.cal-today | 今天",
+     "w": 54,
+     "h": 30
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 安排一场面试",
+     "w": 104,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/calendar"
+  },
+  {
+   "route": "/calendar",
+   "name": "calendar",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/calendar",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 1335,
+   "hOverflow": false,
+   "h1": "面试日历",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.cal-nav | ‹",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.cal-nav | ›",
+     "w": 32,
+     "h": 32
+    },
+    {
+     "el": "button.cal-today | 今天",
+     "w": 54,
+     "h": 30
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/calendar"
+  },
+  {
+   "route": "/calendar",
+   "name": "calendar",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/calendar",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1363,
+   "hOverflow": false,
+   "h1": "面试日历",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/calendar"
+  },
+  {
+   "route": "/calendar",
+   "name": "calendar",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/calendar",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 1240,
+   "hOverflow": false,
+   "h1": "面试日历",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/calendar"
+  },
+  {
+   "route": "/calendar",
+   "name": "calendar",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/calendar",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 1240,
+   "hOverflow": false,
+   "h1": "面试日历",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/calendar"
+  },
+  {
+   "route": "/wrong-book",
+   "name": "wrong-book",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/wrong-book",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "错题本",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button | 低于 50 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button.active | 低于 60 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button | 低于 70 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 再来一场面试",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/wrong-book"
+  },
+  {
+   "route": "/wrong-book",
+   "name": "wrong-book",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/wrong-book",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 900,
+   "hOverflow": false,
+   "h1": "错题本",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button | 低于 50 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button.active | 低于 60 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button | 低于 70 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 再来一场面试",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/wrong-book"
+  },
+  {
+   "route": "/wrong-book",
+   "name": "wrong-book",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/wrong-book",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 798,
+   "hOverflow": false,
+   "h1": "错题本",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button | 低于 50 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button.active | 低于 60 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button | 低于 70 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 再来一场面试",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/wrong-book"
+  },
+  {
+   "route": "/wrong-book",
+   "name": "wrong-book",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/wrong-book",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 802,
+   "hOverflow": false,
+   "h1": "错题本",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button | 低于 50 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button.active | 低于 60 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button | 低于 70 分",
+     "w": 103,
+     "h": 37
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/wrong-book"
+  },
+  {
+   "route": "/wrong-book",
+   "name": "wrong-book",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/wrong-book",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "错题本",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/wrong-book"
+  },
+  {
+   "route": "/wrong-book",
+   "name": "wrong-book",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/wrong-book",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 896,
+   "hOverflow": false,
+   "h1": "错题本",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/wrong-book"
+  },
+  {
+   "route": "/wrong-book",
+   "name": "wrong-book",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/wrong-book",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 935,
+   "hOverflow": false,
+   "h1": "错题本",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/wrong-book"
+  },
+  {
+   "route": "/favorites",
+   "name": "favorites",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/favorites",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "收藏夹",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.jp-refresh | 刷新",
+     "w": 52,
+     "h": 31
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 从收藏发起面试",
+     "w": 136,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | ＋ 手动加题",
+     "w": 112,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往历史记录",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/favorites"
+  },
+  {
+   "route": "/favorites",
+   "name": "favorites",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/favorites",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 920,
+   "hOverflow": false,
+   "h1": "收藏夹",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.jp-refresh | 刷新",
+     "w": 52,
+     "h": 31
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 从收藏发起面试",
+     "w": 136,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | ＋ 手动加题",
+     "w": 112,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往历史记录",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/favorites"
+  },
+  {
+   "route": "/favorites",
+   "name": "favorites",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/favorites",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 920,
+   "hOverflow": false,
+   "h1": "收藏夹",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.jp-refresh | 刷新",
+     "w": 52,
+     "h": 31
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 从收藏发起面试",
+     "w": 136,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | ＋ 手动加题",
+     "w": 112,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 前往历史记录",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/favorites"
+  },
+  {
+   "route": "/favorites",
+   "name": "favorites",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/favorites",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 928,
+   "hOverflow": false,
+   "h1": "收藏夹",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.jp-refresh | 刷新",
+     "w": 52,
+     "h": 31
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/favorites"
+  },
+  {
+   "route": "/favorites",
+   "name": "favorites",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/favorites",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "收藏夹",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/favorites"
+  },
+  {
+   "route": "/favorites",
+   "name": "favorites",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/favorites",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 976,
+   "hOverflow": false,
+   "h1": "收藏夹",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/favorites"
+  },
+  {
+   "route": "/favorites",
+   "name": "favorites",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/favorites",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 999,
+   "hOverflow": false,
+   "h1": "收藏夹",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/favorites"
+  },
+  {
+   "route": "/progress",
+   "name": "progress",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/progress",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1464,
+   "hOverflow": false,
+   "h1": "成长趋势",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.active | 按次",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button | 按周",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button | 按月",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 开始第一次模拟面试",
+     "w": 164,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/progress"
+  },
+  {
+   "route": "/progress",
+   "name": "progress",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/progress",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 1464,
+   "hOverflow": false,
+   "h1": "成长趋势",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.active | 按次",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button | 按周",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button | 按月",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 开始第一次模拟面试",
+     "w": 164,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/progress"
+  },
+  {
+   "route": "/progress",
+   "name": "progress",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/progress",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 1464,
+   "hOverflow": false,
+   "h1": "成长趋势",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.active | 按次",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button | 按周",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button | 按月",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 开始第一次模拟面试",
+     "w": 164,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/progress"
+  },
+  {
+   "route": "/progress",
+   "name": "progress",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/progress",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 1472,
+   "hOverflow": false,
+   "h1": "成长趋势",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.active | 按次",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button | 按周",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button | 按月",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/progress"
+  },
+  {
+   "route": "/progress",
+   "name": "progress",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/progress",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "成长趋势",
+   "mounted": true,
+   "loadError": true,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/progress"
+  },
+  {
+   "route": "/progress",
+   "name": "progress",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/progress",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 1064,
+   "hOverflow": false,
+   "h1": "成长趋势",
+   "mounted": true,
+   "loadError": true,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/progress"
+  },
+  {
+   "route": "/progress",
+   "name": "progress",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/progress",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 1064,
+   "hOverflow": false,
+   "h1": "成长趋势",
+   "mounted": true,
+   "loadError": true,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/progress"
+  },
+  {
+   "route": "/profile",
+   "name": "profile",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/profile",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 2026,
+   "hOverflow": false,
+   "h1": "个人中心",
+   "mounted": true,
+   "loadError": true,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 重新加载",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 导出我的数据",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 从备份导入",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "select.mode-select | 合并 覆盖",
+     "w": 72,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-4.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-5.base-input__inner",
+     "w": 189,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/profile"
+  },
+  {
+   "route": "/profile",
+   "name": "profile",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/profile",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 1943,
+   "hOverflow": false,
+   "h1": "个人中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 导出我的数据",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 从备份导入",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "select.mode-select | 合并 覆盖",
+     "w": 72,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-4.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-5.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-6.base-input__inner",
+     "w": 189,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/profile"
+  },
+  {
+   "route": "/profile",
+   "name": "profile",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/profile",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 1943,
+   "hOverflow": false,
+   "h1": "个人中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 导出我的数据",
+     "w": 122,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 从备份导入",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "select.mode-select | 合并 覆盖",
+     "w": 72,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-4.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-5.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-6.base-input__inner",
+     "w": 189,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/profile"
+  },
+  {
+   "route": "/profile",
+   "name": "profile",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/profile",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 2046,
+   "hOverflow": false,
+   "h1": "个人中心",
+   "mounted": true,
+   "loadError": true,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "select.mode-select | 合并 覆盖",
+     "w": 72,
+     "h": 35
+    },
+    {
+     "el": "input#base-input-4.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-5.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-6.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-1.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-2.base-input__inner",
+     "w": 208,
+     "h": 44
+    },
+    {
+     "el": "input#base-input-3.base-input__inner",
+     "w": 189,
+     "h": 44
+    },
+    {
+     "el": "button.btn-link | 简历历史",
+     "w": 56,
+     "h": 25
+    },
+    {
+     "el": "button.btn-link | 面试记录",
+     "w": 56,
+     "h": 25
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/profile"
+  },
+  {
+   "route": "/profile",
+   "name": "profile",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/profile",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 2255,
+   "hOverflow": false,
+   "h1": "个人中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/profile"
+  },
+  {
+   "route": "/profile",
+   "name": "profile",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/profile",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 2588,
+   "hOverflow": false,
+   "h1": "个人中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/profile"
+  },
+  {
+   "route": "/profile",
+   "name": "profile",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/profile",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 2636,
+   "hOverflow": false,
+   "h1": "个人中心",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 1,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/profile"
+  },
+  {
+   "route": "/knowledge",
+   "name": "knowledge",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/knowledge",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "知识库",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | RAG 问答",
+     "w": 116,
+     "h": 35
+    },
+    {
+     "el": "button | 快速检索",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 导入知识",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 错题总结",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 题目汇总",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | AI 知识问答",
+     "w": 111,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/knowledge"
+  },
+  {
+   "route": "/knowledge",
+   "name": "knowledge",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/knowledge",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 900,
+   "hOverflow": false,
+   "h1": "知识库",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | RAG 问答",
+     "w": 116,
+     "h": 35
+    },
+    {
+     "el": "button | 快速检索",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 导入知识",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 错题总结",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 题目汇总",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | AI 知识问答",
+     "w": 111,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/knowledge"
+  },
+  {
+   "route": "/knowledge",
+   "name": "knowledge",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/knowledge",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "知识库",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.active | RAG 问答",
+     "w": 116,
+     "h": 35
+    },
+    {
+     "el": "button | 快速检索",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 导入知识",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 错题总结",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 题目汇总",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | AI 知识问答",
+     "w": 111,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/knowledge"
+  },
+  {
+   "route": "/knowledge",
+   "name": "knowledge",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/knowledge",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 768,
+   "hOverflow": false,
+   "h1": "知识库",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.active | RAG 问答",
+     "w": 116,
+     "h": 35
+    },
+    {
+     "el": "button | 快速检索",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 导入知识",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 错题总结",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button | 题目汇总",
+     "w": 112,
+     "h": 35
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/knowledge"
+  },
+  {
+   "route": "/knowledge",
+   "name": "knowledge",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/knowledge",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "知识库",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/knowledge"
+  },
+  {
+   "route": "/knowledge",
+   "name": "knowledge",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/knowledge",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 896,
+   "hOverflow": false,
+   "h1": "知识库",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/knowledge"
+  },
+  {
+   "route": "/knowledge",
+   "name": "knowledge",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/knowledge",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 898,
+   "hOverflow": false,
+   "h1": "知识库",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/knowledge"
+  },
+  {
+   "route": "/admin",
+   "name": "admin",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "admin",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 2883,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.router-link-active.router-link-exact-active | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_admin",
+     "w": 130,
+     "h": 44
+    },
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 模拟面试",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/admin",
+   "name": "admin",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "admin",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 2883,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.router-link-active.router-link-exact-active | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_admin",
+     "w": 130,
+     "h": 44
+    },
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.base-btn.base-btn--primary | 上传简历",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 去招聘广场",
+     "w": 91,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 模拟面试",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/admin",
+   "name": "admin",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "admin",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 2730,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.router-link-active.router-link-exact-active | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_admin",
+     "w": 130,
+     "h": 44
+    },
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.todo-retry | 重试",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 投递看板",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 学习中心",
+     "w": 78,
+     "h": 44
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/admin",
+   "name": "admin",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "admin",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 2780,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.todo-refresh | 刷新",
+     "w": 56,
+     "h": 29
+    },
+    {
+     "el": "button.todo-retry | 重试",
+     "w": 58,
+     "h": 29
+    },
+    {
+     "el": "a.tool-chip | 智能体",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 求职诊断",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 投递看板",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 学习中心",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 历史记录",
+     "w": 78,
+     "h": 44
+    },
+    {
+     "el": "a.tool-chip | 知识库",
+     "w": 65,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/admin",
+   "name": "admin",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "admin",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 3850,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/admin",
+   "name": "admin",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "admin",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 4366,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/admin",
+   "name": "admin",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "admin",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 4193,
+   "hOverflow": false,
+   "h1": "求职\n一个工作台就够了",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/"
+  },
+  {
+   "route": "/not-a-real-page",
+   "name": "not-found",
+   "viewport": "1920x1080",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/not-a-real-page",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1920,
+   "iw": 1920,
+   "ph": 1080,
+   "hOverflow": false,
+   "h1": "404",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 返回首页",
+     "w": 112,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 返回上一页",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/not-a-real-page"
+  },
+  {
+   "route": "/not-a-real-page",
+   "name": "not-found",
+   "viewport": "1440x900",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/not-a-real-page",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1440,
+   "iw": 1440,
+   "ph": 900,
+   "hOverflow": false,
+   "h1": "404",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 返回首页",
+     "w": 112,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 返回上一页",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/not-a-real-page"
+  },
+  {
+   "route": "/not-a-real-page",
+   "name": "not-found",
+   "viewport": "1366x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/not-a-real-page",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1366,
+   "iw": 1366,
+   "ph": 802,
+   "hOverflow": false,
+   "h1": "404",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "a.nav-link | 首页",
+     "w": 71,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 简历分析",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 招聘广场",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 投递看板",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | JD 拆解",
+     "w": 90,
+     "h": 44
+    },
+    {
+     "el": "a.nav-link | 模拟面试",
+     "w": 99,
+     "h": 44
+    },
+    {
+     "el": "button.nav-link.nav-trigger | 求职工具",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.theme-toggle",
+     "w": 44,
+     "h": 44
+    },
+    {
+     "el": "button.user-chip | Q qa_user",
+     "w": 118,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--gradient | 返回首页",
+     "w": 112,
+     "h": 44
+    },
+    {
+     "el": "button.base-btn.base-btn--ghost | 返回上一页",
+     "w": 108,
+     "h": 44
+    },
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/not-a-real-page"
+  },
+  {
+   "route": "/not-a-real-page",
+   "name": "not-found",
+   "viewport": "1024x768",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/not-a-real-page",
+   "title": "AI 智能面试辅助平台",
+   "sw": 1024,
+   "iw": 1024,
+   "ph": 806,
+   "hOverflow": false,
+   "h1": "404",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [
+    {
+     "el": "button.version-link | v1.90.4",
+     "w": 55,
+     "h": 24
+    }
+   ],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/not-a-real-page"
+  },
+  {
+   "route": "/not-a-real-page",
+   "name": "not-found",
+   "viewport": "768x1024",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/not-a-real-page",
+   "title": "AI 智能面试辅助平台",
+   "sw": 768,
+   "iw": 768,
+   "ph": 1024,
+   "hOverflow": false,
+   "h1": "404",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/not-a-real-page"
+  },
+  {
+   "route": "/not-a-real-page",
+   "name": "not-found",
+   "viewport": "414x896",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/not-a-real-page",
+   "title": "AI 智能面试辅助平台",
+   "sw": 414,
+   "iw": 414,
+   "ph": 896,
+   "hOverflow": false,
+   "h1": "404",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/not-a-real-page"
+  },
+  {
+   "route": "/not-a-real-page",
+   "name": "not-found",
+   "viewport": "375x667",
+   "theme": "light",
+   "role": "user",
+   "consoleErrors": [],
+   "httpErrors": [],
+   "url": "http://127.0.0.1:5173/not-a-real-page",
+   "title": "AI 智能面试辅助平台",
+   "sw": 375,
+   "iw": 375,
+   "ph": 789,
+   "hOverflow": false,
+   "h1": "404",
+   "mounted": true,
+   "loadError": false,
+   "routeError": false,
+   "empties": 0,
+   "overflowEls": [],
+   "tapTargets": [],
+   "clipped": [],
+   "contrast": [],
+   "finalPath": "/not-a-real-page"
+  }
+ ],
+ "browser": "chrome",
+ "register": {
+  "status": 200,
+  "body": "{\"code\":400,\"message\":\"用户名已存在\",\"data\":null,\"timestamp\":1795248438102}"
+ },
+ "login": {
+  "user": {
+   "ok": true,
+   "user": "qa_user",
+   "path": "/"
+  },
+  "admin": {
+   "ok": true,
+   "user": "qa_admin",
+   "path": "/"
+  }
+ },
+ "finished": "2026-11-21 16:13:19"
+}
